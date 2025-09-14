@@ -366,7 +366,7 @@ namespace EIMSNext.AuthApi
             {
                 //new Auth.Entity.User {Id="system", Name = "System" },
                 //new Auth.Entity.User {Id="anonymous", Name = "Anonymous" },
-                new Auth.Entity.User {Id="liwt.0918", Name = "Jacky", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "liwt@123.com", Phone = "12345678901" }
+                new Auth.Entity.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" }
             };
         }
     }

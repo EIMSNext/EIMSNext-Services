@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using System.Collections.Concurrent;
+using System.Linq.Expressions;
 using System.Reflection;
 
 namespace EIMSNext.Common
@@ -22,7 +23,7 @@ namespace EIMSNext.Common
 
         #region Cast Expression
 
-        private static Dictionary<TypePair, Expression> CastCache = new Dictionary<TypePair, Expression>();
+        private static ConcurrentDictionary <TypePair, Expression> CastCache = new ConcurrentDictionary<TypePair, Expression>();
 
         public static Expression<Func<S, T>> CastExp<S, T>()
         {
@@ -80,7 +81,7 @@ namespace EIMSNext.Common
 
         #region Proj Expression
 
-        private static Dictionary<TypePropPair, Expression> ProjCache = new Dictionary<TypePropPair, Expression>();
+        private static ConcurrentDictionary<TypePropPair, Expression> ProjCache = new ConcurrentDictionary<TypePropPair, Expression>();
 
         public static Expression<Func<S, P, S>> ProjExp<S, P>(Expression<Func<S, P>> keySelector)
         {
@@ -205,7 +206,7 @@ namespace EIMSNext.Common
 
         #region Copy Expression
 
-        private static Dictionary<TypePair, Delegate> CopyToCache = new Dictionary<TypePair, Delegate>();
+        private static ConcurrentDictionary<TypePair, Delegate> CopyToCache = new ConcurrentDictionary<TypePair, Delegate>();
 
         private static Action<S, T> CopyToExp<S, T>()
         {
