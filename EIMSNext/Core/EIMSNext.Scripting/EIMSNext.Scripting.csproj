@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Authors>EIMSNext Team</Authors>
+		<Version>1.0.0.0</Version>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="filter.js" />
+		<None Remove="formula.js" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Include="filter.js" />
+		<EmbeddedResource Include="formula.js" />
+	</ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="Microsoft.ClearScript.V8" Version="7.5.0" />
+		<PackageReference Include="Microsoft.ClearScript.V8.Native.win-x64" Version="7.5.0" />
+		<PackageReference Include="NLog" Version="6.0.4" />
+	</ItemGroup>
+</Project>

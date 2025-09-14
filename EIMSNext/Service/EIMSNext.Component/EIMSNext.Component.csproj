@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Authors>EIMSNext Team</Authors>
+		<Version>1.0.0.0</Version>
+	</PropertyGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
+	  <ProjectReference Include="..\EIMSNext.Entity\EIMSNext.Entity.csproj" />
+	</ItemGroup>
+
+</Project>

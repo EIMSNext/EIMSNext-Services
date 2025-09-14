@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Authors>EIMSNext Team</Authors>
+		<Version>1.0.0.0</Version>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Nanoid" Version="3.1.0" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
+		<ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
+		<ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
+		<ProjectReference Include="..\EIMSNext.Service.Interface\EIMSNext.Service.Interface.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+		<Authors>EIMSNext Team</Authors>
+		<Version>1.0.0.0</Version>
+	</PropertyGroup>
+	<ItemGroup>
+		<PackageReference Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
+		<PackageReference Include="HKH.Common" Version="5.2.0" />
+		<PackageReference Include="HKH.Mef2.Integration.Abstractions" Version="2.0.0" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
+	</ItemGroup>
+	<ItemGroup>
+	  <ProjectReference Include="..\EIMSNext.Cache\EIMSNext.Cache.csproj" />
+	  <ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
+	  <ProjectReference Include="..\EIMSNext.Core\EIMSNext.Core.csproj" />
+	</ItemGroup>
+</Project>
