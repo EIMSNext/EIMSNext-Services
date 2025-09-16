@@ -120,7 +120,7 @@ app.Run();
 
 async void EnsureSeedData(IResolver resolver)
 {
-    resolver.GetServiceContext().Operator = new Operator("", "liwt.0918", "", "");
+    resolver.GetServiceContext().Operator = new Operator("", "admin", "", "");
     var corpService = resolver.GetService<Corporate>();
     if (!corpService!.All().Any())
     {
