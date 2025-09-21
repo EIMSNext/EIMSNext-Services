@@ -16,14 +16,14 @@ namespace EIMSNext.Service
             await base.AfterAdd(entities, session);
             var appRepo = Resolver.GetRepository<App>();
             var app = appRepo.Get(entities.First().AppId, session)!;
-            var maxIndex = app.AppMenus.Count==0?0: app.AppMenus.Max(x => x.SortIndex);
+            var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
             {
                 maxIndex = maxIndex + 100;
-                app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "default", MenuType = e.Type, Title = e.Name, SortIndex = maxIndex });
+                app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = e.Type, Title = e.Name, SortIndex = maxIndex });
             });
             appRepo.Replace(app, session);
-            
+
             return;
         }
     }
