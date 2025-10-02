@@ -28,5 +28,6 @@ namespace EIMSNext.Flow.Core
         public const string MatchParallel = "match_parallel";
         public const string DfCascade = "df_cascade";
         public const string EventIds = "event_ids";
+        public const string ApprovalRounnd = "approval_round";
     }
 }

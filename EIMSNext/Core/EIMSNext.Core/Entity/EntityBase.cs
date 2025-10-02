@@ -49,18 +49,5 @@ namespace EIMSNext.Core.Entity
         }
 
         public ExpandoObject Data { get; set; } = new ExpandoObject { };
-
-        public List<ApprovalLog> ApprovalLogs { get; set; } = new List<ApprovalLog>();
-    }
-    public class ApprovalLog
-    {
-        public int WfVersion { get; set; }
-        public string NodeId { get; set; } = string.Empty;
-        public string NodeName { get; set; } = string.Empty;
-        public Operator? Approver { get; set; }
-        public int Result { get; set; }
-        public string? Comment { get; set; }
-        public string? Signature { get; set; }
-        public DateTime ApprovalTime { get; set; }
     }
 }

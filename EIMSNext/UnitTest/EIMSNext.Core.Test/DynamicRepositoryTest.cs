@@ -17,8 +17,6 @@ namespace EIMSNext.Core.Test
             var resp = new DynamicDataRepository(_dbContext!);
 
             var data = new DynamicData("{\"_widget_1721094301870\":\"fff\",\"_widget_1722302387349\":\"СЎПо1\",\"_widget_1722302387351\":\"666-888\",\"_widget_1721094301874\": [{\"_widget_1721094301876\":\"111\",\"_widget_1721094301877\": 222},{\"_widget_1721094301876\": \"333\",\"_widget_1721094301877\": 444}]}");
-            data.ApprovalLogs.Add(new ApprovalLog() { Approver = new Operator("111", "111", "111", "111"), Result = 1, Comment = "aaa", ApprovalTime = DateTime.Now });
-            data.ApprovalLogs.Add(new ApprovalLog() { Approver = new Operator("111", "111", "111", "111"), Result = 1, Comment = "bbb", ApprovalTime = DateTime.Now });
             data.UpdateTime = null;
 
             resp.Insert(data, _scope?.SessionHandle);

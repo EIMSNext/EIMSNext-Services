@@ -26,6 +26,7 @@ namespace EIMSNext.Flow.Core.Node
         {
             TodoRepository = resolver.GetRepository<Wf_Todo>();
             ExecLogRepository = resolver.GetRepository<Wf_ExecLog>();
+            ApprovalLogRepository = resolver.GetRepository<Wf_ApprovalLog>();
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             Logger = resolver.GetLogger<T>();
@@ -33,6 +34,7 @@ namespace EIMSNext.Flow.Core.Node
 
         protected IRepository<Wf_Todo> TodoRepository { get; private set; }
         protected IRepository<Wf_ExecLog> ExecLogRepository { get; private set; }
+        protected IRepository<Wf_ApprovalLog> ApprovalLogRepository { get; private set; }
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
@@ -48,20 +50,25 @@ namespace EIMSNext.Flow.Core.Node
 
         protected void AddApprovalLog(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
         {
-            var log = new ApprovalLog()
+            var log = new Wf_ApprovalLog()
             {
+                CorpId = dataContext.CorpId,
+                AppId = dataContext.AppId,
+                FormId = dataContext.FormId,
+                DataId = dataContext.DataId,
                 Approver = new Operator(approveData.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,
+                NodeType = wfStep.NodeType,
                 Comment = approveData.Comment,
                 Signature = approveData.Signature,
                 ApprovalTime = DateTime.Now,
-                Result = (int)approveData.Action,
+                Result = approveData.Action,
                 WfVersion = wfInst.Version,
+                Round = 1
             };
 
-            var update = Builders<FormData>.Update.Push("ApprovalLogs", log);
-            FormDataRepository.Update(dataContext.DataId, update, session: session);
+            ApprovalLogRepository.Insert(log, session);
         }
 
         protected ExecutionResult RewaitActivity(IStepExecutionContext context)

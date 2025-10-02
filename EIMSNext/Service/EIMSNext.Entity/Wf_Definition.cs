@@ -817,4 +817,43 @@ namespace EIMSNext.Entity
         /// </summary>
         Node,
     }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public enum ApproveAction
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        None,
+        /// <summary>
+        /// 
+        /// </summary>
+        Approve,
+        /// <summary>
+        /// 
+        /// </summary>
+        Reject,
+        /// <summary>
+        /// 
+        /// </summary>
+        Return,
+        /// <summary>
+        /// 
+        /// </summary>
+        AddSignPre,
+        /// <summary>
+        /// 
+        /// </summary>
+        AddSignAfter,
+        /// <summary>
+        /// 
+        /// </summary>
+        CopyTo,
+        /// <summary>
+        /// 
+        /// </summary>
+        AutoApprove,
+    }
 }

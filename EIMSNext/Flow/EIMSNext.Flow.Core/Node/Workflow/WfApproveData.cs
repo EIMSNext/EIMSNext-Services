@@ -1,4 +1,5 @@
 ﻿using System.Dynamic;
+using EIMSNext.Entity;
 
 namespace EIMSNext.Flow.Core
 {
