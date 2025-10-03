@@ -2,6 +2,7 @@
 using System.IO.Pipelines;
 using System.Reflection;
 using System.Text;
+
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
@@ -11,7 +12,9 @@ using EIMSNext.Core.Entity;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -19,6 +22,7 @@ using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+
 using MongoDB.AspNetCore.OData;
 
 namespace EIMSNext.ServiceApi.OData
@@ -33,6 +37,9 @@ namespace EIMSNext.ServiceApi.OData
         where T : class, IMongoEntity
         where V : class, T, new()
     {
+        protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
+        protected static readonly Type ICorpOwnedType = typeof(ICorpOwned);
+
         /// <summary>
         /// 从ODATA内部类获取属性访问器
         /// </summary>
@@ -114,6 +121,24 @@ namespace EIMSNext.ServiceApi.OData
         /// <param name="query"></param>
         /// <returns></returns>
         protected virtual IQueryable<V> FilterResult(IQueryable<V> query)
+        {
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+        }
+        protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
+        {
+            if (IDeleteFlagType.IsAssignableFrom(typeof(V)))
+                return query.Where(x => !((x as IDeleteFlag)!.DeleteFlag ?? false));
+            else
+                return query;
+        }
+        protected IQueryable<V> FilterByCorpId(IQueryable<V> query)
+        {
+            if (ICorpOwnedType.IsAssignableFrom(typeof(V)))
+                return query.Where(x => (x as ICorpOwned)!.CorpId == IdentityContext.CurrentCorpId);
+            else
+                return query;
+        }
+        protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query)
         {
             return query;
         }
@@ -227,7 +252,7 @@ namespace EIMSNext.ServiceApi.OData
             T? entity = await ApiService.GetAsync(key);
             if (entity == null) return NotFound();
 
-            model.CopyTo(entity);                     
+            model.CopyTo(entity);
 
             await ApiService.ReplaceAsync(entity);
             return Ok(entity.CastTo<T, V>());
@@ -270,7 +295,7 @@ namespace EIMSNext.ServiceApi.OData
                 return BadRequest(fail?.Message);
 
             await ApiService.ReplaceAsync(entity);
-           
+
             return Ok(entity.CastTo<T, V>());
         }
 

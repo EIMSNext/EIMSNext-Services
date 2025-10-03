@@ -4,6 +4,10 @@
     {
         string Id { get; set; }
     }
+    public interface ICorpOwned
+    {
+        string? CorpId {  get; set; }
+    }
     public interface IDeleteFlag
     {
         bool? DeleteFlag { get; set; }

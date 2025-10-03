@@ -1,7 +1,9 @@
 ﻿using System.Dynamic;
 using System.Text.Json.Serialization;
+
 using EIMSNext.Common;
 using EIMSNext.Common.Extension;
+
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
@@ -11,7 +13,6 @@ namespace EIMSNext.Core.Entity
     {
         [BsonId, BsonRepresentation(BsonType.String), JsonPropertyName(Constants.Field_BsonId)]
         public string Id { get; set; } = string.Empty;
-        public bool? IsDeleted { get; set; }
     }
     public abstract class EntityBase : MongoEntityBase, IEntity
     {
@@ -28,7 +29,7 @@ namespace EIMSNext.Core.Entity
     /// <summary>
     /// 企业级
     /// </summary>
-    public abstract class CorpEntityBase : EntityBase, IEntity
+    public abstract class CorpEntityBase : EntityBase, IEntity, ICorpOwned
     {
         /// <summary>
         /// 企业ID，设置为可空类型，方便序列化时忽略

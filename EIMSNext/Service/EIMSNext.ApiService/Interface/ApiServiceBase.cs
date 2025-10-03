@@ -145,7 +145,7 @@ namespace EIMSNext.ApiService
 
         protected virtual Task AddAsyncCore(T entity)
         {
-            if (entity is CorpEntityBase entityBase)
+            if (entity is ICorpOwned entityBase)
             {
                 entityBase.CorpId = IdentityContext.CurrentCorpId;
             }

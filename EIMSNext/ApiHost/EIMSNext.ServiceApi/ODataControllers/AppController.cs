@@ -13,8 +13,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class AppController(IResolver resolver) : ODataController<App, AppViewModel, AppRequest>(resolver)
-	{
-		
-	}
+    public class AppController(IResolver resolver) : ODataController<App, AppViewModel, AppRequest>(resolver)
+    {
+    }
 }
