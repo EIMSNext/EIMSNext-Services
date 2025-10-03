@@ -18,6 +18,10 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
+        public string FormName { get; set; } = string.Empty;
+        /// <summary>
+        /// 
+        /// </summary>
         public string DataId { get; set; } = string.Empty;
         /// <summary>
         /// 

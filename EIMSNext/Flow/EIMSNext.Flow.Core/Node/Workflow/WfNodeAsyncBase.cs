@@ -55,6 +55,7 @@ namespace EIMSNext.Flow.Core.Node
                 CorpId = dataContext.CorpId,
                 AppId = dataContext.AppId,
                 FormId = dataContext.FormId,
+                FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
                 Approver = new Operator(approveData.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
                 NodeId = wfStep.Id,

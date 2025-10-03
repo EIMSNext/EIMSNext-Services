@@ -411,7 +411,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 更新时，两端对象的匹配条件，用于内存中计算
         /// </summary>
-        public DataMatchSetting UpdateMatch { get; set; }= new DataMatchSetting();
+        public DataMatchSetting UpdateMatch { get; set; } = new DataMatchSetting();
         /// <summary>
         /// 
         /// </summary>
@@ -826,34 +826,35 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        None,
+        None = 0,
         /// <summary>
         /// 
         /// </summary>
-        Approve,
+        Approve = 1,
         /// <summary>
         /// 
         /// </summary>
-        Reject,
+        Reject = 2,
         /// <summary>
         /// 
         /// </summary>
-        Return,
+        Return = 3,
         /// <summary>
         /// 
         /// </summary>
-        AddSignPre,
+        AddSignPre = 4,
         /// <summary>
         /// 
         /// </summary>
-        AddSignAfter,
+        AddSignAfter = 5,
         /// <summary>
         /// 
         /// </summary>
-        CopyTo,
+        AutoApprove = 6,
         /// <summary>
         /// 
         /// </summary>
-        AutoApprove,
+        CopyTo = 7,
+
     }
 }
