@@ -21,12 +21,10 @@ namespace EIMSNext.ApiService
             _serviceContext = resolver.GetServiceContext();
         }
 
-        public override async Task AddAsync(FormData entity)
+        public override Task AddAsync(FormData entity)
         {
             _serviceContext.Action = DataAction.Submit;
-            await base.AddAsync(entity);
-            
-            return;
+            return base.AddAsync(entity);
         }
     }
 }

@@ -1,5 +1,5 @@
-﻿using HKH.Mef2.Integration;
-using EIMSNext.Core.Entity;
+﻿using EIMSNext.Core.Entity;
+using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
 namespace EIMSNext.Core.Service
@@ -17,21 +17,24 @@ namespace EIMSNext.Core.Service
 
         protected override T FillSystemField(T entity, bool isEdit)
         {
-            if (IEntityType.IsAssignableFrom(typeof(T)))
+            if (isEdit)
             {
-                if (isEdit)
+                entity.UpdateBy = Context.Operator;
+                entity.UpdateTime = DateTime.UtcNow;
+            }
+            else
+            {
+                entity.CreateBy = Context.Operator;
+                entity.UpdateBy = entity.CreateBy;
+                entity.CreateTime = DateTime.UtcNow;
+                entity.UpdateTime = entity.CreateTime;
+
+                if (ICorpOwnedType.IsAssignableFrom(typeof(T)))
                 {
-                    entity.UpdateBy = Context.Operator;
-                    entity.UpdateTime = DateTime.UtcNow;
-                }
-                else
-                {
-                    entity.CreateBy = Context.Operator;
-                    entity.UpdateBy = entity.CreateBy;
-                    entity.CreateTime = DateTime.UtcNow;
-                    entity.UpdateTime = entity.CreateTime;
+                    (entity as ICorpOwned)!.CorpId = Context.CorpId;
                 }
             }
+
             return entity;
         }
         protected override UpdateDefinition<T> FillSystemField(UpdateDefinition<T> update)

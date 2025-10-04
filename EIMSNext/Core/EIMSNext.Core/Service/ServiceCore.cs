@@ -18,6 +18,7 @@ namespace EIMSNext.Core.Service
 
         protected static readonly Type IEntityType = typeof(IEntity);
         protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
+        protected static readonly Type ICorpOwnedType = typeof(ICorpOwned);
 
         #endregion 
 

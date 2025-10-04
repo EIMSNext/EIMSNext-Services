@@ -145,11 +145,6 @@ namespace EIMSNext.ApiService
 
         protected virtual Task AddAsyncCore(T entity)
         {
-            if (entity is ICorpOwned entityBase)
-            {
-                entityBase.CorpId = IdentityContext.CurrentCorpId;
-            }
-
             return CoreService.AddAsync(entity);
         }
         protected virtual Task<ReplaceOneResult> ReplaceAsyncCore(T entity)

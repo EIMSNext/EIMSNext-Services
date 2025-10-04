@@ -756,6 +756,10 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
+        NotSet,
+        /// <summary>
+        /// 
+        /// </summary>
         All,
         /// <summary>
         /// 
