@@ -63,5 +63,9 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public DateTime ApprovalTime { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<BriefField> DataBrief { get; set; } = new List<BriefField>();
     }
 }

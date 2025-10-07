@@ -11,7 +11,7 @@ namespace EIMSNext.Core.Entity
 {
     public abstract class MongoEntityBase : IMongoEntity
     {
-        [BsonId, BsonRepresentation(BsonType.String), JsonPropertyName(Constants.Field_BsonId)]
+        [BsonId, BsonRepresentation(BsonType.String)]
         public string Id { get; set; } = string.Empty;
     }
     public abstract class EntityBase : MongoEntityBase, IEntity

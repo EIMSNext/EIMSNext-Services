@@ -48,7 +48,7 @@ namespace EIMSNext.Flow.Core.Node
             return WfDataContext.FromExpando((ExpandoObject)context.Workflow.Data);
         }
 
-        protected void AddApprovalLog(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
+        protected void AddApprovalLog(WorkflowInstance wfInst,Wf_Todo todoTask, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
         {
             var log = new Wf_ApprovalLog()
             {
@@ -57,6 +57,7 @@ namespace EIMSNext.Flow.Core.Node
                 FormId = dataContext.FormId,
                 FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
+                DataBrief=todoTask.DataBrief,
                 Approver = new Operator(approveData.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,

@@ -22,7 +22,7 @@ namespace EIMSNext.Flow.Core.Node
             using (var scope = FormDataRepository.NewTransactionScope())
             {
                 UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approving, scope.SessionHandle);
-                AddApprovalLog(context.Workflow, dataContext, Metadata!, approveData, scope.SessionHandle);
+                AddApprovalLog(context.Workflow, new Wf_Todo(), dataContext, Metadata!, approveData, scope.SessionHandle);
 
                 var formData = GetFormData(dataContext.DataId);
                 await RunDataflow(formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
