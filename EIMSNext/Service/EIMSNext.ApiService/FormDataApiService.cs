@@ -3,6 +3,7 @@ using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
+using HKH.Common;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
@@ -23,7 +24,11 @@ namespace EIMSNext.ApiService
 
         public override Task AddAsync(FormData entity)
         {
-            _serviceContext.Action = DataAction.Submit;
+            throw new UnLogException("Please use AddAsync(FormData,DataAction) instead");
+        }
+        public Task AddAsync(FormData entity, DataAction action)
+        {
+            _serviceContext.Action = action;
             return base.AddAsync(entity);
         }
     }

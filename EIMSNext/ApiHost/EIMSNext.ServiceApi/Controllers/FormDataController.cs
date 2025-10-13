@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Common;
@@ -96,7 +97,7 @@ namespace EIMSNext.ServiceApi.Controllers
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await ApiService.AddAsync(entity);
+            await (ApiService as FormDataApiService)!.AddAsync(entity, model.Action);
             return Ok(FormDataViewModel.FromFormData(entity));
         }
 
