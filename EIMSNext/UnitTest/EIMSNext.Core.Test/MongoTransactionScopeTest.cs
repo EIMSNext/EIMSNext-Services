@@ -1,4 +1,5 @@
-﻿using EIMSNext.Core.MongoDb;
+﻿using EIMSNext.Common;
+using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Test
