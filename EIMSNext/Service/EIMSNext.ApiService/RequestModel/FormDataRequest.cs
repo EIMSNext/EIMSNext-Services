@@ -8,7 +8,7 @@ namespace EIMSNext.ApiService.RequestModel
         /// <summary>
         /// 0 - Save, 1 - Submit
         /// </summary>
-        public DataAction Action { get; set; } = DataAction.SaveDraft;
+        public DataAction Action { get; set; } = DataAction.Save;
 
         /// <summary>
         /// 
