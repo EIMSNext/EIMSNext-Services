@@ -1,4 +1,5 @@
-﻿using EIMSNext.Core.Entity;
+﻿using EIMSNext.Common;
+using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 
 using MongoDB.Bson.Serialization.Attributes;

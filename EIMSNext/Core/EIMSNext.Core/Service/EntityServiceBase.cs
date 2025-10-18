@@ -1,5 +1,8 @@
-﻿using EIMSNext.Core.Entity;
+﻿using EIMSNext.Common;
+using EIMSNext.Core.Entity;
+
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.Core.Service
@@ -41,7 +44,7 @@ namespace EIMSNext.Core.Service
         {
             if (IEntityType.IsAssignableFrom(typeof(T)))
             {
-                update = UpdateBuilder.Combine(UpdateBuilder.Set(Common.Constants.Field_UpdateBy, Context.Operator), UpdateBuilder.Set(Common.Constants.Field_UpdateTime, DateTime.UtcNow));
+                update = UpdateBuilder.Combine(UpdateBuilder.Set(Fields.UpdateBy, Context.Operator), UpdateBuilder.Set(Fields.UpdateTime, DateTime.UtcNow));
             }
             return update;
         }
