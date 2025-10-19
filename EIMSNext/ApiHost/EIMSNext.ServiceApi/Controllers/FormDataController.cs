@@ -7,6 +7,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
+using EIMSNext.ServiceApi.Request;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -171,16 +172,30 @@ namespace EIMSNext.ServiceApi.Controllers
         }
 
         /// <summary>
-        /// 
+        /// 删除，支持两种方式 1.请求地址中key != batch, 则删除指定对象 2.请求地址中key == batch, 请求体中keys = 1,2,3...可以批量删除
         /// </summary>
-        /// <param name="key"></param>
+        /// <param name="key">主键Id</param>
+        /// <param name="batch">批量删除</param>
         /// <returns></returns>
         [HttpDelete]
         [Route("{key}")]
-        public async Task<IActionResult> Delete([FromRoute] string key)
+        public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {
-            await ApiService.DeleteAsync(key);
-
+            if ("batch".EqualsIgnoreCase(key))
+            {
+                if (batch?.Keys?.Count > 0)
+                {
+                    await ApiService.DeleteAsync(batch.Keys);
+                }
+                else
+                {
+                    return BadRequest();
+                }
+            }
+            else
+            {
+                await ApiService.DeleteAsync(key);
+            }
             return NoContent();
         }
     }

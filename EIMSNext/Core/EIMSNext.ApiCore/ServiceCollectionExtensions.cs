@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using EIMSNext.Cache;
 using EIMSNext.Common.Extension;
 using EIMSNext.Common.Serialization;
+using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
 using EIMSNext.MongoDb;
 
@@ -27,6 +28,8 @@ namespace EIMSNext.ApiCore
     {
         public static void ConfigCommonServices(this IHostApplicationBuilder builder)
         {
+            MongoDatabase.RegisterConventions();
+            MongoDatabase.RegisterSerializers();
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
