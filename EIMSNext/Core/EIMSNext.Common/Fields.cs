@@ -1,20 +1,20 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace EIMSNext.Common
+﻿namespace EIMSNext.Common
 {
     public static class Fields
     {
         public const string BsonId = "_id";
-        public const string Id = "Id";
-        public const string CreateBy = "CreateBy";
-        public const string CreateTime = "CreateTime";
-        public const string UpdateBy = "UpdateBy";
-        public const string UpdateTime = "UpdateTime";
-        public const string IsDeleted = "IsDeleted";
+        public const string Id = "id";
+        public const string CreateBy = "createBy";
+        public const string CreateTime = "createTime";
+        public const string UpdateBy = "updateBy";
+        public const string UpdateTime = "updateTime";
+        public const string DeleteFlag = "deleteFlag";
+        public const string Data = "data";
+
+        public const string CorpId = "corpId";
+        public const string AppId = "appId";
+        public const string FormId = "formId";
+        public const string FlowStatus = "flowStatus";
     }
 
     public static class FieldType

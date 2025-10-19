@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using EIMSNext.Cache;
+using EIMSNext.Common;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
@@ -157,7 +158,7 @@ namespace EIMSNext.Core.Service
             BeforeDelete(filter, session).Wait();
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                var update = UpdateBuilder.Set("DeleteFlag", true);
+                var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
                 result = Repository.UpdateMany(filter, update, session: session);
             }
             else
@@ -260,7 +261,7 @@ namespace EIMSNext.Core.Service
             await BeforeDelete(filter, session);
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                var update = UpdateBuilder.Set("DeleteFlag", true);
+                var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
                 var result = await Repository.UpdateManyAsync(filter, update, session: session);
 
                 await AfterDelete(filter, session);

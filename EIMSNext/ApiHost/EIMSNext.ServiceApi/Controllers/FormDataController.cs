@@ -45,8 +45,54 @@ namespace EIMSNext.ServiceApi.Controllers
         [Route("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
-            var result = ApiService.Find(options).ToList();
+            var result = ApiService.Find(FilterResult(options)).ToList();
             return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+        }
+
+        /// <summary>
+        /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
+        {
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+        }
+        protected DynamicFindOptions<FormData> FilterByDeleted(DynamicFindOptions<FormData> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected DynamicFindOptions<FormData> FilterByCorpId(DynamicFindOptions<FormData> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected virtual DynamicFindOptions<FormData> FilterByPermission(DynamicFindOptions<FormData> query)
+        {
+            return query;
         }
 
         /// <summary>
@@ -56,6 +102,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="select"></param>
         /// <returns></returns>
         [HttpGet]
+        [Permission(Operation = Operation.Read)]
         [Route("{key}")]
         public ActionResult Get([FromRoute] string key, [FromQuery] string? select)
         {
@@ -84,6 +131,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
+        [Permission(Operation = Operation.Write)]
         public async Task<IActionResult> Post(FormDataRequest model)
         {
             if (!ModelState.IsValid)
@@ -109,6 +157,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPut]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
         public async Task<IActionResult> Put([FromRoute] string key, [FromBody] FormDataRequest model)
         {
@@ -137,6 +186,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="delta"></param>
         /// <returns></returns>
         [HttpPatch]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
         public async Task<IActionResult> Patch([FromRoute] string key, [FromBody] Delta<FormDataRequest> delta)
         {
@@ -178,6 +228,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="batch">批量删除</param>
         /// <returns></returns>
         [HttpDelete]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
         public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {
