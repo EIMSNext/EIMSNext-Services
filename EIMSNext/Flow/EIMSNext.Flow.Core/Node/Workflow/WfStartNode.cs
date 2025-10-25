@@ -16,7 +16,7 @@ namespace EIMSNext.Flow.Core.Node
         {
             var dataContext = GetDataContext(context);
 
-            var approveData = new WfApproveData(dataContext.WfStarter?.CorpId!, dataContext.WfStarter!.UserId ?? "", dataContext.WfStarter.EmpId, dataContext.WfStarter.EmpName,
+            var approveData = new WfApproveData(dataContext.CorpId!, dataContext.WfStarter!.UserId ?? "", dataContext.WfStarter.EmpId, dataContext.WfStarter.EmpName,
                 ApproveAction.Approve, string.Empty, string.Empty, context.Workflow.Id);
 
             using (var scope = FormDataRepository.NewTransactionScope())

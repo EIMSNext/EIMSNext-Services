@@ -17,6 +17,7 @@ using MongoDB.Driver;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using EIMSNext.Common.Extension;
 
 namespace EIMSNext.Flow.Core.Node
 {
@@ -48,7 +49,7 @@ namespace EIMSNext.Flow.Core.Node
             return WfDataContext.FromExpando((ExpandoObject)context.Workflow.Data);
         }
 
-        protected void AddApprovalLog(WorkflowInstance wfInst,Wf_Todo todoTask, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
+        protected void AddApprovalLog(WorkflowInstance wfInst, Wf_Todo todoTask, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
         {
             var log = new Wf_ApprovalLog()
             {
@@ -57,14 +58,14 @@ namespace EIMSNext.Flow.Core.Node
                 FormId = dataContext.FormId,
                 FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
-                DataBrief=todoTask.DataBrief,
-                Approver = new Operator(approveData.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
+                DataBrief = todoTask.DataBrief,
+                Approver = new Operator(dataContext.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,
                 NodeType = wfStep.NodeType,
                 Comment = approveData.Comment,
                 Signature = approveData.Signature,
-                ApprovalTime = DateTime.Now,
+                ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
                 Result = approveData.Action,
                 WfVersion = wfInst.Version,
                 Round = 1
@@ -96,10 +97,10 @@ namespace EIMSNext.Flow.Core.Node
                     ApproveNodeId = wfStep.Id,
                     ApproveNodeName = wfStep.Name,
                     EmployeeId = candidate.CandidateId,
-                    CreateTime = DateTime.Now,
-                    UpdateTime = DateTime.Now,
+                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    UpdateTime = DateTime.UtcNow.ToTimeStampMs(),
                     Starter = dataContext.WfStarter,
-                    ApproveNodeStartTime = DateTime.Now,
+                    ApproveNodeStartTime = DateTime.UtcNow.ToTimeStampMs(),
                     DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId)
                 });
             });
@@ -134,7 +135,7 @@ namespace EIMSNext.Flow.Core.Node
             Wf_ExecLog? execLog = null;
             try
             {
-                execLog = new Wf_ExecLog() { Id = approveData.ExecLogId, DataId = dataContext.DataId, WfInstanceId = wfInst.Id, EmpId = approveData.WorkerId, NodeId = wfStep.Id, ExecTime = DateTime.Now, ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
+                execLog = new Wf_ExecLog() { Id = approveData.ExecLogId, DataId = dataContext.DataId, WfInstanceId = wfInst.Id, EmpId = approveData.WorkerId, NodeId = wfStep.Id, ExecTime = DateTime.UtcNow.ToTimeStampMs(), ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
                 ExecLogRepository.Insert(execLog);
             }
             catch (Exception ex)    //写日志失败不影响整个审批流程

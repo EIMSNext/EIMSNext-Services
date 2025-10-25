@@ -30,6 +30,6 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public DateTime ExecTime { get; set; }
+        public long ExecTime { get; set; }
     }
 }

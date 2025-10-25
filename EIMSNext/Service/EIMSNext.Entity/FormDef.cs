@@ -157,7 +157,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public DateTime ChangeTime { get; set; }
+        public long ChangeTime { get; set; }
         /// <summary>
         /// 
         /// </summary>

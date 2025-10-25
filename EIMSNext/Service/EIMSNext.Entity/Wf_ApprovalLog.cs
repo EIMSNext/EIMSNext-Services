@@ -62,7 +62,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public DateTime ApprovalTime { get; set; }
+        public long ApprovalTime { get; set; }
         /// <summary>
         /// 
         /// </summary>

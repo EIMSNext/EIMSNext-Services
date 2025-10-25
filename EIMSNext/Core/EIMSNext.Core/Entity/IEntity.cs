@@ -15,8 +15,8 @@
     public interface IEntity : IMongoEntity, IDeleteFlag
     {
         Operator? CreateBy { get; set; }
-        DateTime CreateTime { get; set; }
+        long CreateTime { get; set; }
         Operator? UpdateBy { get; set; }
-        DateTime? UpdateTime { get; set; }
+        long? UpdateTime { get; set; }
     }
 }

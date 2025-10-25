@@ -261,7 +261,7 @@ namespace EIMSNext.Flow.Core.Node
                                             FormId = formDef.Id,
                                             Data = new ExpandoObject(),
                                             CreateBy = dataContext.WfStarter,
-                                            CreateTime = DateTime.Now,
+                                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                                         };
 
                                         //逐条填充字段

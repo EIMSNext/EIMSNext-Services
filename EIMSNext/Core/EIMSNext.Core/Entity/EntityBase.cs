@@ -13,12 +13,10 @@ namespace EIMSNext.Core.Entity
     }
     public abstract class EntityBase : MongoEntityBase, IEntity
     {
-        private DateTime _createTime;
-        private DateTime? _updateTime;
         public Operator? CreateBy { get; set; }
-        public DateTime CreateTime { get { return _createTime; } set { _createTime = value.ToUniversalTime(); } }
+        public long CreateTime { get; set; }
         public Operator? UpdateBy { get; set; }
-        public DateTime? UpdateTime { get { return _updateTime; } set { _updateTime = value?.ToUniversalTime(); } }
+        public long? UpdateTime { get; set; }
 
         public bool? DeleteFlag { get; set; }
     }
