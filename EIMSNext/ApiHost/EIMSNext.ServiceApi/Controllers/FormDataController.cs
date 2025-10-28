@@ -30,6 +30,34 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <returns></returns>
         [HttpPost]
         [Permission(Operation = Operation.Read)]
+        [Route("$dynamiccount")]
+        public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
+        {
+            //TODO: fill field type
+            return Ok(ApiService.Count(filter));
+        }
+        /// <summary>
+        /// 动态查询数据
+        /// </summary>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
+        [Route("$dynamicquery")]
+        public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
+        {
+            //TODO: fill field type
+            var result = ApiService.Find(FilterResult(options)).ToList();
+            return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+        }
+
+        /// <summary>
+        /// 动态查询总数
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
         [Route("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {

@@ -31,8 +31,12 @@ builder.Services.AddControllers().AddOData(
          {
              options.TimeZone = TimeZoneInfo.Utc;
              options.EnableQueryFeatures(EIMSNext.Common.Constants.MaxPageSize)
-            //移除$metadata访问
-            .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
+             //移除$metadata访问
+             .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
+
+             //注册路由规范
+             options.Conventions.Add(new DynamicQueryConvention());
+             options.Conventions.Add(new DynamicQueryCountConvention());
          }
     );
 
