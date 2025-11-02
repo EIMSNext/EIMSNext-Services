@@ -16,6 +16,7 @@ namespace EIMSNext.ApiService.RequestModel
         public string Content { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public string? SourceId { get; set; }
+        public bool Disabled { get; set; }
     }
 }
 

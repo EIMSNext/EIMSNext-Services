@@ -1,8 +1,5 @@
 ﻿using EIMSNext.Common;
 using EIMSNext.Core.Entity;
-using EIMSNext.Core.Query;
-
-using MongoDB.Bson.Serialization.Attributes;
 
 namespace EIMSNext.Entity
 {
@@ -57,6 +54,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public EventSetting? EventSetting { get; set; }
+        /// <summary>
+        /// 是否禁用
+        /// </summary>
+        public bool Disabled {  get; set; }
     }
 
     /// <summary>
