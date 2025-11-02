@@ -20,22 +20,24 @@
     public static class FieldType
     {
         public const string Input = "input";
-        public const string InputNumber = "inputnumber";
-        public const string DatePicker = "datePicker";
-        public const string Phone = "phone";
-        public const string Email = "email";
+        public const string Number = "number";
+        public const string TimeStamp = "timestamp";
+        //public const string Phone = "phone";
+        //public const string Email = "email";
         public const string TextArea = "textarea";
         public const string Radio = "radio";
         public const string CheckBox = "checkbox";
         public const string Select = "select";
+        public const string Select2 = "select2";
+        //public const string Address = "address";
+        //public const string Location = "location";
+        public const string ImageUpload = "imageupload";
+        public const string FileUpload = "fileupload";
+        //public const string Signature = "signature";
+        public const string TableForm = "tableform";
         public const string Employee = "employee";
+        public const string Employee2 = "employee2";
         public const string Department = "department";
-        public const string Address = "address";
-        public const string Location = "location";
-        public const string Pictures = "pictures";
-        public const string Files = "files";
-        public const string Signature = "signature";
-        //public const string TableForm = "tableForm";
-        public const string TableFormPro = "tableFormPro";
+        public const string Department2 = "department2";
     }
 }

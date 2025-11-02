@@ -42,7 +42,7 @@ namespace EIMSNext.Component
                     //因为FieldType定义中不包括 Layout的类型，所以此处都是表单控件和子表单控件
                     var fieldDef = ParseField(field)!;
                     var fType = field["type"]!.GetValue<string>();
-                    if (fType == FieldType.TableFormPro)
+                    if (fType == FieldType.TableForm)
                     {
                         //解析Columns
                         if (field.ContainsKey("props"))

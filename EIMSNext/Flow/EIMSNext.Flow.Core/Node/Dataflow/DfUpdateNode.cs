@@ -416,7 +416,7 @@ namespace EIMSNext.Flow.Core.Node
             var valStr = "";
             var fType = matchSetting.Field.Type.ToLower();
 
-            if (fType == FieldType.InputNumber)
+            if (fType == FieldType.Number)
                 valStr = $"{value ?? "0"}";
             else
                 valStr = $"'{value}'";
