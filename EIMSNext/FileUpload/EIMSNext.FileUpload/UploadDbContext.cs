@@ -1,16 +1,15 @@
 ﻿using EIMSNext.MongoDb;
-
 using Microsoft.Extensions.Options;
 
-namespace EIMSNext.Flow.Service
+namespace EIMSNext.FileUpload
 {
-    public class WfDbContext : MongoDbContextBase
+    public class UploadDbContext : MongoDbContextBase
     {
         #region Variables
 
         #endregion
 
-        public WfDbContext(IOptions<MongoDbConfiguration> settings) : base(settings)
+        public UploadDbContext(IOptions<MongoDbConfiguration> settings) : base(settings)
         {
         }
 
