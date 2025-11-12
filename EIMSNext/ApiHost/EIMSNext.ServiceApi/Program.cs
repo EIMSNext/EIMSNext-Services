@@ -82,19 +82,19 @@ using (var serviceScope = app.Services.GetRequiredService<IServiceScopeFactory>(
 }
 
 // Configure the HTTP request pipeline.
-//if (app.Environment.IsDevelopment())
-//{
-app.UseSwagger();
-app.UseSwaggerUI(options =>
+if (app.Environment.IsDevelopment())
 {
-    foreach (var description in app.DescribeApiVersions())
+    app.UseSwagger();
+    app.UseSwaggerUI(options =>
     {
-        var url = $"{description.GroupName}/swagger.json";
-        var name = description.GroupName.ToUpperInvariant();
-        options.SwaggerEndpoint(url, name);
-    }
-});
-//}
+        foreach (var description in app.DescribeApiVersions())
+        {
+            var url = $"{description.GroupName}/swagger.json";
+            var name = description.GroupName.ToUpperInvariant();
+            options.SwaggerEndpoint(url, name);
+        }
+    });
+}
 
 app.UseCustomMiddlewares();
 app.UseMiddleware<ODataMetadataMiddleware>();
