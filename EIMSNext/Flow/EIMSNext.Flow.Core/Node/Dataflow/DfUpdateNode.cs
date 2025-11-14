@@ -1,4 +1,6 @@
 ﻿using System.Dynamic;
+
+using EIMSNext.Common;
 using EIMSNext.Common.Extension;
 using EIMSNext.Core.Query;
 using EIMSNext.Entity;
@@ -259,7 +261,7 @@ namespace EIMSNext.Flow.Core.Node
                                             FormId = formDef.Id,
                                             Data = new ExpandoObject(),
                                             CreateBy = dataContext.WfStarter,
-                                            CreateTime = DateTime.Now,
+                                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                                         };
 
                                         //逐条填充字段
@@ -414,7 +416,7 @@ namespace EIMSNext.Flow.Core.Node
             var valStr = "";
             var fType = matchSetting.Field.Type.ToLower();
 
-            if (fType == FieldType.InputNumber)
+            if (fType == FieldType.Number)
                 valStr = $"{value ?? "0"}";
             else
                 valStr = $"'{value}'";

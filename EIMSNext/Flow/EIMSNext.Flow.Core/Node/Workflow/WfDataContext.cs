@@ -38,6 +38,7 @@ namespace EIMSNext.Flow.Core
 
             ctx.DfCascade = (CascadeMode)expando.GetValue<int>(WfConsts.DfCascade, 0);
             ctx.EventIds = expando.GetValue<string?>(WfConsts.EventIds, null);
+            ctx.Round = expando.GetValue<int>(WfConsts.ApprovalRounnd, 1);
 
             return ctx;
         }
@@ -50,7 +51,8 @@ namespace EIMSNext.Flow.Core
         public CascadeMode DfCascade { get; private set; }
         public string? EventIds { get; private set; }
         public bool MatchedResult { get; set; }
-        public bool MatchParallel {  get; set; }
+        public bool MatchParallel { get; set; }
+        public int Round { get; set; } = 1;
 
         public ExpandoObject ToExpando()
         {
@@ -74,6 +76,7 @@ namespace EIMSNext.Flow.Core
             data.AddOrUpdate(WfConsts.MatchParallel, MatchParallel);
             data.AddOrUpdate(WfConsts.DfCascade, (int)DfCascade);
             data.AddOrUpdate(WfConsts.EventIds, EventIds);
+            data.AddOrUpdate(WfConsts.ApprovalRounnd, Round);
 
             return data;
         }

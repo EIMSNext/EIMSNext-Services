@@ -39,7 +39,6 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.ComplexType<ValueOpt>();
             builder.ComplexType<FieldChangeLog>();
             builder.ComplexType<FormContent>();
-            builder.ComplexType<ApprovalLog>();
             builder.ComplexType<AppMenu>();
 
             builder.ComplexType<Operator>().Ignore(x => x.CorpId);

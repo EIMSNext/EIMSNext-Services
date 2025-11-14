@@ -38,7 +38,7 @@
         /// <summary>
         /// 保存草稿
         /// </summary>
-        SaveDraft,
+        Save,
         /// <summary>
         /// 流程提交
         /// </summary>

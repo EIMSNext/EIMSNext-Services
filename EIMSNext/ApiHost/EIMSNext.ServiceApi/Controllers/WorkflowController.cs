@@ -28,10 +28,15 @@ namespace EIMSNext.ServiceApi.Controllers
             var data = ApiService.Get(request.DataId);
             if (data != null)
             {
+                var approvalLogService = this.Resolver.GetService<Wf_ApprovalLog>();
+                var approvalLog = approvalLogService.Query(x => x.DataId == request.DataId).FirstOrDefault();
+
                 var startReq = new StartRequest { DataId = data.Id, WfDefinitionId = data.FormId };
-                if (data.ApprovalLogs.Count > 0)
+
+                //此处有可能是重新发起流程，应使用之前的流程版本
+                if (approvalLog != null)
                 {
-                    startReq.Version = data.ApprovalLogs.Last().WfVersion;
+                    startReq.Version = approvalLog.WfVersion;
                 }
 
                 var flowClient = Resolver.Resolve<FlowApiClient>();

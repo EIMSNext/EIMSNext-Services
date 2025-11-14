@@ -1,6 +1,4 @@
-﻿using EIMSNext.Core;
-
-using Microsoft.Extensions.Options;
+﻿using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 namespace EIMSNext.MongoDb
@@ -12,11 +10,6 @@ namespace EIMSNext.MongoDb
 
     public abstract class MongoDbContextBase : IMongoDbContex, IDisposable
     {
-        static MongoDbContextBase()
-        {
-            MongoDatabase.RegisterConventions();
-            MongoDatabase.RegisterSerializers();
-        }
         private readonly IMongoClient _client;
 
         protected MongoDbContextBase(IOptions<MongoDbConfiguration> settings)

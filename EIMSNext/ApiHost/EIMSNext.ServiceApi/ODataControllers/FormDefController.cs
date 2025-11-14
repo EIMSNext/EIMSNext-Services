@@ -15,6 +15,5 @@ namespace EIMSNext.ServiceApi.ODataControllers
     [ApiVersion(1.0)]
 	public class FormDefController(IResolver resolver) : ODataController<FormDef, FormDefViewModel, FormDefRequest>(resolver)
 	{
-		
-	}
+    }
 }

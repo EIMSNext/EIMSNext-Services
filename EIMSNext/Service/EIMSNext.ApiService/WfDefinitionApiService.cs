@@ -20,7 +20,6 @@ namespace EIMSNext.ApiService
         {
             await base.AddAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
-            return;
         }
         public override async Task<ReplaceOneResult> ReplaceAsync(Wf_Definition entity)
         {

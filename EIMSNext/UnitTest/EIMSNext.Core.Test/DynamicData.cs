@@ -1,4 +1,5 @@
-﻿using EIMSNext.Core.Entity;
+﻿using EIMSNext.Common.Extension;
+using EIMSNext.Core.Entity;
 
 namespace EIMSNext.Core.Test
 {
@@ -6,7 +7,7 @@ namespace EIMSNext.Core.Test
     {
         public DynamicData()
         {
-            CreateTime = DateTime.Now;
+            CreateTime = DateTime.UtcNow.ToTimeStampMs();
             UpdateTime = CreateTime;
         }
 
@@ -14,7 +15,7 @@ namespace EIMSNext.Core.Test
             string jsonData)
             : base(jsonData)
         {
-            CreateTime = DateTime.Now;
+            CreateTime = DateTime.UtcNow.ToTimeStampMs();
             UpdateTime = CreateTime;
         }
 

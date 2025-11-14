@@ -1,12 +1,8 @@
 ﻿using System.Dynamic;
-
-using HKH.Mef2.Integration;
-
 using EIMSNext.Core;
 using EIMSNext.Entity;
-
+using HKH.Mef2.Integration;
 using MongoDB.Driver;
-
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -38,12 +34,15 @@ namespace EIMSNext.Flow.Core.Node
                             var todo = TodoRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
                             if (todo != null)
                             {
+
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
+
                                 using (var scope = TodoRepository.NewTransactionScope())
                                 {
                                     //写入审批记录
-                                    AddApprovalLog(context.Workflow, dataContext,Metadata!, approveData, scope.SessionHandle);
+                                    AddApprovalLog(context.Workflow, todo, dataContext, Metadata!, approveData, scope.SessionHandle);
 
-                                    if (meta.WfNodeSetting!.ApproveSetting!. ApprovalMode == WfApprovalMode.CounterSign)
+                                    if (meta.WfNodeSetting!.ApproveSetting!.ApprovalMode == WfApprovalMode.CounterSign)
                                     {
                                         //删除当前用户待办
                                         TodoRepository.Delete(todo.Id, scope.SessionHandle);
@@ -53,14 +52,12 @@ namespace EIMSNext.Flow.Core.Node
                                         if (remainTodoCnt > 0)
                                         {
                                             //审批还没完成，重置事件继续等待
-                                            CreateExecLog(context.Workflow, dataContext, meta, approveData);
                                             result = ApproveResult.Wait;
                                         }
                                         else
                                         {
-                                            CreateExecLog(context.Workflow, dataContext, meta, approveData);
                                             var formData = GetFormData(dataContext.DataId);
-                                            await RunDataflow(formData,EventSourceType.Form, EventType.Approving,meta.Id, dataContext.WfStarter,dataContext.DfCascade,dataContext.EventIds);
+                                            await RunDataflow(formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
 
                                             result = ApproveResult.Next;
                                         }
@@ -70,8 +67,6 @@ namespace EIMSNext.Flow.Core.Node
                                         //或签时，任何一人通过，即为审批通过, 删除所有当前节点待办
                                         DeleteTodos(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
 
-                                        CreateExecLog(context.Workflow, dataContext, meta, approveData);
-                                       
                                         var formData = GetFormData(dataContext.DataId);
                                         await RunDataflow(formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
 
@@ -84,24 +79,41 @@ namespace EIMSNext.Flow.Core.Node
                         }
                         break;
                     case ApproveAction.Reject:
-                        {
-                            using (var scope = TodoRepository.NewTransactionScope())
+                        {                            //读取待办， 有待办的才有权限审批
+                            var todo = TodoRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
+                            if (todo != null)
                             {
-                                UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, scope.SessionHandle);
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
 
-                                //删除待办记录
-                                DeleteTodos(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
+                                using (var scope = TodoRepository.NewTransactionScope())
+                                {
+                                    UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, scope.SessionHandle);
 
-                                scope.CommitTransaction();
+                                    //写入审批记录
+                                    AddApprovalLog(context.Workflow, todo, dataContext, Metadata!, approveData, scope.SessionHandle);
+
+                                    //删除待办记录
+                                    DeleteTodos(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
+
+                                    var formData = GetFormData(dataContext.DataId);
+                                    await RunDataflow(formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
+
+                                    result = ApproveResult.Persist;
+
+                                    scope.CommitTransaction();
+                                }
+
+                                //TODO：终止流程，将来可以改单据状态为草稿，允许重启流程
+                                context.Workflow.Status = WorkflowStatus.Terminated;
                             }
+                        }
+                        break;
+                    case ApproveAction.Return:
+                        {
+                            //退回到指定节点，审批轮次+1
+                            //TODO:退回到指定节点，生成新待办
 
-                            CreateExecLog(context.Workflow, dataContext, meta, approveData);
-
-                            var formData = GetFormData(dataContext.DataId);
-                            await RunDataflow(formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
-
-                            //TODO：终止流程，将来可以改单据状态为草稿，允许重启流程
-                            context.Workflow.Status = WorkflowStatus.Terminated;
+                            dataContext.Round += 1;
                             result = ApproveResult.Persist;
                         }
                         break;

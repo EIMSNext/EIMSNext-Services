@@ -5,6 +5,10 @@ using EIMSNext.ServiceApi.OData;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.Common;
+using EIMSNext.Core;
+using Microsoft.AspNetCore.OData.Query;
+using Microsoft.OData.UriParser;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -13,8 +17,31 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class RoleController(IResolver resolver) : ODataController<Role, RoleViewModel, RoleRequest>(resolver)
-	{
-		
-	}
+    public class RoleController(IResolver resolver) : ODataController<Role, RoleViewModel, RoleRequest>(resolver)
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="query"></param>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        protected override IQueryable<RoleViewModel> Expand(IQueryable<RoleViewModel> query, ODataQueryOptions<RoleViewModel> options)
+        {
+            var expands = options.SelectExpand?.SelectExpandClause?.SelectedItems?.Where(x => x is ExpandedNavigationSelectItem);
+
+            if (expands != null)
+            {
+                foreach (ExpandedNavigationSelectItem item in expands)
+                {
+                    if (item.NavigationSource.Name.Equals("rolegroup", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var groups = Resolver.GetService<RoleGroup>().All();
+                        query = query.Join(groups, x => x.RoleGroupId, y => y.Id, ObjectConvert.ProjExp<RoleViewModel, RoleGroup>(x => x.RoleGroup!));
+                    }
+                }
+            }
+
+            return base.Expand(query, options);
+        }
+    }
 }

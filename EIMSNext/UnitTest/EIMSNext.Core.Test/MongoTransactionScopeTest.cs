@@ -1,4 +1,6 @@
-﻿using EIMSNext.Core.MongoDb;
+﻿using EIMSNext.Common;
+using EIMSNext.Common.Extension;
+using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Test
@@ -49,12 +51,12 @@ namespace EIMSNext.Core.Test
 
                 resp.Insert(data);
 
-                var result = resp.Find(new DynamicFindOptions<EntityData> { Filter = new DynamicFilter { Field = "CreateTime", Op = FilterOp.Gt, Value = DateTime.Today } });
+                var result = resp.Find(new DynamicFindOptions<EntityData> { Filter = new DynamicFilter { Field = "createTime", Op = FilterOp.Gt, Value = DateTime.Today.ToTimeStampMs() } });
                 Assert.AreEqual(1, result.CountDocuments());
 
                 scope?.CommitTransaction();
                 //Query不能执行事务内查询
-                var cnt = resp.Queryable.Where(x => x.CreateTime > DateTime.Today).Count();
+                var cnt = resp.Queryable.Where(x => x.CreateTime > DateTime.Today.ToTimeStampMs()).Count();
                 Assert.AreEqual(1, cnt);
 
                 scope?.AbortTransaction();

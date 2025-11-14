@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
+using EIMSNext.Common;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 
@@ -156,7 +157,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public DateTime ChangeTime { get; set; }
+        public long ChangeTime { get; set; }
         /// <summary>
         /// 
         /// </summary>

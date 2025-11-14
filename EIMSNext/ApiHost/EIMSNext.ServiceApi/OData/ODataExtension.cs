@@ -1,9 +1,7 @@
 ﻿using HKH.Common;
-using EIMSNext.Common;
 using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Query.Validator;
-using Microsoft.OData;
 
 namespace EIMSNext.ServiceApi.OData
 {

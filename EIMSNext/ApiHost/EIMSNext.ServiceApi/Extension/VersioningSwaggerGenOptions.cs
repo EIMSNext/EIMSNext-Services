@@ -1,7 +1,6 @@
 ﻿using System.Text;
 using Asp.Versioning.ApiExplorer;
 using Microsoft.AspNetCore.Mvc.Controllers;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi.Models;
 using Swashbuckle.AspNetCore.SwaggerGen;
@@ -51,8 +50,8 @@ namespace EIMSNext.ServiceApi.Extension
                     ((actionDesc.ControllerTypeInfo.Namespace??string.Empty).Contains("ODataControllers")?"OData 接口":"API 接口") + " - " + actionDesc.ControllerName};
             });
 
-            options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
-            options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
+            //options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
+            //options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
             options.AddSecurityDefinition(
                 "Bearer",
                 new OpenApiSecurityScheme

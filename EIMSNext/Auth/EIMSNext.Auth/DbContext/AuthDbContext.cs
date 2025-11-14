@@ -1,5 +1,6 @@
 ﻿using EIMSNext.Auth.Entity;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Common.Extension;
 using EIMSNext.MongoDb;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
