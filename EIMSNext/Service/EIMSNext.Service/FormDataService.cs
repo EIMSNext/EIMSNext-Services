@@ -28,11 +28,14 @@ namespace EIMSNext.Service
             return base.BeforeAdd(entities, session);
         }
 
+        public override async Task AddAsync(IEnumerable<FormData> entities)
+        {
+            await base.AddAsync(entities);
+            await SubmitAsync(entities, null, Entity.CascadeMode.NotSet, null);
+        }
+
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, Entity.CascadeMode cascade, string? eventIds)
         {
-            //先保存，流程才能使用该数据
-            await AddAsync(entities);
-
             var entity = entities.First();
 
             if (Context.Action == Core.Entity.DataAction.Submit)

@@ -77,7 +77,7 @@ namespace EIMSNext.Flow.Core.Node
             Df_ExecLog? execLog = null;
             try
             {
-                execLog = new Df_ExecLog() { Id = string.Empty, DataId = dataContext.DataId ?? "", WfInstanceId = wfInst.Id, NodeId = wfStep.Id, ExecTime = DateTime.Now, ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
+                execLog = new Df_ExecLog() { Id = string.Empty, DataId = dataContext.DataId ?? "", WfInstanceId = wfInst.Id, NodeId = wfStep.Id, ExecTime = DateTime.UtcNow.ToTimeStampMs(), ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
                 ExecLogRepository.Insert(execLog);
             }
             catch (Exception ex)    //写日志失败不影响整个数据流程
@@ -173,7 +173,7 @@ namespace EIMSNext.Flow.Core.Node
                             FormId = formDef.Id,
                             Data = new ExpandoObject(),
                             CreateBy = dataContext.WfStarter,
-                            CreateTime = DateTime.Now,
+                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                         };
 
                         //逐条填充字段
@@ -213,7 +213,7 @@ namespace EIMSNext.Flow.Core.Node
                             FormId = formDef.Id,
                             Data = new ExpandoObject(),
                             CreateBy = dataContext.WfStarter,
-                            CreateTime = DateTime.Now,
+                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                         };
 
                         //逐条填充字段
@@ -232,7 +232,7 @@ namespace EIMSNext.Flow.Core.Node
                     FormId = formDef.Id,
                     Data = new ExpandoObject(),
                     CreateBy = dataContext.WfStarter,
-                    CreateTime = DateTime.Now,
+                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 };
 
                 InsertFormData(insertData, dataContext, scriptData, formDef, fieldSettings);

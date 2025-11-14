@@ -18,16 +18,7 @@ namespace EIMSNext.ApiService.ViewModel
                 form.CreateBy.UserId = null;
             }
 
-            form.UpdateBy = null;
-
-            form.ApprovalLogs.ForEach(log =>
-            {
-                if (log.Approver != null)
-                {
-                    log.Approver.CorpId = null; 
-                    log.Approver.UserId = null;
-                }
-            });
+            form.UpdateBy = null;                      
 
             return form;
         }

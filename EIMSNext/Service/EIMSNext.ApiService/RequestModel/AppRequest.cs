@@ -17,6 +17,10 @@
         /// <summary>
         /// 
         /// </summary>
+        public string IconColor { get; set; } = "";
+        /// <summary>
+        /// 
+        /// </summary>
         public int SortIndex { get; set; }
     }
 }

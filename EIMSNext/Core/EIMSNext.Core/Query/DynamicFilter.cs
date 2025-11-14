@@ -66,25 +66,4 @@ namespace EIMSNext.Core.Query
         public const string Or = "or";
         public const string Not = "not";
     }
-    public static class FieldType
-    {
-        public const string Input = "input";
-        public const string InputNumber = "inputnumber";
-        public const string DatePicker = "datePicker";
-        public const string Phone = "phone";
-        public const string Email = "email";
-        public const string TextArea = "textarea";
-        public const string Radio = "radio";
-        public const string CheckBox = "checkbox";
-        public const string Select = "select";
-        public const string Employee = "employee";
-        public const string Department = "department";
-        public const string Address = "address";
-        public const string Location = "location";
-        public const string Pictures = "pictures";
-        public const string Files = "files";
-        public const string Signature = "signature";
-        //public const string TableForm = "tableForm";
-        public const string TableFormPro = "tableFormPro";
-    }
 }

@@ -1,4 +1,5 @@
-﻿using EIMSNext.Core.Entity;
+﻿using EIMSNext.Common.Extension;
+using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Test
@@ -7,7 +8,7 @@ namespace EIMSNext.Core.Test
     {
         public EntityData()
         {
-            CreateTime = DateTime.Now;
+            CreateTime = DateTime.UtcNow.ToTimeStampMs();
             UpdateTime = CreateTime;
         }
 

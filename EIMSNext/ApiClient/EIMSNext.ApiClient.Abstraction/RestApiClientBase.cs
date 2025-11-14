@@ -2,6 +2,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json.Nodes;
 using EIMSNext.Common.Extension;
+using HKH.Common;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
@@ -25,18 +26,16 @@ namespace EIMSNext.ApiClient.Abstraction
             var request = new RestRequest(url, Method.Get);
             BuilderRequest(request, null, token);
 
-            var response = Client.Execute<T>(request);
-            HandleHttpError(response);
-            return response.Data;
+            var response = Client.Execute(request);
+            return HandleResponse<T>(response).Data;
         }
         protected virtual async Task<RestResponse<T>> GetAsync<T>(string url, string? token = null)
         {
             var request = new RestRequest(url, Method.Get);
             BuilderRequest(request, null, token);
 
-            var response = await Client.ExecuteAsync<T>(request);
-            HandleHttpError(response);
-            return response;
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response);
         }
 
         protected virtual RestResponse<T> Post<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
@@ -44,20 +43,16 @@ namespace EIMSNext.ApiClient.Abstraction
             var request = new RestRequest(url, Method.Post);
             BuilderRequest(request, data, token, contentType);
 
-            var response = Client.Execute<T>(request);
-
-            HandleHttpError(response);
-            return response;
+            var response = Client.Execute(request);
+            return HandleResponse<T>(response);
         }
         protected virtual async Task<RestResponse<T>> PostAsync<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
         {
             var request = new RestRequest(url, Method.Post);
             BuilderRequest(request, data, token, contentType);
 
-            var response = await Client.ExecuteAsync<T>(request);
-
-            HandleHttpError(response);
-            return response;
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response);
         }
 
         protected virtual void BuilderRequest(RestRequest request, object? data, string? token, WebContentType contentType = WebContentType.Json)
@@ -102,22 +97,30 @@ namespace EIMSNext.ApiClient.Abstraction
             return "";
         }
 
-        protected virtual void HandleHttpError(RestResponse response)
+        protected virtual RestResponse<T> HandleResponse<T>(RestResponse response)
         {
             if (!response.IsSuccessful)
             {
                 Logger.LogError($"API返回错误：{response.Content}");
+                var errMsg = "";
                 if (response.ErrorException != null)
                 {
+                    errMsg = response.ErrorException.Message;
                     Logger.LogError(response.ErrorException, $"API请求异常: {response.Request.Resource}");
                     //throw new UnLogException(response.Content, response.ErrorException);
                 }
                 else
                 {
+                    errMsg = response.ErrorMessage;
                     Logger.LogError($"API请求异常:  {response.Request.Resource} -- {response.ErrorMessage}");
                     //throw new UnLogException(response.ErrorMessage);
                 }
+                throw new UnLogException(errMsg);
             }
+
+            var tResp = RestResponse<T>.FromResponse(response);
+            tResp.Data = Client.Serializers.DeserializeContent<T>(response);
+            return tResp;
         }
     }
 

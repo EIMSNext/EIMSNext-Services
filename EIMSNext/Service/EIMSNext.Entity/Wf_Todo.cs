@@ -1,7 +1,5 @@
 ﻿using EIMSNext.Core.Entity;
 
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace EIMSNext.Entity
 {
     /// <summary>
@@ -48,7 +46,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public DateTime ApproveNodeStartTime{ get; set; }
+        public long ApproveNodeStartTime{ get; set; }
         /// <summary>
         /// 
         /// </summary>

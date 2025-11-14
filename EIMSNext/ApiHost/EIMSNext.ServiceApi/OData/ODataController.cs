@@ -2,16 +2,20 @@
 using System.IO.Pipelines;
 using System.Reflection;
 using System.Text;
+
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
+using EIMSNext.Core.Query;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -19,7 +23,9 @@ using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+
 using MongoDB.AspNetCore.OData;
+using MongoDB.Driver;
 
 namespace EIMSNext.ServiceApi.OData
 {
@@ -33,6 +39,9 @@ namespace EIMSNext.ServiceApi.OData
         where T : class, IMongoEntity
         where V : class, T, new()
     {
+        protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
+        protected static readonly Type ICorpOwnedType = typeof(ICorpOwned);
+
         /// <summary>
         /// 从ODATA内部类获取属性访问器
         /// </summary>
@@ -115,6 +124,24 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         protected virtual IQueryable<V> FilterResult(IQueryable<V> query)
         {
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+        }
+        protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
+        {
+            if (IDeleteFlagType.IsAssignableFrom(typeof(V)))
+                return query.Where(x => !((x as IDeleteFlag)!.DeleteFlag ?? false));
+            else
+                return query;
+        }
+        protected IQueryable<V> FilterByCorpId(IQueryable<V> query)
+        {
+            if (ICorpOwnedType.IsAssignableFrom(typeof(V)))
+                return query.Where(x => (x as ICorpOwned)!.CorpId == IdentityContext.CurrentCorpId);
+            else
+                return query;
+        }
+        protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query)
+        {
             return query;
         }
 
@@ -159,6 +186,85 @@ namespace EIMSNext.ServiceApi.OData
         //        return string.IsNullOrEmpty(orgId) ? 0 : orgId.SafeToInt64();
         //    }
         //}
+
+        #region DynamicQuery
+
+        /// <summary>
+        /// 动态查询数据
+        /// </summary>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
+        [DynamicQuery]
+        public ActionResult GetData([FromBody] DynamicFindOptions<T> options)
+        {
+            //TODO: fill field type
+            var result = ApiService.Find(FilterResult(options)).ToList();
+            return Ok(new { value = result });
+        }
+
+        /// <summary>
+        /// 动态查询总数
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
+        [DynamicQueryCount]
+        public ActionResult GetCount([FromBody] DynamicFilter filter)
+        {  
+            //TODO: fill field type
+            return Ok(ApiService.Count(filter));
+        }
+
+        /// <summary>
+        /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        protected virtual DynamicFindOptions<T> FilterResult(DynamicFindOptions<T> query)
+        {
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+        }
+        protected DynamicFindOptions<T> FilterByDeleted(DynamicFindOptions<T> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected DynamicFindOptions<T> FilterByCorpId(DynamicFindOptions<T> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected virtual DynamicFindOptions<T> FilterByPermission(DynamicFindOptions<T> query)
+        {
+            return query;
+        }
+
+        #endregion
     }
 
     /// <summary>
@@ -227,7 +333,7 @@ namespace EIMSNext.ServiceApi.OData
             T? entity = await ApiService.GetAsync(key);
             if (entity == null) return NotFound();
 
-            model.CopyTo(entity);                     
+            model.CopyTo(entity);
 
             await ApiService.ReplaceAsync(entity);
             return Ok(entity.CastTo<T, V>());
@@ -270,7 +376,7 @@ namespace EIMSNext.ServiceApi.OData
                 return BadRequest(fail?.Message);
 
             await ApiService.ReplaceAsync(entity);
-           
+
             return Ok(entity.CastTo<T, V>());
         }
 

@@ -1,4 +1,5 @@
 ﻿using EIMSNext.Auth.Entity;
+using EIMSNext.Common.Extension;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.Service;
@@ -16,7 +17,7 @@ namespace EIMSNext.Service
             var entity = entities.First();
             var deptRepo = Resolver.GetRepository<Department>();
             var empRepo = Resolver.GetRepository<Employee>();
-            var clientRepo = Resolver.GetRepository<EIMSNext.Auth.Entity. Client>();
+            var clientRepo = Resolver.GetRepository<EIMSNext.Auth.Entity.Client>();
             var userRepo = Resolver.GetRepository<User>();
             var user = Context.User as User;
 
@@ -26,7 +27,7 @@ namespace EIMSNext.Service
 
             Repository.EnsureId(entity);
 
-            var serviceClient = new Auth.Entity. Client
+            var serviceClient = new Auth.Entity.Client
             {
                 ClientName = "service_" + entity.Code,
                 ClientSecrets = { },
@@ -43,9 +44,10 @@ namespace EIMSNext.Service
                 Code = "0",
                 Name = entity.Name
             };
-            dept.HeriarchyId = dept.Id;
-            dept.HeriarchyName = dept.Name;
+
             deptRepo.EnsureId(dept);
+            dept.HeriarchyId = $"|{dept.Id}|";
+            dept.HeriarchyName = dept.Name;
 
             var emp = new Employee
             {
@@ -62,14 +64,14 @@ namespace EIMSNext.Service
             empRepo.EnsureId(emp);
 
             dept.CreateBy = Context.Operator;
-            dept.CreateTime = DateTime.UtcNow;
+            dept.CreateTime = DateTime.UtcNow.ToTimeStampMs();
             dept.UpdateBy = dept.CreateBy;
-            dept.UpdateTime = DateTime.UtcNow;
+            dept.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
 
             emp.CreateBy = Context.Operator;
-            emp.CreateTime = DateTime.UtcNow;
+            emp.CreateTime = DateTime.UtcNow.ToTimeStampMs();
             emp.UpdateBy = emp.CreateBy;
-            emp.UpdateTime = DateTime.UtcNow;
+            emp.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
 
             user!.Crops.Add(new UserCorp { CorpId = entity.Id, CorpType = "internal", IsCorpOwner = true, IsDefault = true });
 

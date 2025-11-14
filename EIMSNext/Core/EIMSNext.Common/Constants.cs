@@ -22,15 +22,6 @@
         public const string System = "system";
         public const string Id = "Id";
 
-        public const string Field_BsonId = "_id";
-        public const string Field_Id = "Id";
-        public const string Field_CreateBy = "CreateBy";
-        public const string Field_CreateTime = "CreateTime";
-        public const string Field_UpdateBy = "UpdateBy";
-        public const string Field_UpdateTime = "UpdateTime";
-        public const string Field_IsDeleted = "IsDeleted";
-
-        public static readonly string[] SystemFields = { Field_Id, Field_BsonId, Field_CreateBy, Field_CreateTime, Field_UpdateBy, Field_UpdateTime, Field_IsDeleted };
-
+        public static readonly string[] SystemFields = { Fields.Id, Fields.BsonId, Fields.CreateBy, Fields.CreateTime, Fields.UpdateBy, Fields.UpdateTime, Fields.DeleteFlag, Fields.CorpId, Fields.AppId, Fields.FormId, Fields.FlowStatus };
     }
 }

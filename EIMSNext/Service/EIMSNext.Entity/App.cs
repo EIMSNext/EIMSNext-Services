@@ -23,7 +23,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public string Icon { get; set; } = "";
-
+        /// <summary>
+        /// 
+        /// </summary>
+        public string IconColor { get; set; } = "";
         /// <summary>
         /// 分组
         /// </summary>
@@ -59,7 +62,10 @@ namespace EIMSNext.Entity
         /// 图标
         /// </summary>
         public string Icon { get; set; } = "";
-
+        /// <summary>
+        /// 
+        /// </summary>
+        public string IconColor { get; set; } = "";
         /// <summary>
         /// 菜单类型
         /// </summary>

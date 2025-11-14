@@ -1,5 +1,7 @@
 ﻿using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
+
+using EIMSNext.Common;
 using EIMSNext.Common.Extension;
 using EIMSNext.Core.Query;
 using EIMSNext.Entity;
@@ -40,23 +42,35 @@ namespace EIMSNext.Component
                     //因为FieldType定义中不包括 Layout的类型，所以此处都是表单控件和子表单控件
                     var fieldDef = ParseField(field)!;
                     var fType = field["type"]!.GetValue<string>();
-                    if (fType == FieldType.TableFormPro)
+
+
+                    if (field.ContainsKey("props"))
                     {
-                        //解析Columns
-                        if (field.ContainsKey("props"))
+                        var props = field["props"]!.AsObject();
+
+                        switch (fType)
                         {
-                            var props = field["props"]!.AsObject();
-                            if (props.ContainsKey("columns"))
-                            {
-                                fieldDef.Columns = new List<FieldDef>();
-                                var columns = props["columns"]!.AsArray();
-                                foreach (var column in columns)
+                            case FieldType.TableForm:
                                 {
-                                    var subDef = ParseField(column?["rule"]?.AsArray()?.FirstOrDefault()?.AsObject());
-                                    if (subDef != null)
-                                        fieldDef.Columns.Add(subDef);
+                                    //解析Columns
+                                    if (props.ContainsKey("columns"))
+                                    {
+                                        fieldDef.Columns = new List<FieldDef>();
+                                        var columns = props["columns"]!.AsArray();
+                                        foreach (var column in columns)
+                                        {
+                                            var subDef = ParseField(column?["rule"]?.AsArray()?.FirstOrDefault()?.AsObject());
+                                            if (subDef != null)
+                                                fieldDef.Columns.Add(subDef);
+                                        }
+                                    }
                                 }
-                            }
+                                break;
+                            case FieldType.TimeStamp:
+                                {
+                                    fieldDef.Options.Format = props["format"]?.GetValue<string>();
+                                }
+                                break;
                         }
                     }
 

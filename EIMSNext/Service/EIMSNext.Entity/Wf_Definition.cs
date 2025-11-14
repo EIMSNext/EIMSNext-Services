@@ -1,7 +1,5 @@
-﻿using EIMSNext.Core.Entity;
-using EIMSNext.Core.Query;
-
-using MongoDB.Bson.Serialization.Attributes;
+﻿using EIMSNext.Common;
+using EIMSNext.Core.Entity;
 
 namespace EIMSNext.Entity
 {
@@ -56,6 +54,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public EventSetting? EventSetting { get; set; }
+        /// <summary>
+        /// 是否禁用
+        /// </summary>
+        public bool Disabled {  get; set; }
     }
 
     /// <summary>
@@ -411,7 +413,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 更新时，两端对象的匹配条件，用于内存中计算
         /// </summary>
-        public DataMatchSetting UpdateMatch { get; set; }= new DataMatchSetting();
+        public DataMatchSetting UpdateMatch { get; set; } = new DataMatchSetting();
         /// <summary>
         /// 
         /// </summary>
@@ -756,6 +758,10 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
+        NotSet,
+        /// <summary>
+        /// 
+        /// </summary>
         All,
         /// <summary>
         /// 
@@ -816,5 +822,45 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         Node,
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public enum ApproveAction
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        None = 0,
+        /// <summary>
+        /// 
+        /// </summary>
+        Approve = 1,
+        /// <summary>
+        /// 
+        /// </summary>
+        Reject = 2,
+        /// <summary>
+        /// 
+        /// </summary>
+        Return = 3,
+        /// <summary>
+        /// 
+        /// </summary>
+        AddSignPre = 4,
+        /// <summary>
+        /// 
+        /// </summary>
+        AddSignAfter = 5,
+        /// <summary>
+        /// 
+        /// </summary>
+        AutoApprove = 6,
+        /// <summary>
+        /// 
+        /// </summary>
+        CopyTo = 7,
+
     }
 }

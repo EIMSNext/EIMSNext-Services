@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Common;
@@ -6,6 +7,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
+using EIMSNext.ServiceApi.Request;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -28,6 +30,34 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <returns></returns>
         [HttpPost]
         [Permission(Operation = Operation.Read)]
+        [Route("$dynamiccount")]
+        public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
+        {
+            //TODO: fill field type
+            return Ok(ApiService.Count(filter));
+        }
+        /// <summary>
+        /// 动态查询数据
+        /// </summary>
+        /// <param name="options"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
+        [Route("$dynamicquery")]
+        public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
+        {
+            //TODO: fill field type
+            var result = ApiService.Find(FilterResult(options)).ToList();
+            return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+        }
+
+        /// <summary>
+        /// 动态查询总数
+        /// </summary>
+        /// <param name="filter"></param>
+        /// <returns></returns>
+        [HttpPost]
+        [Permission(Operation = Operation.Read)]
         [Route("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {
@@ -43,8 +73,54 @@ namespace EIMSNext.ServiceApi.Controllers
         [Route("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
-            var result = ApiService.Find(options).ToList();
+            var result = ApiService.Find(FilterResult(options)).ToList();
             return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+        }
+
+        /// <summary>
+        /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
+        /// </summary>
+        /// <param name="query"></param>
+        /// <returns></returns>
+        protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
+        {
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+        }
+        protected DynamicFindOptions<FormData> FilterByDeleted(DynamicFindOptions<FormData> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected DynamicFindOptions<FormData> FilterByCorpId(DynamicFindOptions<FormData> query)
+        {
+            var filter = query.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
+            }
+
+            query.Filter = filter;
+            return query;
+        }
+        protected virtual DynamicFindOptions<FormData> FilterByPermission(DynamicFindOptions<FormData> query)
+        {
+            return query;
         }
 
         /// <summary>
@@ -54,6 +130,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="select"></param>
         /// <returns></returns>
         [HttpGet]
+        [Permission(Operation = Operation.Read)]
         [Route("{key}")]
         public ActionResult Get([FromRoute] string key, [FromQuery] string? select)
         {
@@ -82,6 +159,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
+        [Permission(Operation = Operation.Write)]
         public async Task<IActionResult> Post(FormDataRequest model)
         {
             if (!ModelState.IsValid)
@@ -96,7 +174,7 @@ namespace EIMSNext.ServiceApi.Controllers
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await ApiService.AddAsync(entity);
+            await (ApiService as FormDataApiService)!.AddAsync(entity, model.Action);
             return Ok(FormDataViewModel.FromFormData(entity));
         }
 
@@ -107,6 +185,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPut]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
         public async Task<IActionResult> Put([FromRoute] string key, [FromBody] FormDataRequest model)
         {
@@ -135,6 +214,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="delta"></param>
         /// <returns></returns>
         [HttpPatch]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
         public async Task<IActionResult> Patch([FromRoute] string key, [FromBody] Delta<FormDataRequest> delta)
         {
@@ -170,16 +250,31 @@ namespace EIMSNext.ServiceApi.Controllers
         }
 
         /// <summary>
-        /// 
+        /// 删除，支持两种方式 1.请求地址中key != batch, 则删除指定对象 2.请求地址中key == batch, 请求体中keys = 1,2,3...可以批量删除
         /// </summary>
-        /// <param name="key"></param>
+        /// <param name="key">主键Id</param>
+        /// <param name="batch">批量删除</param>
         /// <returns></returns>
         [HttpDelete]
+        [Permission(Operation = Operation.Write)]
         [Route("{key}")]
-        public async Task<IActionResult> Delete([FromRoute] string key)
+        public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {
-            await ApiService.DeleteAsync(key);
-
+            if ("batch".EqualsIgnoreCase(key))
+            {
+                if (batch?.Keys?.Count > 0)
+                {
+                    await ApiService.DeleteAsync(batch.Keys);
+                }
+                else
+                {
+                    return BadRequest();
+                }
+            }
+            else
+            {
+                await ApiService.DeleteAsync(key);
+            }
             return NoContent();
         }
     }

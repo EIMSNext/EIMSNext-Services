@@ -1,9 +1,15 @@
 ﻿using System.Dynamic;
+using EIMSNext.Core.Entity;
 
 namespace EIMSNext.ApiService.RequestModel
 {
     public class FormDataRequest : RequestBase
     {
+        /// <summary>
+        /// 0 - Save, 1 - Submit
+        /// </summary>
+        public DataAction Action { get; set; } = DataAction.Save;
+
         /// <summary>
         /// 
         /// </summary>

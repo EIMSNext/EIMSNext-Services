@@ -446,7 +446,7 @@ namespace EIMSNext.Component
             {
                 var fType = fieldType.ToLower();
                 var valStr = "";
-                if (fType == FieldType.InputNumber)
+                if (fType == FieldType.Number)
                     valStr = $"{value?.Value ?? "0"}";
                 else
                     valStr = $"'{value?.Value}'";
@@ -517,7 +517,7 @@ namespace EIMSNext.Component
                 default:// FieldValueType.Custom:
                     {
                         var fType = item.Field!.Type;
-                        if (fType == FieldType.InputNumber)
+                        if (fType == FieldType.Number)
                             exp = $"{item.Value.Value ?? "0"}";
                         else
                             exp = $"'{item.Value.Value}'";

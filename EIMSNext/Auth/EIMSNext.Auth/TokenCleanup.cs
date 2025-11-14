@@ -1,4 +1,5 @@
 ﻿using EIMSNext.Auth.Interfaces;
+using EIMSNext.Common.Extension;
 using Microsoft.Extensions.Logging;
 
 namespace EIMSNext.Auth
