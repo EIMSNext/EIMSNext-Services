@@ -51,8 +51,8 @@ namespace EIMSNext.FlowApi.Extension
                     ((actionDesc.ControllerTypeInfo.Namespace??string.Empty).Contains("ODataControllers")?"OData 接口":"API 接口") + " - " + actionDesc.ControllerName};
             });
 
-            options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
-            options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
+            //options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
+            //options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
             options.AddSecurityDefinition(
                 "Bearer",
                 new OpenApiSecurityScheme
