@@ -68,11 +68,11 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 
 ### 1. Start the service
 - Ensure that MongoDB is installed and running.
-- Configuration appsettings.json Database connection information.
+- Configuration `appsettings.json` Database connection information.
 - Start all API services (AuthApi, FileUploadApi, FlowApi, ServiceApi) /gitee.com/eimsnext/EIMSNext-Services)。
 
 ### 2. Authentication
-- Use /auth/sendcode Send verification code through the interface.
+- Use  `/auth/sendcode` Send verification code through the interface.
 - Use the standard OAuth2 interface to obtain an access token.
 - Supports multiple authorization methods, including password, verification code, single sign-on, integrated authorization, and more.
 
@@ -81,20 +81,20 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 - Support performing create, read, update, and delete operations on entities such as forms, applications, users, departments, etc., through an API.
 
 ### 4. Process Service
-- through /api/v1/workflow/start Start the process.
-- through /api/v1/workflow/approve Submit for approval.
-- through /api/v1/dataflow/run Trigger data flow operation.
+- through `/api/v1/workflow/start` Start the process.
+- through `/api/v1/workflow/approve` Submit for approval.
+- through `/api/v1/dataflow/run` Trigger data flow operation.
 
 ### 5. File Upload
-- Use /api/v1/upload Upload file through the interface.
+- Use `/api/v1/upload` Upload file through the interface.
 - Support file storage path configuration, access control, and cache management.
 
 ## Development and Testing
 
-- Use dotnet test Run unit tests.
-- Use MongoTransactionScope Manage affairs.
-- Use V8ScriptEngine Execute dynamic expression.
-- Use DynamicFindOptions Implement flexible query logic.
+- Use `dotnet test` Run unit tests.
+- Use `MongoTransactionScope` Manage affairs.
+- Use `V8ScriptEngine` Execute dynamic expression.
+- Use `DynamicFindOptions` Implement flexible query logic.
 
 ### Donate
 If you feel that our open source software is helpful to you, please scan the QR code below to enjoy a cup of coffee.
