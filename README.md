@@ -1,8 +1,12 @@
-# EIMS Next 企业信息管理系统
+# EIMSNext 企业信息管理系统
 
 ## 项目简介
 
 EIMS Next 是一个企业低代码应用系统，旨在为企业提供全面的信息管理解决方案。系统涵盖了身份验证、数据管理、流程控制、文件上传、表单定义、工作流引擎等多个模块，支持通过 API 进行数据交互，并提供基于 MongoDB 的持久化支持。
+
+官方网站： [www.eimsnext.com](https://www.eimsnext.com)
+
+示例网站： [work.eimsnext.com](https://work.eimsnext.com)
 
 ## 主要功能模块
 
@@ -92,9 +96,19 @@ EIMS Next 是一个企业低代码应用系统，旨在为企业提供全面的�
 - 使用 `V8ScriptEngine` 执行动态表达式。
 - 使用 `DynamicFindOptions` 实现灵活的查询逻辑。
 
+### 捐助
+如果您觉得我们的开源软件对你有所帮助，请扫下方二维码打赏我们一杯咖啡。
+1. 点击链接[Paypal](https://www.paypal.com/ncp/payment/VF39PBVWQ7VVS)或扫描二维码通过Paypal打赏
+
+![Paypal打赏](https://foruda.gitee.com/images/1764387152456008244/97ecd31c_12828486.png "paypal200.png")
+
+2. 扫描二维码通过微信打赏
+
+![微信打赏](https://foruda.gitee.com/images/1763474049128942966/bada62bb_12828486.jpeg "wxpay200.jpg")
+
 ## 许可证
 
-本项目采用 [MIT License](LICENSE)，请在使用前确认遵守相关条款。
+本项目采用 Apache 2.0 许可证。详情请参阅 [LICENSE](LICENSE) 文件。
 
 ## 贡献指南
 
