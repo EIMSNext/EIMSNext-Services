@@ -113,7 +113,7 @@ This project is licensed under the Apache 2.0 License. See the [LICENSE](LICENSE
 ## Contribution Guidelines
 
 Welcome to contribute code and documentation. Please follow the steps below:
-1. Fork this repository.
+1. Fork `https://gitee.com/eimsnext/EIMSNext-Services`.
 2. Create a new branch.
 3. Submit changes.
 4. Create Pull Request。

@@ -229,8 +229,10 @@ namespace EIMSNext.Component
                             }
                         }.SerializeToJson() : null,
                         InsertIfNoData = flowNode.Metadata.UpdateMeta.InsertIfNoData,
-                        InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList),
                     };
+
+                    if (dfNodeSetting.UpdateSetting.InsertIfNoData)
+                        dfNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList);
 
                     otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
                     break;
@@ -508,8 +510,15 @@ namespace EIMSNext.Component
             switch (valueType)
             {
                 case FieldValueType.Field:
-                    exp = item.Value.FieldValue!.ToFieldExp();
-                    isSubField = item.Value.FieldValue.IsSubField;
+                    if (item.Value.FieldValue != null)
+                    {
+                        exp = item.Value.FieldValue.ToFieldExp();
+                        isSubField = item.Value.FieldValue.IsSubField;
+                    }
+                    else
+                    {
+                        exp = "null";
+                    }
                     break;
                 case FieldValueType.Empty:
                     exp = "null";

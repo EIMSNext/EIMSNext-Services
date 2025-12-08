@@ -49,7 +49,7 @@ EIMS Next 是一个企业低代码应用系统，旨在为企业提供全面的�
 ## 技术架构
 
 - **后端技术栈**：
-  - C# / .NET 6
+  - C# / .NET 8
   - MongoDB 作为主要数据存储
   - IdentityServer4 实现身份认证与授权
   - Autofac 实现依赖注入
@@ -113,7 +113,7 @@ EIMS Next 是一个企业低代码应用系统，旨在为企业提供全面的�
 ## 贡献指南
 
 欢迎贡献代码和文档。请遵循以下步骤：
-1. Fork 本仓库。
+1. Fork `https://gitee.com/eimsnext/EIMSNext-Services`。
 2. 创建新分支。
 3. 提交更改。
 4. 创建 Pull Request。
