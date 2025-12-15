@@ -193,8 +193,22 @@ namespace EIMSNext.ServiceApi.Controllers
             {
                 return BadRequest(ModelState.ToErrorString());
             }
-
-            FormData entity = model.CastTo<FormDataRequest, FormData>();
+            //根据key获取数据库中的实体
+            FormData? entity = ApiService.Get(key);
+            if (entity == null) return NotFound();
+            
+            //保存原始实体的重要字段
+            var originalCorpId = entity.CorpId;
+            var originalDeleteFlag = entity.DeleteFlag;
+            
+            //将请求的数据直接复制到原始实体，而不是通过中间转换
+            model.CopyTo(entity);
+            
+            //恢复重要字段，确保不会丢失
+            entity.CorpId = originalCorpId;
+            entity.DeleteFlag = originalDeleteFlag;
+            
+            
             if (key != entity.Id)
             {
                 return BadRequest("请求修改对象的Key不一致");
