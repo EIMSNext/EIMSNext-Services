@@ -3,7 +3,7 @@ using Microsoft.AspNetCore.OData.Routing;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.AspNetCore.OData.Routing.Template;
 
-namespace EIMSNext.ServiceApi.OData
+namespace EIMSNext.ServiceApi.OData.Conventions
 {
     public class DynamicQueryCountConvention : IODataControllerActionConvention
     {

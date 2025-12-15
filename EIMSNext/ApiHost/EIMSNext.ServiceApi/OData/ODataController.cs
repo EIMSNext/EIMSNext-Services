@@ -12,6 +12,7 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
+using EIMSNext.ServiceApi.OData.Conventions;
 using EIMSNext.ServiceApi.Request;
 
 using HKH.Mef2.Integration;
@@ -387,7 +388,7 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         [HttpPatch]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> Patch([FromODataUri] DeltaSet<R> deltas)
+        public virtual async Task<ActionResult> PatchSet([FromODataUri] DeltaSet<R> deltas)
         {
             if (deltas == null)
                 return BadRequest("数据解析失败，请检查数据格式, 确认正确的字段名和数据类型");
