@@ -26,7 +26,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
-        [Route("currentuser"), HttpGet]
+        [HttpGet("currentuser") ]
         public IActionResult CurrentUser()
         {
             var appService = Resolver.GetApiService<App, AppViewModel>();
@@ -60,7 +60,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        [Route("switchcorp"), HttpPost]
+        [HttpPost("switchcorp")]
         public async Task<IActionResult> SwitchCorprate(SwitchCorprateRequest req)
         {
             if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
@@ -76,7 +76,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        [Route("updatesecret"), HttpPost]
+        [HttpPost("updatesecret")]
         public async Task<IActionResult> UpdateClientSecret(UpdateSecretRequest req)
         {
             if (string.IsNullOrEmpty(req.ClientId)) return NotFound();

@@ -18,14 +18,13 @@ namespace EIMSNext.ServiceApi.Controllers
         /// test if works
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
-        [Route("api/v{version:apiVersion}/ping")]
+        [HttpGet("api/v{version:apiVersion}/ping")]
         public IActionResult Ping()
         {
             return ApiResult.Success("API Server is running.").ToActionResult();
         }
 
-        [Route("api/version"), HttpGet]
+        [HttpGet("api/version")]
         public string Version()
         {
             return Assembly.GetExecutingAssembly().GetName().Version!.ToString();

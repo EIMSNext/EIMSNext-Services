@@ -22,7 +22,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost, Route("Start")]
+        [HttpPost("Start")]
         public async Task<IActionResult> StartAsync(WfStartRequest request)
         {
             var data = ApiService.Get(request.DataId);
@@ -57,7 +57,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost, Route("Approve")]
+        [HttpPost("Approve")]
         public async Task<IActionResult> Approve(WfApproveRequest request)
         {
             var data = ApiService.Get(request.DataId);
