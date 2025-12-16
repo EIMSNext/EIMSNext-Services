@@ -7,7 +7,6 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.OData;
-using EIMSNext.ServiceApi.OData.Conventions;
 
 using HKH.Mef2.Integration;
 
@@ -41,10 +40,9 @@ builder.Services.AddControllers().AddOData(
              //移除$metadata访问
              .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
 
-             //注册路由规范
-             options.Conventions.Add(new DynamicQueryConvention());
-             options.Conventions.Add(new DynamicQueryCountConvention());
-             options.Conventions.Add(new PatchSetConvention());
+             options.RouteOptions.EnableControllerNameCaseInsensitive = true;
+             options.RouteOptions.EnableActionNameCaseInsensitive=true;
+             options.RouteOptions.EnablePropertyNameCaseInsensitive = true;
          }
     );
 

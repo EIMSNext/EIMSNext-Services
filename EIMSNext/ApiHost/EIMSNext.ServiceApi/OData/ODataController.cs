@@ -12,7 +12,6 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 using EIMSNext.ServiceApi.Authorization;
 using EIMSNext.ServiceApi.Extension;
-using EIMSNext.ServiceApi.OData.Conventions;
 using EIMSNext.ServiceApi.Request;
 
 using HKH.Mef2.Integration;
@@ -195,29 +194,27 @@ namespace EIMSNext.ServiceApi.OData
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
-        [HttpPost]
-        [Permission(Operation = Operation.Read)]
-        [DynamicQuery]
-        public ActionResult GetData([FromBody] DynamicFindOptions<T> options)
-        {
-            //TODO: fill field type
-            var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result });
-        }
+        //[HttpPost]
+        //[Permission(Operation = Operation.Read)]       
+        //public ActionResult GetData([FromBody] DynamicFindOptions<T> options)
+        //{
+        //    //TODO: fill field type
+        //    var result = ApiService.Find(FilterResult(options)).ToList();
+        //    return Ok(new { value = result });
+        //}
 
         /// <summary>
         /// 动态查询总数
         /// </summary>
         /// <param name="filter"></param>
         /// <returns></returns>
-        [HttpPost]
-        [Permission(Operation = Operation.Read)]
-        [DynamicQueryCount]
-        public ActionResult GetCount([FromBody] DynamicFilter filter)
-        {  
-            //TODO: fill field type
-            return Ok(ApiService.Count(filter));
-        }
+        //[HttpPost]
+        //[Permission(Operation = Operation.Read)]
+        //public ActionResult GetCount([FromBody] DynamicFilter filter)
+        //{  
+        //    //TODO: fill field type
+        //    return Ok(ApiService.Count(filter));
+        //}
 
         /// <summary>
         /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
@@ -388,7 +385,7 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         [HttpPatch]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> PatchSet([FromODataUri] DeltaSet<R> deltas)
+        public virtual async Task<ActionResult> Patch([FromODataUri] DeltaSet<R> deltas)
         {
             if (deltas == null)
                 return BadRequest("数据解析失败，请检查数据格式, 确认正确的字段名和数据类型");
