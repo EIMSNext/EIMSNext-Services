@@ -1,0 +1,20 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.OData.ApiExplorer" Version="8.2.0" />
+    <PackageReference Include="Swashbuckle.AspNetCore.SwaggerGen" Version="9.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entity\EIMSNext.Auth.Entity.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Entity\EIMSNext.Entity.csproj" />
+  </ItemGroup>
+
+</Project>
