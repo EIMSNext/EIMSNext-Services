@@ -13,8 +13,7 @@ namespace EIMSNext.ServiceApi.Controllers
     /// 工作流
     /// </summary>
     /// <param name="resolver"></param>
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion(1.0)]
     public class WorkflowController(IResolver resolver) : MefControllerBase<FormData, FormData>(resolver)
     {
         /// <summary>

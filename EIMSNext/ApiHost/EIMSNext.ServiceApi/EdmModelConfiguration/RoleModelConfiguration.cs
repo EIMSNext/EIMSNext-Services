@@ -15,11 +15,6 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
         protected override void ConfigureCommon(EntityTypeConfiguration<RoleViewModel> entityType)
         {
             base.ConfigureCommon(entityType);
-
-            var addEmps = entityType.Collection.Action("AddEmps");
-            addEmps.Parameter<string>("roleId");
-            addEmps.Parameter<string[]>("empIds");
-            addEmps.Returns<ActionResult>();
         }
     }
 }

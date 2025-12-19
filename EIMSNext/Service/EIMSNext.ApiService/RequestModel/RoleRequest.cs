@@ -19,5 +19,17 @@
         /// </summary>
         public int SortValue { get; set; }
     }
+
+    public class AddEmpsToRoleRequest
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public required string RoleId {  get; set; }
+      /// <summary>
+      /// 
+      /// </summary>
+        public required string EmpIds { get; set; }
+    }
 }
 

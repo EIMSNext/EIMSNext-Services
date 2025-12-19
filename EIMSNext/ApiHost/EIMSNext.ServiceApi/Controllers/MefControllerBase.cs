@@ -1,6 +1,9 @@
 ﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
+
+using Asp.Versioning;
+
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
@@ -8,7 +11,9 @@ using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -19,7 +24,8 @@ namespace EIMSNext.ServiceApi.Controllers
     /// <summary>
     /// 
     /// </summary>
-    [Authorize]
+    [ApiController, Authorize]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public abstract class MefControllerBase : ControllerBase
     {
         /// <summary>

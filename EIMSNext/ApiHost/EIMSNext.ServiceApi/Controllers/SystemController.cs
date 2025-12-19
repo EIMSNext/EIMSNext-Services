@@ -17,9 +17,8 @@ namespace EIMSNext.ServiceApi.Controllers
     /// <summary>
     /// 
     /// </summary>
-    /// <param name="resolver"></param>
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
+    /// <param name="resolver"></param> 
+    [ApiVersion(1.0)]
     public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
         /// <summary>

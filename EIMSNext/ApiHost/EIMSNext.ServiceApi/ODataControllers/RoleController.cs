@@ -47,16 +47,5 @@ namespace EIMSNext.ServiceApi.ODataControllers
 
             return base.Expand(query, options);
         }
-
-        [HttpPost]
-        [Permission(Operation = Operation.Write)]
-        public virtual ActionResult AddEmps(ODataActionParameters odataParameters)
-        {
-            var roleId = odataParameters.GetParameterValue<string>("roleId")!;
-            var empIds = odataParameters.GetParameterValue<string[]>("empIds")!;
-
-
-            return Ok(ApiResult.Success());
-        }
     }
 }
