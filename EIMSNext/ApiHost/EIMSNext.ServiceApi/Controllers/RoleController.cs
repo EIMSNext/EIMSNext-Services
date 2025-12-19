@@ -1,18 +1,15 @@
 ﻿using Asp.Versioning;
 
-using HKH.Mef2.Integration;
-using EIMSNext.ServiceApi.OData;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
-using EIMSNext.Entity;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using Microsoft.AspNetCore.OData.Query;
-using Microsoft.OData.UriParser;
-using EIMSNext.ApiService;
+using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Authorization;
+
+using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.OData.Formatter;
 
 namespace EIMSNext.ServiceApi.Controllers
 {
@@ -25,9 +22,10 @@ namespace EIMSNext.ServiceApi.Controllers
     {
         [HttpPost("addemps")]
         [Permission(Operation = Operation.Write)]
-        public virtual ActionResult AddEmps(AddEmpsToRoleRequest request)
+        public virtual async Task<ActionResult> AddEmps(AddEmpsToRoleRequest request)
         {
-            
+            await (ApiService as RoleApiService)!.AddEmployeesToRole(request);
+
             return Ok(ApiResult.Success());
         }
     }

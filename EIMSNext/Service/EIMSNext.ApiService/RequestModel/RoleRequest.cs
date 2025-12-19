@@ -25,11 +25,11 @@
         /// <summary>
         /// 
         /// </summary>
-        public required string RoleId {  get; set; }
-      /// <summary>
-      /// 
-      /// </summary>
-        public required string EmpIds { get; set; }
+        public required string RoleId { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public required List<string> EmpIds { get; set; }
     }
 }
 
