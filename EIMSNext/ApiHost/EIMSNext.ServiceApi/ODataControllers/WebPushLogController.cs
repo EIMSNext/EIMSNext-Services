@@ -4,6 +4,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.ServiceApi.OData;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.ApiService;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -12,7 +13,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WebPushLogController(IResolver resolver) : ReadOnlyODataController<WebPushLog, WebPushLogViewModel>(resolver)
+	public class WebPushLogController(IResolver resolver) : ReadOnlyODataController<WebPushLogApiService, WebPushLog, WebPushLogViewModel>(resolver)
 	{
 		
 	}

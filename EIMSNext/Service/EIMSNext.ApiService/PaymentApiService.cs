@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class PaymentApiService(IResolver resolver) : ApiServiceBase<Payment, PaymentViewModel>(resolver)
+	public class PaymentApiService(IResolver resolver) : ApiServiceBase<Payment, PaymentViewModel, IPaymentService>(resolver)
 	{
 	}
 }

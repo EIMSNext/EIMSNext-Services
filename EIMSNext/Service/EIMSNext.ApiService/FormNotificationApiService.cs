@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class FormNotificationApiService(IResolver resolver) : ApiServiceBase<FormNotification, FormNotificationViewModel>(resolver)
+	public class FormNotificationApiService(IResolver resolver) : ApiServiceBase<FormNotification, FormNotificationViewModel, IFormNotificationService>(resolver)
 	{
 	}
 }

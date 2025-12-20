@@ -5,10 +5,11 @@ using EIMSNext.Component;
 using EIMSNext.Entity;
 
 using MongoDB.Driver;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-    public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, FormDefViewModel>(resolver)
+    public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, FormDefViewModel, IFormDefService>(resolver)
 	{
         public override Task AddAsync(FormDef entity)
         {

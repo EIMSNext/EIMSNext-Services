@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class RoleGroupApiService(IResolver resolver) : ApiServiceBase<RoleGroup, RoleGroupViewModel>(resolver)
+	public class RoleGroupApiService(IResolver resolver) : ApiServiceBase<RoleGroup, RoleGroupViewModel, IRoleGroupService>(resolver)
 	{
 	}
 }

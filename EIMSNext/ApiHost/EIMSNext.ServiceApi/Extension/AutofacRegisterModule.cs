@@ -29,7 +29,7 @@ namespace EIMSNext.ServiceApi.Extension
             builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterType<IdentityContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterAssemblyTypes(typeof(CorporateService).Assembly).AsImplementedInterfaces().InstancePerLifetimeScope();
-            builder.RegisterAssemblyTypes(typeof(CorporateApiService).Assembly).AsImplementedInterfaces().InstancePerLifetimeScope();
+            builder.RegisterAssemblyTypes(typeof(CorporateApiService).Assembly).AsSelf() .AsImplementedInterfaces().InstancePerLifetimeScope();
 
             builder.RegisterType<FlowApiClient>().AsSelf().SingleInstance();
             //builder.RegisterType<WeChatPublicClient>().AsSelf().SingleInstance();

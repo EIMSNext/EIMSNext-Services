@@ -8,7 +8,7 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
-    public class FormDataApiService : ApiServiceBase<FormData, FormData>
+    public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
     {
         private FlowApiClient _flowClient;
         private IFormDefService _formDefService;

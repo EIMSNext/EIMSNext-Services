@@ -1,5 +1,6 @@
 ﻿using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
+using EIMSNext.ApiService;
 using EIMSNext.Core;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Request;
@@ -13,16 +14,15 @@ namespace EIMSNext.ServiceApi.Controllers
     /// 工作流
     /// </summary>
     /// <param name="resolver"></param>
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
-    public class WorkflowController(IResolver resolver) : MefControllerBase<FormData, FormData>(resolver)
+    [ApiVersion(1.0)]
+    public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
         /// <summary>
         /// 
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost, Route("Start")]
+        [HttpPost("Start")]
         public async Task<IActionResult> StartAsync(WfStartRequest request)
         {
             var data = ApiService.Get(request.DataId);
@@ -57,7 +57,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="request"></param>
         /// <returns></returns>
-        [HttpPost, Route("Approve")]
+        [HttpPost("Approve")]
         public async Task<IActionResult> Approve(WfApproveRequest request)
         {
             var data = ApiService.Get(request.DataId);

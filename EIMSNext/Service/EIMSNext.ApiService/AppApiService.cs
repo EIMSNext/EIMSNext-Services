@@ -1,12 +1,11 @@
-﻿using HKH.Mef2.Integration;
-using EIMSNext.Core.Service;
+﻿using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
-using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Service.Interface;
+using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
-	public class AppApiService(IResolver resolver) : ApiServiceBase<App, AppViewModel>(resolver)
+	public class AppApiService(IResolver resolver) : ApiServiceBase<App, AppViewModel, IAppService>(resolver)
 	{
 	}
 }

@@ -21,7 +21,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class RoleController(IResolver resolver) : ODataController<Role, RoleViewModel, RoleRequest>(resolver)
+    public class RoleController(IResolver resolver) : ODataController<RoleApiService, Role, RoleViewModel, RoleRequest>(resolver)
     {
         /// <summary>
         /// 
@@ -46,17 +46,6 @@ namespace EIMSNext.ServiceApi.ODataControllers
             }
 
             return base.Expand(query, options);
-        }
-
-        [HttpPost]
-        [Permission(Operation = Operation.Write)]
-        public virtual ActionResult AddEmps(ODataActionParameters odataParameters)
-        {
-            var roleId = odataParameters.GetParameterValue<string>("roleId")!;
-            var empIds = odataParameters.GetParameterValue<string[]>("empIds")!;
-
-
-            return Ok(ApiResult.Success());
         }
     }
 }

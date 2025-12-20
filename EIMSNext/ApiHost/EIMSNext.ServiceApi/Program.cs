@@ -1,4 +1,5 @@
 using Asp.Versioning;
+
 using EIMSNext.ApiCore;
 using EIMSNext.Component;
 using EIMSNext.Core;
@@ -6,15 +7,20 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.OData;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+
 using MongoDB.Driver;
+
 using NLog.Extensions.Logging;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -34,9 +40,9 @@ builder.Services.AddControllers().AddOData(
              //移除$metadata访问
              .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
 
-             //注册路由规范
-             options.Conventions.Add(new DynamicQueryConvention());
-             options.Conventions.Add(new DynamicQueryCountConvention());
+             options.RouteOptions.EnableControllerNameCaseInsensitive = true;
+             options.RouteOptions.EnableActionNameCaseInsensitive=true;
+             options.RouteOptions.EnablePropertyNameCaseInsensitive = true;
          }
     );
 

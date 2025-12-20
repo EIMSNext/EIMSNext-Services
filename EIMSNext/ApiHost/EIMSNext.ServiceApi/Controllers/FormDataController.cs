@@ -19,18 +19,16 @@ namespace EIMSNext.ServiceApi.Controllers
     /// 
     /// </summary>
     /// <param name="resolver"></param>
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
-    public class FormDataController(IResolver resolver) : MefControllerBase<FormData, FormData>(resolver)
+    [ApiVersion(1.0)]
+    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
         /// <summary>
         /// 动态查询总数
         /// </summary>
         /// <param name="filter"></param>
         /// <returns></returns>
-        [HttpPost]
         [Permission(Operation = Operation.Read)]
-        [Route("$dynamiccount")]
+        [HttpPost("dynamic/$count")]
         public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
         {
             //TODO: fill field type
@@ -41,9 +39,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
-        [HttpPost]
         [Permission(Operation = Operation.Read)]
-        [Route("$dynamicquery")]
+        [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
             //TODO: fill field type
@@ -56,9 +53,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="filter"></param>
         /// <returns></returns>
-        [HttpPost]
         [Permission(Operation = Operation.Read)]
-        [Route("$count")]
+        [HttpPost("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {
             return Ok(ApiService.Count(filter));
@@ -68,9 +64,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
-        [HttpPost]
         [Permission(Operation = Operation.Read)]
-        [Route("$query")]
+        [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
             var result = ApiService.Find(FilterResult(options)).ToList();
@@ -129,9 +124,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="key"></param>
         /// <param name="select"></param>
         /// <returns></returns>
-        [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [Route("{key}")]
+        [HttpGet("{key}")]
         public ActionResult Get([FromRoute] string key, [FromQuery] string? select)
         {
             var fields = new DynamicFieldList();
@@ -184,9 +178,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="key"></param>
         /// <param name="model"></param>
         /// <returns></returns>
-        [HttpPut]
         [Permission(Operation = Operation.Write)]
-        [Route("{key}")]
+        [HttpPut("{key}")]
         public async Task<IActionResult> Put([FromRoute] string key, [FromBody] FormDataRequest model)
         {
             if (!ModelState.IsValid)
@@ -227,9 +220,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="key"></param>
         /// <param name="delta"></param>
         /// <returns></returns>
-        [HttpPatch]
         [Permission(Operation = Operation.Write)]
-        [Route("{key}")]
+        [HttpPatch("{key}")]
         public async Task<IActionResult> Patch([FromRoute] string key, [FromBody] Delta<FormDataRequest> delta)
         {
             if (delta == null)
@@ -269,9 +261,8 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="key">主键Id</param>
         /// <param name="batch">批量删除</param>
         /// <returns></returns>
-        [HttpDelete]
         [Permission(Operation = Operation.Write)]
-        [Route("{key}")]
+        [HttpDelete("{key}")]
         public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {
             if ("batch".EqualsIgnoreCase(key))

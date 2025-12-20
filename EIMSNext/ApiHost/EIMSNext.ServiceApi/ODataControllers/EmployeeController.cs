@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Common;
@@ -17,7 +18,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class EmployeeController(IResolver resolver) : ODataController<Employee, EmployeeViewModel, EmployeeRequest>(resolver)
+    public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeViewModel, EmployeeRequest>(resolver)
     {
         /// <summary>
         /// 

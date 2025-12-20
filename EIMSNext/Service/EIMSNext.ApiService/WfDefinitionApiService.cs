@@ -5,10 +5,11 @@ using EIMSNext.Entity;
 using EIMSNext.ApiClient.Flow;
 
 using MongoDB.Driver;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-    public class WfDefinitionApiService : ApiServiceBase<Wf_Definition, WfDefinitionViewModel>
+    public class WfDefinitionApiService : ApiServiceBase<Wf_Definition, WfDefinitionViewModel, IWfDefinitionService>
     {
         private FlowApiClient _flowClient;
         public WfDefinitionApiService(IResolver resolver) : base(resolver)
