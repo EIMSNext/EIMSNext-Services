@@ -5,6 +5,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.ServiceApi.OData;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.ApiService;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -13,7 +14,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class DfExecLogController(IResolver resolver) : ReadOnlyODataController<Df_ExecLog, DfExecLogViewModel>(resolver)
+	public class DfExecLogController(IResolver resolver) : ReadOnlyODataController<DfExecLogApiService, Df_ExecLog, DfExecLogViewModel>(resolver)
 	{
 		
 	}

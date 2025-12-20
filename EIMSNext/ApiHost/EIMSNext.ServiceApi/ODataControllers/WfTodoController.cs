@@ -9,6 +9,7 @@ using EIMSNext.Core;
 using EIMSNext.Entity;
 
 using Microsoft.AspNetCore.OData.Query;
+using EIMSNext.ApiService;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -17,7 +18,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WfTodoController(IResolver resolver) : ODataController<Wf_Todo, WfTodoViewModel, WfTodoRequest>(resolver)
+    public class WfTodoController(IResolver resolver) : ODataController<WfTodoApiService, Wf_Todo, WfTodoViewModel, WfTodoRequest>(resolver)
     {
         /// <summary>
         /// 

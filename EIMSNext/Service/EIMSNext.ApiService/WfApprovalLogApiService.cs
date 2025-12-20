@@ -1,11 +1,11 @@
-﻿using EIMSNext.ApiService;
-using EIMSNext.ApiService.ViewModel;
+﻿using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.Service.Interface;
 using HKH.Mef2.Integration;
 
-namespace EIMSNext.Service
+namespace EIMSNext.ApiService
 {
-	public class WfApprovalLogApiService(IResolver resolver) : ApiServiceBase<Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
+	public class WfApprovalLogApiService(IResolver resolver) : ApiServiceBase<Wf_ApprovalLog, WfApprovalLogViewModel, IWfApprovalLogService>(resolver)
 	{
 	}
 }

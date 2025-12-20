@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class SerialNoSequenceApiService(IResolver resolver) : ApiServiceBase<SerialNoSequence, SerialNoSequenceViewModel>(resolver)
+	public class SerialNoSequenceApiService(IResolver resolver) : ApiServiceBase<SerialNoSequence, SerialNoSequenceViewModel, ISerialNoSequenceService>(resolver)
 	{
 	}
 }

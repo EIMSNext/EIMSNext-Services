@@ -21,7 +21,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class RoleController(IResolver resolver) : ODataController<Role, RoleViewModel, RoleRequest>(resolver)
+    public class RoleController(IResolver resolver) : ODataController<RoleApiService, Role, RoleViewModel, RoleRequest>(resolver)
     {
         /// <summary>
         /// 

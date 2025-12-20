@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class FormTemplateApiService(IResolver resolver) : ApiServiceBase<FormTemplate, FormTemplateViewModel>(resolver)
+	public class FormTemplateApiService(IResolver resolver) : ApiServiceBase<FormTemplate, FormTemplateViewModel, IFormTemplateService>(resolver)
 	{
 	}
 }

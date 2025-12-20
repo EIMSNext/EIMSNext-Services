@@ -1,4 +1,5 @@
 ﻿using Asp.Versioning;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.OData;
@@ -11,7 +12,7 @@ namespace EIMSNextt.API.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WfApprovalLogController(IResolver resolver) : ReadOnlyODataController<Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
+    public class WfApprovalLogController(IResolver resolver) : ReadOnlyODataController<WfApprovalLogApiService, Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
     {
 
     }

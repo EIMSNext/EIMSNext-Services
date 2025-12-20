@@ -2,10 +2,11 @@
 
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class WfTodoApiService(IResolver resolver) : ApiServiceBase<Wf_Todo, WfTodoViewModel>(resolver)
+	public class WfTodoApiService(IResolver resolver) : ApiServiceBase<Wf_Todo, WfTodoViewModel, IWfTodoService>(resolver)
 	{
 	}
 }

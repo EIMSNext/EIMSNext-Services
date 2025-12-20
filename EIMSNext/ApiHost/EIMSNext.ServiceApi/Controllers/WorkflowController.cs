@@ -1,5 +1,6 @@
 ﻿using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
+using EIMSNext.ApiService;
 using EIMSNext.Core;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Request;
@@ -14,7 +15,7 @@ namespace EIMSNext.ServiceApi.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WorkflowController(IResolver resolver) : MefControllerBase<FormData, FormData>(resolver)
+    public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
         /// <summary>
         /// 

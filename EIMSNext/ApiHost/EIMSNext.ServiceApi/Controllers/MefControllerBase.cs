@@ -2,8 +2,6 @@
 using System.IO.Pipelines;
 using System.Text;
 
-using Asp.Versioning;
-
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
@@ -126,7 +124,8 @@ namespace EIMSNext.ServiceApi.Controllers
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="Q"></typeparam>
-    public abstract class MefControllerBase<T, Q> : MefControllerBase
+    public abstract class MefControllerBase<S, T, Q> : MefControllerBase
+        where S : class, IApiService<T, Q>
         where T : class, IEntity
         where Q : T, new()
     {
@@ -136,12 +135,12 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="resolver"></param>
         protected MefControllerBase(IResolver resolver) : base(resolver)
         {
-            ApiService = resolver.GetApiService<T, Q>();
+            ApiService = resolver.GetApiService<S, T, Q>();
         }
 
         /// <summary>
         /// 服务接口
         /// </summary>
-        protected IApiService<T, Q> ApiService { get; private set; }
+        protected S ApiService { get; private set; }
     }
 }

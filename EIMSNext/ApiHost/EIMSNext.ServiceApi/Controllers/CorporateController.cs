@@ -1,6 +1,7 @@
 ﻿using Asp.Versioning;
 
 using HKH.Mef2.Integration;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
 
@@ -11,7 +12,7 @@ namespace EIMSNext.ServiceApi.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class CorporateController(IResolver resolver) : ApiControllerBase<Corporate, CorporateViewModel>(resolver)
+	public class CorporateController(IResolver resolver) : ApiControllerBase<CorporateApiService, Corporate, CorporateViewModel>(resolver)
 	{
 		
 	}

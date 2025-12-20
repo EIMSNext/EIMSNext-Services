@@ -31,5 +31,16 @@
         /// </summary>
         public required List<string> EmpIds { get; set; }
     }
+    public class RemoveEmpsToRoleRequest
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public required string RoleId { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public required List<string> EmpIds { get; set; }
+    }
 }
 

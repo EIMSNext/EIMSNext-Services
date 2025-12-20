@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class WebhookApiService(IResolver resolver) : ApiServiceBase<Webhook, WebhookViewModel>(resolver)
+	public class WebhookApiService(IResolver resolver) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
 	{
 	}
 }

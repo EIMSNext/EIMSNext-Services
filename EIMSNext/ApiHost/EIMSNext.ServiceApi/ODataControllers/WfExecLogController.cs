@@ -1,10 +1,9 @@
 ﻿using Asp.Versioning;
-
-using HKH.Mef2.Integration;
-using EIMSNext.ServiceApi.OData;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
-using EIMSNext.ApiService;
+using EIMSNext.ServiceApi.OData;
+using HKH.Mef2.Integration;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -13,7 +12,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WebPushLogController(IResolver resolver) : ReadOnlyODataController<WebPushLogApiService, WebPushLog, WebPushLogViewModel>(resolver)
+	public class WfExecLogController(IResolver resolver) : ReadOnlyODataController<WfExecLogApiService, Wf_ExecLog, WfExecLogViewModel>(resolver)
 	{
 		
 	}

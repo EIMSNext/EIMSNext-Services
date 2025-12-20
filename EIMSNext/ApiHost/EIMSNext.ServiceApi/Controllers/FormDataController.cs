@@ -20,7 +20,7 @@ namespace EIMSNext.ServiceApi.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class FormDataController(IResolver resolver) : MefControllerBase<FormData, FormData>(resolver)
+    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
         /// <summary>
         /// 动态查询总数
@@ -28,7 +28,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="filter"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
-        [HttpPost("dynamic/count")]
+        [HttpPost("dynamic/$count")]
         public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
         {
             //TODO: fill field type
@@ -40,7 +40,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <param name="options"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
-        [HttpPost("dynamic/query")]
+        [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
             //TODO: fill field type

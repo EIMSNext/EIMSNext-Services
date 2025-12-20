@@ -18,13 +18,22 @@ namespace EIMSNext.ServiceApi.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class RoleController(IResolver resolver) : ApiControllerBase<Role, RoleViewModel>(resolver)
+    public class RoleController(IResolver resolver) : ApiControllerBase<RoleApiService, Role, RoleViewModel>(resolver)
     {
-        [HttpPost("addemps")]
+        [HttpPost("AddEmps")]
         [Permission(Operation = Operation.Write)]
         public virtual async Task<ActionResult> AddEmps(AddEmpsToRoleRequest request)
         {
-            await (ApiService as RoleApiService)!.AddEmployeesToRole(request);
+            await ApiService.AddEmployeesToRole(request);
+
+            return Ok(ApiResult.Success());
+        }
+
+        [HttpPost("RemoveEmps")]
+        [Permission(Operation = Operation.Write)]
+        public virtual async Task<ActionResult> RemoveEmps(RemoveEmpsToRoleRequest request)
+        {
+            await ApiService.RemoveEmployeesFromRole(request);
 
             return Ok(ApiResult.Success());
         }

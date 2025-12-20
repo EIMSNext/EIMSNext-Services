@@ -18,5 +18,13 @@ namespace EIMSNext.ApiService.Extension
         {
             return resolver.Resolve<IApiService<T, Q>>();
         }
+
+        public static S GetApiService<S, T, Q>(this IResolver resolver)
+            where S : class, IApiService<T, Q>
+           where T : IMongoEntity
+           where Q : T, new()
+        {
+            return resolver.Resolve<S>();
+        }
     }
 }

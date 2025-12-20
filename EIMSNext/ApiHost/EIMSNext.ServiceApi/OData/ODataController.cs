@@ -33,7 +33,8 @@ namespace EIMSNext.ServiceApi.OData
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="V"></typeparam>
     [Authorize]
-    public abstract class ReadOnlyODataController<T, V> : ODataController
+    public abstract class ReadOnlyODataController<S, T, V> : ODataController
+        where S : class, IApiService<T, V>
         where T : class, IMongoEntity
         where V : class, T, new()
     {
@@ -193,7 +194,8 @@ namespace EIMSNext.ServiceApi.OData
     /// <typeparam name="V"></typeparam>
     /// <typeparam name="R"></typeparam>
     [Authorize]
-    public abstract class ODataController<T, V, R> : ReadOnlyODataController<T, V>
+    public abstract class ODataController<S, T, V, R> : ReadOnlyODataController<S, T, V>
+        where S : class, IApiService<T, V>
         where T : class, IEntity
         where V : class, T, new()
         where R : class, IMongoEntity

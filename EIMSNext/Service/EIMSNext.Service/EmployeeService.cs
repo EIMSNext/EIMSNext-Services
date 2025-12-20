@@ -15,5 +15,13 @@ namespace EIMSNext.Service
 
             return Repository.UpdateManyAsync(filter, update);
         }
+
+        public Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds)
+        {
+            var update = UpdateBuilder.Pull(x => x.Roles, new EmpRole { RoleId = roleId });
+            var filter = FilterBuilder.In(x => x.Id, empIds);
+
+            return Repository.UpdateManyAsync(filter, update);
+        }
     }
 }
