@@ -10,15 +10,17 @@ namespace EIMSNext.Service
     {
         public Task<UpdateResult> AddToRoleAsync(Role role, IEnumerable<string> empIds)
         {
-            var update = UpdateBuilder.Push(x => x.Roles, new EmpRole { RoleId = role.Id, RoleName = role.Name });
-            var filter = FilterBuilder.In(x => x.Id, empIds);
+            var update = UpdateBuilder.AddToSet(x => x.Roles, new EmpRole { RoleId = role.Id, RoleName = role.Name });
+            var filter = FilterBuilder.And(FilterBuilder.In(x => x.Id, empIds),
+                FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.Roles, r => r.RoleId == role.Id) // 排除已存在该RoleId的员工
+    )           );
 
             return Repository.UpdateManyAsync(filter, update);
         }
 
         public Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds)
         {
-            var update = UpdateBuilder.Pull(x => x.Roles, new EmpRole { RoleId = roleId });
+            var update = UpdateBuilder.PullFilter(x => x.Roles, r => r.RoleId == roleId);
             var filter = FilterBuilder.In(x => x.Id, empIds);
 
             return Repository.UpdateManyAsync(filter, update);

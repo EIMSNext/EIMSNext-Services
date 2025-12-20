@@ -22,20 +22,30 @@ namespace EIMSNext.ServiceApi.Controllers
     {
         [HttpPost("AddEmps")]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> AddEmps(AddEmpsToRoleRequest request)
+        public virtual async Task<ActionResult> AddEmps([FromBody] AddEmpsToRoleRequest request)
         {
-            await ApiService.AddEmployeesToRole(request);
+            if (!string.IsNullOrEmpty(request.RoleId) && request.EmpIds?.Count > 0)
+            {
+                await ApiService.AddEmployeesToRole(request);
 
-            return Ok(ApiResult.Success());
+                return Ok(ApiResult.Success());
+            }
+
+            return BadRequest();
         }
 
         [HttpPost("RemoveEmps")]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> RemoveEmps(RemoveEmpsToRoleRequest request)
+        public virtual async Task<ActionResult> RemoveEmps([FromBody] RemoveEmpsToRoleRequest request)
         {
-            await ApiService.RemoveEmployeesFromRole(request);
+            if (!string.IsNullOrEmpty(request.RoleId) && request.EmpIds?.Count > 0)
+            {
+                await ApiService.RemoveEmployeesFromRole(request);
 
-            return Ok(ApiResult.Success());
+                return Ok(ApiResult.Success());
+            }
+
+            return BadRequest();
         }
     }
 }
