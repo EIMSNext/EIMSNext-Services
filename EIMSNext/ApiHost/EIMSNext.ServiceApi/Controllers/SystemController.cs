@@ -25,12 +25,12 @@ namespace EIMSNext.ServiceApi.Controllers
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
-        [HttpGet("CurrentUser") ]
+        [HttpGet("CurrentUser")]
         public IActionResult CurrentUser()
         {
             var appService = Resolver.GetApiService<App, AppViewModel>();
             var user = IdentityContext.CurrentUser!;
-            var emp = IdentityContext.CurrentEmployee;
+            var emp = IdentityContext.CurrentEmployee as Employee;
             var apps = appService.All().Select(x => new
             {
                 x.Id,
@@ -48,9 +48,11 @@ namespace EIMSNext.ServiceApi.Controllers
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
                 corpId = IdentityContext.CurrentCorpId,
+                deptId = emp?.DepartmentId,
                 appId = IdentityContext.CurrentAppId,
                 userType = IdentityContext.IdentityType,
-                apps
+                apps,
+                roles = emp?.Roles.Select(x => x.RoleId)
             }).ToActionResult();
         }
 
