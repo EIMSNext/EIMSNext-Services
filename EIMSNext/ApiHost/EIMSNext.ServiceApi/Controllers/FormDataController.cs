@@ -154,7 +154,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <returns></returns>
         [HttpPost]
         [Permission(Operation = Operation.Write)]
-        public async Task<IActionResult> Post(FormDataRequest model)
+        public async Task<IActionResult> Post([FromBody]FormDataRequest model)
         {
             if (!ModelState.IsValid)
             {
