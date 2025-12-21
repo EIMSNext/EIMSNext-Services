@@ -308,7 +308,7 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         [HttpPatch]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> Patch([FromODataUri] DeltaSet<R> deltas)
+        public virtual async Task<ActionResult> Patch([FromBody] DeltaSet<R> deltas)
         {
             if (deltas == null)
                 return BadRequest("数据解析失败，请检查数据格式, 确认正确的字段名和数据类型");
