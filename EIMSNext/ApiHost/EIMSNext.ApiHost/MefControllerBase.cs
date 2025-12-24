@@ -1,17 +1,28 @@
 ﻿using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
+
 using EIMSNext.ApiCore;
+using EIMSNext.ApiService;
+using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
-using EIMSNext.FlowApi.Authorization;
-using EIMSNext.FlowApi.Extension;
-using HKH.Mef2.Integration;
-using Microsoft.AspNetCore.Mvc;
 
-namespace EIMSNext.FlowApi.Controllers
+using HKH.Mef2.Integration;
+
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData.Deltas;
+using Microsoft.AspNetCore.OData.Results;
+
+namespace EIMSNext.ApiHost.Controllers
 {
+    /// <summary>
+    /// 
+    /// </summary>
+    [ApiController, Authorize]
+    [Route("api/v{version:apiVersion}/[controller]")]
     public abstract class MefControllerBase : ControllerBase
     {
         /// <summary>
@@ -41,11 +52,11 @@ namespace EIMSNext.FlowApi.Controllers
         /// <param name="resolver"></param>
         public MefControllerBase(IResolver resolver)
         {
-            Resolver = resolver;
+            this.Resolver = resolver;
             MefContainer = resolver.MefContainer;
-            Cache = resolver.GetCacheClient();
-            IdentityContext = resolver.GetIdentityContext();
-            AppSetting = resolver.GetAppSetting();
+            this.Cache = resolver.GetCacheClient();
+            this.IdentityContext = resolver.GetIdentityContext();
+            this.AppSetting = resolver.GetAppSetting();
         }
 
         /// <summary>
@@ -77,12 +88,33 @@ namespace EIMSNext.FlowApi.Controllers
         //    return restClient.Execute<JsonObject>(request).Data;
         //}
 
-        protected IActionResult Error(int errCode, string errMsg, dynamic? data = null)
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="errCode"></param>
+        /// <param name="errMsg"></param>
+        /// <returns></returns>
+        protected IActionResult Error(int errCode, string errMsg)
         {
-            return new ObjectResult(new { code = errCode, message = errMsg, data })
-            {               
-                StatusCode = errCode
-            };
+            return new ODataErrorResult(errCode.ToString(), errMsg);
+        }
+
+        /// <summary>
+        /// 获取Delta对象中的Id值
+        /// </summary>
+        /// <param name="delta"></param>
+        /// <param name="id"></param>
+        /// <returns></returns>
+        protected bool TryGetId<R>(Delta<R> delta, out string id) where R : class
+        {
+            id = string.Empty;
+            object _id;
+            if (delta.TryGetPropertyValue("Id", out _id) && _id != null)
+                id = _id.ToString()!;
+            else if (delta.TryGetPropertyValue("_id", out _id) && _id != null)
+                id = _id.ToString()!;
+
+            return !string.IsNullOrEmpty(id);
         }
     }
 }

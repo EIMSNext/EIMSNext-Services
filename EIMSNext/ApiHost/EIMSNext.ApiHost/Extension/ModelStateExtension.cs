@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using Microsoft.AspNetCore.Mvc.ModelBinding;
 
-namespace EIMSNext.ServiceApi.Extension
+namespace EIMSNext.ApiHost.Extension
 {
     /// <summary>
     /// 

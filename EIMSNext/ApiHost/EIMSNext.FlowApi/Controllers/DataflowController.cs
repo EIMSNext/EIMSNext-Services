@@ -1,21 +1,24 @@
 using Asp.Versioning;
+
+using EIMSNext.ApiHost.Controllers;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Entity;
 using EIMSNext.Flow.Core.Interface;
-using EIMSNext.FlowApi.Extension;
 using EIMSNext.Service.Interface;
+
 using HKH.Mef2.Integration;
-using Microsoft.AspNetCore.Authorization;
+
 using Microsoft.AspNetCore.Mvc;
+
 using MongoDB.Driver;
+
 using WorkflowCore.Interface;
 
 namespace EIMSNext.FlowApi.Controllers
 {
-    [Authorize]
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion(1.0)]
     public class DataflowController : MefControllerBase
     {
         private readonly IWorkflowHost _wfHost;

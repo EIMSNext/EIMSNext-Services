@@ -1,18 +1,19 @@
 using Asp.Versioning;
+
+using EIMSNext.ApiHost.Controllers;
 using EIMSNext.Core;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
+
 using HKH.Mef2.Integration;
 
-using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+
 using NanoidDotNet;
 
 namespace EIMSNext.FileUploadApi.Controllers
 {
-    [Authorize]
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
+    [ApiVersion(1.0)]
     public class UploadController : MefControllerBase
     {
         private readonly ILogger<UploadController> _logger;
@@ -28,7 +29,7 @@ namespace EIMSNext.FileUploadApi.Controllers
         /// 上传附件
         /// </summary>
         /// <returns></returns>
-        [HttpPost]
+        [HttpPost, Route("Upload")]
         public async Task<IActionResult> Upload()
         {
             var files = Request.Form.Files;

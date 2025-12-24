@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-using Asp.Versioning.ApiExplorer;
+﻿using Asp.Versioning.ApiExplorer;
 
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.Extensions.DependencyInjection;
@@ -17,14 +15,15 @@ namespace EIMSNext.ApiHost.Extension
     public class VersioningSwaggerGenOptions : IConfigureOptions<SwaggerGenOptions>
     {
         private IApiVersionDescriptionProvider provider;
-
+        private ISwaggerGenHandler handler;
         /// <summary>
         /// 
         /// </summary>
         /// <param name="provider"></param>
-        public VersioningSwaggerGenOptions(IApiVersionDescriptionProvider provider)
+        public VersioningSwaggerGenOptions(IApiVersionDescriptionProvider provider, ISwaggerGenHandler handler)
         {
             this.provider = provider;
+            this.handler = handler;
         }
         /// <summary>
         /// 
@@ -32,9 +31,13 @@ namespace EIMSNext.ApiHost.Extension
         /// <param name="options"></param>
         public void Configure(SwaggerGenOptions options)
         {
+            //options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
+            //options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
+            this.handler.IncludeXmlComments();
+
             foreach (var description in provider.ApiVersionDescriptions)
             {
-                options.SwaggerDoc(description.GroupName, CreateInfoForApiVersion(description));
+                options.SwaggerDoc(description.GroupName, this.handler.CreateOpenApiInfo(description));
             }
 
             options.DocInclusionPredicate((version, apiDescription) =>
@@ -54,8 +57,6 @@ namespace EIMSNext.ApiHost.Extension
                     ((actionDesc.ControllerTypeInfo.Namespace??string.Empty).Contains("ODataControllers")?"OData 接口":"API 接口") + " - " + actionDesc.ControllerName};
             });
 
-            //options.IncludeXmlComments("D:\\Fork\\doc\\api.xml");
-            //options.IncludeXmlComments("D:\\Fork\\doc\\entity.xml");
             options.AddSecurityDefinition(
                 "Bearer",
                 new OpenApiSecurityScheme
@@ -81,27 +82,6 @@ namespace EIMSNext.ApiHost.Extension
                     new List<string>()
                 },
             });
-        }
-
-        private OpenApiInfo CreateInfoForApiVersion(ApiVersionDescription description)
-        {
-            var text = new StringBuilder();
-            var info = new OpenApiInfo()
-            {
-                Title = $"EIMSNext Workflow API - V{description.ApiVersion}",
-                Version = description.ApiVersion.ToString(),
-                //Contact = new OpenApiContact() { Name = "Bill Mei", Email = "bill.mei@somewhere.com" },
-            };
-
-            if (description.IsDeprecated)
-            {
-                text.Append(" This API version has been deprecated.");
-            }
-
-            //text.Append("<h4>Additional Information</h4>");
-            info.Description = text.ToString();
-
-            return info;
         }
     }
 }
