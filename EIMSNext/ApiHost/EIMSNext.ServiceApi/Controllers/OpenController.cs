@@ -1,6 +1,6 @@
 ﻿using Asp.Versioning;
 
-using EIMSNext.ServiceApi.Extension;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.Common;
 
 using Microsoft.AspNetCore.Mvc;

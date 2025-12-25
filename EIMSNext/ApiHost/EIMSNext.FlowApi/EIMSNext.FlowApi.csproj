@@ -25,6 +25,7 @@
 	  <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Persistence\EIMSNext.Flow.Persistence.csproj" />
 	  <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Service\EIMSNext.Flow.Service.csproj" />
 	  <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
+	  <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
 	</ItemGroup>
 
 </Project>

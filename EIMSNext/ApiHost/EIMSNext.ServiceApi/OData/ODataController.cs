@@ -3,6 +3,7 @@ using System.IO.Pipelines;
 using System.Reflection;
 using System.Text;
 
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
@@ -10,7 +11,6 @@ using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.ServiceApi.Authorization;
-using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
 
 using HKH.Mef2.Integration;

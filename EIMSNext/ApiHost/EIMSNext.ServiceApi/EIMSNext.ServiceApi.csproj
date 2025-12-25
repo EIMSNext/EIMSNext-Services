@@ -33,6 +33,7 @@
 		<ProjectReference Include="..\..\Service\EIMSNext.Repository\EIMSNext.Repository.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.Service.Interface\EIMSNext.Service.Interface.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
+		<ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
 	</ItemGroup>
 
 </Project>

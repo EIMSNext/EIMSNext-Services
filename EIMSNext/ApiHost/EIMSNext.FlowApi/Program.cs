@@ -1,5 +1,7 @@
 using Asp.Versioning;
+
 using EIMSNext.ApiCore;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.Component;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interface;
@@ -7,10 +9,14 @@ using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.FlowApi.Extension;
 using EIMSNext.MongoDb;
+
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+
 using NLog.Extensions.Logging;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
+
 using WorkflowCore.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -46,6 +52,7 @@ builder.Services.AddApiVersioning(opt =>
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSwaggerGenOptions>();
 builder.Services.AddSwaggerGen();
 
