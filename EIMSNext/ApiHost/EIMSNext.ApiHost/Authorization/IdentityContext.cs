@@ -1,4 +1,5 @@
-﻿using EIMSNext.Auth.Entity;
+﻿using EIMSNext.ApiService;
+using EIMSNext.Auth.Entity;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
@@ -14,9 +15,11 @@ namespace EIMSNext.ApiHost.Authorization
     /// <summary>
     /// 身份标识上下文
     /// </summary>
-    public abstract class IdentityContext : IIdentityContext
+    public class IdentityContext : IIdentityContext
     {
         private bool _retrieved = false;
+
+        private IdentityType _type = IdentityType.None;
         private IResolver _resolver;
         private User? _user;
         private Employee? _employee;
@@ -35,34 +38,34 @@ namespace EIMSNext.ApiHost.Authorization
             CurrentUserID = idClaim?.Value ?? string.Empty;
             CurrentCorpId = corpClaim?.Value ?? string.Empty;
 
-            //if (idClaim == null && corpClaim == null)
-            //{
-            //    var client_idClaim = httpContextAccessor.HttpContext?.User.FindFirst("client_id");
-            //    var clientId = client_idClaim?.Value ?? string.Empty;
-            //    if (!string.IsNullOrEmpty(clientId))
-            //    {
-            //        var client = resolver.GetService<Client>().Get(clientId);
-            //        if (client != null)
-            //        {
-            //            CurrentCorpId = client.CorpId;
-            //            CurrentUserID = "system";
-            //        }
-            //    }
-            //}
+            if (idClaim == null && corpClaim == null)
+            {
+                var client_idClaim = httpContextAccessor.HttpContext?.User.FindFirst("client_id");
+                var clientId = client_idClaim?.Value ?? string.Empty;
+                if (!string.IsNullOrEmpty(clientId))
+                {
+                    var client = resolver.GetService<Auth.Entity.Client>().Get(clientId);
+                    if (client != null)
+                    {
+                        CurrentCorpId = client.CorpId;
+                        CurrentUserID = "system";
+                    }
+                }
+            }
 
-            //var httpQuery = httpContextAccessor.HttpContext?.Request.Query;
-            //if (httpQuery != null)
-            //{
-            //    CurrentAppId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("appid")).Value;
-            //    CurrentFormId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("formid")).Value;
-            //}
+            var httpQuery = httpContextAccessor.HttpContext?.Request.Query;
+            if (httpQuery != null)
+            {
+                CurrentAppId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("appid")).Value;
+                CurrentFormId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("formid")).Value;
+            }
 
             var serviceContext = resolver.GetServiceContext();
-            //serviceContext.User = CurrentUser;
-            serviceContext.Employee = CurrentEmployee;
-            serviceContext.Operator = CurrentEmployee?.ToOperator() ?? Operator.Empty;
             serviceContext.AccessToken = AccessToken;
             serviceContext.CorpId = CurrentCorpId;
+            serviceContext.User = CurrentUser;
+            serviceContext.Employee = CurrentEmployee;
+            serviceContext.Operator = CurrentEmployee?.ToOperator() ?? Operator.Empty;
         }
 
         /// <summary>
@@ -70,13 +73,29 @@ namespace EIMSNext.ApiHost.Authorization
         /// </summary>
         public string CurrentUserID { get; private set; } = string.Empty;
 
-        public IEmployee CurrentEmployee
+        /// <summary>
+        /// 当前用户对象
+        /// </summary>
+        public IUser? CurrentUser
         {
             get
             {
-                if (!_retrieved && _employee == null)
+                if (_user == null && !_retrieved)
                     Retrieve();
-                return _employee!;
+                return _user;
+            }
+        }
+
+        /// <summary>
+        /// 
+        /// </summary>
+        public IEmployee? CurrentEmployee
+        {
+            get
+            {
+                if (_employee == null && !_retrieved)
+                    Retrieve();
+                return _employee;
             }
         }
 
@@ -90,6 +109,73 @@ namespace EIMSNext.ApiHost.Authorization
                     _employee = _resolver.GetRepository<Employee>().Queryable.FirstOrDefault(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id);
                 }
                 _retrieved = true;
+            }
+        }
+
+        /// <summary>
+        /// 用户身份
+        /// </summary>
+        public IdentityType IdentityType
+        {
+            get
+            {
+                if (_type == IdentityType.None)
+                {
+                    if (CurrentUser != null && CurrentUser is User)
+                    {
+                        var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
+                        if (corp != null)
+                        {
+                            if (corp.IsCorpOwner) _type = IdentityType.CorpOwmer;
+                            else
+                            {
+
+                            }
+                        }
+                    }
+                }
+                //if (_type == IdentityType.None)
+                //{
+                //    if (IsAdmin)
+                //    {
+                //        _type = IdentityType.Admin;
+                //    }
+                //    else
+                //    {
+                //        _user = CurrentUser;
+                //        if (_user != null)
+                //        {
+                //            if (_user.Disabled ?? false)
+                //            {
+                //                _type = IdentityType.Disabled;
+                //            }
+                //            else
+                //            {
+                //                if (_user.UserType == null)
+                //                    _type = IdentityType.NonRegister;
+                //                else if (_user.UserType == 1)
+                //                    _type = IdentityType.Terminal;
+                //                else
+                //                {
+                //                    _type = IdentityType.Internal;
+
+                //                    var _org = _user.SysOrg;
+                //                    if (_org != null)
+                //                    {
+                //                        if (_org.IsMerchant.HasValue && _org.IsMerchant.Value)
+                //                            _type = IdentityType.Agent;
+                //                        if (_org.IsTransport.HasValue && _org.IsTransport.Value)
+                //                            _type = IdentityType.Transport;
+                //                        if (_org.IsRecovery.HasValue && _org.IsRecovery.Value)
+                //                            _type = IdentityType.Recovery;
+                //                    }
+                //                }
+                //            }
+                //        }
+                //    }
+                //}
+
+                return _type;
             }
         }
 
@@ -108,10 +194,9 @@ namespace EIMSNext.ApiHost.Authorization
         /// </summary>
         public string? CurrentFormId { get; private set; }
 
-        public virtual IUser? CurrentUser => throw new NotImplementedException();
-
-        public virtual ApiService.IdentityType IdentityType => throw new NotImplementedException();
-
+        /// <summary>
+        /// 当前的Token
+        /// </summary>
         public string AccessToken { get; private set; }
     }
 }

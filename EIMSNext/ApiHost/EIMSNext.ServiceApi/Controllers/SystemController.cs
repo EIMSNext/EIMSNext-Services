@@ -1,16 +1,19 @@
 ﻿using Asp.Versioning;
+
+using EIMSNext.ApiHost.Controllers;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Auth.Entity;
 using EIMSNext.Common;
 using EIMSNext.Entity;
-using EIMSNext.ServiceApi.Authorization;
-using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
-using HKH.Mef2.Integration;
-using IdentityServer4.Models;
-using Microsoft.AspNetCore.Mvc;
 
+using HKH.Mef2.Integration;
+
+using IdentityServer4.Models;
+
+using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.ServiceApi.Controllers
 {
@@ -66,8 +69,8 @@ namespace EIMSNext.ServiceApi.Controllers
         {
             if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
 
-            var user = IdentityContext.CurrentUser!.AsUser();
-            user.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
+            var user = IdentityContext.CurrentUser! as User;
+            user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
             await Resolver.GetApiService<User, User>().ReplaceAsync(user);
             return ApiResult.Success(req.CorpId).ToActionResult();
         }

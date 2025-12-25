@@ -1,6 +1,7 @@
 using Asp.Versioning;
 
 using EIMSNext.ApiCore;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
@@ -76,6 +77,7 @@ builder.Services.AddApiVersioning(opt =>
 builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSwaggerGenOptions>();
 builder.Services.AddSwaggerGen();
 
