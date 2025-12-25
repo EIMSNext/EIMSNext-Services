@@ -2,10 +2,11 @@
 
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class DfExecLogApiService(IResolver resolver) : ApiServiceBase<Df_ExecLog, DfExecLogViewModel>(resolver)
+	public class DfExecLogApiService(IResolver resolver) : ApiServiceBase<Df_ExecLog, DfExecLogViewModel, IDfExecLogService>(resolver)
 	{
 	}
 }

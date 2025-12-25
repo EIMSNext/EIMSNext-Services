@@ -1,6 +1,6 @@
 ﻿using Asp.Versioning;
 
-using EIMSNext.ServiceApi.Extension;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.Common;
 
 using Microsoft.AspNetCore.Mvc;
@@ -18,14 +18,13 @@ namespace EIMSNext.ServiceApi.Controllers
         /// test if works
         /// </summary>
         /// <returns></returns>
-        [HttpGet]
-        [Route("api/v{version:apiVersion}/ping")]
+        [HttpGet("api/v{version:apiVersion}/Ping")]
         public IActionResult Ping()
         {
             return ApiResult.Success("API Server is running.").ToActionResult();
         }
 
-        [Route("api/version"), HttpGet]
+        [HttpGet("api/Version")]
         public string Version()
         {
             return Assembly.GetExecutingAssembly().GetName().Version!.ToString();

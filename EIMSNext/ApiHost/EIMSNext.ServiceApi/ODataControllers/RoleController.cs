@@ -9,6 +9,10 @@ using EIMSNext.Common;
 using EIMSNext.Core;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.OData.UriParser;
+using EIMSNext.ApiService;
+using EIMSNext.ServiceApi.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData.Formatter;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -17,7 +21,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class RoleController(IResolver resolver) : ODataController<Role, RoleViewModel, RoleRequest>(resolver)
+    public class RoleController(IResolver resolver) : ODataController<RoleApiService, Role, RoleViewModel, RoleRequest>(resolver)
     {
         /// <summary>
         /// 

@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class PublicSettingApiService(IResolver resolver) : ApiServiceBase<PublicSetting, PublicSettingViewModel>(resolver)
+	public class PublicSettingApiService(IResolver resolver) : ApiServiceBase<PublicSetting, PublicSettingViewModel, IPublicSettingService>(resolver)
 	{
 	}
 }

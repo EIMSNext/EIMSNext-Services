@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class AuditLoginApiService(IResolver resolver) : ApiServiceBase<AuditLogin, AuditLoginViewModel>(resolver)
-	{
-	}
+    public class AuditLoginApiService(IResolver resolver) : ApiServiceBase<AuditLogin, AuditLoginViewModel, IAuditLoginService>(resolver)
+    {
+    }
 }

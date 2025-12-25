@@ -1,8 +1,11 @@
 using Asp.Versioning;
+
 using EIMSNext.ApiCore;
-using EIMSNext.Common;
+using EIMSNext.ApiHost.Extension;
+using EIMSNext.Component;
 using EIMSNext.FileUpload;
 using EIMSNext.FileUploadApi.Extension;
+
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 
@@ -12,6 +15,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigCommonServices();
+
 // Add services to the container.
 builder.Host.UseAutofac<AutofacRegisterModule>();
 
@@ -35,16 +39,17 @@ builder.Services.AddApiVersioning(opt =>
 });
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
+builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSwaggerGenOptions>();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDefaultMef(Constants.BaseDirectory, "*Plugin.dll");
+builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
 
 var app = builder.Build();
 
 app.UseCustomMiddlewares();
 
-//Configure the HTTP request pipeline.
+// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();

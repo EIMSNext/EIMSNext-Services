@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, EmployeeViewModel>(resolver)
+	public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, EmployeeViewModel, IEmployeeService>(resolver)
 	{
 	}
 }

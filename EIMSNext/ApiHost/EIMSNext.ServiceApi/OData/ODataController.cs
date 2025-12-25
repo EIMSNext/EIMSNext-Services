@@ -3,15 +3,14 @@ using System.IO.Pipelines;
 using System.Reflection;
 using System.Text;
 
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
-using EIMSNext.Core.Query;
 using EIMSNext.ServiceApi.Authorization;
-using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
 
 using HKH.Mef2.Integration;
@@ -25,7 +24,6 @@ using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 
 using MongoDB.AspNetCore.OData;
-using MongoDB.Driver;
 
 namespace EIMSNext.ServiceApi.OData
 {
@@ -35,7 +33,8 @@ namespace EIMSNext.ServiceApi.OData
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="V"></typeparam>
     [Authorize]
-    public abstract class ReadOnlyODataController<T, V> : ODataController
+    public abstract class ReadOnlyODataController<S, T, V> : ODataController
+        where S : class, IApiService<T, V>
         where T : class, IMongoEntity
         where V : class, T, new()
     {
@@ -186,85 +185,6 @@ namespace EIMSNext.ServiceApi.OData
         //        return string.IsNullOrEmpty(orgId) ? 0 : orgId.SafeToInt64();
         //    }
         //}
-
-        #region DynamicQuery
-
-        /// <summary>
-        /// 动态查询数据
-        /// </summary>
-        /// <param name="options"></param>
-        /// <returns></returns>
-        [HttpPost]
-        [Permission(Operation = Operation.Read)]
-        [DynamicQuery]
-        public ActionResult GetData([FromBody] DynamicFindOptions<T> options)
-        {
-            //TODO: fill field type
-            var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result });
-        }
-
-        /// <summary>
-        /// 动态查询总数
-        /// </summary>
-        /// <param name="filter"></param>
-        /// <returns></returns>
-        [HttpPost]
-        [Permission(Operation = Operation.Read)]
-        [DynamicQueryCount]
-        public ActionResult GetCount([FromBody] DynamicFilter filter)
-        {  
-            //TODO: fill field type
-            return Ok(ApiService.Count(filter));
-        }
-
-        /// <summary>
-        /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
-        /// </summary>
-        /// <param name="query"></param>
-        /// <returns></returns>
-        protected virtual DynamicFindOptions<T> FilterResult(DynamicFindOptions<T> query)
-        {
-            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
-        }
-        protected DynamicFindOptions<T> FilterByDeleted(DynamicFindOptions<T> query)
-        {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
-            }
-
-            query.Filter = filter;
-            return query;
-        }
-        protected DynamicFindOptions<T> FilterByCorpId(DynamicFindOptions<T> query)
-        {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
-            }
-
-            query.Filter = filter;
-            return query;
-        }
-        protected virtual DynamicFindOptions<T> FilterByPermission(DynamicFindOptions<T> query)
-        {
-            return query;
-        }
-
-        #endregion
     }
 
     /// <summary>
@@ -274,7 +194,8 @@ namespace EIMSNext.ServiceApi.OData
     /// <typeparam name="V"></typeparam>
     /// <typeparam name="R"></typeparam>
     [Authorize]
-    public abstract class ODataController<T, V, R> : ReadOnlyODataController<T, V>
+    public abstract class ODataController<S, T, V, R> : ReadOnlyODataController<S, T, V>
+        where S : class, IApiService<T, V>
         where T : class, IEntity
         where V : class, T, new()
         where R : class, IMongoEntity
@@ -387,7 +308,7 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         [HttpPatch]
         [Permission(Operation = Operation.Write)]
-        public virtual async Task<ActionResult> Patch([FromODataUri] DeltaSet<R> deltas)
+        public virtual async Task<ActionResult> Patch([FromBody] DeltaSet<R> deltas)
         {
             if (deltas == null)
                 return BadRequest("数据解析失败，请检查数据格式, 确认正确的字段名和数据类型");

@@ -6,6 +6,6 @@ using EIMSNext.Service.Interface;
 namespace EIMSNext.Service
 {
     public class RoleService(IResolver resolver) : EntityServiceBase<Role>(resolver), IRoleService
-    {
+    {      
     }
 }

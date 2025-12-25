@@ -19,5 +19,28 @@
         /// </summary>
         public int SortValue { get; set; }
     }
+
+    public class AddEmpsToRoleRequest
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string? RoleId { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<string>? EmpIds { get; set; }
+    }
+    public class RemoveEmpsToRoleRequest
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string? RoleId { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<string>? EmpIds { get; set; }
+    }
 }
 

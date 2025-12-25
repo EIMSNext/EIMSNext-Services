@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class AuthGroupApiService(IResolver resolver) : ApiServiceBase<AuthGroup, AuthGroupViewModel>(resolver)
+	public class AuthGroupApiService(IResolver resolver) : ApiServiceBase<AuthGroup, AuthGroupViewModel, IAuthGroupService>(resolver)
 	{
 	}
 }

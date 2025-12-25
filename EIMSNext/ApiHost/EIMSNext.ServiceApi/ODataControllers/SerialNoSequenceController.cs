@@ -5,6 +5,7 @@ using EIMSNext.ServiceApi.OData;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
+using EIMSNext.ApiService;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -13,7 +14,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class SerialNoSequenceController(IResolver resolver) : ODataController<SerialNoSequence, SerialNoSequenceViewModel, SerialNoSequenceRequest>(resolver)
+	public class SerialNoSequenceController(IResolver resolver) : ODataController<SerialNoSequenceApiService, SerialNoSequence, SerialNoSequenceViewModel, SerialNoSequenceRequest>(resolver)
 	{
 		
 	}

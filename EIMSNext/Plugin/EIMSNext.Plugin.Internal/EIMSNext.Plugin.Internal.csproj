@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="HKH.Mef2.Integration.Abstractions" Version="1.1.1" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.6" />
+    <PackageReference Include="RestSharp" Version="112.1.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\EIMSNext.Plugin.Interface\EIMSNext.Plugin.Interface.csproj" />
+  </ItemGroup>
+</Project>

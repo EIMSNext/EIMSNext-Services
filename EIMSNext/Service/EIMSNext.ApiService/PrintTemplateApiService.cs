@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class PrintTemplateApiService(IResolver resolver) : ApiServiceBase<PrintTemplate, PrintTemplateViewModel>(resolver)
+	public class PrintTemplateApiService(IResolver resolver) : ApiServiceBase<PrintTemplate, PrintTemplateViewModel, IPrintTemplateService>(resolver)
 	{
 	}
 }

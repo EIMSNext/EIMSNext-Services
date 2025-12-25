@@ -1,9 +1,11 @@
 ﻿using Asp.Versioning;
+
+using HKH.Mef2.Integration;
+using EIMSNext.ServiceApi.OData;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
-using EIMSNext.ServiceApi.OData;
-using HKH.Mef2.Integration;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
@@ -12,7 +14,8 @@ namespace EIMSNext.ServiceApi.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class DepartmentController(IResolver resolver) : ODataController<Department, DepartmentViewModel,DepartmentRequest>(resolver)
+	public class DepartmentController(IResolver resolver) : ODataController<DepartmentApiService, Department, DepartmentViewModel, DepartmentRequest>(resolver)
 	{
-    }
+		
+	}
 }

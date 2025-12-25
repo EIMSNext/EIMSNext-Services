@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class DepartmentApiService(IResolver resolver) : ApiServiceBase<Department, DepartmentViewModel>(resolver)
+	public class DepartmentApiService(IResolver resolver) : ApiServiceBase<Department, DepartmentViewModel, IDepartmentService>(resolver)
 	{
 	}
 }

@@ -1,37 +1,39 @@
 ﻿using Asp.Versioning;
+
+using EIMSNext.ApiHost.Controllers;
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Auth.Entity;
 using EIMSNext.Common;
 using EIMSNext.Entity;
-using EIMSNext.ServiceApi.Authorization;
-using EIMSNext.ServiceApi.Extension;
 using EIMSNext.ServiceApi.Request;
-using HKH.Mef2.Integration;
-using IdentityServer4.Models;
-using Microsoft.AspNetCore.Mvc;
 
+using HKH.Mef2.Integration;
+
+using IdentityServer4.Models;
+
+using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.ServiceApi.Controllers
 {
     /// <summary>
     /// 
     /// </summary>
-    /// <param name="resolver"></param>
-    [ApiController, ApiVersion(1.0)]
-    [Route("api/v{version:apiVersion}/[controller]")]
+    /// <param name="resolver"></param> 
+    [ApiVersion(1.0)]
     public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
         /// <summary>
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
-        [Route("currentuser"), HttpGet]
+        [HttpGet("CurrentUser")]
         public IActionResult CurrentUser()
         {
             var appService = Resolver.GetApiService<App, AppViewModel>();
             var user = IdentityContext.CurrentUser!;
-            var emp = IdentityContext.CurrentEmployee;
+            var emp = IdentityContext.CurrentEmployee as Employee;
             var apps = appService.All().Select(x => new
             {
                 x.Id,
@@ -49,9 +51,11 @@ namespace EIMSNext.ServiceApi.Controllers
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
                 corpId = IdentityContext.CurrentCorpId,
+                deptId = emp?.DepartmentId,
                 appId = IdentityContext.CurrentAppId,
                 userType = IdentityContext.IdentityType,
-                apps
+                apps,
+                roles = emp?.Roles.Select(x => x.RoleId)
             }).ToActionResult();
         }
 
@@ -60,13 +64,13 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        [Route("switchcorp"), HttpPost]
+        [HttpPost("SwitchCorp")]
         public async Task<IActionResult> SwitchCorprate(SwitchCorprateRequest req)
         {
             if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
 
-            var user = IdentityContext.CurrentUser!.AsUser();
-            user.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
+            var user = IdentityContext.CurrentUser! as User;
+            user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
             await Resolver.GetApiService<User, User>().ReplaceAsync(user);
             return ApiResult.Success(req.CorpId).ToActionResult();
         }
@@ -76,7 +80,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
-        [Route("updatesecret"), HttpPost]
+        [HttpPost("UpdateSecret")]
         public async Task<IActionResult> UpdateClientSecret(UpdateSecretRequest req)
         {
             if (string.IsNullOrEmpty(req.ClientId)) return NotFound();

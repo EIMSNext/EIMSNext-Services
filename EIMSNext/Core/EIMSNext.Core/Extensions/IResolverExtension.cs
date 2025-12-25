@@ -26,6 +26,11 @@ namespace EIMSNext.Core
             return resolver.Resolve<IService<T>>();
         }
 
+        public static S GetService<S, T>(this IResolver resolver) where T : IMongoEntity where S : class, IService<T>
+        {
+            return resolver.Resolve<S>();
+        }
+
         public static ICacheClient GetCacheClient(this IResolver resolver)
         {
             return resolver.Resolve<ICacheClient>();

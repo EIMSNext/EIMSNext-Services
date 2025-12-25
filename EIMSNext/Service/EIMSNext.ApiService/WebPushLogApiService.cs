@@ -6,7 +6,7 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, WebPushLogViewModel>(resolver)
+	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, WebPushLogViewModel, IWebPushLogService>(resolver)
 	{
 	}
 }

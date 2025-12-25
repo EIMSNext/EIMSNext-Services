@@ -1,16 +1,14 @@
 ﻿using Autofac;
-using EIMSNext.Common;
-using EIMSNext.Core.Repository;
+
+using EIMSNext.ApiHost.Extension;
 using EIMSNext.FileUpload;
-using EIMSNext.FileUploadApi.Authorization;
-using HKH.Mef2.Integration;
 
 namespace EIMSNext.FileUploadApi.Extension
 {
     /// <summary>
     /// 
     /// </summary>
-    public class AutofacRegisterModule : Module
+    public class AutofacRegisterModule : AutofacRegisterModuleBase
     {
         /// <summary>
         /// 
@@ -18,12 +16,10 @@ namespace EIMSNext.FileUploadApi.Extension
         /// <param name="builder"></param>
         protected override void Load(ContainerBuilder builder)
         {
-            builder.RegisterType<AppSetting>().AsSelf().SingleInstance();
+            base.Load(builder);
+
             builder.RegisterType<UploadDbContext>().AsImplementedInterfaces().SingleInstance();
-            builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).SingleInstance();
             builder.RegisterType<UploadServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
-            builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
-            builder.RegisterType<IdentityContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
         }
     }
 }

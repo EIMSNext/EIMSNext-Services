@@ -12,21 +12,22 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
-    public abstract class ApiServiceBase<T, V> : IApiService<T, V>
+    public abstract class ApiServiceBase<T, V, S> : IApiService<T, V>
         where T : class, IMongoEntity
         where V : T, new()
+        where S : class, IService<T>
     {
         public ApiServiceBase(IResolver resolver)
         {
             Resolver = resolver;
-            CoreService = resolver.GetService<T>();
+            CoreService = resolver.GetService<S, T>();
             CacheClient = resolver.GetCacheClient();
             MemoryCache = resolver.GetMemoryCache();
             IdentityContext = resolver.GetIdentityContext();
         }
 
         protected IResolver Resolver { get; private set; }
-        protected IService<T> CoreService { get; private set; }
+        protected S CoreService { get; private set; }
         protected ICacheClient CacheClient { get; private set; }
         protected IMemoryCache MemoryCache { get; private set; }
         protected IIdentityContext IdentityContext { get; private set; }
@@ -112,7 +113,7 @@ namespace EIMSNext.ApiService
         }
 
         public virtual Task AddAsync(T entity)
-        {           
+        {
             return AddAsyncCore(entity);
         }
 

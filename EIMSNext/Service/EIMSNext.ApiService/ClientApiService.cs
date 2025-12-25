@@ -3,10 +3,11 @@
 using EIMSNext.ApiService.Interface;
 
 using NanoidDotNet;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.ApiService
 {
-    public class ClientApiService(IResolver resolver) : ApiServiceBase<Auth.Entity.Client, Auth.Entity.Client>(resolver), IClientApiService
+    public class ClientApiService(IResolver resolver) : ApiServiceBase<Auth.Entity.Client, Auth.Entity.Client, IClientService >(resolver), IClientApiService
     {
         public Task AddApiKeyAsync(Auth.Entity.Client entity)
         {
