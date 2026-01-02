@@ -31,5 +31,11 @@ namespace EIMSNext.ApiService
             _serviceContext.Action = action;
             return base.AddAsync(entity);
         }
+
+        public Task ReplaceAsync(FormData entity, DataAction action)
+        {
+            _serviceContext.Action = action;
+            return base.ReplaceAsync(entity);
+        }
     }
 }

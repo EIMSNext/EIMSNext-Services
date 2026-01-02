@@ -1,5 +1,5 @@
 ﻿using HKH.Mef2.Integration;
-
+using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -11,9 +11,16 @@ namespace EIMSNext.Flow.Core.Node
         {
         }
 
-        public override Task<ExecutionResult> RunAsync(IStepExecutionContext context)
+        public override async Task<ExecutionResult> RunAsync(IStepExecutionContext context)
         {
-            throw new NotImplementedException();
+            var dataContext = GetDataContext(context);
+
+            var empIds = await PopulateEmpIds(dataContext, Metadata!.WfNodeSetting?.CopyToSetting?.Candidates);
+
+            if (empIds.Any())
+                await AddCCLogs(context.Workflow, dataContext, Metadata!, empIds, null);
+
+            return ExecutionResult.Next();
         }
     }
 }
