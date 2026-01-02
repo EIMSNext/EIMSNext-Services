@@ -55,9 +55,9 @@ namespace EIMSNext.FlowApi.Controllers
         [HttpPost, Route("Start")]
         public async Task<IActionResult> StartAsync(StartRequest request)
         {
-            if (string.IsNullOrEmpty(request.WfDefinitionId) && string.IsNullOrEmpty(request.DataId))
+            if (IdentityContext.CurrentEmployee == null || (string.IsNullOrEmpty(request.WfDefinitionId) && string.IsNullOrEmpty(request.DataId)))
             {
-                return BadRequest("流程定义Id和数据Id不能为空");
+                return BadRequest("发起人和流程定义Id和数据Id不能为空");
             }
 
             var formData = _formDataservice.Get(request.DataId);
@@ -83,10 +83,10 @@ namespace EIMSNext.FlowApi.Controllers
         [HttpPost, Route("Approve")]
         public async Task<IActionResult> ApproveAsync(ApproveRequest request)
         {
-            if ((string.IsNullOrEmpty(request.WfInstanceId) && string.IsNullOrEmpty(request.DataId))
+            if (IdentityContext.CurrentEmployee == null || (string.IsNullOrEmpty(request.WfInstanceId) && string.IsNullOrEmpty(request.DataId))
                  || request.Action == ApproveAction.None)
             {
-                return BadRequest("流程实例Id和数据Id不能为空");
+                return BadRequest("审批人和流程实例Id和数据Id不能为空");
             }
 
             var workerId = IdentityContext.CurrentEmployee.Id;
