@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "API + Flow",
+    "Projects": [
+      {
+        "Path": "ApiHost\\EIMSNext.FlowApi\\EIMSNext.FlowApi.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.ServiceApi\\EIMSNext.ServiceApi.csproj",
+        "Action": "Start"
+      }
+    ]
+  }
+]

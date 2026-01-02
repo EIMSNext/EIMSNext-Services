@@ -34,9 +34,6 @@ namespace EIMSNext.Flow.Core.Node
                             var todo = TodoRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
                             if (todo != null)
                             {
-
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
-
                                 using (var scope = TodoRepository.NewTransactionScope())
                                 {
                                     //写入审批记录
@@ -75,6 +72,12 @@ namespace EIMSNext.Flow.Core.Node
 
                                     scope.CommitTransaction();
                                 }
+
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
+                            }
+                            else
+                            {
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData, "没有审批权限");
                             }
                         }
                         break;
@@ -83,8 +86,6 @@ namespace EIMSNext.Flow.Core.Node
                             var todo = TodoRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
                             if (todo != null)
                             {
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
-
                                 using (var scope = TodoRepository.NewTransactionScope())
                                 {
                                     UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, scope.SessionHandle);
@@ -105,6 +106,12 @@ namespace EIMSNext.Flow.Core.Node
 
                                 //TODO：终止流程，将来可以改单据状态为草稿，允许重启流程
                                 context.Workflow.Status = WorkflowStatus.Terminated;
+
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
+                            }
+                            else
+                            {
+                                CreateExecLog(context.Workflow, dataContext, meta, approveData, "没有审批权限");
                             }
                         }
                         break;
@@ -136,7 +143,7 @@ namespace EIMSNext.Flow.Core.Node
             else
             {
                 //写入待办记录
-                CreateTodos(context.Workflow, dataContext, meta, null);
+                await CreateTodos(context.Workflow, dataContext, meta, null);
 
                 var activityKey = $"{context.Workflow.Id}_{dataContext.DataId}_{context.Step.ExternalId}";
                 return ExecutionResult.WaitForActivity(activityKey, context.Workflow.Data, DateTime.Now);
