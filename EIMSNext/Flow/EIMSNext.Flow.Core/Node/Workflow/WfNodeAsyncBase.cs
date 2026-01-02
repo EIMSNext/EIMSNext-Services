@@ -79,6 +79,34 @@ namespace EIMSNext.Flow.Core.Node
             ApprovalLogRepository.Insert(log, session);
         }
 
+        protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
+        {
+            var logs = new List<Wf_ApprovalLog>();
+            await EmployeeRepository.Find(x => empIds.Contains(x.Id))
+             .ForEachAsync(emp => logs.Add(new Wf_ApprovalLog()
+             {
+                 CorpId = dataContext.CorpId,
+                 AppId = dataContext.AppId,
+                 FormId = dataContext.FormId,
+                 FormName = GetFormDef(dataContext.FormId).Name,
+                 DataId = dataContext.DataId,
+                 DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
+                 Approver = new Operator(dataContext.CorpId, emp.UserId, emp.Id, emp.EmpName),
+                 NodeId = wfStep.Id,
+                 NodeName = wfStep.Name,
+                 NodeType = wfStep.NodeType,
+                 ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
+                 Result = ApproveAction.CopyTo,
+                 WfVersion = wfInst.Version,
+                 Round = 1
+             }));
+
+            if (logs.Any())
+            {
+                ApprovalLogRepository.Insert(logs, session);
+            }
+        }
+
         protected ExecutionResult RewaitActivity(IStepExecutionContext context)
         {
             context.ExecutionPointer.EventPublished = false;
@@ -166,8 +194,8 @@ namespace EIMSNext.Flow.Core.Node
                 }
             }
 
-            //只取前200人
-            return empIds.Take(200);
+            //只取前100人
+            return empIds.Take(100);
         }
 
         public DeleteResult DeleteTodos(string corpId, string dataId, string nodeId, IClientSessionHandle? session)

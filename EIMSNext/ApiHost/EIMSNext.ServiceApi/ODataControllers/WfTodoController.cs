@@ -59,5 +59,16 @@ namespace EIMSNext.ServiceApi.ODataControllers
 
             return base.Expand(query, options);
         }
+
+        protected override IQueryable<WfTodoViewModel> FilterByPermission(IQueryable<WfTodoViewModel> query)
+        {
+            if (IdentityContext.CurrentEmployee != null)
+            {
+                var empId = IdentityContext.CurrentEmployee.Id;
+                return query.Where(x => x.EmployeeId == empId);
+            }
+
+            return query;
+        }
     }
 }

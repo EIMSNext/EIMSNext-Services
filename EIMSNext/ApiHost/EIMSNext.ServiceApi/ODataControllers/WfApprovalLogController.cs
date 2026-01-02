@@ -14,6 +14,15 @@ namespace EIMSNextt.API.ODataControllers
     [ApiVersion(1.0)]
     public class WfApprovalLogController(IResolver resolver) : ReadOnlyODataController<WfApprovalLogApiService, Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
     {
+        protected override IQueryable<WfApprovalLogViewModel> FilterByPermission(IQueryable<WfApprovalLogViewModel> query)
+        {
+            if (IdentityContext.CurrentEmployee != null)
+            {
+                var empId = IdentityContext.CurrentEmployee.Id;
+                return query.Where(x => x.Approver != null && x.Approver.EmpId == empId);
+            }
 
+            return query;
+        }
     }
 }
