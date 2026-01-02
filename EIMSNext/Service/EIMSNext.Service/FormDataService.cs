@@ -34,6 +34,13 @@ namespace EIMSNext.Service
             await SubmitAsync(entities, null, Entity.CascadeMode.NotSet, null);
         }
 
+        public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
+        {
+            var result = await base.ReplaceAsync(entity);
+            await SubmitAsync([entity], null, Entity.CascadeMode.NotSet, null);
+            return result;
+        }
+
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, Entity.CascadeMode cascade, string? eventIds)
         {
             var entity = entities.First();

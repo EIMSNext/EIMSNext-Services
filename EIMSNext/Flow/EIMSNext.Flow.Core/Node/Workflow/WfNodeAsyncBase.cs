@@ -18,6 +18,9 @@ using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 using EIMSNext.Common.Extension;
+using EIMSNext.Service.Interface;
+using System.Threading.Tasks;
+using StackExchange.Redis;
 
 namespace EIMSNext.Flow.Core.Node
 {
@@ -30,6 +33,7 @@ namespace EIMSNext.Flow.Core.Node
             ApprovalLogRepository = resolver.GetRepository<Wf_ApprovalLog>();
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
+            EmployeeRepository = resolver.GetRepository<Employee>();
             Logger = resolver.GetLogger<T>();
         }
 
@@ -38,6 +42,7 @@ namespace EIMSNext.Flow.Core.Node
         protected IRepository<Wf_ApprovalLog> ApprovalLogRepository { get; private set; }
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
+        protected IRepository<Employee> EmployeeRepository { get; private set; }
         protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
 
         protected ILogger<T> Logger { get; private set; }
@@ -74,6 +79,34 @@ namespace EIMSNext.Flow.Core.Node
             ApprovalLogRepository.Insert(log, session);
         }
 
+        protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
+        {
+            var logs = new List<Wf_ApprovalLog>();
+            await EmployeeRepository.Find(x => empIds.Contains(x.Id))
+             .ForEachAsync(emp => logs.Add(new Wf_ApprovalLog()
+             {
+                 CorpId = dataContext.CorpId,
+                 AppId = dataContext.AppId,
+                 FormId = dataContext.FormId,
+                 FormName = GetFormDef(dataContext.FormId).Name,
+                 DataId = dataContext.DataId,
+                 DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
+                 Approver = new Operator(dataContext.CorpId, emp.UserId, emp.Id, emp.EmpName),
+                 NodeId = wfStep.Id,
+                 NodeName = wfStep.Name,
+                 NodeType = wfStep.NodeType,
+                 ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
+                 Result = ApproveAction.CopyTo,
+                 WfVersion = wfInst.Version,
+                 Round = 1
+             }));
+
+            if (logs.Any())
+            {
+                ApprovalLogRepository.Insert(logs, session);
+            }
+        }
+
         protected ExecutionResult RewaitActivity(IStepExecutionContext context)
         {
             context.ExecutionPointer.EventPublished = false;
@@ -82,10 +115,12 @@ namespace EIMSNext.Flow.Core.Node
             return ExecutionResult.WaitForActivity(context.ExecutionPointer.EventKey, context.Workflow.Data, DateTime.Now);
         }
 
-        protected void CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
+        protected async Task CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
         {
+            var empIds = await PopulateEmpIds(dataContext, wfStep.WfNodeSetting?.ApproveSetting?.Candidates);
+
             var todos = new List<Wf_Todo>();
-            wfStep.WfNodeSetting!.ApproveSetting!.Candidates.ForEach(candidate =>
+            empIds.ForEach(empId =>
             {
                 todos.Add(new Wf_Todo
                 {
@@ -96,7 +131,7 @@ namespace EIMSNext.Flow.Core.Node
                     WfInstanceId = wfInst.Id,
                     ApproveNodeId = wfStep.Id,
                     ApproveNodeName = wfStep.Name,
-                    EmployeeId = candidate.CandidateId,
+                    EmployeeId = empId,
                     CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                     UpdateTime = DateTime.UtcNow.ToTimeStampMs(),
                     Starter = dataContext.WfStarter,
@@ -109,6 +144,58 @@ namespace EIMSNext.Flow.Core.Node
             {
                 TodoRepository.Insert(todos, session);
             }
+        }
+
+        protected async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
+        {
+            var empIds = new List<string>();
+            if (candidates?.Count > 0)
+            {
+                var deptIds = new List<string>();
+                var roleIds = new List<string>();
+
+                var formData = GetFormData(dataContext.DataId);
+
+                candidates.ForEach(c =>
+                {
+                    switch (c.CandidateType)
+                    {
+                        case CandidateType.Department:
+                            deptIds.Add(c.CandidateId);
+                            break;
+                        case CandidateType.Role:
+                            roleIds.Add(c.CandidateId);
+                            break;
+                        case CandidateType.Employee:
+                            empIds.Add(c.CandidateId);
+                            break;
+                        case CandidateType.Dynamic:
+                            //TODO: 进一步计算
+                            if (c.CandidateId == "starter" && dataContext.WfStarter != null)
+                            {
+                                //TODO:此处应进一步的排除匿名，比如由数据流节点或其他系统任务发起的流程
+                                empIds.Add(dataContext.WfStarter.EmpId);
+                            }
+                            break;
+                    }
+                });
+
+                if (deptIds.Any())
+                {
+                    await EmployeeRepository.Find(x => deptIds.Contains(x.DepartmentId)).ForEachAsync(x => empIds.Add(x.Id));
+                }
+
+                if (roleIds.Any())
+                {
+                    await EmployeeRepository.Find(new MongoFindOptions<Employee>
+                    {
+                        Filter = Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId))
+                    }).ForEachAsync(x => empIds.Add(x.Id));
+                }
+            }
+
+            //只取前100人
+            return empIds.Take(100);
         }
 
         public DeleteResult DeleteTodos(string corpId, string dataId, string nodeId, IClientSessionHandle? session)

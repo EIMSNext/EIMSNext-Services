@@ -158,7 +158,7 @@ namespace EIMSNext.ServiceApi.Controllers
         /// <returns></returns>
         [HttpPost]
         [Permission(Operation = Operation.Write)]
-        public async Task<IActionResult> Post([FromBody]FormDataRequest model)
+        public async Task<IActionResult> Post([FromBody] FormDataRequest model)
         {
             if (!ModelState.IsValid)
             {
@@ -172,7 +172,7 @@ namespace EIMSNext.ServiceApi.Controllers
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await (ApiService as FormDataApiService)!.AddAsync(entity, model.Action);
+            await ApiService.AddAsync(entity, model.Action);
             return Ok(FormDataViewModel.FromFormData(entity));
         }
 
@@ -193,19 +193,19 @@ namespace EIMSNext.ServiceApi.Controllers
             //根据key获取数据库中的实体
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
-            
+
             //保存原始实体的重要字段
             var originalCorpId = entity.CorpId;
             var originalDeleteFlag = entity.DeleteFlag;
-            
+
             //将请求的数据直接复制到原始实体，而不是通过中间转换
             model.CopyTo(entity);
-            
+
             //恢复重要字段，确保不会丢失
             entity.CorpId = originalCorpId;
             entity.DeleteFlag = originalDeleteFlag;
-            
-            
+
+
             if (key != entity.Id)
             {
                 return BadRequest("请求修改对象的Key不一致");
@@ -214,7 +214,7 @@ namespace EIMSNext.ServiceApi.Controllers
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await ApiService.ReplaceAsync(entity);
+            await ApiService.ReplaceAsync(entity, model.Action);
             return Ok(FormDataViewModel.FromFormData(entity));
         }
 
