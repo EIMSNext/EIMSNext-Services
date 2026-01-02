@@ -64,7 +64,7 @@ namespace EIMSNext.FlowApi.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var dfExecResult = await _dataflowRunner.RunAsync(formData, request.EventSource, request.EventType, "", IdentityContext.CurrentEmployee.ToOperator(), request.DfCascade, request.EventIds);
+                var dfExecResult = await _dataflowRunner.RunAsync(formData, request.EventSource, request.EventType, "", IdentityContext.CurrentEmployee?.ToOperator(), request.DfCascade, request.EventIds);
 
                 if (!dfExecResult.Success)
                 {
