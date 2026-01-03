@@ -31,6 +31,9 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.EnumType<WfNodeType>();
             builder.EnumType<WfApprovalMode>();
             builder.EnumType<PrintTemplateType>();
+            builder.EnumType<AuthGroupType>();
+            builder.EnumType<DataPerms>();
+            builder.EnumType<MemberType>();
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();
