@@ -35,9 +35,9 @@
         public const string FileUpload = "fileupload";
         //public const string Signature = "signature";
         public const string TableForm = "tableform";
-        public const string Employee = "employee";
-        public const string Employee2 = "employee2";
-        public const string Department = "department";
-        public const string Department2 = "department2";
+        public const string Employee = "employeeselect";
+        public const string Employee2 = "employeeselect2";
+        public const string Department = "departmentselect";
+        public const string Department2 = "departmentselect2";
     }
 }

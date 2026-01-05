@@ -172,5 +172,17 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public bool Editable { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool? TableInsert { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool? TableEdit { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool? TableDelete { get; set; }
     }
 }
