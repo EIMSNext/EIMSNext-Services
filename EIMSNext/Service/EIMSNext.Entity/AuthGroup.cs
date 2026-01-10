@@ -31,16 +31,19 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public List<Member> Members
-        { get; set; } = new List<Member>();
+        public List<Member> Members { get; set; } = new List<Member>();
         /// <summary>
         /// 
         /// </summary>
-        public DataPerms DataPerms { get; set; }
+        public long DataPerms { get; set; }
         /// <summary>
         /// 
         /// </summary>
         public string? DataFilter { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<FieldPerm> FieldPerms { get; set; } = new List<FieldPerm>();
         /// <summary>
         /// 是否禁用
         /// </summary>
@@ -55,19 +58,19 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        ManageSelfData = 0,
+        ManageSelfData,
         /// <summary>
         /// 
         /// </summary>
-        ViewAllData = 1,
+        ViewAllData,
         /// <summary>
         /// 
         /// </summary>
-        ManageAllData = 2,
+        ManageAllData,
         /// <summary>
         /// 
         /// </summary>
-        Custom = 3,
+        Custom,
     }
 
     /// <summary>
@@ -91,6 +94,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public MemberType Type { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool CascadedDept { get; set; }
     }
     /// <summary>
     /// 成员类型，与前端的 SelectedTag组件的TagType对应
@@ -100,7 +107,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        NotSet = 0,
+        None = 0,
         /// <summary>
         /// 
         /// </summary>
@@ -112,7 +119,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        Role,
+        Role
     }
 
     /// <summary>
@@ -153,6 +160,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         Export = 1 << 6,
+        /// <summary>
+        /// 
+        /// </summary>
+        All = (1 << 7) - 1,
     }
 
     /// <summary>

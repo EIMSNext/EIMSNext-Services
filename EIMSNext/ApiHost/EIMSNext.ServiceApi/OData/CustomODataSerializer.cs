@@ -31,7 +31,7 @@ namespace EIMSNext.ServiceApi.OData
         public override ODataEnumValue CreateODataEnumValue(object graph, IEdmEnumTypeReference enumType,
             ODataSerializerContext writeContext)
         {
-            if (graph != null && !enumType.EnumDefinition().IsFlags)
+            if (graph != null)
             {
                 ODataMetadataLevel metadataLevel = writeContext != null ? writeContext.MetadataLevel : ODataMetadataLevel.Minimal;
                 var enumValue = new ODataEnumValue(Convert.ToInt64(graph).ToString(), enumType.FullName());
@@ -95,6 +95,10 @@ namespace EIMSNext.ServiceApi.OData
     /// </summary>
     public class LowercaseODataEnumDeserializer : ODataEnumDeserializer
     {
+        public override Task<object> ReadAsync(ODataMessageReader messageReader, Type type, ODataDeserializerContext readContext)
+        {
+            return base.ReadAsync(messageReader, type, readContext);
+        }
         /// <inheritdoc />
         public override object ReadInline(object item, IEdmTypeReference edmType, ODataDeserializerContext readContext)
         {

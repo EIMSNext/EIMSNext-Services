@@ -32,7 +32,7 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.EnumType<WfApprovalMode>();
             builder.EnumType<PrintTemplateType>();
             builder.EnumType<AuthGroupType>();
-            builder.EnumType<DataPerms>();
+            //builder.EnumType<DataPerms>();
             builder.EnumType<MemberType>();
 
             builder.ComplexType<UserCorp>();
@@ -43,6 +43,8 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.ComplexType<FieldChangeLog>();
             builder.ComplexType<FormContent>();
             builder.ComplexType<AppMenu>();
+            builder.ComplexType<Member>();
+            builder.ComplexType<FieldPerm>();
 
             builder.ComplexType<Operator>().Ignore(x => x.CorpId);
             builder.ComplexType<Operator>().Ignore(x => x.UserId);
