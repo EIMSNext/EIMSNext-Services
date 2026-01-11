@@ -4,6 +4,7 @@ using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.OData;
 using HKH.Mef2.Integration;
+using Microsoft.AspNetCore.OData.Query;
 
 namespace EIMSNextt.API.ODataControllers
 {
@@ -14,7 +15,7 @@ namespace EIMSNextt.API.ODataControllers
     [ApiVersion(1.0)]
     public class WfApprovalLogController(IResolver resolver) : ReadOnlyODataController<WfApprovalLogApiService, Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
     {
-        protected override IQueryable<WfApprovalLogViewModel> FilterByPermission(IQueryable<WfApprovalLogViewModel> query)
+        protected override IQueryable<WfApprovalLogViewModel> FilterByPermission(IQueryable<WfApprovalLogViewModel> query, ODataQueryOptions<WfApprovalLogViewModel> options)
         {
             if (IdentityContext.CurrentEmployee != null)
             {

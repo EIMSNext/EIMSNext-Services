@@ -7,5 +7,12 @@
         public DynamicSortList? Sort { get; set; }
         public int Skip { get; set; }
         public int Take { get; set; } = 20;
+
+        public DataScope? Scope { get; set; }
+    }
+
+    public class DataScope
+    {
+        public string? AuthGroupId { get; set; }
     }
 }

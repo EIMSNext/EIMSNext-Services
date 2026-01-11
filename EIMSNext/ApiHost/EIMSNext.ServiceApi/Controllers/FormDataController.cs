@@ -5,6 +5,9 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Common;
+using EIMSNext.Common.Extension;
+using EIMSNext.Component;
+using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Entity;
 using EIMSNext.ServiceApi.Authorization;
@@ -119,6 +122,51 @@ namespace EIMSNext.ServiceApi.Controllers
         }
         protected virtual DynamicFindOptions<FormData> FilterByPermission(DynamicFindOptions<FormData> query)
         {
+            if (query.Scope != null)
+            {
+                if (!string.IsNullOrEmpty(query.Scope.AuthGroupId))
+                {
+                    var authGrp = Resolver.GetService<AuthGroup>().Get(query.Scope.AuthGroupId);
+                    if (authGrp != null)
+                    {
+                        var filter = query.Filter;
+                        if (filter == null) { filter = new DynamicFilter(); }
+
+                        if (authGrp.Type == AuthGroupType.ManageSelfData)
+                        {
+                            if (filter.IsGroup && filter.Rel == FilterRel.And)
+                            {
+                                filter.Items!.Add(new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
+                            }
+                            else
+                            {
+                                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
+                            }
+                        }
+                        else if (authGrp.Type == AuthGroupType.Custom)
+                        {
+                            if (!string.IsNullOrEmpty(authGrp.DataFilter))
+                            {
+                                var condList = authGrp.DataFilter.DeserializeFromJson<ConditionList>();
+                                if (condList != null)
+                                {
+                                    var dataFilter = condList.ToDynamicFilter();
+
+                                    if (filter.IsGroup && filter.Rel == FilterRel.And)
+                                    {
+                                        filter.Items!.Add(dataFilter);
+                                    }
+                                    else
+                                    {
+                                        filter = new DynamicFilter() { Rel = FilterRel.And, Items = [dataFilter, filter] };
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
             return query;
         }
 

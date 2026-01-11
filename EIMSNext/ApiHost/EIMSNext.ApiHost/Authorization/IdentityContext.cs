@@ -53,13 +53,6 @@ namespace EIMSNext.ApiHost.Authorization
                 }
             }
 
-            var httpQuery = httpContextAccessor.HttpContext?.Request.Query;
-            if (httpQuery != null)
-            {
-                CurrentAppId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("appid")).Value;
-                CurrentFormId = httpQuery.FirstOrDefault(x => x.Key.EqualsIgnoreCase("formid")).Value;
-            }
-
             var serviceContext = resolver.GetServiceContext();
             serviceContext.AccessToken = AccessToken;
             serviceContext.CorpId = CurrentCorpId;
@@ -119,61 +112,34 @@ namespace EIMSNext.ApiHost.Authorization
         {
             get
             {
-                if (_type == IdentityType.None)
+                if (_type == IdentityType.None && CurrentUser != null && CurrentUser is User)
                 {
-                    if (CurrentUser != null && CurrentUser is User)
+                    var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
+                    if (corp != null)
                     {
-                        var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
-                        if (corp != null)
+                        if (corp.IsCorpOwner)
                         {
-                            if (corp.IsCorpOwner) _type = IdentityType.CorpOwmer;
+                            _type = IdentityType.CorpOwmer;
+                        }
+                        else
+                        {
+                            if (_user!.Disabled)
+                            {
+                                _type = IdentityType.Disabled;
+                            }
                             else
                             {
-
+                                //TODO:将来根据角色来指定身份
+                                _type = IdentityType.Employee;
                             }
+
                         }
                     }
+                    else
+                    {
+                        _type = IdentityType.NoCorp;
+                    }
                 }
-                //if (_type == IdentityType.None)
-                //{
-                //    if (IsAdmin)
-                //    {
-                //        _type = IdentityType.Admin;
-                //    }
-                //    else
-                //    {
-                //        _user = CurrentUser;
-                //        if (_user != null)
-                //        {
-                //            if (_user.Disabled ?? false)
-                //            {
-                //                _type = IdentityType.Disabled;
-                //            }
-                //            else
-                //            {
-                //                if (_user.UserType == null)
-                //                    _type = IdentityType.NonRegister;
-                //                else if (_user.UserType == 1)
-                //                    _type = IdentityType.Terminal;
-                //                else
-                //                {
-                //                    _type = IdentityType.Internal;
-
-                //                    var _org = _user.SysOrg;
-                //                    if (_org != null)
-                //                    {
-                //                        if (_org.IsMerchant.HasValue && _org.IsMerchant.Value)
-                //                            _type = IdentityType.Agent;
-                //                        if (_org.IsTransport.HasValue && _org.IsTransport.Value)
-                //                            _type = IdentityType.Transport;
-                //                        if (_org.IsRecovery.HasValue && _org.IsRecovery.Value)
-                //                            _type = IdentityType.Recovery;
-                //                    }
-                //                }
-                //            }
-                //        }
-                //    }
-                //}
 
                 return _type;
             }
@@ -198,5 +164,9 @@ namespace EIMSNext.ApiHost.Authorization
         /// 当前的Token
         /// </summary>
         public string AccessToken { get; private set; }
+        /// <summary>
+        /// 当前用户对资源的访问范围
+        /// </summary>
+        public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.NotSet;
     }
 }

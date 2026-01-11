@@ -14,6 +14,5 @@ namespace EIMSNext.ServiceApi.Controllers
     [ApiVersion(1.0)]
 	public class AuthGroupController(IResolver resolver) : ApiControllerBase<AuthGroupApiService, AuthGroup, AuthGroupViewModel>(resolver)
 	{
-		
 	}
 }

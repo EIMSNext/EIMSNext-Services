@@ -29,9 +29,19 @@
         CorpAdmin = 8,
 
         /// <summary>
+        /// 企业创建者或超级管理员
+        /// </summary>
+        Corp_Admins = 12,
+
+        /// <summary>
         /// 普通管理员
         /// </summary>
         AppAdmin = 16,
+
+        /// <summary>
+        /// 普通管理员或企业创建者或超级管理员
+        /// </summary>
+        App_Admins = 28,
 
         /// <summary>
         /// 应用管理员
@@ -39,9 +49,24 @@
         FormAdmin = 32,
 
         /// <summary>
+        /// 应用管理员或普通管理员或企业创建者或超级管理员
+        /// </summary>
+        Form_Admins = 60,
+
+        /// <summary>
         /// 普通员工
         /// </summary>
         Employee = 64,
+
+        /// <summary>
+        /// 普通员工或应用管理员或普通管理员或企业创建者或超级管理员
+        /// </summary>
+        Employee_Admins = 124,
+
+        /// <summary>
+        /// 无企业用户
+        /// </summary>
+        NoCorp = 248,
 
         /// <summary>
         /// 匿名用户
@@ -54,27 +79,23 @@
         Disabled = 65536,
     }
 
-    public static class IdentityTypes
+    public enum AccessControlLevel
     {
-        public static IdentityType CorpAdminAndOwners => IdentityType.CorpOwmer | IdentityType.CorpOwmer;
-        public static IdentityType AppAdminAndCorpAdmins => CorpAdminAndOwners | IdentityType.AppAdmin;
-        public static IdentityType FormAdminAndAppAdmins => AppAdminAndCorpAdmins | IdentityType.FormAdmin;
-        public static IdentityType EmployeeAndAdmins => FormAdminAndAppAdmins | IdentityType.Employee;
+        /// <summary>
+        /// 根据权限控制
+        /// </summary>
+        NotSet = 0,
+        /// <summary>
+        /// 总是允许
+        /// </summary>
+        Allow = 1,
+        /// <summary>
+        /// 总是禁止
+        /// </summary>
+        Forbid = 2,
+        /// <summary>
+        /// 资源所有者
+        /// </summary>
+        Owner = 3
     }
-
-    //public enum AccessControlLevel
-    //{
-    //    / <summary>
-    //    / 根据权限控制
-    //    / </summary>
-    //    NotSet = 0,
-    //    / <summary>
-    //    / 总是允许
-    //    / </summary>
-    //    Allow = 1,
-    //    / <summary>
-    //    / 总是禁止
-    //    / </summary>
-    //    Forbid = 2
-    //}
 }

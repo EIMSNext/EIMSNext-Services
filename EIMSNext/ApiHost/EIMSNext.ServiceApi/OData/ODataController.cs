@@ -77,6 +77,9 @@ namespace EIMSNext.ServiceApi.OData
         /// </summary>
         protected IIdentityContext IdentityContext { get; private set; }
 
+        protected string? QueryAppId => Request.Query.FirstOrDefault(x => x.Key.EqualsIgnoreCase("appid")).Value;
+        protected string? QueryFormId => Request.Query.FirstOrDefault(x => x.Key.EqualsIgnoreCase("formid")).Value;
+
         /// <summary>
         /// 是否可以访问
         /// </summary>
@@ -100,7 +103,7 @@ namespace EIMSNext.ServiceApi.OData
         {
             var query = ApiService.All();
 
-            query = FilterResult(query);
+            query = FilterResult(query, options);
             query = Expand(query, options);
 
             return Ok(query);
@@ -121,9 +124,9 @@ namespace EIMSNext.ServiceApi.OData
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        protected virtual IQueryable<V> FilterResult(IQueryable<V> query)
+        protected virtual IQueryable<V> FilterResult(IQueryable<V> query, ODataQueryOptions<V> options)
         {
-            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)),options);
         }
         protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
         {
@@ -139,7 +142,7 @@ namespace EIMSNext.ServiceApi.OData
             else
                 return query;
         }
-        protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query)
+        protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query, ODataQueryOptions<V> options)
         {
             return query;
         }
