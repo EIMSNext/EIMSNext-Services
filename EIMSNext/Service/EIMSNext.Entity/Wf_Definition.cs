@@ -666,6 +666,10 @@ namespace EIMSNext.Entity
         /// 
         /// </summary>
         public string? CandidateName { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public bool CascadedDept {  get; set; }
     }
 
     /// <summary>

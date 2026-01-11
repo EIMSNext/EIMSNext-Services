@@ -5,7 +5,8 @@ using EIMSNext.Service.Interface;
 
 namespace EIMSNext.Service
 {
-	public class AuthGroupService(IResolver resolver) : EntityServiceBase<AuthGroup>(resolver), IAuthGroupService
-	{
-	}
+    public class AuthGroupService(IResolver resolver) : EntityServiceBase<AuthGroup>(resolver), IAuthGroupService
+    {
+        protected override bool LogicDelete => false;
+    }
 }

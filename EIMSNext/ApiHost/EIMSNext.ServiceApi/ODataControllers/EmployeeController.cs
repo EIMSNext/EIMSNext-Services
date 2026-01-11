@@ -50,9 +50,9 @@ namespace EIMSNext.ServiceApi.ODataControllers
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        protected override IQueryable<EmployeeViewModel> FilterResult(IQueryable<EmployeeViewModel> query)
+        protected override IQueryable<EmployeeViewModel> FilterResult(IQueryable<EmployeeViewModel> query, ODataQueryOptions<EmployeeViewModel> options)
         {
-            query = base.FilterResult(query);
+            query = base.FilterResult(query, options);
             query = query.Where(x => !x.IsDummy);
 
             return query;

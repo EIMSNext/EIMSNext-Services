@@ -1,5 +1,5 @@
-﻿using EIMSNext.Common;
-using EIMSNext.Core;
+﻿using EIMSNext.ApiService;
+using EIMSNext.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.ServiceApi.Authorization
@@ -17,7 +17,7 @@ namespace EIMSNext.ServiceApi.Authorization
         /// <summary>
         /// 访问控制级别
         /// </summary>
-        //public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.NotSet;
+        public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.NotSet;
         /// <summary>
         /// 需要的操作权限
         /// </summary>

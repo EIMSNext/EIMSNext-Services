@@ -60,7 +60,7 @@ namespace EIMSNext.ServiceApi.ODataControllers
             return base.Expand(query, options);
         }
 
-        protected override IQueryable<WfTodoViewModel> FilterByPermission(IQueryable<WfTodoViewModel> query)
+        protected override IQueryable<WfTodoViewModel> FilterByPermission(IQueryable<WfTodoViewModel> query, ODataQueryOptions<WfTodoViewModel> options)
         {
             if (IdentityContext.CurrentEmployee != null)
             {
