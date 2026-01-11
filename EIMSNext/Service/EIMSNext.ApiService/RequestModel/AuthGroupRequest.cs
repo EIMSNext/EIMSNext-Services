@@ -32,11 +32,15 @@ namespace EIMSNext.ApiService.RequestModel
         /// <summary>
         /// 
         /// </summary>
-        public DataPerms DataPerms { get; set; }
+        public long DataPerms { get; set; }
         /// <summary>
         /// 
         /// </summary>
         public string? DataFilter { get; set; }
+        /// <summary>
+        /// 
+        /// </summary>
+        public List<FieldPerm> FieldPerms { get; set; } = new List<FieldPerm>();
         /// <summary>
         /// 是否禁用
         /// </summary>

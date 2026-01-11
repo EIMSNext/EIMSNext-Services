@@ -9,11 +9,18 @@ using HKH.Mef2.Integration;
 namespace EIMSNext.ServiceApi.Controllers
 {
     [ApiVersion(1.0)]
-    public class ApiControllerBase<S, T, Q>(IResolver resolver) : MefControllerBase<S, T, Q>(resolver)
+    public class ApiControllerBase<S, T, Q> : MefControllerBase<S, T, Q>
        where S : class, IApiService<T, Q>
         where T : class, IEntity
         where Q : T, new()
     {
+        public ApiControllerBase(IResolver resolver) : base(resolver)
+        {
+        }
+
+        protected string? QueryAppId => Request.Query.FirstOrDefault(x => x.Key.EqualsIgnoreCase("appid")).Value;
+        protected string? QueryFormId => Request.Query.FirstOrDefault(x => x.Key.EqualsIgnoreCase("formid")).Value;
+
         #region DynamicQuery
 
         ///// <summary>

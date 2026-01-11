@@ -9,11 +9,9 @@ namespace EIMSNext.ApiService
         IEmployee? CurrentEmployee { get; }
 
         IdentityType IdentityType { get; }
-        //AccessControlLevel AccessControlLevel { get; set; }
+        AccessControlLevel AccessControlLevel { get; set; }
 
         string CurrentCorpId { get; }
-        string? CurrentAppId { get; }
-        string? CurrentFormId { get; }
 
         string AccessToken { get; }
     }
