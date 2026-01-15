@@ -1,4 +1,4 @@
-﻿using MongoDB.Bson;
+﻿using EIMSNext.Common;
 using MongoDB.Driver;
 
 namespace EIMSNext.Core.Query
@@ -34,7 +34,7 @@ namespace EIMSNext.Core.Query
                     //    || Consts.SystemFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase)
                     //    || mainFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase))
                     //    ? filter.Field : "Data." + filter.Field;
-                    var field = filter.Field;
+                    var field = FormatField(filter.Field, filter.Type);
                     var filterValues = new List<object>();
                     if (filter.Value is List<object>)
                     {
@@ -52,7 +52,7 @@ namespace EIMSNext.Core.Query
                         arrField = fields[0];
                         field = fields[1];
 
-                        var subFilter=Builders<dynamic>.Filter.Empty;
+                        var subFilter = Builders<dynamic>.Filter.Empty;
 
                         switch (filter.Op.ToLower())
                         {
@@ -204,6 +204,35 @@ namespace EIMSNext.Core.Query
             return myFilter;
         }
 
+        private static string FormatField(string field, string? fieldType)
+        {
+            var finalField = field;
+
+            if (!string.IsNullOrEmpty(fieldType))
+            {
+                switch (fieldType)
+                {
+                    case FieldType.Select:
+                    case FieldType.Select2:
+                    case FieldType.CheckBox:
+                    case FieldType.Radio:
+                    case FieldType.Employee:
+                    case FieldType.Employee2:
+                    case FieldType.Department:
+                    case FieldType.Department2:
+                        if (!(field.EndsWith(".id") ||
+                            field.EndsWith(".code") ||
+                            field.EndsWith(".value") ||
+                            field.EndsWith(".label")))
+                        {
+                            finalField = $"{field}.label";
+                        }
+                        break;
+                }
+            }
+
+            return finalField;
+        }
         private static FilterDefinition<T> ParseDynamicFilterGroup<T>(DynamicFilter filter)
         {
             FilterDefinition<T> myFilter = Builders<T>.Filter.Empty;
