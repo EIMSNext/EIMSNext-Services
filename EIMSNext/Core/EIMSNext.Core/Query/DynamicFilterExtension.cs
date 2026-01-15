@@ -1,4 +1,5 @@
 ﻿using EIMSNext.Common;
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 namespace EIMSNext.Core.Query
@@ -52,151 +53,11 @@ namespace EIMSNext.Core.Query
                         arrField = fields[0];
                         field = fields[1];
 
-                        var subFilter = Builders<dynamic>.Filter.Empty;
-
-                        switch (filter.Op.ToLower())
-                        {
-                            case FilterOp.AnyEq:
-                                subFilter = Builders<dynamic>.Filter.AnyEq(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyGt:
-                                subFilter = Builders<dynamic>.Filter.AnyGt(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyGte:
-                                subFilter = Builders<dynamic>.Filter.AnyGte(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyIn:
-                                subFilter = Builders<dynamic>.Filter.AnyIn(field, filterValues);
-                                break;
-                            case FilterOp.AnyLt:
-                                subFilter = Builders<dynamic>.Filter.AnyLt(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyLte:
-                                subFilter = Builders<dynamic>.Filter.AnyLte(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyNe:
-                                subFilter = Builders<dynamic>.Filter.AnyNe(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyNin:
-                                subFilter = Builders<dynamic>.Filter.AnyNin(field, filterValues);
-                                break;
-                            //case FilterOperation.AnyStringIn:
-                            //    subFilter = Builders<dynamic>.Filter.AnyStringIn(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.AnyStringNin:
-                            //    subFilter = Builders<dynamic>.Filter.AnyStringNin(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.ElemMatch:
-                            //    subFilter = Builders<dynamic>.Filter.ElemMatch<T>(field, filter.Value[0]);
-                            //    break;
-                            case FilterOp.Exists:
-                                subFilter = Builders<dynamic>.Filter.Exists(field);
-                                break;
-                            case FilterOp.Gt:
-                                subFilter = Builders<dynamic>.Filter.Gt(field, filterValues[0]);
-                                break;
-                            case FilterOp.In:
-                                subFilter = Builders<dynamic>.Filter.In(field, filterValues);
-                                break;
-                            case FilterOp.Lt:
-                                subFilter = Builders<dynamic>.Filter.Lt(field, filterValues[0]);
-                                break;
-                            case FilterOp.Lte:
-                                subFilter = Builders<dynamic>.Filter.Lte(field, filterValues[0]);
-                                break;
-                            case FilterOp.Ne:
-                                subFilter = Builders<dynamic>.Filter.Ne(field, filterValues[0]);
-                                break;
-                            case FilterOp.Nin:
-                                subFilter = Builders<dynamic>.Filter.Nin(field, filterValues);
-                                break;
-                            //case FilterOperation.StringIn:
-                            //    subFilter = Builders<dynamic>.Filter.StringIn(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.StringNin:
-                            //    subFilter = Builders<dynamic>.Filter.StringNin(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.Text:
-                            //    subFilter = Builders<dynamic>.Filter.Text(field, filter.Value);
-                            //    break;
-                            default:
-                                subFilter = Builders<dynamic>.Filter.Eq(field, filterValues[0]);
-                                break;
-                        }
-
-                        myFilter = Builders<T>.Filter.ElemMatch<dynamic>(arrField, subFilter);
+                        myFilter = Builders<T>.Filter.ElemMatch<dynamic>(arrField, BuildFilter<dynamic>(field, filter.Op.ToLower(), filterValues));
                     }
                     else
                     {
-                        switch (filter.Op.ToLower())
-                        {
-                            case FilterOp.AnyEq:
-                                myFilter = Builders<T>.Filter.AnyEq(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyGt:
-                                myFilter = Builders<T>.Filter.AnyGt(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyGte:
-                                myFilter = Builders<T>.Filter.AnyGte(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyIn:
-                                myFilter = Builders<T>.Filter.AnyIn(field, filterValues);
-                                break;
-                            case FilterOp.AnyLt:
-                                myFilter = Builders<T>.Filter.AnyLt(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyLte:
-                                myFilter = Builders<T>.Filter.AnyLte(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyNe:
-                                myFilter = Builders<T>.Filter.AnyNe(field, filterValues[0]);
-                                break;
-                            case FilterOp.AnyNin:
-                                myFilter = Builders<T>.Filter.AnyNin(field, filterValues);
-                                break;
-                            //case FilterOperation.AnyStringIn:
-                            //    myFilter = Builders<T>.Filter.AnyStringIn(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.AnyStringNin:
-                            //    myFilter = Builders<T>.Filter.AnyStringNin(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.ElemMatch:
-                            //    myFilter = Builders<T>.Filter.ElemMatch<T>(field, filter.Value[0]);
-                            //    break;
-                            case FilterOp.Exists:
-                                myFilter = Builders<T>.Filter.Exists(field);
-                                break;
-                            case FilterOp.Gt:
-                                myFilter = Builders<T>.Filter.Gt(field, filterValues[0]);
-                                break;
-                            case FilterOp.In:
-                                myFilter = Builders<T>.Filter.In(field, filterValues);
-                                break;
-                            case FilterOp.Lt:
-                                myFilter = Builders<T>.Filter.Lt(field, filterValues[0]);
-                                break;
-                            case FilterOp.Lte:
-                                myFilter = Builders<T>.Filter.Lte(field, filterValues[0]);
-                                break;
-                            case FilterOp.Ne:
-                                myFilter = Builders<T>.Filter.Ne(field, filterValues[0]);
-                                break;
-                            case FilterOp.Nin:
-                                myFilter = Builders<T>.Filter.Nin(field, filterValues);
-                                break;
-                            //case FilterOperation.StringIn:
-                            //    myFilter = Builders<T>.Filter.StringIn(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.StringNin:
-                            //    myFilter = Builders<T>.Filter.StringNin(field, filter.Value);
-                            //    break;
-                            //case FilterOperation.Text:
-                            //    myFilter = Builders<T>.Filter.Text(field, filter.Value);
-                            //    break;
-                            default:
-                                myFilter = Builders<T>.Filter.Eq(field, filterValues[0]);
-                                break;
-                        }
+                        myFilter = BuildFilter<T>(field, filter.Op.ToLower(), filterValues);
                     }
                 }
             }
@@ -232,6 +93,98 @@ namespace EIMSNext.Core.Query
             }
 
             return finalField;
+        }
+        private static FilterDefinition<T> BuildFilter<T>(string field, string op, List<object> filterValues)
+        {
+            var filter = Builders<T>.Filter.Empty;
+
+            if (op == FilterOp.Empty)
+            {
+                filter = Builders<T>.Filter.Or(
+                            Builders<T>.Filter.Exists(field, false),
+                            Builders<T>.Filter.Eq(field, BsonNull.Value));
+            }
+            else
+            {
+                filter = Builders<T>.Filter.Exists(field, true);
+
+                FilterDefinition<T>? subFilter = null;
+                switch (op)
+                {
+                    case FilterOp.NotEmpty:
+                        subFilter = Builders<T>.Filter.Ne(field, BsonNull.Value);
+                        break;
+                    case FilterOp.AnyEq:
+                        subFilter = Builders<T>.Filter.AnyEq(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyGt:
+                        subFilter = Builders<T>.Filter.AnyGt(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyGte:
+                        subFilter = Builders<T>.Filter.AnyGte(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyIn:
+                        subFilter = Builders<T>.Filter.AnyIn(field, filterValues);
+                        break;
+                    case FilterOp.AnyLt:
+                        subFilter = Builders<T>.Filter.AnyLt(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyLte:
+                        subFilter = Builders<T>.Filter.AnyLte(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyNe:
+                        subFilter = Builders<T>.Filter.AnyNe(field, filterValues[0]);
+                        break;
+                    case FilterOp.AnyNin:
+                        subFilter = Builders<T>.Filter.AnyNin(field, filterValues);
+                        break;
+                    //case FilterOperation.AnyStringIn:
+                    //    subFilter = Builders<dynamic>.Filter.AnyStringIn(field, filter.Value);
+                    //    break;
+                    //case FilterOperation.AnyStringNin:
+                    //    subFilter = Builders<dynamic>.Filter.AnyStringNin(field, filter.Value);
+                    //    break;
+                    //case FilterOperation.ElemMatch:
+                    //    subFilter = Builders<dynamic>.Filter.ElemMatch<T>(field, filter.Value[0]);
+                    //    break;
+                    case FilterOp.Exists:
+                        break;
+                    case FilterOp.Gt:
+                        subFilter = Builders<T>.Filter.Gt(field, filterValues[0]);
+                        break;
+                    case FilterOp.In:
+                        subFilter = Builders<T>.Filter.In(field, filterValues);
+                        break;
+                    case FilterOp.Lt:
+                        subFilter = Builders<T>.Filter.Lt(field, filterValues[0]);
+                        break;
+                    case FilterOp.Lte:
+                        subFilter = Builders<T>.Filter.Lte(field, filterValues[0]);
+                        break;
+                    case FilterOp.Ne:
+                        subFilter = Builders<T>.Filter.Ne(field, filterValues[0]);
+                        break;
+                    case FilterOp.Nin:
+                        subFilter = Builders<T>.Filter.Nin(field, filterValues);
+                        break;
+                    //case FilterOperation.StringIn:
+                    //    subFilter = Builders<dynamic>.Filter.StringIn(field, filter.Value);
+                    //    break;
+                    //case FilterOperation.StringNin:
+                    //    subFilter = Builders<dynamic>.Filter.StringNin(field, filter.Value);
+                    //    break;
+                    //case FilterOperation.Text:
+                    //    subFilter = Builders<dynamic>.Filter.Text(field, filter.Value);
+                    //    break;
+                    default:
+                        subFilter = Builders<T>.Filter.Eq(field, filterValues[0]);
+                        break;
+                }
+                if (subFilter != null)
+                    filter = Builders<T>.Filter.And(filter, subFilter);
+            }
+
+            return filter;
         }
         private static FilterDefinition<T> ParseDynamicFilterGroup<T>(DynamicFilter filter)
         {
