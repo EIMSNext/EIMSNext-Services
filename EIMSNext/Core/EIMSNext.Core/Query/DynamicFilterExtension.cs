@@ -35,7 +35,7 @@ namespace EIMSNext.Core.Query
                     //    || Consts.SystemFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase)
                     //    || mainFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase))
                     //    ? filter.Field : "Data." + filter.Field;
-                    var field = FormatField(filter.Field, filter.Type);
+                    var field = FormatFilterField(filter.Field, filter.Type);
                     var filterValues = new List<object>();
                     if (filter.Value is List<object>)
                     {
@@ -66,7 +66,7 @@ namespace EIMSNext.Core.Query
             return myFilter;
         }
 
-        private static string FormatField(string field, string? fieldType)
+        private static string FormatFilterField(string field, string? fieldType)
         {
             var finalField = field;
 
@@ -93,7 +93,7 @@ namespace EIMSNext.Core.Query
                             field.EndsWith(".code") ||
                             field.EndsWith(".label")))
                         {
-                            finalField = $"{field}.label";
+                            finalField = $"{field}.id";
                         }
                         break;
                 }
@@ -239,20 +239,51 @@ namespace EIMSNext.Core.Query
             {
                 if (!string.IsNullOrEmpty(sort.Field))
                 {
+                    var field = FormatSortField(sort.Field, sort.Type);
+
                     if (sort.Dir == SortDir.Desc)
                     {
-                        var st = Builders<T>.Sort.Descending(sort.Field);
+                        var st = Builders<T>.Sort.Descending(field);
                         mySort = mySort == null ? st : Builders<T>.Sort.Combine(mySort, st);
                     }
                     else
                     {
-                        var st = Builders<T>.Sort.Ascending(sort.Field);
+                        var st = Builders<T>.Sort.Ascending(field);
                         mySort = mySort == null ? st : Builders<T>.Sort.Combine(mySort, st);
                     }
                 }
             }
 
             return mySort;
+        }
+        private static string FormatSortField(string field, string? fieldType)
+        {
+            var finalField = field;
+
+            if (!string.IsNullOrEmpty(fieldType))
+            {
+                switch (fieldType)
+                {
+                    case FieldType.Select:
+                    case FieldType.Select2:
+                    case FieldType.CheckBox:
+                    case FieldType.Radio:
+                    case FieldType.Employee:
+                    case FieldType.Employee2:
+                    case FieldType.Department:
+                    case FieldType.Department2:
+                        if (!(field.EndsWith(".id") ||
+                            field.EndsWith(".code") ||
+                            field.EndsWith(".value") ||
+                            field.EndsWith(".label")))
+                        {
+                            finalField = $"{field}.label";
+                        }
+                        break;
+                }
+            }
+
+            return finalField;
         }
         public static ProjectionDefinition<T>? ToProjectionDefinition<T>(this DynamicFieldList fieldList)
         {
