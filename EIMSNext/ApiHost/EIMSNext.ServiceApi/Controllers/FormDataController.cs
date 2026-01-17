@@ -215,7 +215,7 @@ namespace EIMSNext.ServiceApi.Controllers
 
             FormData entity = model.CastTo<FormDataRequest, FormData>();
             //默认草稿
-            entity.FlowStatus = EIMSNext.Core.FlowStatus.Draft;
+            entity.FlowStatus = FlowStatus.Draft;
 
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);

@@ -4,6 +4,22 @@
     {
         protected Dictionary<Type, Dictionary<string, object>> _store = new Dictionary<Type, Dictionary<string, object>>();
 
+        public IEnumerable<T> GetAll<T>(DataVersion version = DataVersion.V0) where T : class
+        {
+            if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
+            {
+                yield break;
+            }
+
+            var keySuffix = $"_{version}";
+            foreach (var kvp in dic)
+            {
+                if (kvp.Key.EndsWith(keySuffix))
+                {
+                    yield return (T)kvp.Value;
+                }
+            }
+        }
         public T? Get<T>(string key, DataVersion version = DataVersion.V0, Func<string, T?>? getter = null) where T : class
         {
             if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
@@ -68,7 +84,7 @@
             if (_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {
                 var dataKey = $"{key}_{version}";
-                return dic.ContainsKey(dataKey);               
+                return dic.ContainsKey(dataKey);
             }
 
             return false;

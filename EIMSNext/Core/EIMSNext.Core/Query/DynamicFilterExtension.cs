@@ -28,7 +28,7 @@ namespace EIMSNext.Core.Query
             }
             else
             {
-                if (!string.IsNullOrEmpty(filter.Field) && !string.IsNullOrEmpty(filter.Op) && filter.Value != null)
+                if (!string.IsNullOrEmpty(filter.Field) && !string.IsNullOrEmpty(filter.Op))
                 {
                     // 不在此转换，应该在之外补上Data.
                     //var field = (string.IsNullOrEmpty(filter.Type)
@@ -43,7 +43,8 @@ namespace EIMSNext.Core.Query
                     }
                     else
                     {
-                        filterValues.Add(filter.Value);
+                        if (filter.Value != null)
+                            filterValues.Add(filter.Value);
                     }
 
                     var arrField = "";
@@ -77,13 +78,19 @@ namespace EIMSNext.Core.Query
                     case FieldType.Select2:
                     case FieldType.CheckBox:
                     case FieldType.Radio:
+                        if (!(
+                           field.EndsWith(".value") ||
+                           field.EndsWith(".label")))
+                        {
+                            finalField = $"{field}.value";
+                        }
+                        break;
                     case FieldType.Employee:
                     case FieldType.Employee2:
                     case FieldType.Department:
                     case FieldType.Department2:
                         if (!(field.EndsWith(".id") ||
                             field.EndsWith(".code") ||
-                            field.EndsWith(".value") ||
                             field.EndsWith(".label")))
                         {
                             finalField = $"{field}.label";
@@ -106,7 +113,8 @@ namespace EIMSNext.Core.Query
             }
             else
             {
-                filter = Builders<T>.Filter.Exists(field, true);
+                if (!Fields.IsSystemField(field))
+                    filter = Builders<T>.Filter.Exists(field, true);
 
                 FilterDefinition<T>? subFilter = null;
                 switch (op)

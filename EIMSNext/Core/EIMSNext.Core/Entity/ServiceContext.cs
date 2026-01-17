@@ -1,4 +1,6 @@
-﻿namespace EIMSNext.Core.Entity
+﻿using EIMSNext.Cache;
+
+namespace EIMSNext.Core.Entity
 {
     public interface IServiceContext
     {
@@ -9,6 +11,7 @@
         public IEmployee? Employee { get; set; }
 
         public DataAction Action { get; set; }
+        ISessionStore SessionStore { get; }
     }
     public sealed class Operator
     {

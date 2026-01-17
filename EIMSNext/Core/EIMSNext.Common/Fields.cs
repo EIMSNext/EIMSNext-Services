@@ -15,6 +15,12 @@
         public const string AppId = "appId";
         public const string FormId = "formId";
         public const string FlowStatus = "flowStatus";
+
+        public static readonly string[] SystemFields = { Id, BsonId, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
+        public static bool IsSystemField(string fieldName)
+        {
+            return SystemFields.Contains(fieldName, StringComparer.OrdinalIgnoreCase);
+        }
     }
 
     public static class FieldType

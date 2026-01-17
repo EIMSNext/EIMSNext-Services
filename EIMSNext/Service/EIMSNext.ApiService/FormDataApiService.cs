@@ -1,5 +1,4 @@
 ﻿using EIMSNext.ApiClient.Flow;
-using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
@@ -13,13 +12,11 @@ namespace EIMSNext.ApiService
         private FlowApiClient _flowClient;
         private IFormDefService _formDefService;
         private IWfDefinitionService _wfDefinitionService;
-        private IServiceContext _serviceContext;
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
             _formDefService = resolver.Resolve<IFormDefService>();
             _wfDefinitionService = resolver.Resolve<IWfDefinitionService>();
-            _serviceContext = resolver.GetServiceContext();
         }
 
         public override Task AddAsync(FormData entity)
@@ -28,13 +25,13 @@ namespace EIMSNext.ApiService
         }
         public Task AddAsync(FormData entity, DataAction action)
         {
-            _serviceContext.Action = action;
+            ServiceContext.Action = action;
             return base.AddAsync(entity);
         }
 
         public Task ReplaceAsync(FormData entity, DataAction action)
         {
-            _serviceContext.Action = action;
+            ServiceContext.Action = action;
             return base.ReplaceAsync(entity);
         }
     }

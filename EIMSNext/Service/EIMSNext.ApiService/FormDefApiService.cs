@@ -20,6 +20,8 @@ namespace EIMSNext.ApiService
         public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
         {
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            ServiceContext.SessionStore.Set(entity.Id, entity, Cache.DataVersion.V1);
+
             return base.ReplaceAsync(entity);
         }
     }
