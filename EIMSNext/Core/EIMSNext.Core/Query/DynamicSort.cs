@@ -1,21 +1,14 @@
-﻿namespace EIMSNext.Core.Query
+﻿using EIMSNext.Common;
+
+namespace EIMSNext.Core.Query
 {
     public class DynamicSort
     {
         public DynamicSort() { }
-        public DynamicSort(string field, SortDir dir = SortDir.Asc)
-        {
-            Field = field;
-            Dir = dir;
-        }
 
         public string Field { get; set; } = "";
+        public string? Type { get; set; }
         public SortDir Dir { get; set; } = SortDir.Asc;
-
-        public static DynamicSort Create(string field, SortDir dir = SortDir.Asc)
-        {
-            return new DynamicSort(field, dir);
-        }
     }
     public class DynamicSortList : List<DynamicSort>
     {

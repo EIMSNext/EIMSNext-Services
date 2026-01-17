@@ -21,7 +21,5 @@
 
         public const string System = "system";
         public const string Id = "Id";
-
-        public static readonly string[] SystemFields = { Fields.Id, Fields.BsonId, Fields.CreateBy, Fields.CreateTime, Fields.UpdateBy, Fields.UpdateTime, Fields.DeleteFlag, Fields.CorpId, Fields.AppId, Fields.FormId, Fields.FlowStatus };
     }
 }

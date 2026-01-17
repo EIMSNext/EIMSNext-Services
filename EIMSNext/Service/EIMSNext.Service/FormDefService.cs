@@ -1,12 +1,9 @@
-﻿using HKH.Mef2.Integration;
-
-using EIMSNext.Core;
+﻿using EIMSNext.Core;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
-
+using HKH.Mef2.Integration;
 using MongoDB.Driver;
-using System.Threading.Tasks;
 
 namespace EIMSNext.Service
 {
@@ -28,9 +25,44 @@ namespace EIMSNext.Service
             return;
         }
 
+        protected override async Task AfterReplace(FormDef entity, IClientSessionHandle? session)
+        {
+            await base.AfterReplace(entity, session);
+            var appRepo = Resolver.GetRepository<App>();
+            var app = appRepo.Get(entity.AppId, session)!;
+
+            var menu = app.AppMenus.FirstOrDefault(x => x.MenuId == entity.Id);
+            if (menu != null)
+            {
+                menu.Title = entity.Name;
+                appRepo.Replace(app, session);
+            }
+        }
+        protected override async Task AfterUpdate(FilterDefinition<FormDef> filter, UpdateDefinition<FormDef> update, bool upsert, IClientSessionHandle? session)
+        {
+            await base.AfterUpdate(filter, update, upsert, session);
+            var updated = Context.SessionStore.GetAll<FormDef>(Cache.DataVersion.V1);
+            if (!updated.Any())
+            {
+                updated = await Collection.Find(filter).ToListAsync();
+            }
+            if (updated.Any())
+            {
+                var appRepo = Resolver.GetRepository<App>();
+                var app = appRepo.Get(updated.First().AppId, session)!;
+
+                updated.ForEach(e =>
+                {
+                    var menu = app.AppMenus.FirstOrDefault(x => x.MenuId == e.Id);
+                    if (menu != null) menu.Title = e.Name;
+                });
+                appRepo.Replace(app, session);
+            }
+        }
+
         protected override async Task AfterDelete(FilterDefinition<FormDef> filter, IClientSessionHandle? session)
         {
-             await base.AfterDelete(filter, session);
+            await base.AfterDelete(filter, session);
             // 找到被删除的 FormDef 实体
             var deletedForms = await Collection.Find(filter).ToListAsync();
             if (deletedForms.Count == 0)
@@ -52,9 +84,7 @@ namespace EIMSNext.Service
                     appRepo.Replace(app, session);
                 }
             }
-
-            return;
         }
-       
+
     }
 }

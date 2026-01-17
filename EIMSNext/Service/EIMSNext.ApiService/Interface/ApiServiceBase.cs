@@ -24,6 +24,7 @@ namespace EIMSNext.ApiService
             CacheClient = resolver.GetCacheClient();
             MemoryCache = resolver.GetMemoryCache();
             IdentityContext = resolver.GetIdentityContext();
+            ServiceContext = resolver.GetServiceContext();
         }
 
         protected IResolver Resolver { get; private set; }
@@ -31,6 +32,7 @@ namespace EIMSNext.ApiService
         protected ICacheClient CacheClient { get; private set; }
         protected IMemoryCache MemoryCache { get; private set; }
         protected IIdentityContext IdentityContext { get; private set; }
+        protected IServiceContext ServiceContext { get; private set; }
 
         public V? Get(string id)
         {

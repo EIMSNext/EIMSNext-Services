@@ -30,7 +30,7 @@ namespace EIMSNext.Component
             }
             else if (Field != null)
             {
-                filter.Field = Constants.SystemFields.Contains(Field.Field, StringComparer.OrdinalIgnoreCase) ? Field.Field : "data." + Field.Field;
+                filter.Field = Fields.IsSystemField(Field.Field) ? Field.Field : "data." + Field.Field;
                 filter.Type = Field.Type;
                 filter.Op = Op;
                 filter.Value = ParseValue(Value, out FieldValueType valueType);
