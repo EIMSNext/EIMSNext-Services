@@ -8,7 +8,7 @@ using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
-
+using EIMSNext.Core.Entity;
 using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Authorization;
@@ -46,6 +46,8 @@ namespace EIMSNext.ApiHost.Controllers
         /// </summary>
         protected AppSetting AppSetting { get; private set; }
 
+        protected IServiceContext ServiceContext { get; private set; }
+
         /// <summary>
         /// 
         /// </summary>
@@ -57,6 +59,7 @@ namespace EIMSNext.ApiHost.Controllers
             this.Cache = resolver.GetCacheClient();
             this.IdentityContext = resolver.GetIdentityContext();
             this.AppSetting = resolver.GetAppSetting();
+            ServiceContext = resolver.GetServiceContext();
         }
 
         /// <summary>

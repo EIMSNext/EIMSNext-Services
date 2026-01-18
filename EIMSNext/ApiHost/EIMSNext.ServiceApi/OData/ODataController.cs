@@ -126,7 +126,7 @@ namespace EIMSNext.ServiceApi.OData
         /// <returns></returns>
         protected virtual IQueryable<V> FilterResult(IQueryable<V> query, ODataQueryOptions<V> options)
         {
-            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)),options);
+            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)), options);
         }
         protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
         {
@@ -209,7 +209,11 @@ namespace EIMSNext.ServiceApi.OData
         /// <param name="resolver">对象容器</param>
         public ODataController(IResolver resolver)
            : base(resolver)
-        { }
+        {
+            ServiceContext = resolver.GetServiceContext();
+        }
+
+        protected IServiceContext ServiceContext { get; private set; }
 
         /// <summary>
         /// 新增

@@ -2,6 +2,7 @@
 
 using EIMSNext.ApiHost.Extension;
 using EIMSNext.FileUpload;
+using EIMSNext.Service.Interface;
 
 namespace EIMSNext.FileUploadApi.Extension
 {
@@ -19,7 +20,7 @@ namespace EIMSNext.FileUploadApi.Extension
             base.Load(builder);
 
             builder.RegisterType<UploadDbContext>().AsImplementedInterfaces().SingleInstance();
-            builder.RegisterType<UploadServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
+            builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
         }
     }
 }

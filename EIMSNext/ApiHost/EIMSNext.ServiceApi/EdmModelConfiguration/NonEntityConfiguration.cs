@@ -38,8 +38,8 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();
             builder.ComplexType<FieldDef>();
-            builder.ComplexType<FieldOpt>();
-            builder.ComplexType<ValueOpt>();
+            builder.ComplexType<FieldProp>();
+            builder.ComplexType<ValueProp>();
             builder.ComplexType<FieldChangeLog>();
             builder.ComplexType<FormContent>();
             builder.ComplexType<AppMenu>();

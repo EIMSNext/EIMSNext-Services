@@ -1,4 +1,5 @@
 ﻿using EIMSNext.Auth.Entity;
+using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
@@ -18,9 +19,11 @@ namespace EIMSNext.Service.Interface
             Resolver = resolver;
             AccessToken = "";
             CorpId = "";
+            SessionStore = resolver.Resolve<ISessionStore>();
         }
 
         private IResolver Resolver { get; set; }
+        public ISessionStore SessionStore { get; private set; }
         public Operator? Operator { get; set; }
 
         public IUser? User

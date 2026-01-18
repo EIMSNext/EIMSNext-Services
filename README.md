@@ -94,7 +94,8 @@ EIMS Next 是一个企业低代码应用系统，旨在为企业提供全面的�
 - 使用 `dotnet test` 运行单元测试。
 - 使用 `MongoTransactionScope` 管理事务。
 - 使用 `V8ScriptEngine` 执行动态表达式。
-- 使用 `DynamicFindOptions` 实现灵活的查询逻辑。
+- 使用 `MongoDB.AspNetCore.OData` 实现普通表单的查询与数据提交
+- 使用 `DynamicFindOptions` 实现灵活的动态数据查询逻辑。
 
 ### 捐助
 如果您觉得我们的开源软件对你有所帮助，请扫下方二维码打赏我们一杯咖啡。

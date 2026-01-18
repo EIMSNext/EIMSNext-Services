@@ -681,7 +681,7 @@ namespace EIMSNext.Component
         {
             public bool SingleResult { get; set; }
         }
-                      
+
 
         private class FieldSortItem
         {
@@ -701,7 +701,7 @@ namespace EIMSNext.Component
                 {
                     var sortItem = new DynamicSort() { Dir = item.Sort };
 
-                    sortItem.Field = Constants.SystemFields.Contains(item.Field!.Field, StringComparer.OrdinalIgnoreCase) ? item.Field!.Field : "data." + item.Field!.Field;
+                    sortItem.Field = Fields.IsSystemField(item.Field!.Field) ? item.Field!.Field : "data." + item.Field!.Field;
 
                     sortList.Add(sortItem);
                 }

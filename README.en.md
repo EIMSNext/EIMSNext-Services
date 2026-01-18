@@ -94,7 +94,8 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 - Use `dotnet test` Run unit tests.
 - Use `MongoTransactionScope` Manage affairs.
 - Use `V8ScriptEngine` Execute dynamic expression.
-- Use `DynamicFindOptions` Implement flexible query logic.
+- Use `MongoDB.AspNetCore.OData` Implement flexible query for generic form
+- Use `DynamicFindOptions` Implement dynamic data flexible query logic.
 
 ### Donate
 If you feel that our open source software is helpful to you, please scan the QR code below to enjoy a cup of coffee.
