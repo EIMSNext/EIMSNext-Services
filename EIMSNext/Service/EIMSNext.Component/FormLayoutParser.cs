@@ -68,9 +68,18 @@ namespace EIMSNext.Component
                                 break;
                             case FieldType.TimeStamp:
                                 {
-                                    fieldDef.Options.Format = props["format"]?.GetValue<string>();
+                                    fieldDef.Props.Format = props["format"]?.GetValue<string>();
                                 }
                                 break;
+                        }
+                    }
+
+                    if (field.ContainsKey("options"))
+                    {
+                        var options = field["options"]?.AsArray();
+                        if (options != null)
+                        {
+                            fieldDef.Props.Options = options.SerializeToJson().DeserializeFromJson<List<ValueOption>>();
                         }
                     }
 
@@ -100,10 +109,10 @@ namespace EIMSNext.Component
             var computed = field["computed"]?.AsObject();
             if (computed != null)
             {
-                fieldDef.Options.ValueOpt = new ValueOpt() { Formula = computed["value"]?.GetValue<string>() };
-                if (!string.IsNullOrEmpty(fieldDef.Options.ValueOpt.Formula))
+                fieldDef.Props.ValueProp = new ValueProp() { Formula = computed["value"]?.GetValue<string>() };
+                if (!string.IsNullOrEmpty(fieldDef.Props.ValueProp.Formula))
                 {
-                    fieldDef.Options.ValueOpt.Depends = ParseDepends(fieldDef.Options.ValueOpt.Formula);
+                    fieldDef.Props.ValueProp.Depends = ParseDepends(fieldDef.Props.ValueProp.Formula);
                 }
             }
             return fieldDef;
