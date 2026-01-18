@@ -94,21 +94,21 @@ namespace EIMSNext.Entity
     public class FieldDef
     {
         /// <summary>
-        /// 
+        /// 字段名
         /// </summary>
         public string Field { get; set; } = string.Empty;
         /// <summary>
-        /// 
+        /// 字段类型
         /// </summary>
         public string Type { get; set; } = FieldType.Input;
         /// <summary>
-        /// 
+        /// 标题
         /// </summary>
         public string Title { get; set; } = string.Empty;
         /// <summary>
-        /// 
+        /// 属性配置
         /// </summary>
-        public FieldOpt Options { get; set; } = new FieldOpt();
+        public FieldProp Props { get; set; } = new FieldProp();
 
         /// <summary>
         /// 子表单中的列
@@ -119,21 +119,39 @@ namespace EIMSNext.Entity
     /// <summary>
     /// 
     /// </summary>
-    public class FieldOpt
+    public class FieldProp
     {
         /// <summary>
-        /// 
+        /// Radio/Checkbox/Select/Select2预设的选项
+        /// </summary>
+        public List<ValueOption>? Options { get; set; }
+        /// <summary>
+        /// Number/Timestamp的格式
         /// </summary>
         public string? Format { get; set; }
         /// <summary>
         /// 值配置
         /// </summary>
-        public ValueOpt? ValueOpt { get; set; }
+        public ValueProp? ValueProp { get; set; }
     }
     /// <summary>
     /// 
     /// </summary>
-    public class ValueOpt
+    public class ValueOption
+    {
+        /// <summary>
+        /// 
+        /// </summary>
+        public string Value {  get; set; } = string.Empty;
+        /// <summary>
+        /// 
+        /// </summary>
+        public string Label {  get; set; } = string.Empty;
+    }
+    /// <summary>
+    /// 
+    /// </summary>
+    public class ValueProp
     {
         /// <summary>
         /// 值公式
