@@ -20,5 +20,10 @@ namespace EIMSNext.Entity
         /// 流程状态
         /// </summary>
         public FlowStatus FlowStatus { get; set; }
+
+        /// <summary>
+        /// 数据更新日志
+        /// </summary>
+        //public List<UpdateLog> UpdateLog {  get; set; }
     }    
 }

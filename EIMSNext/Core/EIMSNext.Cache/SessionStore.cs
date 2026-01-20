@@ -4,7 +4,7 @@
     {
         protected Dictionary<Type, Dictionary<string, object>> _store = new Dictionary<Type, Dictionary<string, object>>();
 
-        public IEnumerable<T> GetAll<T>(DataVersion version = DataVersion.V0) where T : class
+        public IEnumerable<T> GetAll<T>(DataVersion version = DataVersion.Temp) where T : class
         {
             if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {
@@ -20,7 +20,7 @@
                 }
             }
         }
-        public T? Get<T>(string key, DataVersion version = DataVersion.V0, Func<string, T?>? getter = null) where T : class
+        public T? Get<T>(string key, DataVersion version = DataVersion.Temp, Func<string, T?>? getter = null) where T : class
         {
             if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {
@@ -49,7 +49,7 @@
             return null;
         }
 
-        public void Remove<T>(string key, DataVersion version = DataVersion.V0) where T : class
+        public void Remove<T>(string key, DataVersion version = DataVersion.Temp) where T : class
         {
             if (_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {
@@ -61,7 +61,7 @@
             }
         }
 
-        public void Set<T>(string key, T value, DataVersion version = DataVersion.V0) where T : class
+        public void Set<T>(string key, T value, DataVersion version = DataVersion.Temp) where T : class
         {
             if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {
@@ -79,7 +79,7 @@
                 dic.Add(dataKey, value);
             }
         }
-        public bool Contains<T>(string key, DataVersion version = DataVersion.V0) where T : class
+        public bool Contains<T>(string key, DataVersion version = DataVersion.Temp) where T : class
         {
             if (_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
             {

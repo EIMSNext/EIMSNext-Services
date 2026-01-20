@@ -1,12 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using EIMSNext.Core.Entity;
 
-using EIMSNext.Core.Entity;
-
-namespace EIMSNext.Entity
+namespace EIMSNext.Auth.Entity
 {
     /// <summary>
     /// 登录日志

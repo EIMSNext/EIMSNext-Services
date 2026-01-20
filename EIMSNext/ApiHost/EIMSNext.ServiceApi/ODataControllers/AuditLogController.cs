@@ -1,10 +1,9 @@
 ﻿using Asp.Versioning;
-
-using HKH.Mef2.Integration;
-using EIMSNext.ServiceApi.OData;
-using EIMSNext.ApiService.ViewModel;
-using EIMSNext.Entity;
 using EIMSNext.ApiService;
+using EIMSNext.ApiService.ViewModel;
+using EIMSNext.Core.Entity;
+using EIMSNext.ServiceApi.OData;
+using HKH.Mef2.Integration;
 
 namespace EIMSNext.ServiceApi.ODataControllers
 {
