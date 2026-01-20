@@ -1,5 +1,5 @@
-﻿using EIMSNext.Core.Service;
-using EIMSNext.Entity;
+﻿using EIMSNext.Core.Entity;
+using EIMSNext.Core.Service;
 
 namespace EIMSNext.Service.Interface
 {

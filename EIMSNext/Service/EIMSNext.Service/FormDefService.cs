@@ -41,7 +41,7 @@ namespace EIMSNext.Service
         protected override async Task AfterUpdate(FilterDefinition<FormDef> filter, UpdateDefinition<FormDef> update, bool upsert, IClientSessionHandle? session)
         {
             await base.AfterUpdate(filter, update, upsert, session);
-            var updated = Context.SessionStore.GetAll<FormDef>(Cache.DataVersion.V1);
+            var updated = Context.SessionStore.GetAll<FormDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
                 updated = await Collection.Find(filter).ToListAsync();
