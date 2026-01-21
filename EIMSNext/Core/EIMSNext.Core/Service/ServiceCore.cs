@@ -100,6 +100,7 @@ namespace EIMSNext.Core.Service
                  NewData = x.SerializeToJson(),
                  CreateBy = Context.Operator,
                  CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                 ClientIp = Context.ClientIp,
              }));
             return logList;
         }
@@ -117,6 +118,7 @@ namespace EIMSNext.Core.Service
                     DataFilter = filter?.ToString(),
                     CreateBy = Context.Operator,
                     CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    ClientIp = Context.ClientIp,
                 });
             }
             else
@@ -126,8 +128,6 @@ namespace EIMSNext.Core.Service
                     var y = newData.FirstOrDefault(e => e.Id == x.Id);
                     if (y != null)
                     {
-
-
                         logList.Add(new AuditLog
                         {
                             Action = DbAction.Update,
@@ -138,6 +138,7 @@ namespace EIMSNext.Core.Service
                             NewData = y.SerializeToJson(),
                             CreateBy = Context.Operator,
                             CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                            ClientIp = Context.ClientIp,
                         });
                     }
                 });

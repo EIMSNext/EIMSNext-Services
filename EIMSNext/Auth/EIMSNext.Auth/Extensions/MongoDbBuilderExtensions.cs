@@ -40,6 +40,7 @@ namespace Microsoft.Extensions.DependencyInjection
             builder.Services.AddScoped<IUserService, UserService>();
             builder.Services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             builder.Services.AddScoped<ISingleSignOnService, SingleSignOnService>();
+            builder.Services.AddScoped<IAuditLoginService, AuditLoginService>();
 
             return builder;
         }

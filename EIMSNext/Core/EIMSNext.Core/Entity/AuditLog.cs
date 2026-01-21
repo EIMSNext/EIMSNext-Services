@@ -37,5 +37,9 @@
         /// 批量更新时的字段
         /// </summary>
         public string? UpdateExp { get; set; }
+        /// <summary>
+        /// 客户端IP
+        /// </summary>
+        public string? ClientIp {  get; set; }
     }
 }
