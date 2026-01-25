@@ -4,6 +4,7 @@ namespace EIMSNext.ApiService.RequestModel
 {
     public class WfDefinitionRequest : RequestBase
     {
+        public string AppId { get; set; } = "";
         public string Name { get; set; } = string.Empty;
         public FlowType FlowType { get; set; } = FlowType.Workflow;
         public string ExternalId { get; set; } = string.Empty;
