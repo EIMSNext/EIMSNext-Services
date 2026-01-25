@@ -1,6 +1,5 @@
 ﻿using EIMSNext.Auth.Entity;
 using EIMSNext.Auth.Interfaces;
-using EIMSNext.Common.Extension;
 using EIMSNext.MongoDb;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
@@ -15,6 +14,7 @@ namespace EIMSNext.Auth.DbContext
         private readonly IMongoCollection<ApiScope> _apiScopes;
         private readonly IMongoCollection<User> _users;
         private readonly IMongoCollection<PersistedGrant> _persistedGrants;
+        private readonly IMongoCollection<AuditLogin> _auditLogin;
 
         public AuthDbContext(IOptions<MongoDbConfiguration> settings)
             : base(settings)
@@ -25,6 +25,7 @@ namespace EIMSNext.Auth.DbContext
             _apiScopes = Database.GetCollection<ApiScope>(nameof(ApiScope));
             _users = Database.GetCollection<User>(nameof(User));
             _persistedGrants = Database.GetCollection<PersistedGrant>(nameof(PersistedGrant));
+            _auditLogin = Database.GetCollection<AuditLogin>(nameof(AuditLogin));
         }
 
         #region IConfigurationDbContext
@@ -61,6 +62,11 @@ namespace EIMSNext.Auth.DbContext
         public async Task AddUser(User entity)
         {
             await this._users.InsertOneAsync(entity);
+        }
+
+        public async Task AddAuditLogin(AuditLogin entity)
+        {
+            await this._auditLogin.InsertOneAsync(entity);
         }
 
         #endregion

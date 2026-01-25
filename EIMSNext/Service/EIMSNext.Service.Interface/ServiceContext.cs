@@ -54,6 +54,7 @@ namespace EIMSNext.Service.Interface
         }
 
         public string AccessToken { get; set; }
+        public string? ClientIp {  get; set; }
         public DataAction Action { get; set; }
         public string CorpId { get; set; }
 
