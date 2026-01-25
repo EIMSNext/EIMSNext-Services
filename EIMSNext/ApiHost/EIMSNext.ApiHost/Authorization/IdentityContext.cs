@@ -1,4 +1,5 @@
-﻿using EIMSNext.ApiService;
+﻿using EIMSNext.ApiCore;
+using EIMSNext.ApiService;
 using EIMSNext.Auth.Entity;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
@@ -59,6 +60,7 @@ namespace EIMSNext.ApiHost.Authorization
             serviceContext.User = CurrentUser;
             serviceContext.Employee = CurrentEmployee;
             serviceContext.Operator = CurrentEmployee?.ToOperator() ?? Operator.Empty;
+            serviceContext.ClientIp = IpHelper.GetClientIp(httpContextAccessor);
         }
 
         /// <summary>

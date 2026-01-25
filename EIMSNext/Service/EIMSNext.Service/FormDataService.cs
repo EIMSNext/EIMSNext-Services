@@ -17,6 +17,11 @@ namespace EIMSNext.Service
             _flowClient = resolver.Resolve<FlowApiClient>();
         }
 
+        protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
+        {
+            //TODO: 它的修改历史记在本身？
+        }
+
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;

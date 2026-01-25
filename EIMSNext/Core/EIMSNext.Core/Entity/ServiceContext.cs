@@ -9,7 +9,7 @@ namespace EIMSNext.Core.Entity
         public Operator? Operator { get; set; }
         public IUser? User { get; set; }
         public IEmployee? Employee { get; set; }
-
+        public string? ClientIp { get; set; }
         public DataAction Action { get; set; }
         ISessionStore SessionStore { get; }
     }

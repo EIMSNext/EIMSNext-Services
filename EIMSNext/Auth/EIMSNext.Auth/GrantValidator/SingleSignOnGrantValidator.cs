@@ -5,15 +5,23 @@ using IdentityServer4.Validation;
 
 using EIMSNext.Auth.Entity;
 using EIMSNext.Auth.Interfaces;
+using Microsoft.AspNetCore.Http;
+using EIMSNext.ApiCore;
+using EIMSNext.Common.Extension;
 
 namespace EIMSNext.Auth.GrantValidator
 {
     public class SingleSignOnGrantValidator : IExtensionGrantValidator
     {
         private readonly ISingleSignOnService _ssoService;
-        public SingleSignOnGrantValidator(ISingleSignOnService ssoService)
+        private readonly IAuditLoginService _auditLoginService;
+        private readonly IHttpContextAccessor _contextAccessor;
+        public SingleSignOnGrantValidator(ISingleSignOnService ssoService, IAuditLoginService auditLoginService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _ssoService = ssoService;
+            _auditLoginService = auditLoginService;
+            _contextAccessor = httpContextAccessor;
         }
 
         public string GrantType => CustomGrantType.SingleSignOn;
@@ -26,6 +34,15 @@ namespace EIMSNext.Auth.GrantValidator
             if (user == null)
             {
                 context.Result = new GrantValidationResult(TokenRequestErrors.InvalidGrant, "用户不存在或密码错误");
+                _auditLoginService.AddAuditLogin(
+                   new AuditLogin
+                   {
+                       LoginId = username,
+                       ClientIp = IpHelper.GetClientIp(_contextAccessor),
+                       CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                       GrantType = "password",
+                       FailReason = "用户不存在或密码错误"
+                   });
             }
             else
             {
@@ -41,6 +58,17 @@ namespace EIMSNext.Auth.GrantValidator
                     };
 
                 context.Result = new GrantValidationResult(username, GrantType, DateTime.UtcNow, claims);
+                _auditLoginService.AddAuditLogin(
+                    new AuditLogin
+                    {
+                        LoginId = username,
+                        UserId = user.Id,
+                        UserName = user.Name,
+                        CorpId = corp?.CorpId,
+                        ClientIp = IpHelper.GetClientIp(_contextAccessor),
+                        CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                        GrantType = "sso"
+                    });
             }
 
             return Task.CompletedTask;
