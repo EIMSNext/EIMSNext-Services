@@ -9,6 +9,10 @@ namespace EIMSNext.Entity
     public class Wf_Definition : CorpEntityBase
     {
         /// <summary>
+        /// 应用ID,
+        /// </summary>
+        public string AppId { get; set; } = string.Empty;
+        /// <summary>
         /// 
         /// </summary>
         public string Name { get; set; } = string.Empty;
@@ -17,7 +21,7 @@ namespace EIMSNext.Entity
         /// </summary>
         public FlowType FlowType { get; set; } = FlowType.Workflow;
         /// <summary>
-        /// 
+        /// 表单ID
         /// </summary>
         public string ExternalId { get; set; } = string.Empty;
         /// <summary>
@@ -57,7 +61,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 是否禁用
         /// </summary>
-        public bool Disabled {  get; set; }
+        public bool Disabled { get; set; }
     }
 
     /// <summary>
@@ -669,7 +673,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public bool CascadedDept {  get; set; }
+        public bool CascadedDept { get; set; }
     }
 
     /// <summary>
