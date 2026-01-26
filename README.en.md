@@ -1,8 +1,8 @@
-# EIMSNext Enterprise Information Management System
+# EIMSNext（Dongfeng Low-Code）- Enterprise Information Management System
 
 ## Project Introduction
 
-EIMSNext is an enterprise information management system designed to provide comprehensive information management solutions for enterprises. The system covers multiple modules such as authentication, data management, process control, file upload, form definition, and workflow engine. It supports data interaction through API and provides persistence support based on MongoDB.
+EIMSNext (also known as Dongfeng Low-Code) is an open-source enterprise-level information management solution. Centered on low-code technology, it provides full-stack support for both frontend and backend. The frontend is built with Vue 3 and TypeScript using a modular design, while the backend encompasses core modules such as identity authentication, data management, and workflow engine, supporting flexible API interactions and data persistence. Adaptable to diverse scenarios including enterprise internal management, process approval, and dynamic forms, the solution helps enterprises reduce informatization costs and improve management efficiency.
 
 WebSite： [www.eimsnext.com](https://www.eimsnext.com)
 
