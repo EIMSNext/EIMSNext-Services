@@ -1,12 +1,13 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extension;
 using EIMSNext.Common;
 using EIMSNext.Core;
+using EIMSNext.Core.Query;
 using EIMSNext.Entity;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interface;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.Service.Interface;
 
 using HKH.Mef2.Integration;
@@ -16,6 +17,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 using WorkflowCore.Interface;
+using WorkflowCore.Models;
 namespace EIMSNext.FlowApi.Controllers
 {
     [ApiVersion(1.0)]
@@ -28,6 +30,7 @@ namespace EIMSNext.FlowApi.Controllers
         private readonly IFormDataService _formDataservice;
         private readonly IWfExecLogService _execlogservice;
         private readonly IWfTodoService _todoservice;
+        private readonly IMongoPersistenceProvider _store;
 
         public WorkflowController(IResolver resolver) : base(resolver)
         {
@@ -38,6 +41,7 @@ namespace EIMSNext.FlowApi.Controllers
             _formDataservice = resolver.Resolve<IFormDataService>();
             _execlogservice = resolver.Resolve<IWfExecLogService>();
             _todoservice = resolver.Resolve<IWfTodoService>();
+            _store = (IMongoPersistenceProvider)_wfHost.PersistenceStore;
         }
 
         [HttpPost, Route("Load")]
@@ -68,7 +72,7 @@ namespace EIMSNext.FlowApi.Controllers
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
 
-                var wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando());
+                var wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando(), request.DataId);
                 var errMsg = WaitForComplete(wfinstId);
 
                 if (!string.IsNullOrEmpty(errMsg))
@@ -110,6 +114,36 @@ namespace EIMSNext.FlowApi.Controllers
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
         }
 
+        [HttpPost, Route("Terminate")]
+        public async Task<IActionResult> TerminateAsync(TerminateRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || (string.IsNullOrEmpty(request.WfInstanceId) && string.IsNullOrEmpty(request.DataId)))
+            {
+                return BadRequest("审批人和流程实例Id和数据Id不能为空");
+            }
+
+            if (IdentityContext.IdentityType != ApiService.IdentityType.CorpAdmin)
+            {
+                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有中止权限");
+            }
+
+            WorkflowInstance? wfInst;
+            if (!string.IsNullOrEmpty(request.WfInstanceId))
+                wfInst = _store.GetWorkflowInstances().Where(x => x.Id == request.WfInstanceId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+            else
+                wfInst = _store.GetWorkflowInstances().Where(x => x.Reference == request.DataId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+
+            if (wfInst != null)
+            {
+                var result = await _wfHost.TerminateWorkflow(wfInst.Id);
+
+                if (!result)
+                    return ApiResult.Fail(-1, "指定数程实例中止失败", new { id = request.WfInstanceId }).ToActionResult();
+            }
+
+            return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
+        }
+
         [HttpGet, Route("Status")]
         public async Task<IActionResult> GetStatusAsync([FromQuery] StatusRequest request)
         {
@@ -139,6 +173,32 @@ namespace EIMSNext.FlowApi.Controllers
                 return string.Empty;
 
             return execLog.ErrMsg;
+        }
+
+        [HttpPost, Route("Definition/Delete")]
+        public IActionResult DeleteDef(DeleteRequest request)
+        {
+            List<string>? defIds = null;
+            if (!string.IsNullOrEmpty(request.AppId))
+                defIds = _defservice.Query(x => x.AppId == request.AppId && !x.DeleteFlag).Select(x => x.Id).ToList();
+            else
+                defIds = _defservice.Query(x => x.FlowType == FlowType.Workflow && request.FormIds!.Contains(x.SourceId!) && !x.DeleteFlag).Select(x => x.Id).ToList();
+
+            if (defIds?.Count > 0)
+            {
+                var wfInsts = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id);
+                wfInsts.ForEach(x => _wfHost.TerminateWorkflow(x));
+            }
+
+            if (request.DeleteDef.HasValue && request.DeleteDef.Value)
+            {
+                if (!string.IsNullOrEmpty(request.AppId))
+                    _defservice.Delete(new DynamicFilter() { Rel = "and", Items = [new DynamicFilter { Field = "deleteFlag", Op = FilterOp.Eq, Value = false }, new DynamicFilter { Field = "appId", Op = FilterOp.Eq, Value = request.AppId }] });
+                else if (defIds?.Count > 0)
+                    _defservice.Delete(defIds);
+            }
+
+            return Ok();
         }
 
 #if DEBUG
@@ -226,9 +286,22 @@ namespace EIMSNext.FlowApi.Controllers
         public string Signature { get; set; } = string.Empty;
     }
 
+    public class TerminateRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WorkerId { get; set; } = string.Empty;
+    }
+
     public class StatusRequest
     {
         public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
+    }
+    public class DeleteRequest()
+    {
+        public string? AppId { get; set; }
+        public List<string>? FormIds { get; set; }
+        public bool? DeleteDef { get; set; }
     }
 }

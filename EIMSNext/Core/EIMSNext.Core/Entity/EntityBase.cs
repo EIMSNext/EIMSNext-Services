@@ -18,7 +18,7 @@ namespace EIMSNext.Core.Entity
         public Operator? UpdateBy { get; set; }
         public long? UpdateTime { get; set; }
 
-        public bool? DeleteFlag { get; set; }= false;
+        public bool DeleteFlag { get; set; }= false;
     }
 
     /// <summary>

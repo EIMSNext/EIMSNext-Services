@@ -45,5 +45,11 @@
         public const string Employee2 = "employeeselect2";
         public const string Department = "departmentselect";
         public const string Department2 = "departmentselect2";
+
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select, Select2, ImageUpload, FileUpload, TableForm, Employee, Employee2, Department, Department2];
+        public static bool IsInputField(string type)
+        {
+            return AllFieldTypes.Contains(type);
+        }
     }
 }

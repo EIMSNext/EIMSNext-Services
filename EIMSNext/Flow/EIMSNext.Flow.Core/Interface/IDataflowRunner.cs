@@ -14,7 +14,6 @@ namespace EIMSNext.Flow.Core.Interface
     public class DfExecResult
     {
         public bool Success => string.IsNullOrEmpty(Error);
-
         public WorkflowInstance? DfInstance { get; set; }
         public string? Error { get; set; }
     }

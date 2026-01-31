@@ -7,12 +7,21 @@ using RestSharp;
 
 namespace EIMSNext.ApiClient.Flow
 {
-    public class FlowApiClient : RestApiClientBase<FlowApiClient, FlowApiClientSetting>
+    public class FlowApiClient : RestApiClientBase<FlowApiClient, FlowApiClientSetting>, IFlowClient
     {
         public FlowApiClient(IConfiguration config, ILogger<FlowApiClient> logger) : base(config, logger)
         {
         }
 
+        public async Task<WfResponse?> Terminate(TerminateRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Terminate", req, accessToken));
+        }
+
+        public async Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Definition/Delete", req, accessToken));
+        }
         public async Task<WfResponse?> Approve(ApproveRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Approve", req, accessToken));

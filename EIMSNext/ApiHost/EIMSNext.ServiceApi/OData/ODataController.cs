@@ -131,7 +131,7 @@ namespace EIMSNext.ServiceApi.OData
         protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
         {
             if (IDeleteFlagType.IsAssignableFrom(typeof(V)))
-                return query.Where(x => !((x as IDeleteFlag)!.DeleteFlag ?? false));
+                return query.Where(x => !((x as IDeleteFlag)!.DeleteFlag));
             else
                 return query;
         }
