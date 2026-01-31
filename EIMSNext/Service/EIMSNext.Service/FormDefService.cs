@@ -1,4 +1,6 @@
-﻿using EIMSNext.Core;
+﻿using EIMSNext.ApiClient.Flow;
+using EIMSNext.Core;
+using EIMSNext.Core.Query;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
@@ -7,8 +9,14 @@ using MongoDB.Driver;
 
 namespace EIMSNext.Service
 {
-    public class FormDefService(IResolver resolver) : EntityServiceBase<FormDef>(resolver), IFormDefService
+    public class FormDefService : EntityServiceBase<FormDef>, IFormDefService
     {
+        private FlowApiClient _flowClient;
+        public FormDefService(IResolver resolver) : base(resolver)
+        {
+            _flowClient = resolver.Resolve<FlowApiClient>();
+        }
+
         protected override async Task AfterAdd(IEnumerable<FormDef> entities, IClientSessionHandle? session)
         {
             await base.AfterAdd(entities, session);
@@ -64,7 +72,7 @@ namespace EIMSNext.Service
         {
             await base.AfterDelete(filter, session);
             // 找到被删除的 FormDef 实体
-            var deletedForms = await Collection.Find(filter).ToListAsync();
+            var deletedForms = Repository.Find(new MongoFindOptions<FormDef> { Filter = filter }, session).ToList();
             if (deletedForms.Count == 0)
                 return;
 
@@ -83,6 +91,22 @@ namespace EIMSNext.Service
                 {
                     appRepo.Replace(app, session);
                 }
+            }
+
+            var formIds = deletedForms.Select(x => x.Id);
+            //更新所有相关数据为已删除
+            var formDataRepo = Resolver.GetRepository<FormData>();
+            await formDataRepo.UpdateManyAsync(formDataRepo.FilterBuilder.And(formDataRepo.FilterBuilder.Eq(x => x.DeleteFlag, false), formDataRepo.FilterBuilder.In(x => x.FormId, formIds)), formDataRepo.UpdateBuilder.Set(x => x.DeleteFlag, true), session: session);
+
+            var flowFormIds = deletedForms.Where(x => x.UsingWorkflow).Select(x => x.Id);
+            if (flowFormIds.Any())
+            {
+                //删除所有待办
+                var todoRepo = Resolver.GetRepository<Wf_Todo>();
+                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIds), session);
+
+                //废弃所有流程实例
+                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIds }, Context.AccessToken);
             }
         }
 

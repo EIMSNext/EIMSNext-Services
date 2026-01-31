@@ -6,6 +6,7 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 
 using MongoDB.Driver;
+using EIMSNext.Common;
 
 namespace EIMSNext.Core.Service
 {
@@ -93,7 +94,7 @@ namespace EIMSNext.Core.Service
         {
             using (var scope = NewTransactionScope())
             {
-                var result = DeleteCore(id, scope.SessionHandle);
+                var result = DeleteCore(FilterBuilder.Eq(x => Fields.BsonId, id), scope.SessionHandle);
                 scope.CommitTransaction();
                 return result;
             }
@@ -102,7 +103,7 @@ namespace EIMSNext.Core.Service
         {
             using (var scope = NewTransactionScope())
             {
-                var result = DeleteCore(FilterBuilder.In(x => x.Id, ids), scope.SessionHandle);
+                var result = DeleteCore(FilterBuilder.In(x => Fields.BsonId, ids), scope.SessionHandle);
                 scope.CommitTransaction();
                 return result;
             }
@@ -177,7 +178,7 @@ namespace EIMSNext.Core.Service
         {
             using (var scope = NewTransactionScope())
             {
-                var result = await DeleteCoreAsync(FilterBuilder.Eq(x => x.Id, id), scope.SessionHandle);
+                var result = await DeleteCoreAsync(FilterBuilder.Eq(x => Fields.BsonId, id), scope.SessionHandle);
                 scope.CommitTransaction();
                 return result;
             }
@@ -186,7 +187,7 @@ namespace EIMSNext.Core.Service
         {
             using (var scope = NewTransactionScope())
             {
-                var result = await DeleteCoreAsync(FilterBuilder.In(x => x.Id, ids), scope.SessionHandle);
+                var result = await DeleteCoreAsync(FilterBuilder.In(x => Fields.BsonId, ids), scope.SessionHandle);
                 scope.CommitTransaction();
                 return result;
             }
