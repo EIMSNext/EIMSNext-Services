@@ -1,12 +1,10 @@
 ﻿using MongoDB.Driver;
 using MongoDB.Driver.Linq;
-
-using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Persistence
 {
-    public class MongoPersistenceProvider : IPersistenceProvider
+    public class MongoPersistenceProvider : IMongoPersistenceProvider
     {
         internal const string WorkflowCollectionName = "Wf_WorkflowInstance";
         private readonly IMongoDatabase _database;
@@ -98,6 +96,29 @@ namespace EIMSNext.Flow.Persistence
                 result = result.Where(x => x.CreateTime <= createdTo.Value);
 
             return await result.Skip(skip).Take(take).ToListAsync();
+        }
+
+        public IQueryable<WorkflowInstance> GetWorkflowInstancesByReference(IEnumerable<string> references, WorkflowStatus? status)
+        {
+            IQueryable<WorkflowInstance> result = WorkflowInstances.AsQueryable().Where(x => references.Contains(x.Reference));
+
+            if (status.HasValue)
+                result = result.Where(x => x.Status == status.Value);
+
+            return result;
+        }
+        public IQueryable<WorkflowInstance> GetWorkflowInstancesByDefId(IEnumerable<string> defIds, WorkflowStatus? status)
+        {
+            IQueryable<WorkflowInstance> result = WorkflowInstances.AsQueryable().Where(x => defIds.Contains(x.WorkflowDefinitionId));
+
+            if (status.HasValue)
+                result = result.Where(x => x.Status == status.Value);
+
+            return result;
+        }
+        public IQueryable<WorkflowInstance> GetWorkflowInstances()
+        {
+            return WorkflowInstances.AsQueryable();
         }
 
         public async Task<string> CreateEventSubscription(EventSubscription subscription, CancellationToken cancellationToken = default)
@@ -251,7 +272,7 @@ namespace EIMSNext.Flow.Persistence
 
         public void EnsureStoreExists()
         {
-            
+
         }
     }
 }

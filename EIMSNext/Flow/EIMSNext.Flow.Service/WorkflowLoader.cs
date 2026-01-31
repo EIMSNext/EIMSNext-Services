@@ -36,7 +36,8 @@ namespace EIMSNext.Flow.Service
 
         public void LoadDefinitionsFromStorage()
         {
-            foreach (var definition in _defService.All())
+            //TODO: 将来是否可以改为懒加载
+            foreach (var definition in _defService.Query(x => !x.DeleteFlag))
             {
                 try
                 {
