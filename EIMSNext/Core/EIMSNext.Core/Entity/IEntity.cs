@@ -10,7 +10,7 @@
     }
     public interface IDeleteFlag
     {
-        bool? DeleteFlag { get; set; }
+        bool DeleteFlag { get; set; }
     }
     public interface IEntity : IMongoEntity, IDeleteFlag
     {

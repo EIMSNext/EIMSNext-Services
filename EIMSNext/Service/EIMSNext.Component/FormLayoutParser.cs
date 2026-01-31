@@ -1,10 +1,12 @@
-﻿using System.Text.Json.Nodes;
+﻿using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using EIMSNext.Common;
 using EIMSNext.Common.Extension;
 using EIMSNext.Core.Query;
 using EIMSNext.Entity;
+using Newtonsoft.Json.Linq;
 
 namespace EIMSNext.Component
 {
@@ -33,11 +35,12 @@ namespace EIMSNext.Component
             if (fieldArr == null || fieldArr.Count == 0)
                 return fieldList;
 
-            foreach (JsonObject? field in fieldArr)
+            foreach (JsonNode? node in fieldArr)
             {
-                if (field == null) continue;
+                if (node == null || node.GetValueKind() != JsonValueKind.Object) continue;
+                var field = node.AsObject();
 
-                if (field.ContainsKey("type"))
+                if (field.ContainsKey("type") && FieldType.IsInputField(field["type"]!.GetValue<string>()))
                 {
                     //因为FieldType定义中不包括 Layout的类型，所以此处都是表单控件和子表单控件
                     var fieldDef = ParseField(field)!;
@@ -97,6 +100,7 @@ namespace EIMSNext.Component
 
             return fieldList;
         }
+
         private FieldDef? ParseField(JsonObject? field)
         {
             if (field == null) return null;
