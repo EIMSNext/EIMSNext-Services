@@ -1,4 +1,6 @@
-﻿using Microsoft.International.Converters.PinYinConverter;
+﻿using System.Text.Json;
+
+using Microsoft.International.Converters.PinYinConverter;
 
 namespace EIMSNext.Common.Extension
 {
@@ -71,6 +73,12 @@ namespace EIMSNext.Common.Extension
         public static bool IsFlagsEnum(this Type enumType)
         {
             return enumType.IsEnum && enumType.IsDefined(typeof(FlagsAttribute), false);
+        }
+
+        public static T DeepClone<T>(this T src) where T : class
+        {
+            var json = JsonSerializer.Serialize(src);
+            return JsonSerializer.Deserialize<T>(json)!;
         }
     }
 }
