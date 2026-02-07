@@ -33,7 +33,7 @@
         public const string TextArea = "textarea";
         public const string Radio = "radio";
         public const string CheckBox = "checkbox";
-        public const string Select = "select";
+        public const string Select1 = "select";
         public const string Select2 = "select2";
         //public const string Address = "address";
         //public const string Location = "location";
@@ -41,12 +41,12 @@
         public const string FileUpload = "fileupload";
         //public const string Signature = "signature";
         public const string TableForm = "tableform";
-        public const string Employee = "employeeselect";
-        public const string Employee2 = "employeeselect2";
-        public const string Department = "departmentselect";
-        public const string Department2 = "departmentselect2";
+        public const string Employee1 = "employee1";
+        public const string Employee2 = "employee2";
+        public const string Department1 = "department1";
+        public const string Department2 = "department2";
 
-        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select, Select2, ImageUpload, FileUpload, TableForm, Employee, Employee2, Department, Department2];
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, TableForm, Employee1, Employee2, Department1, Department2];
         public static bool IsInputField(string type)
         {
             return AllFieldTypes.Contains(type);
