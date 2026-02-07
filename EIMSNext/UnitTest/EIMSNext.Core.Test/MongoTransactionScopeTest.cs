@@ -46,7 +46,7 @@ namespace EIMSNext.Core.Test
                     AppId = "111",
                     AppName = "TestApp",
                     Fields = new FieldDefList {
-                    new FieldDef{ Id="field_1", Label="field_111", Type= FieldType.Input}, new FieldDef{ Id="field_2", Label="field_222", Type= FieldType.Select } }
+                    new FieldDef{ Id="field_1", Label="field_111", Type= FieldType.Input}, new FieldDef{ Id="field_2", Label="field_222", Type= FieldType.Select1 } }
                 };
 
                 resp.Insert(data);

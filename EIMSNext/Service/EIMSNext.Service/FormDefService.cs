@@ -33,6 +33,12 @@ namespace EIMSNext.Service
             return;
         }
 
+        protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
+        {
+
+            return base.BeforeReplace(entity, session);
+        }
+
         protected override async Task AfterReplace(FormDef entity, IClientSessionHandle? session)
         {
             await base.AfterReplace(entity, session);
