@@ -74,7 +74,7 @@ namespace EIMSNext.Core.Query
             {
                 switch (fieldType)
                 {
-                    case FieldType.Select:
+                    case FieldType.Select1:
                     case FieldType.Select2:
                     case FieldType.CheckBox:
                     case FieldType.Radio:
@@ -85,12 +85,12 @@ namespace EIMSNext.Core.Query
                             finalField = $"{field}.value";
                         }
                         break;
-                    case FieldType.Employee:
+                    case FieldType.Employee1:
                     case FieldType.Employee2:
-                    case FieldType.Department:
+                    case FieldType.Department1:
                     case FieldType.Department2:
                         if (!(field.EndsWith(".id") ||
-                            field.EndsWith(".code") ||
+                            field.EndsWith(".value") ||
                             field.EndsWith(".label")))
                         {
                             finalField = $"{field}.id";
@@ -264,13 +264,13 @@ namespace EIMSNext.Core.Query
             {
                 switch (fieldType)
                 {
-                    case FieldType.Select:
+                    case FieldType.Select1:
                     case FieldType.Select2:
                     case FieldType.CheckBox:
                     case FieldType.Radio:
-                    case FieldType.Employee:
+                    case FieldType.Employee1:
                     case FieldType.Employee2:
-                    case FieldType.Department:
+                    case FieldType.Department1:
                     case FieldType.Department2:
                         if (!(field.EndsWith(".id") ||
                             field.EndsWith(".code") ||

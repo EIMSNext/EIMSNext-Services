@@ -8,6 +8,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extension;
 using EIMSNext.Cache;
 using EIMSNext.Common;
+using EIMSNext.Common.Extension;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.ServiceApi.Authorization;
@@ -293,6 +294,8 @@ namespace EIMSNext.ServiceApi.OData
 
             T? entity = await ApiService.GetAsync(key);
             if (entity == null) return NotFound();
+
+            ServiceContext.SessionStore.Set<T>(entity.Id, entity.DeepClone());
 
             R model = entity.CastTo<T, R>();
 

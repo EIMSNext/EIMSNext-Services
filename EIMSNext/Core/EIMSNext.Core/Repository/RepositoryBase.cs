@@ -99,14 +99,14 @@ namespace EIMSNext.Core.Repository
 
         public virtual T? Get(string id, IClientSessionHandle? session = null)
         {
-            var idFilter = FilterBuilder.Eq(Fields.BsonId, id);
+            var idFilter = FilterBuilder.Eq(x => x.Id, id);
             session = GetSessionHandle(session);
             var result = session == null ? Collection.Find(idFilter) : Collection.Find(session, idFilter);
             return result.FirstOrDefault();
         }
         public virtual async Task<T?> GetAsync(string id, IClientSessionHandle? session = null)
         {
-            var idFilter = FilterBuilder.Eq(Fields.BsonId, id);
+            var idFilter = FilterBuilder.Eq(x => x.Id, id);
             session = GetSessionHandle(session);
             var result = await (session == null ? Collection.FindAsync(idFilter) : Collection.FindAsync(session, idFilter));
             return result.FirstOrDefault();
@@ -131,11 +131,11 @@ namespace EIMSNext.Core.Repository
 
         public virtual UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
-            return UpdateCore(FilterBuilder.Eq(Fields.BsonId, id), update, false, upsert, session);
+            return UpdateCore(FilterBuilder.Eq(x => x.Id, id), update, false, upsert, session);
         }
         public virtual Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
-            return UpdateCoreAsync(FilterBuilder.Eq(Fields.BsonId, id), update, false, upsert, session);
+            return UpdateCoreAsync(FilterBuilder.Eq(x => x.Id, id), update, false, upsert, session);
         }
         public virtual UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
@@ -165,11 +165,11 @@ namespace EIMSNext.Core.Repository
 
         public virtual DeleteResult Delete(string id, IClientSessionHandle? session = null)
         {
-            return DeleteCore(FilterBuilder.Eq(Fields.BsonId, id), session);
+            return DeleteCore(FilterBuilder.Eq(x => x.Id, id), session);
         }
         public virtual DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null)
         {
-            return DeleteCore(FilterBuilder.In(Fields.BsonId, ids), session);
+            return DeleteCore(FilterBuilder.In(x => x.Id, ids), session);
         }
         public virtual DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null)
         {
@@ -182,11 +182,11 @@ namespace EIMSNext.Core.Repository
 
         public virtual Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null)
         {
-            return DeleteCoreAsync(FilterBuilder.Eq(Fields.BsonId, id), session);
+            return DeleteCoreAsync(FilterBuilder.Eq(x => x.Id, id), session);
         }
         public virtual Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null)
         {
-            return DeleteCoreAsync(FilterBuilder.In(Fields.BsonId, ids), session);
+            return DeleteCoreAsync(FilterBuilder.In(x => x.Id, ids), session);
         }
         public virtual Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null)
         {
@@ -366,7 +366,7 @@ namespace EIMSNext.Core.Repository
 
         protected FilterDefinition<T> GetIdFilter(T entity)
         {
-            return FilterBuilder.Eq(Fields.BsonId, entity.Id);
+            return FilterBuilder.Eq(x => x.Id, entity.Id);
         }
 
         private IClientSessionHandle? GetSessionHandle(IClientSessionHandle? session)
