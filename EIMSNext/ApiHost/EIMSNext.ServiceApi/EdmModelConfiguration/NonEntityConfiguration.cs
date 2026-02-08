@@ -1,6 +1,7 @@
 ﻿using Asp.Versioning;
 
 using EIMSNext.Auth.Entity;
+using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
 
@@ -22,6 +23,7 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
         /// <exception cref="NotImplementedException"></exception>
         public override void Apply(ODataModelBuilder builder, ApiVersion apiVersion, string? routePrefix)
         {
+            builder.EnumType<DbAction>();
             builder.EnumType<FormType>();
             builder.EnumType<FlowType>();
             builder.EnumType<EventSourceType>();

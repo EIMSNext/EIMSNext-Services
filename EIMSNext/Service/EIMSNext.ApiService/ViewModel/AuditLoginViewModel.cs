@@ -1,4 +1,4 @@
-﻿using EIMSNext.Entity;
+﻿using EIMSNext.Auth.Entity;
 
 namespace EIMSNext.ApiService.ViewModel
 {

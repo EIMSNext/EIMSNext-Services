@@ -75,6 +75,14 @@ namespace EIMSNext.ServiceApi.Controllers
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
+            if (options.Select == null || options.Select.Count == 0)
+            {
+                //不指定列时，不返回UpdateLog
+                options.Select = new DynamicFieldList()
+                {
+                    DynamicField.Create("updateLog",false)
+                };
+            }
             var result = ApiService.Find(FilterResult(options)).ToList();
             return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
         }

@@ -1,6 +1,9 @@
 ﻿using System.Linq.Expressions;
+using System.Text;
+using System.Text.Json.Nodes;
 using EIMSNext.Cache;
 using EIMSNext.Common;
+using EIMSNext.Common.Extension;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
@@ -27,6 +30,7 @@ namespace EIMSNext.Core.Service
         {
             Resolver = resolver;
             Repository = resolver.GetRepository<T>();
+            AuditLogRepository = resolver.GetRepository<AuditLog>();
             CacheClient = resolver.GetCacheClient();
             Logger = resolver.GetLogger<T>();
             Context = resolver.GetServiceContext();
@@ -37,11 +41,13 @@ namespace EIMSNext.Core.Service
 
         protected IResolver Resolver { get; private set; }
         protected IRepository<T> Repository { get; private set; }
+        protected IRepository<AuditLog> AuditLogRepository { get; private set; }
         protected ICacheClient CacheClient { get; private set; }
         protected ILogger<T> Logger { get; private set; }
         protected IServiceContext Context { get; private set; }
         protected ISessionStore SessionStore { get; private set; }
         protected virtual bool LogicDelete => true;
+        protected virtual bool LogAudit => true;
 
         protected FilterDefinitionBuilder<T> FilterBuilder => Repository.FilterBuilder;
         protected SortDefinitionBuilder<T> SortBuilder => Repository.SortBuilder;
@@ -58,11 +64,122 @@ namespace EIMSNext.Core.Service
             return Repository.NewTransactionScope(transOptions);
         }
 
-        protected virtual void CreateAuditLog(DbAction action, T oldEntity, T newEntity)
+        protected virtual void CreateAuditLog(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, FilterDefinition<T>? filter, UpdateDefinition<T>? update, IClientSessionHandle? session)
         {
-        }
+            if (!LogAudit) return;
 
-        protected virtual S? GetFromStore<S>(string key, DataVersion version = DataVersion.V0) where S : class, IMongoEntity
+            var logList = new List<AuditLog>();
+            if (action == DbAction.Insert && newData != null)
+            {
+                logList = CreateInsertLog(newData);
+            }
+            else if (action == DbAction.Update)
+            {
+                logList = CreateUpdateLog(oldData, newData, filter, update);
+            }
+            else if (action == DbAction.Delete)
+            {
+                logList = CreateDeleteLog(oldData, filter);
+            }
+
+            if (logList.Count > 0)
+            {
+                AuditLogRepository.Insert(logList, session);
+            }
+        }
+        protected virtual List<AuditLog> CreateInsertLog(IEnumerable<T> newData)
+        {
+            var logList = new List<AuditLog>();
+            newData.ForEach(x => logList.Add(
+             new AuditLog
+             {
+                 Action = DbAction.Insert,
+                 EntityType = nameof(T),
+                 DataId = x.Id,
+                 Detail = $"新增数据:", //TODO:考虑显示一两个主字段？
+                 NewData = x.SerializeToJson(),
+                 CreateBy = Context.Operator,
+                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                 ClientIp = Context.ClientIp,
+             }));
+            return logList;
+        }
+        protected virtual List<AuditLog> CreateUpdateLog(IEnumerable<T>? oldData, IEnumerable<T>? newData, FilterDefinition<T>? filter, UpdateDefinition<T>? update)
+        {
+            var logList = new List<AuditLog>();
+
+            if (oldData == null || newData == null)
+            {
+                logList.Add(new AuditLog
+                {
+                    Action = DbAction.Update,
+                    EntityType = nameof(T),
+                    Detail = $"批量更新数据:",
+                    DataFilter = filter?.ToString(),
+                    CreateBy = Context.Operator,
+                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    ClientIp = Context.ClientIp,
+                });
+            }
+            else
+            {
+                oldData.ForEach(x =>
+                {
+                    var y = newData.FirstOrDefault(e => e.Id == x.Id);
+                    if (y != null)
+                    {
+                        logList.Add(new AuditLog
+                        {
+                            Action = DbAction.Update,
+                            EntityType = nameof(T),
+                            DataId = x.Id,
+                            Detail = GetChangeDetail(x, y),
+                            OldData = x.SerializeToJson(),
+                            NewData = y.SerializeToJson(),
+                            CreateBy = Context.Operator,
+                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                            ClientIp = Context.ClientIp,
+                        });
+                    }
+                });
+            }
+
+            return logList;
+        }
+        protected virtual List<AuditLog> CreateDeleteLog(IEnumerable<T>? oldData, FilterDefinition<T>? filter)
+        {
+            var logList = new List<AuditLog>();
+
+            if (oldData == null)
+            {
+                logList.Add(new AuditLog
+                {
+                    Action = DbAction.Delete,
+                    EntityType = nameof(T),
+                    Detail = $"批量删除数据:",
+                    DataFilter = filter?.ToString(),
+                    CreateBy = Context.Operator,
+                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                });
+            }
+            else
+            {
+                oldData.ForEach(x =>
+                logList.Add(new AuditLog
+                {
+                    Action = DbAction.Delete,
+                    EntityType = nameof(T),
+                    DataId = x.Id,
+                    Detail = $"删除数据:", //TODO:考虑显示一两个主字段？
+                    OldData = x.SerializeToJson(),
+                    CreateBy = Context.Operator,
+                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                }));
+            }
+
+            return logList;
+        }
+        protected virtual S? GetFromStore<S>(string key, DataVersion version = DataVersion.Temp) where S : class, IMongoEntity
         {
             return SessionStore.Get<S>(key, version, id => Resolver.GetRepository<S>().Get(id));
         }
@@ -111,6 +228,7 @@ namespace EIMSNext.Core.Service
             entities.ForEach(entity => FillSystemField(entity, false));
             BeforeAdd(entities, session).Wait();
             Repository.Insert(entities, session);
+            CreateAuditLog(DbAction.Insert, null, entities, null, null, session);
             AfterAdd(entities, session).Wait();
         }
         protected virtual ReplaceOneResult ReplaceCore(T entity, IClientSessionHandle? session)
@@ -118,6 +236,8 @@ namespace EIMSNext.Core.Service
             FillSystemField(entity, true);
             BeforeReplace(entity, session).Wait();
             var result = Repository.Replace(entity, session);
+            var old = SessionStore.Get<T>(entity.Id, DataVersion.Old);
+            CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             AfterReplace(entity, session).Wait();
             return result;
         }
@@ -136,6 +256,7 @@ namespace EIMSNext.Core.Service
             update = FillSystemField(update);
             BeforeUpdate(filter, update, upsert, session).Wait();
             var result = Repository.UpdateMany(filter, update, upsert, session);
+            CreateAuditLog(DbAction.Update, null, null, filter, update, session);
             AfterUpdate(filter, update, upsert, session).Wait();
             return result;
         }
@@ -163,9 +284,28 @@ namespace EIMSNext.Core.Service
             }
             else
                 result = Repository.Delete(filter, session);
-
+            CreateAuditLog(DbAction.Delete, null, null, filter, null, session);
             AfterDelete(filter, session).Wait();
             return result;
+        }
+
+        private string GetChangeDetail(T oldT, T newT)
+        {
+            var builder = new StringBuilder();
+
+            var oldJson = JsonNode.Parse(oldT.SerializeToJson())?.AsObject();
+            var newJson = JsonNode.Parse(newT.SerializeToJson())?.AsObject();
+
+            foreach (var kvp in oldJson!)
+            {
+                var oldValue = kvp.Value?.ToString() ?? "NULL";
+                var newValue = newJson![kvp.Key]?.ToString() ?? "NULL";
+                builder.Append($"{kvp.Key}:{oldValue}->{newValue},");
+            }
+
+            if (builder.Length > 0) builder.Remove(builder.Length - 1, 1);
+
+            return builder.ToString();
         }
 
         #endregion
@@ -212,7 +352,7 @@ namespace EIMSNext.Core.Service
             entities.ForEach(entity => FillSystemField(entity, false));
             await BeforeAdd(entities, session);
             await Repository.InsertAsync(entities, session);
-
+            CreateAuditLog(DbAction.Insert, null, entities, null, null, session);
             await AfterAdd(entities, session);
             return;
         }
@@ -231,7 +371,7 @@ namespace EIMSNext.Core.Service
             update = FillSystemField(update);
             await BeforeUpdate(filter, update, upsert, session);
             var result = await Repository.UpdateManyAsync(filter, update, upsert, session);
-
+            CreateAuditLog(DbAction.Update, null, null, filter, update, session);
             await AfterUpdate(filter, update, upsert, session);
             return result;
         }
@@ -240,7 +380,8 @@ namespace EIMSNext.Core.Service
             FillSystemField(entity, true);
             await BeforeReplace(entity, session);
             var result = await Repository.ReplaceAsync(entity, session);
-
+            var old = SessionStore.Get<T>(entity.Id, DataVersion.Old);
+            CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             await AfterReplace(entity, session);
             return result;
         }
@@ -263,14 +404,14 @@ namespace EIMSNext.Core.Service
             {
                 var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
                 var result = await Repository.UpdateManyAsync(filter, update, session: session);
-
+                CreateAuditLog(DbAction.Delete, null, null, filter, null, session);
                 await AfterDelete(filter, session);
                 return result;
             }
             else
             {
                 var result = await Repository.DeleteAsync(filter, session);
-
+                CreateAuditLog(DbAction.Delete, null, null, filter, null, session);
                 await AfterDelete(filter, session);
                 return result;
             }
