@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
@@ -113,7 +113,23 @@ namespace EIMSNext.Component
             var computed = field["computed"]?.AsObject();
             if (computed != null)
             {
-                fieldDef.Props.ValueProp = new ValueProp() { Formula = computed["value"]?.GetValue<string>() };
+                var valueNode = computed["value"];
+                string? formula = null;
+                
+                if (valueNode != null)
+                {
+                    if (valueNode is JsonValue jsonValue)
+                    {
+                        formula = jsonValue.GetValue<string>();
+                    }
+                    else
+                    {
+                        // 如果value是一个对象，将其序列化为JSON字符串
+                        formula = valueNode.SerializeToJson();
+                    }
+                }
+                
+                fieldDef.Props.ValueProp = new ValueProp() { Formula = formula };
                 if (!string.IsNullOrEmpty(fieldDef.Props.ValueProp.Formula))
                 {
                     fieldDef.Props.ValueProp.Depends = ParseDepends(fieldDef.Props.ValueProp.Formula);
