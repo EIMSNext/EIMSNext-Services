@@ -20,7 +20,7 @@ namespace EIMSNextt.API.ODataControllers
             if (IdentityContext.CurrentEmployee != null)
             {
                 var empId = IdentityContext.CurrentEmployee.Id;
-                return query.Where(x => x.Approver != null && x.Approver.EmpId == empId);
+                return query.Where(x => x.Approver != null && x.Approver.Id == empId);
             }
 
             return query;

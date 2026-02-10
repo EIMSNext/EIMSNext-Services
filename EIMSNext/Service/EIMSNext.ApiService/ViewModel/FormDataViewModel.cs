@@ -11,13 +11,6 @@ namespace EIMSNext.ApiService.ViewModel
             FormDataViewModel form = formData.CastTo<FormData, FormDataViewModel>();
 
             form.CorpId = null;
-
-            if (form.CreateBy != null)
-            {
-                form.CreateBy.CorpId = null;
-                form.CreateBy.UserId = null;
-            }
-
             form.UpdateBy = null;                      
 
             return form;

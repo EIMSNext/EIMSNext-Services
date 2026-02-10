@@ -8,6 +8,7 @@ namespace EIMSNext.Flow.Core
     public class DfDataContext
     {
         public string CorpId { get; set; } = string.Empty;
+        public string UserId { get; set; } = string.Empty;
         public string AppId { get; set; } = string.Empty;
         public string? FormId { get; set; }
         public string? DataId { get; set; }

@@ -48,9 +48,6 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.ComplexType<Member>();
             builder.ComplexType<FieldPerm>();
 
-            builder.ComplexType<Operator>().Ignore(x => x.CorpId);
-            builder.ComplexType<Operator>().Ignore(x => x.UserId);
-
             builder.ComplexType<WfMetadata>();
             builder.ComplexType<WfStep>();
             builder.ComplexType<ApprovalCandidate>();
