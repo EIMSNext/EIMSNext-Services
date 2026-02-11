@@ -106,6 +106,10 @@ namespace EIMSNext.Entity
         /// </summary>
         public string Title { get; set; } = string.Empty;
         /// <summary>
+        /// 标题多语言Key
+        /// </summary>
+        public string? I18n { get; set; }
+        /// <summary>
         /// 属性配置
         /// </summary>
         public FieldProp Props { get; set; } = new FieldProp();
