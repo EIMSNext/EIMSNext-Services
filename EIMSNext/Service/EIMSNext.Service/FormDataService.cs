@@ -3,8 +3,10 @@ using EIMSNext.Core;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
+
 using HKH.Common;
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.Service
@@ -19,7 +21,16 @@ namespace EIMSNext.Service
 
         protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
         {
+            var dataLog = new DataUpdateLog();
             //TODO: 它的修改历史记在本身？
+            switch (action)
+            {
+                case DbAction.Insert:
+                    break;
+                case DbAction.Update:
+                    break;
+                default: break;
+            }
         }
 
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
