@@ -20,6 +20,7 @@ namespace EIMSNext.Service.Interface
             Resolver = resolver;
             AccessToken = "";
             CorpId = "";
+            UserId = "";
             SessionStore = resolver.Resolve<ISessionStore>();
         }
 

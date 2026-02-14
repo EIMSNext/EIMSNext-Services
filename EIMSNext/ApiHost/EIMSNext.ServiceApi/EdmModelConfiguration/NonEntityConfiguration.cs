@@ -3,6 +3,7 @@
 using EIMSNext.Auth.Entity;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
+using EIMSNext.Core.Extensions;
 using EIMSNext.Entity;
 
 using Microsoft.OData.ModelBuilder;
@@ -27,7 +28,7 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.EnumType<FormType>();
             builder.EnumType<FlowType>();
             builder.EnumType<EventSourceType>();
-            builder.EnumType<ChangeType>();
+            builder.EnumType<FieldChangeType>();
             builder.EnumType<PlatformType>();
             builder.EnumType<CandidateType>();
             builder.EnumType<WfNodeType>();
@@ -36,6 +37,7 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
             builder.EnumType<AuthGroupType>();
             //builder.EnumType<DataPerms>();
             builder.EnumType<MemberType>();
+            builder.EnumType<DataChangeType>();
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();

@@ -1,10 +1,5 @@
-﻿using System;
-using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections;
 using System.Dynamic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace EIMSNext.Core.Extensions
 {
@@ -18,56 +13,56 @@ namespace EIMSNext.Core.Extensions
         /// <returns>IList<DataUpdateLog> 变更列表</returns>
         public static IList<ExpandoChangeLog> Compare(ExpandoObject original, ExpandoObject modified)
         {
-            var originalDict = original as IDictionary<string, object> ?? new Dictionary<string, object>();
-            var modifiedDict = modified as IDictionary<string, object> ?? new Dictionary<string, object>();
+            var oriDict = original as IDictionary<string, object> ?? new Dictionary<string, object>();
+            var modDict = modified as IDictionary<string, object> ?? new Dictionary<string, object>();
 
             var changeLogs = new List<ExpandoChangeLog>();
 
-            foreach (var kvp in originalDict)
+            foreach (var kvp in oriDict)
             {
-                string propertyName = kvp.Key;
-                object originalValue = kvp.Value;
+                string fId = kvp.Key;
+                object oriValue = kvp.Value;
 
                 // 属性被删除
-                if (!modifiedDict.ContainsKey(propertyName))
+                if (!modDict.ContainsKey(fId))
                 {
                     changeLogs.Add(new ExpandoChangeLog
                     {
-                        PropertyName = propertyName,
-                        OriginalValue = originalValue,
-                        ModifiedValue = null,
-                        ChangeType = "Deleted"
+                        FieldId = fId,
+                        OriValue = oriValue,
+                        NewValue = null,
+                        ChangeType = DataChangeType.Deleted
                     });
                 }
                 // 属性值被修改
                 else
                 {
-                    object modifiedValue = modifiedDict[propertyName];
-                    if (!AreValuesEqual(originalValue, modifiedValue))
+                    object newValue = modDict[fId];
+                    if (!AreValuesEqual(oriValue, newValue))
                     {
                         changeLogs.Add(new ExpandoChangeLog
                         {
-                            PropertyName = propertyName,
-                            OriginalValue = originalValue,
-                            ModifiedValue = modifiedValue,
-                            ChangeType = "Modified"
+                            FieldId = fId,
+                            OriValue = oriValue,
+                            NewValue = newValue,
+                            ChangeType = DataChangeType.Modified
                         });
                     }
                 }
             }
 
             // 2. 检查新增的属性
-            foreach (var kvp in modifiedDict)
+            foreach (var kvp in modDict)
             {
-                string propertyName = kvp.Key;
-                if (!originalDict.ContainsKey(propertyName))
+                string fId = kvp.Key;
+                if (!oriDict.ContainsKey(fId))
                 {
                     changeLogs.Add(new ExpandoChangeLog
                     {
-                        PropertyName = propertyName,
-                        OriginalValue = null,
-                        ModifiedValue = kvp.Value,
-                        ChangeType = "Added"
+                        FieldId = fId,
+                        OriValue = null,
+                        NewValue = kvp.Value,
+                        ChangeType = DataChangeType.Added
                     });
                 }
             }
@@ -121,21 +116,27 @@ namespace EIMSNext.Core.Extensions
         /// <summary>
         /// 变更的属性名
         /// </summary>
-        public string PropertyName { get; set; }
+        public required string FieldId { get; set; }
 
         /// <summary>
         /// 修改前的原值
         /// </summary>
-        public object OriginalValue { get; set; }
+        public object? OriValue { get; set; }
 
         /// <summary>
         /// 修改后的新值
         /// </summary>
-        public object ModifiedValue { get; set; }
+        public object? NewValue { get; set; }
 
         /// <summary>
         /// 变更类型（Added/Modified/Deleted）
         /// </summary>
-        public string ChangeType { get; set; }
+        public DataChangeType ChangeType { get; set; }
+    }
+    public enum DataChangeType
+    {
+        Added,
+        Modified,
+        Deleted
     }
 }

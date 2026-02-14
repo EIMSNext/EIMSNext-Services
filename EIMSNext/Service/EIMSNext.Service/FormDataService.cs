@@ -1,5 +1,6 @@
 ﻿using EIMSNext.ApiClient.Flow;
 using EIMSNext.Core;
+using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
@@ -21,8 +22,21 @@ namespace EIMSNext.Service
 
         protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
         {
+            if (oldData == null || !oldData.Any())
+            {
+                //新增
+            }
+            else if (newData == null || !newData.Any())
+            {
+                //删除
+            }
+            else
+            {
+                //TODO:此处需要循环
+                var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
+            }
             var dataLog = new DataUpdateLog();
-            //TODO: 它的修改历史记在本身？
+            //TODO: 保存变更日志
             switch (action)
             {
                 case DbAction.Insert:

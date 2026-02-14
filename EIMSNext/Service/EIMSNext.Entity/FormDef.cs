@@ -175,7 +175,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public ChangeType ChangeType { get; set; }
+        public FieldChangeType ChangeType { get; set; }
         /// <summary>
         /// 
         /// </summary>
@@ -193,7 +193,7 @@ namespace EIMSNext.Entity
     /// <summary>
     /// 变动类型
     /// </summary>
-    public enum ChangeType
+    public enum FieldChangeType
     {
         /// <summary>
         /// 
