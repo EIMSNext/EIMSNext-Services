@@ -25,7 +25,11 @@ namespace EIMSNext.ApiService.RequestModel
         /// <summary>
         /// 
         /// </summary>
-        public WebHookTrigger Triggers { get; set; }
+        public long Triggers { get; set; }
+        /// <summary>
+        /// 是否禁用
+        /// </summary>
+        public bool Disabled { get; set; }
     }
 }
 

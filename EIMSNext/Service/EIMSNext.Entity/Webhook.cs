@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using EIMSNext.Core.Entity;
+﻿using EIMSNext.Core.Entity;
 
 namespace EIMSNext.Entity
 {
@@ -35,6 +29,10 @@ namespace EIMSNext.Entity
         /// WebHook触发模式，类型为WebHookTrigger
         /// </summary>
         public long Triggers { get; set; }
+        /// <summary>
+        /// 是否禁用
+        /// </summary>
+        public bool Disabled { get; set; }
     }
 
     /// <summary>
@@ -50,22 +48,22 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 数据新增
         /// </summary>
-        DataCreated = 1 << 0,
+        Data_Created = 1 << 0,
         /// <summary>
         /// 数据修改
         /// </summary>
-        DataUpdated = 1 << 1,
+        Data_Updated = 1 << 1,
         /// <summary>
         /// 数据删除
         /// </summary>
-        DateRemoved = 1 << 2,
+        Data_Removed = 1 << 2,
         /// <summary>
         /// 流程状态变更
         /// </summary>
-        WfStatusUpdated = 1 << 3,
+        WfStatus_Updated = 1 << 3,
         /// <summary>
         /// 流程待办变更
         /// </summary>
-        WfTodoUpdated = 1 << 4,
+        WfTodo_Updated = 1 << 4,
     }
 }
