@@ -8,9 +8,10 @@ namespace EIMSNext.Flow.Core
     public class WfDataContext
     {
         private WfDataContext() { }
-        public WfDataContext(string corpId, string appId, string formId, string dataId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public WfDataContext(string corpId, string userId, string appId, string formId, string dataId, Operator? starter, CascadeMode cascade, string? eventIds)
         {
             CorpId = corpId;
+            UserId = userId;
             AppId = appId;
             FormId = formId;
             DataId = dataId;
@@ -23,6 +24,7 @@ namespace EIMSNext.Flow.Core
         {
             var ctx = new WfDataContext();
             ctx.CorpId = expando.GetValue(WfConsts.CorpId, string.Empty);
+            ctx.UserId = expando.GetValue(WfConsts.UserId, string.Empty);
             ctx.AppId = expando.GetValue(WfConsts.AppId, string.Empty);
             ctx.FormId = expando.GetValue(WfConsts.FormId, string.Empty);
             ctx.DataId = expando.GetValue(WfConsts.DataId, string.Empty);
@@ -30,10 +32,10 @@ namespace EIMSNext.Flow.Core
             var empdo = expando.GetValueOrDefault<ExpandoObject>(WfConsts.WfStarter);
             if (empdo != null)
             {
-                var userId = empdo.GetValue(WfConsts.UserId, string.Empty);
                 var empId = empdo.GetValue(WfConsts.EmpId, string.Empty);
+                var empCode = empdo.GetValue(WfConsts.EmpCode, string.Empty);
                 var empName = empdo.GetValue(WfConsts.EmpName, string.Empty);
-                ctx.WfStarter = new Operator(ctx.CorpId, userId, empId, empName);
+                ctx.WfStarter = new Operator(empId, empCode, empName);
             }
 
             ctx.DfCascade = (CascadeMode)expando.GetValue<int>(WfConsts.DfCascade, 0);
@@ -44,6 +46,7 @@ namespace EIMSNext.Flow.Core
         }
 
         public string CorpId { get; private set; } = string.Empty;
+        public string UserId { get; private set; } = string.Empty;
         public string AppId { get; private set; } = string.Empty;
         public string FormId { get; private set; } = string.Empty;
         public string DataId { get; private set; } = string.Empty;
@@ -58,6 +61,7 @@ namespace EIMSNext.Flow.Core
         {
             var data = new ExpandoObject();
             data.AddOrUpdate(WfConsts.CorpId, CorpId);
+            data.AddOrUpdate(WfConsts.UserId, UserId);
             data.AddOrUpdate(WfConsts.AppId, AppId);
             data.AddOrUpdate(WfConsts.FormId, FormId);
             data.AddOrUpdate(WfConsts.DataId, DataId);
@@ -66,9 +70,9 @@ namespace EIMSNext.Flow.Core
             empdo.AddOrUpdate(WfConsts.CorpId, CorpId);
             if (WfStarter != null)
             {
-                empdo.AddOrUpdate(WfConsts.UserId, WfStarter.UserId);
-                empdo.AddOrUpdate(WfConsts.EmpId, WfStarter.EmpId);
-                empdo.AddOrUpdate(WfConsts.EmpName, WfStarter.EmpName);
+                empdo.AddOrUpdate(WfConsts.EmpId, WfStarter.Id);
+                empdo.AddOrUpdate(WfConsts.EmpCode, WfStarter.Value);
+                empdo.AddOrUpdate(WfConsts.EmpName, WfStarter.Label);
             }
 
             data.AddOrUpdate(WfConsts.WfStarter, empdo);

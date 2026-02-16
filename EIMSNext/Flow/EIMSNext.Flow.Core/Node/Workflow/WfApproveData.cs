@@ -1,4 +1,5 @@
 ﻿using System.Dynamic;
+
 using EIMSNext.Entity;
 
 namespace EIMSNext.Flow.Core
@@ -6,11 +7,12 @@ namespace EIMSNext.Flow.Core
     public class WfApproveData
     {
         private WfApproveData() { }
-        public WfApproveData(string corpId, string userId, string workerId, string workerName, ApproveAction action, string comment, string signature, string execLogId)
+        public WfApproveData(string corpId, string userId, string workerId, string workerCode, string workerName, ApproveAction action, string comment, string signature, string execLogId)
         {
             CorpId = corpId;
             UserId = userId;
             WorkerId = workerId;
+            WorkerCode = workerCode;
             WorkerName = workerName;
             Action = action;
             Comment = comment;
@@ -24,6 +26,7 @@ namespace EIMSNext.Flow.Core
             ctx.CorpId = expando.GetValue(WfConsts.WorkerCorpId, string.Empty);
             ctx.UserId = expando.GetValue(WfConsts.WorkerUserId, string.Empty);
             ctx.WorkerId = expando.GetValue(WfConsts.WorkerId, string.Empty);
+            ctx.WorkerCode = expando.GetValue(WfConsts.WorkerCode, string.Empty);
             ctx.WorkerName = expando.GetValue(WfConsts.WorkerName, string.Empty);
             ctx.Action = expando.GetValue(WfConsts.ApproveAction, ApproveAction.None);
             ctx.Comment = expando.GetValue(WfConsts.ApproveComment, string.Empty);
@@ -36,6 +39,7 @@ namespace EIMSNext.Flow.Core
         public string CorpId { get; private set; } = string.Empty;
         public string UserId { get; private set; } = string.Empty;
         public string WorkerId { get; private set; } = string.Empty;
+        public string WorkerCode { get; private set; } = string.Empty;
         public string WorkerName { get; private set; } = string.Empty;
         public ApproveAction Action { get; private set; }
         public string Comment { get; private set; } = string.Empty;
@@ -49,6 +53,7 @@ namespace EIMSNext.Flow.Core
             approveData.AddOrUpdate(WfConsts.WorkerCorpId, CorpId);
             approveData.AddOrUpdate(WfConsts.WorkerUserId, UserId);
             approveData.AddOrUpdate(WfConsts.WorkerId, WorkerId);
+            approveData.AddOrUpdate(WfConsts.WorkerCode, WorkerCode);
             approveData.AddOrUpdate(WfConsts.WorkerName, WorkerName);
             approveData.AddOrUpdate(WfConsts.ApproveAction, Action);
             approveData.AddOrUpdate(WfConsts.ApproveComment, Comment);

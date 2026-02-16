@@ -106,6 +106,10 @@ namespace EIMSNext.Entity
         /// </summary>
         public string Title { get; set; } = string.Empty;
         /// <summary>
+        /// 标题多语言Key
+        /// </summary>
+        public string? I18n { get; set; }
+        /// <summary>
         /// 属性配置
         /// </summary>
         public FieldProp Props { get; set; } = new FieldProp();
@@ -171,7 +175,7 @@ namespace EIMSNext.Entity
         /// <summary>
         /// 
         /// </summary>
-        public ChangeType ChangeType { get; set; }
+        public FieldChangeType ChangeType { get; set; }
         /// <summary>
         /// 
         /// </summary>
@@ -189,7 +193,7 @@ namespace EIMSNext.Entity
     /// <summary>
     /// 变动类型
     /// </summary>
-    public enum ChangeType
+    public enum FieldChangeType
     {
         /// <summary>
         /// 

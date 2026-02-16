@@ -5,9 +5,13 @@ using EIMSNext.Core.Repository;
 using EIMSNext.Entity;
 using EIMSNext.Flow.Core.Interface;
 using EIMSNext.Scripting;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.Extensions.Logging;
+
 using MongoDB.Driver;
+
 using WorkflowCore.Interface;
 
 namespace EIMSNext.Flow.Core.Node
@@ -43,29 +47,30 @@ namespace EIMSNext.Flow.Core.Node
             return true;
         }
 
-        public async Task<DfExecResult> RunAsync(FormData data, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public async Task<DfExecResult> RunAsync(DfRunParamter paramter)
         {
             var execResult = new DfExecResult();
-            if (cascade == CascadeMode.Never || (cascade == CascadeMode.Specified && string.IsNullOrEmpty(eventIds)))
+            if (paramter.Cascade == CascadeMode.Never || (paramter.Cascade == CascadeMode.Specified && string.IsNullOrEmpty(paramter.EventIds)))
             {
                 return execResult;
             }
 
-            var dataflow = _resolver.Resolve<IRepository<Wf_Definition>>().Find(x => x.CorpId == data.CorpId && x.FlowType == FlowType.Dataflow
-               && x.EventSource == eventSource && data.FormId.Equals(x.SourceId) && x.EventSetting != null && x.EventSetting.EventType.HasFlag(eventType)).FirstOrDefault();
+            var dataflow = _resolver.Resolve<IRepository<Wf_Definition>>().Find(x => x.CorpId == paramter.Data.CorpId && x.FlowType == FlowType.Dataflow
+               && x.EventSource == paramter.EventSource && paramter.Data.FormId.Equals(x.SourceId) && x.EventSetting != null && x.EventSetting.EventType.HasFlag(paramter.EventType)).FirstOrDefault();
 
-            if (dataflow != null && (cascade == CascadeMode.All || eventIds!.Contains($",{dataflow.Id},")))
+            if (dataflow != null && (paramter.Cascade == CascadeMode.All || paramter.EventIds!.Contains($",{dataflow.Id},")))
             {
-                if (!IsMeet(dataflow, data))
+                if (!IsMeet(dataflow, paramter.Data))
                     return execResult;
 
                 var ctx = new DfDataContext()
                 {
-                    CorpId = data.CorpId ?? "",
-                    AppId = data.AppId,
-                    FormId = data.FormId,
-                    DataId = data.Id,
-                    WfStarter = starter,
+                    CorpId = paramter.Data.CorpId ?? "",
+                    UserId = paramter.UserId,
+                    AppId = paramter.Data.AppId,
+                    FormId = paramter.Data.FormId,
+                    DataId = paramter.Data.Id,
+                    WfStarter = paramter.Starter,
                     DfCascade = dataflow.EventSetting!.CascadeMode,
                     EventIds = dataflow.EventSetting.SpecifiedEvents
                 };

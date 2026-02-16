@@ -64,7 +64,7 @@ namespace EIMSNext.Flow.Core.Node
                 FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
                 DataBrief = todoTask.DataBrief,
-                Approver = new Operator(dataContext.CorpId, approveData.UserId, approveData.WorkerId, approveData.WorkerName),
+                Approver = new Operator(approveData.WorkerId, approveData.WorkerCode, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,
                 NodeType = wfStep.NodeType,
@@ -91,7 +91,7 @@ namespace EIMSNext.Flow.Core.Node
                  FormName = GetFormDef(dataContext.FormId).Name,
                  DataId = dataContext.DataId,
                  DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
-                 Approver = new Operator(dataContext.CorpId, emp.UserId, emp.Id, emp.EmpName),
+                 Approver = new Operator(emp.Id, emp.Code, emp.EmpName),
                  NodeId = wfStep.Id,
                  NodeName = wfStep.Name,
                  NodeType = wfStep.NodeType,
@@ -174,7 +174,7 @@ namespace EIMSNext.Flow.Core.Node
                             if (c.CandidateId == "starter" && dataContext.WfStarter != null)
                             {
                                 //TODO:此处应进一步的排除匿名，比如由数据流节点或其他系统任务发起的流程
-                                empIds.Add(dataContext.WfStarter.EmpId);
+                                empIds.Add(dataContext.WfStarter.Id);
                             }
                             break;
                     }
@@ -266,9 +266,9 @@ namespace EIMSNext.Flow.Core.Node
             return brief;
         }
 
-        protected async Task RunDataflow(FormData formData, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, CascadeMode cascade, string? eventIds)
+        protected async Task RunDataflow(DfRunParamter paramter)
         {
-            var dfExecResult = await DataflowRunner.RunAsync(formData, eventSource, eventType, wfNodeId, starter, cascade, eventIds);
+            var dfExecResult = await DataflowRunner.RunAsync(paramter);
             if (!dfExecResult.Success)
             {
                 throw new UnLogException(dfExecResult.Error);

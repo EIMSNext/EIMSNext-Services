@@ -42,7 +42,7 @@ builder.Services.AddControllers().AddOData(
              .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
 
              options.RouteOptions.EnableControllerNameCaseInsensitive = true;
-             options.RouteOptions.EnableActionNameCaseInsensitive=true;
+             options.RouteOptions.EnableActionNameCaseInsensitive = true;
              options.RouteOptions.EnablePropertyNameCaseInsensitive = true;
          }
     );
@@ -132,7 +132,7 @@ app.Run();
 
 async void EnsureSeedData(IResolver resolver)
 {
-    resolver.GetServiceContext().Operator = new Operator("", "admin", "", "");
+    resolver.GetServiceContext().Operator = new Operator("", "", "");
     var corpService = resolver.GetService<Corporate>();
     if (!corpService!.All().Any())
     {

@@ -15,8 +15,10 @@ namespace EIMSNext.Flow.Core
         public const string WfStarter = "wf_starter";
         public const string UserId = "user_id";
         public const string EmpId = "emp_id";
+        public const string EmpCode = "emp_code";
         public const string EmpName = "emp_name";
         public const string WorkerId = "worker_id";
+        public const string WorkerCode = "worker_code";
         public const string WorkerName = "worker_name";
         public const string WorkerCorpId = "worker_corp_id";
         public const string WorkerUserId = "worker_user_id";
