@@ -1,4 +1,5 @@
 using Asp.Versioning;
+
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extension;
 using EIMSNext.Common;
@@ -67,7 +68,7 @@ namespace EIMSNext.FlowApi.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var data = new WfDataContext(formData.CorpId ?? "", formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), CascadeMode.All, null);
+                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), CascadeMode.All, null);
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
@@ -103,7 +104,7 @@ namespace EIMSNext.FlowApi.Controllers
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 
-            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
+            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, IdentityContext.CurrentUserID, workerId, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
 
             await _wfHost.SubmitActivitySuccess(act.Token, approveData.ToExpando());
             var errMsg = WaitForComplete(approveData.ExecLogId);

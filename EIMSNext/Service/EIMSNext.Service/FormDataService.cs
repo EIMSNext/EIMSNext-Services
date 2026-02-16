@@ -1,10 +1,13 @@
 ﻿using EIMSNext.ApiClient.Flow;
 using EIMSNext.Core;
+using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
+
 using HKH.Common;
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.Service
@@ -19,7 +22,29 @@ namespace EIMSNext.Service
 
         protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
         {
-            //TODO: 它的修改历史记在本身？
+            if (oldData == null || !oldData.Any())
+            {
+                //新增
+            }
+            else if (newData == null || !newData.Any())
+            {
+                //删除
+            }
+            else
+            {
+                //TODO:此处需要循环
+                var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
+            }
+            var dataLog = new DataUpdateLog();
+            //TODO: 保存变更日志
+            switch (action)
+            {
+                case DbAction.Insert:
+                    break;
+                case DbAction.Update:
+                    break;
+                default: break;
+            }
         }
 
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)

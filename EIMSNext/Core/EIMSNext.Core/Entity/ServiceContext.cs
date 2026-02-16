@@ -7,30 +7,39 @@ namespace EIMSNext.Core.Entity
         public string AccessToken { get; set; }
         public string CorpId { get; set; }
         public Operator? Operator { get; set; }
+        public string UserId { get; set; }
         public IUser? User { get; set; }
         public IEmployee? Employee { get; set; }
         public string? ClientIp { get; set; }
         public DataAction Action { get; set; }
         ISessionStore SessionStore { get; }
     }
+
     public sealed class Operator
     {
-        public static Operator _empty = new Operator("", "", "", "");
+        public static Operator _empty = new Operator("", "", "");
 
         public Operator()
         { }
-        public Operator(string? corpId, string userId, string empId, string empName)
+        public Operator(string id, string value, string label)
         {
-            CorpId = corpId;
-            UserId = userId;
-            EmpId = empId;
-            EmpName = empName;
+            Id = id;
+            Label = label;
+            Value = value;
         }
 
-        public string? CorpId { get; set; }
-        public string? UserId { get; set; }
-        public string EmpId { get; set; } = string.Empty;
-        public string EmpName { get; set; } = string.Empty;
+        /// <summary>
+        /// 员工Id
+        /// </summary>
+        public string Id { get; set; } = string.Empty;
+        /// <summary>
+        /// 员工编码
+        /// </summary>
+        public string Value { get; set; } = string.Empty;
+        /// <summary>
+        /// 员工姓名
+        /// </summary>
+        public string Label { get; set; } = string.Empty;
 
         public static Operator Empty => _empty;
     }

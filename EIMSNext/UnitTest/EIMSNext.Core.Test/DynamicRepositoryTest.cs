@@ -1,4 +1,5 @@
 using System.Dynamic;
+
 using EIMSNext.Common.Extension;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
@@ -49,8 +50,8 @@ namespace EIMSNext.Core.Test
         [TestMethod]
         public void FindTest()
         {
-            var data0= "{\"id\":\"\",\"appId\":\"68144ea3ee5f2aa4d37c02dd\",\"formId\":\"6877c3129839c3f592a87f98\",\"data\":{\"jxqoyp2pzq6orpoy\":\"1\",\"jiavqvqlmg0u3nmc\":\"1\",\"jkxo31f8215xjjel\":[{\"js0utbcbwu8qby53\":\"1\",\"jsne7rbcebsw3du0\":1},{\"js0utbcbwu8qby53\":\"2\",\"jsne7rbcebsw3du0\":2}]}}".DeserializeFromJson<DynamicData>();
-          
+            var data0 = "{\"id\":\"\",\"appId\":\"68144ea3ee5f2aa4d37c02dd\",\"formId\":\"6877c3129839c3f592a87f98\",\"data\":{\"jxqoyp2pzq6orpoy\":\"1\",\"jiavqvqlmg0u3nmc\":\"1\",\"jkxo31f8215xjjel\":[{\"js0utbcbwu8qby53\":\"1\",\"jsne7rbcebsw3du0\":1},{\"js0utbcbwu8qby53\":\"2\",\"jsne7rbcebsw3du0\":2}]}}".DeserializeFromJson<DynamicData>();
+
             var resp = new DynamicDataRepository(_dbContext!);
 
             var data1 = new DynamicData("{\"f_1721094301870\":\"aaa\",\"f_1722302387349\":\"选项1\",\"f_1722302387351\":\"666-777\",\"f_1721094301874\": [{\"f_1721094301876\":\"1112\",\"f_1721094301877\": 2221},{\"f_1721094301876\": \"3331\",\"f_1721094301877\": 4441}]}");
@@ -90,7 +91,7 @@ namespace EIMSNext.Core.Test
 
             result = resp.Find(new DynamicFindOptions<DynamicData> { Filter = new DynamicFilter { Field = "data.f_1721094301874>f_1721094301876", Op = FilterOp.Eq, Value = "1113" } }, _scope?.SessionHandle);
             Assert.AreEqual(2, result.CountDocuments());
-       
+
             result = resp.Find(new DynamicFindOptions<DynamicData> { Filter = new DynamicFilter { Field = "data.f_1721094301874>f_1721094301877", Op = FilterOp.Gt, Value = 4442 } }, _scope?.SessionHandle);
             Assert.AreEqual(1, result.CountDocuments());
         }
@@ -109,7 +110,7 @@ namespace EIMSNext.Core.Test
             innerData.TryAdd("f_1721094301870", "fff");
 
             list.Add(resp.UpdateBuilder.Set(x => x.Data, innerData));
-            list.Add(resp.UpdateBuilder.Set(x => x.CreateBy, new Operator("1", "1","001", "t1")));
+            list.Add(resp.UpdateBuilder.Set(x => x.CreateBy, new Operator("1", "001", "t1")));
             var udata = resp.UpdateBuilder.Combine(list);
             //new { Data = new { f_1721094301870 = "fff" }, _id = data.Id, CreateBy = new Entity.Operator { Id = "1", Code = "001", Name = "t1" } };
             resp.Update(data.Id, udata, session: _scope?.SessionHandle);
@@ -143,7 +144,7 @@ namespace EIMSNext.Core.Test
             innerData.TryAdd("f_1721094301870", "fff");
 
             list.Add(resp.UpdateBuilder.Set(x => x.Data, innerData));
-            list.Add(resp.UpdateBuilder.Set(x => x.CreateBy, new Operator("1", "1", "001", "t1")));
+            list.Add(resp.UpdateBuilder.Set(x => x.CreateBy, new Operator( "1", "001", "t1")));
             var udata = resp.UpdateBuilder.Combine(list);
             //new { Data = new { f_1721094301870 = "fff" }, _id = data.Id, CreateBy = new Entity.Operator { Id = "1", Code = "001", Name = "t1" } };
             resp.UpdateMany(filter, udata, session: _scope?.SessionHandle);
@@ -162,7 +163,7 @@ namespace EIMSNext.Core.Test
 
             var data2 = new DynamicData("{\"f_1721094301870\":\"fff\",\"f_1722302387349\":\"选项1\",\"f_1722302387351\":\"666-888\",\"f_1721094301874\": [{\"f_1721094301876\":\"111\",\"f_1721094301877\": 222},{\"f_1721094301876\": \"333\",\"f_1721094301877\": 444}]}");
             data2.Id = data.Id;
-            data2.CreateBy = new Operator("1", "1", "001", "t1");
+            data2.CreateBy = new Operator("1", "001", "t1");
 
             resp.Replace(data2, _scope?.SessionHandle);
 

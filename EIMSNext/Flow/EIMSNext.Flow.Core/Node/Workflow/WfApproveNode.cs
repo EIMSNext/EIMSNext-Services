@@ -1,8 +1,13 @@
 ﻿using System.Dynamic;
+
 using EIMSNext.Core;
 using EIMSNext.Entity;
+using EIMSNext.Flow.Core.Interface;
+
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
+
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -54,7 +59,7 @@ namespace EIMSNext.Flow.Core.Node
                                         else
                                         {
                                             var formData = GetFormData(dataContext.DataId);
-                                            await RunDataflow(formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
+                                            await RunDataflow(new DfRunParamter(dataContext.UserId, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
 
                                             result = ApproveResult.Next;
                                         }
@@ -65,7 +70,7 @@ namespace EIMSNext.Flow.Core.Node
                                         DeleteTodos(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
 
                                         var formData = GetFormData(dataContext.DataId);
-                                        await RunDataflow(formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
+                                        await RunDataflow(new DfRunParamter(dataContext.UserId, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
 
                                         result = ApproveResult.Next;
                                     }
@@ -97,7 +102,7 @@ namespace EIMSNext.Flow.Core.Node
                                     DeleteTodos(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
 
                                     var formData = GetFormData(dataContext.DataId);
-                                    await RunDataflow(formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
+                                    await RunDataflow(new DfRunParamter(dataContext.UserId, formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
 
                                     result = ApproveResult.Persist;
 

@@ -71,7 +71,7 @@ namespace EIMSNext.Entity
         /// <returns></returns>
         public Operator ToOperator()
         {
-            return new Operator(CorpId, UserId, Id, EmpName);
+            return new Operator(Id, Code, EmpName);
         }
 
         /// <summary>

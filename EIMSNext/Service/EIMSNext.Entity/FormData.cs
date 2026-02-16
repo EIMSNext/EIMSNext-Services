@@ -1,5 +1,6 @@
 ﻿using EIMSNext.Core;
 using EIMSNext.Core.Entity;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Entity
 {
@@ -32,10 +33,6 @@ namespace EIMSNext.Entity
     public class DataUpdateLog
     {
         /// <summary>
-        /// 操作类型
-        /// </summary>
-        public OperateType OperateType { get; set; }
-        /// <summary>
         /// 操作人
         /// </summary>
         public Operator? Operator { get; set; }
@@ -44,30 +41,38 @@ namespace EIMSNext.Entity
         /// </summary>
         public long OperateTime { get; set; }
         /// <summary>
-        /// 修改内容，Json
+        /// 修改内容
         /// </summary>
-        public string? Content { get; set; }
+        public List<DataUpdateContent> Content { get; set; } = new List<DataUpdateContent>();
     }
     /// <summary>
-    /// 操作类型
+    /// 修改内容
     /// </summary>
-    public enum OperateType
+    public class DataUpdateContent
     {
         /// <summary>
-        /// 
+        /// 字段ID
         /// </summary>
-        Create = 0,
+        public required string FieldId { get; set; }
         /// <summary>
-        /// 
+        /// 字段标题
         /// </summary>
-        Modify,
+        public required string FieldLabel { get; set; }
         /// <summary>
-        /// 
+        /// 字段类型
         /// </summary>
-        Delete,
+        public required string FieldType { get; set; }
         /// <summary>
-        /// 
+        /// 操作类型
         /// </summary>
-        Restore
+        public DataChangeType ChangeType { get; set; }
+        /// <summary>
+        /// 旧值
+        /// </summary>
+        public object? OriVallue { get; set; }
+        /// <summary>
+        /// 新值
+        /// </summary>
+        public object? NewVallue { get; set; }
     }
 }

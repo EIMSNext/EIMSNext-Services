@@ -77,7 +77,7 @@ namespace EIMSNext.Flow.Service
                     var formDef = dataContext.FormDefs[x.FormId];
                     if (formDef.UsingWorkflow)
                     {
-                        var data = new WfDataContext(x.CorpId ?? "", x.AppId, x.FormId, x.Id, x.CreateBy, dataContext.DfCascade, dataContext.EventIds);
+                        var data = new WfDataContext(x.CorpId ?? "", dataContext.UserId, x.AppId, x.FormId, x.Id, x.CreateBy, dataContext.DfCascade, dataContext.EventIds);
                         WorkflowHost.StartWorkflow(x.FormId, data.ToExpando());
                     }
                 }

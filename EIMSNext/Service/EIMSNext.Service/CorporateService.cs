@@ -5,7 +5,9 @@ using EIMSNext.Core.Entity;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
+
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.Service
@@ -51,7 +53,7 @@ namespace EIMSNext.Service
 
             var emp = new Employee
             {
-                UserId = Context.Operator!.UserId!,
+                UserId = Context.UserId,
                 UserName = Context.User?.Name ?? "",
                 CorpId = entity.Id,
                 Code = "E01",

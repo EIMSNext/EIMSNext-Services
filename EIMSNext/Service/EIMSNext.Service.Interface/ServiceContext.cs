@@ -3,6 +3,7 @@ using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Entity;
+
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Service.Interface
@@ -19,6 +20,7 @@ namespace EIMSNext.Service.Interface
             Resolver = resolver;
             AccessToken = "";
             CorpId = "";
+            UserId = "";
             SessionStore = resolver.Resolve<ISessionStore>();
         }
 
@@ -54,18 +56,19 @@ namespace EIMSNext.Service.Interface
         }
 
         public string AccessToken { get; set; }
-        public string? ClientIp {  get; set; }
+        public string? ClientIp { get; set; }
         public DataAction Action { get; set; }
         public string CorpId { get; set; }
+        public string UserId { get; set; }
 
         private void RetrieveUser()
         {
             if (Resolver == null)
                 throw new ArgumentNullException("Resolver");
 
-            if (!_userRetrieved && !string.IsNullOrEmpty(Operator?.UserId))
+            if (!_userRetrieved && !string.IsNullOrEmpty(UserId))
             {
-                _user = Resolver.GetService<User>().Get(Operator.UserId);
+                _user = Resolver.GetService<User>().Get(UserId);
                 _userRetrieved = true;
             }
         }
@@ -74,9 +77,9 @@ namespace EIMSNext.Service.Interface
             if (Resolver == null)
                 throw new ArgumentNullException("Resolver");
 
-            if (!_empRetrieved && !string.IsNullOrEmpty(Operator?.EmpId))
+            if (!_empRetrieved && !string.IsNullOrEmpty(Operator?.Id))
             {
-                _employee = Resolver.GetService<Employee>().Get(Operator.EmpId);
+                _employee = Resolver.GetService<Employee>().Get(Operator.Id);
                 _empRetrieved = true;
             }
         }

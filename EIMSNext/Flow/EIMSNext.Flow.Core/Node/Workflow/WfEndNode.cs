@@ -1,7 +1,8 @@
-﻿using HKH.Mef2.Integration;
-
-using EIMSNext.Core;
+﻿using EIMSNext.Core;
 using EIMSNext.Entity;
+using EIMSNext.Flow.Core.Interface;
+
+using HKH.Mef2.Integration;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -23,7 +24,7 @@ namespace EIMSNext.Flow.Core.Node
                 UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approved, scope.SessionHandle);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds);
+                await RunDataflow(new DfRunParamter(dataContext.UserId, formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
 
                 scope.CommitTransaction();
             }
