@@ -23,6 +23,11 @@
         public string LayoutId { get; set; } = string.Empty;
 
         /// <summary>
+        /// 名称
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
+
+        /// <summary>
         /// 详细设置
         /// </summary>
         public string Details { get; set; } = string.Empty;

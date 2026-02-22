@@ -1,4 +1,5 @@
-﻿using EIMSNext.ApiService.ViewModel;
+﻿using EIMSNext.ApiService.RequestModel;
+using EIMSNext.ApiService.ViewModel;
 using EIMSNext.Entity;
 
 namespace EIMSNext.ServiceApi.EdmModelConfiguration
@@ -6,7 +7,7 @@ namespace EIMSNext.ServiceApi.EdmModelConfiguration
     /// <summary>
     /// 
     /// </summary>
-    public class DashboardDefModelConfiguration : CorpModelConfigurationBase<DashboardDefViewModel>
+    public class DashboardDefModelConfiguration : CorpModelConfigurationBase<DashboardDefViewModel, DashboardDefRequest>
     {
     }
 }
