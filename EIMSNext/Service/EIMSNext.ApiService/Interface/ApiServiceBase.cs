@@ -6,21 +6,18 @@ using EIMSNext.Core;
 using EIMSNext.Core.Entity;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Service;
+using EIMSNext.Service.Interface;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Memory;
 using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
-    public abstract class ApiServiceBase<T, V, S> : IApiService<T, V>
-        where T : class, IMongoEntity
-        where V : T, new()
-        where S : class, IService<T>
+    public abstract class ApiServiceBase : IApiService
     {
         public ApiServiceBase(IResolver resolver)
         {
             Resolver = resolver;
-            CoreService = resolver.GetService<S, T>();
             CacheClient = resolver.GetCacheClient();
             MemoryCache = resolver.GetMemoryCache();
             IdentityContext = resolver.GetIdentityContext();
@@ -28,11 +25,22 @@ namespace EIMSNext.ApiService
         }
 
         protected IResolver Resolver { get; private set; }
-        protected S CoreService { get; private set; }
         protected ICacheClient CacheClient { get; private set; }
         protected IMemoryCache MemoryCache { get; private set; }
         protected IIdentityContext IdentityContext { get; private set; }
         protected IServiceContext ServiceContext { get; private set; }
+    }
+    public abstract class ApiServiceBase<T, V, S> : ApiServiceBase, IApiService<T, V>
+        where T : class, IMongoEntity
+        where V : T, new()
+        where S : class, IService<T>
+    {
+        public ApiServiceBase(IResolver resolver) : base(resolver)
+        {
+            CoreService = resolver.GetService<S, T>();
+        }
+
+        protected S CoreService { get; private set; }
 
         public V? Get(string id)
         {
