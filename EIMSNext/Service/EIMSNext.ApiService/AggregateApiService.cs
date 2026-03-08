@@ -117,11 +117,11 @@ namespace EIMSNext.ApiService
             // 构建指标聚合（$sum/$avg/$count等）
             foreach (var metric in metrics)
             {
-                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AgFun))
+                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
                     continue;
 
                 // 处理特殊聚合函数：$count（无需字段名）
-                if (metric.AgFun.Equals("count", StringComparison.OrdinalIgnoreCase))
+                if (metric.AggFun.Equals("count", StringComparison.OrdinalIgnoreCase))
                 {
                     groupDoc[$"{metric.Id}_count"] = new BsonDocument("$sum", 1);
                 }
@@ -129,8 +129,8 @@ namespace EIMSNext.ApiService
                 {
                     var finalId = GetFinalId(metric.Id);
                     // 常规聚合函数：$sum/$avg/$max/$min
-                    groupDoc[$"{metric.Id}_{metric.AgFun}"] =
-                        new BsonDocument($"${metric.AgFun}", $"${finalId}");
+                    groupDoc[$"{metric.Id}_{metric.AggFun}"] =
+                        new BsonDocument($"${metric.AggFun}", $"${finalId}");
                 }
             }
 
@@ -159,10 +159,10 @@ namespace EIMSNext.ApiService
             // 2. 保留聚合指标字段
             foreach (var metric in metrics)
             {
-                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AgFun))
+                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
                     continue;
 
-                projectDoc[$"{metric.Id}_{metric.AgFun}"] = $"${metric.Id}_{metric.AgFun}";
+                projectDoc[$"{metric.Id}_{metric.AggFun}"] = $"${metric.Id}_{metric.AggFun}";
             }
 
             // 3. 隐藏默认的_id字段

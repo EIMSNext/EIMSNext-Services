@@ -25,7 +25,7 @@ namespace EIMSNext.ApiService.RequestModel
     {
         public string Id { get; set; } = string.Empty;
         public string Type { get; set; } = FieldType.Input;
-        public string AgFun { get; set; } = "count";
+        public string AggFun { get; set; } = "count";
     }
 
     public enum AgDataSourceType
