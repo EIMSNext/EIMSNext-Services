@@ -1,16 +1,16 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EIMSNext.ApiService.RequestModel;
+﻿using EIMSNext.ApiService.RequestModel;
+using EIMSNext.Common;
+using EIMSNext.Core.Entity;
+using EIMSNext.Core.Query;
 using EIMSNext.Core.Service;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
+using MongoDB.Bson.Serialization;
+using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
-    public class AggregateApiService : ApiServiceBase
+    public class AggregateApiService : ApiServiceBase, IAggregateApiService
     {
         public AggregateApiService(IResolver resolver) : base(resolver)
         {
@@ -19,14 +19,38 @@ namespace EIMSNext.ApiService
 
         private AggregateService AggregateService { get; set; }
 
-        public dynamic Calucate(AggCalcRequest request)
+        public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request)
         {
+            IMongoCollection<BsonDocument> collection;
             if (request.DataSource!.Type == AgDataSourceType.Form)
             {
+                collection = AggregateService.GetCollection("FormData");
 
+                var filter = request.Filter;
+                if (filter == null) { filter = new DynamicFilter(); }
+                if (filter.IsGroup && filter.Rel == FilterRel.And)
+                {
+                    filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId });
+                    filter.Items!.Add(new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id });
+                }
+                else
+                {
+                    filter = new DynamicFilter()
+                    {
+                        Rel = FilterRel.And,
+                        Items = [
+                            new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId },
+                            new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id },
+                            filter
+                        ]
+                    };
+                }
+                request.Filter = filter;
+
+                var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(PipelineBuilder.BuildPipeline(collection, request, ServiceContext));
+                return await collection.AggregateAsync(pipeline);
             }
-            return new { };
-            //AggregateService.Calucate
+            return null;
         }
     }
 
@@ -38,13 +62,14 @@ namespace EIMSNext.ApiService
         /// <param name="request">聚合请求</param>
         /// <returns>构建好的BsonDocument[]管道</returns>
         /// <exception cref="ArgumentException">参数校验异常</exception>
-        public static BsonDocument[] BuildPipeline(AggCalcRequest request)
+        public static BsonDocument[] BuildPipeline(IMongoCollection<BsonDocument> collection, AggCalcRequest request, IServiceContext context)
         {
             var pipelineStages = new List<BsonDocument>();
 
-            if (request.Filter != null && request.Filter.Any())
+            if (request.Filter != null)
             {
-                var matchStage = BuildMatchStage(request.Filter);
+                var filterDef = request.Filter.ToFilterDefinition<BsonDocument>();
+                var matchStage = new BsonDocument("$match", filterDef.Render(new RenderArgs<BsonDocument>(collection.DocumentSerializer, BsonSerializer.SerializerRegistry)));
                 pipelineStages.Add(matchStage);
             }
 
@@ -61,22 +86,6 @@ namespace EIMSNext.ApiService
         }
 
         #region 私有构建方法
-        /// <summary>
-        /// 构建$match过滤阶段
-        /// </summary>
-        private static BsonDocument BuildMatchStage(List<AgFilter> filters)
-        {
-            var matchFilter = new BsonDocument();
-            foreach (var filter in filters)
-            {
-                if (string.IsNullOrEmpty(filter.Field) || string.IsNullOrEmpty(filter.Operator))
-                    continue; // 跳过无效过滤条件
-
-                // 支持常见操作符：$eq/$gt/$lt/$gte/$lte/$in/$nin
-                matchFilter[filter.Field] = new BsonDocument(filter.Operator, filter.Value);
-            }
-            return new BsonDocument("$match", matchFilter);
-        }
 
         /// <summary>
         /// 构建$group分组聚合阶段
@@ -93,8 +102,8 @@ namespace EIMSNext.ApiService
                 {
                     if (!string.IsNullOrEmpty(dimension.Id))
                     {
-                        // 关联字段：$ + 维度名（如$category）
-                        idDoc[dimension.Id] = "$" + dimension.Id;
+                        var finalId = GetFinalId(dimension.Id);
+                        idDoc[dimension.Id] = $"${finalId}";
                     }
                 }
                 groupDoc["_id"] = idDoc;
@@ -109,24 +118,28 @@ namespace EIMSNext.ApiService
             foreach (var metric in metrics)
             {
                 if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AgFun))
-                    continue; // 跳过无效指标
+                    continue;
 
                 // 处理特殊聚合函数：$count（无需字段名）
-                if (metric.AgFun.Equals("$count", StringComparison.OrdinalIgnoreCase))
+                if (metric.AgFun.Equals("count", StringComparison.OrdinalIgnoreCase))
                 {
-                    groupDoc[metric.Id + "_count"] = new BsonDocument("$count", new BsonDocument());
+                    groupDoc[$"{metric.Id}_count"] = new BsonDocument("$sum", 1);
                 }
                 else
                 {
+                    var finalId = GetFinalId(metric.Id);
                     // 常规聚合函数：$sum/$avg/$max/$min
-                    groupDoc[metric.Id + "_" + metric.AgFun.TrimStart('$')] =
-                        new BsonDocument(metric.AgFun, "$" + metric.Id);
+                    groupDoc[$"{metric.Id}_{metric.AgFun}"] =
+                        new BsonDocument($"${metric.AgFun}", $"${finalId}");
                 }
             }
 
             return new BsonDocument("$group", groupDoc);
         }
-
+        private static string GetFinalId(string field)
+        {
+            return Fields.IsSystemField(field) ? field : $"data.{field}";
+        }
         /// <summary>
         /// 构建$project阶段（将_id中的维度字段平级输出）
         /// </summary>
@@ -139,7 +152,7 @@ namespace EIMSNext.ApiService
             {
                 if (!string.IsNullOrEmpty(dimension.Id))
                 {
-                    projectDoc[dimension.Id] = "$_id." + dimension.Id;
+                    projectDoc[dimension.Id] = $"$_id.{dimension.Id}";
                 }
             }
 
@@ -149,11 +162,7 @@ namespace EIMSNext.ApiService
                 if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AgFun))
                     continue;
 
-                var metricFieldName = metric.AgFun.Equals("$count", StringComparison.OrdinalIgnoreCase)
-                    ? metric.Id + "_count"
-                    : metric.Id + "_" + metric.AgFun.TrimStart('$');
-
-                projectDoc[metricFieldName] = 1;
+                projectDoc[$"{metric.Id}_{metric.AgFun}"] = $"${metric.Id}_{metric.AgFun}";
             }
 
             // 3. 隐藏默认的_id字段

@@ -1,14 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using EIMSNext.ApiService.RequestModel;
+﻿using EIMSNext.ApiService.RequestModel;
+using MongoDB.Bson;
+using MongoDB.Driver;
 
-namespace EIMSNext.ApiService.Interface
+namespace EIMSNext.ApiService
 {
     public interface IAggregateApiService: IApiService
     {
-        dynamic Calucate(AggCalcRequest request);
+        Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request);
     }
 }

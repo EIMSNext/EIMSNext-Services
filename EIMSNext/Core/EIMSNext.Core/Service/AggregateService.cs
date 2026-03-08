@@ -13,9 +13,9 @@ namespace EIMSNext.Core.Service
 
         private IMongoDbContex DbContext { get; set; }
 
-        public Task<IAsyncCursor<BsonDocument>> Calucate(PipelineDefinition<BsonDocument, BsonDocument> pipeline, AggregateOptions? options = null)
+        public IMongoCollection<BsonDocument> GetCollection(string name)
         {
-            return DbContext.Database.GetCollection<BsonDocument>("FormData").AggregateAsync(pipeline, options);
+            return DbContext.Database.GetCollection<BsonDocument>("FormData");
         }
     }
 }

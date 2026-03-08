@@ -1,39 +1,31 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using MongoDB.Bson;
+﻿using EIMSNext.Common;
+using EIMSNext.Core.Query;
 
 namespace EIMSNext.ApiService.RequestModel
 {
     public class AggCalcRequest
     {
-        public AgDataSource? DataSource { get; set; }
+        public required AgDataSource DataSource { get; set; }
         public List<Dimension>? Dimensions { get; set; }
         public List<Metric>? Metrics { get; set; }
-        public List<AgFilter>? Filter { get; set; }
+        public DynamicFilter? Filter { get; set; }
     }
 
     public class AgDataSource
     {
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
         public AgDataSourceType Type { get; set; }
     }
     public class Dimension
     {
-        public string Id { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = FieldType.Input;
     }
     public class Metric
     {
-        public string Id { get; set; }
-        public string AgFun { get; set; }
-    }
-    public class AgFilter
-    {
-        public string Field { get; set; } 
-        public string Operator { get; set; } 
-        public BsonValue Value { get; set; }
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = FieldType.Input;
+        public string AgFun { get; set; } = "count";
     }
 
     public enum AgDataSourceType

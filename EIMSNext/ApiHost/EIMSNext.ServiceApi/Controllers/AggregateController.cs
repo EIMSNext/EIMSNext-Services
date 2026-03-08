@@ -1,9 +1,13 @@
-﻿using Asp.Versioning;
+﻿using System.Threading.Tasks;
+using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
-using EIMSNext.ApiService.Interface;
+using EIMSNext.ApiHost.Extension;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
+using EIMSNext.Common;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 
 namespace EIMSNext.ServiceApi.Controllers
 {
@@ -18,12 +22,18 @@ namespace EIMSNext.ServiceApi.Controllers
         private IAggregateApiService ApiService { get; set; }
 
         [HttpPost("Calucate")]
-        public IActionResult Calucate(AggCalcRequest request)
+        public async Task<IActionResult> Calucate([FromBody] AggCalcRequest request)
         {
             if (request == null || request.DataSource == null || request.Dimensions?.Count == 0 || request.Metrics?.Count == 0)
                 return BadRequest();
+            var cursor = await ApiService.Calucate(request);
+            if ((cursor == null))
+            {
+                return ApiResult.Fail(-1, "没有数据").ToActionResult();
+            }
 
-            return Ok(ApiService.Calucate(request));
+            var data = await cursor.ToListAsync();
+            return ApiResult.Success(data).ToActionResult();
         }
     }
 }
