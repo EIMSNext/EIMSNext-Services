@@ -7,7 +7,9 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
-    public interface IApiService<T, V>
+    public interface IApiService
+    { }
+    public interface IApiService<T, V> : IApiService
         where T : IMongoEntity
         where V : T, new()
     {

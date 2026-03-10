@@ -6,8 +6,6 @@ namespace EIMSNext.Core.Query
 {
     public static class DynamicFilterExtension
     {
-        private static readonly string[] mainFields = ["corpId", "appId", "formId"];
-
         public static FilterDefinition<T> ToFilterDefinition<T>(this DynamicFilter filter)
         {
             if (filter == null || filter.IsEmpty)
@@ -35,7 +33,7 @@ namespace EIMSNext.Core.Query
                     //    || Consts.SystemFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase)
                     //    || mainFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase))
                     //    ? filter.Field : "Data." + filter.Field;
-                    var field = FormatFilterField(filter.Field, filter.Type);
+                    var field = DynamicField.FormatFieldForFilter(filter.Field, filter.Type);
                     var filterValues = new List<object>();
                     if (filter.Value is List<object>)
                     {
@@ -66,41 +64,6 @@ namespace EIMSNext.Core.Query
             return myFilter;
         }
 
-        private static string FormatFilterField(string field, string? fieldType)
-        {
-            var finalField = field;
-
-            if (!string.IsNullOrEmpty(fieldType))
-            {
-                switch (fieldType)
-                {
-                    case FieldType.Select1:
-                    case FieldType.Select2:
-                    case FieldType.CheckBox:
-                    case FieldType.Radio:
-                        if (!(
-                           field.EndsWith(".value") ||
-                           field.EndsWith(".label")))
-                        {
-                            finalField = $"{field}.value";
-                        }
-                        break;
-                    case FieldType.Employee1:
-                    case FieldType.Employee2:
-                    case FieldType.Department1:
-                    case FieldType.Department2:
-                        if (!(field.EndsWith(".id") ||
-                            field.EndsWith(".value") ||
-                            field.EndsWith(".label")))
-                        {
-                            finalField = $"{field}.id";
-                        }
-                        break;
-                }
-            }
-
-            return finalField;
-        }
         private static FilterDefinition<T> BuildFilter<T>(string field, string op, List<object> filterValues)
         {
             var filter = Builders<T>.Filter.Empty;
