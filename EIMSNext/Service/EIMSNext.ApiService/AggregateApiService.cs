@@ -73,13 +73,25 @@ namespace EIMSNext.ApiService
                 pipelineStages.Add(matchStage);
             }
 
-            var groupStage = BuildGroupStage(request.Dimensions!, request.Metrics!);
+            var groupStage = BuildGroupStage(request.Dimensions, request.Metrics!);
             pipelineStages.Add(groupStage);
 
             if (request.Dimensions != null && request.Dimensions.Any())
             {
                 var projectStage = BuildProjectStage(request.Dimensions!, request.Metrics!);
                 pipelineStages.Add(projectStage);
+            }
+
+            if (request.Sort != null && request.Sort.Any())
+            {
+                var sortStage = BuildSortStage(request.Sort!);
+                pipelineStages.Add(sortStage);
+            }
+
+            if (request.Take.HasValue && request.Take.Value > 0)
+            {
+                var limitStage = new BsonDocument("$limit", request.Take.Value);
+                pipelineStages.Add(limitStage);
             }
 
             return pipelineStages.ToArray();
@@ -170,6 +182,30 @@ namespace EIMSNext.ApiService
 
             return new BsonDocument("$project", projectDoc);
         }
+
+        /// <summary>
+        /// 构建$sort阶段
+        /// </summary>
+        /// <param name="sort">多字段排序规则</param>
+        /// <returns>$sort阶段的BsonDocument</returns>
+        private static BsonDocument BuildSortStage(List<SortItem>? sort)
+        {
+            var sortDoc = new BsonDocument();
+
+            if (sort != null)
+            {
+                foreach (var rule in sort)
+                {
+                    if (string.IsNullOrEmpty(rule.Id))
+                        continue;
+
+                    sortDoc[rule.Id] = (int)rule.Dir;
+                }
+            }
+
+            return new BsonDocument("$sort", sortDoc);
+        }
+
         #endregion
 
     }
