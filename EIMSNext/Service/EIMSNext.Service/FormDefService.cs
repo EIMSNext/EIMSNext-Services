@@ -26,7 +26,7 @@ namespace EIMSNext.Service
             entities.ForEach(e =>
             {
                 maxIndex = maxIndex + 100;
-                app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = e.Type, Title = e.Name, SortIndex = maxIndex });
+                app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = FormType.Form, Title = e.Name, SortIndex = maxIndex });
             });
             appRepo.Replace(app, session);
 

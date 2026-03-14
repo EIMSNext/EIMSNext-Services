@@ -17,11 +17,6 @@ namespace EIMSNext.ApiService.RequestModel
         /// <summary>
         /// 
         /// </summary>
-        public FormType Type { get; set; } = FormType.Form;
-
-        /// <summary>
-        /// 
-        /// </summary>
         public FormContent Content { get; set; } = new FormContent();
 
         /// <summary>

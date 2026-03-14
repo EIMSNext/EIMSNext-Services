@@ -29,12 +29,7 @@ namespace EIMSNext.Entity
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
-        /// <summary>
-        /// 
-        /// </summary>
-        public FormType Type { get; set; } = FormType.Form;
-
-        /// <summary>
+         /// <summary>
         /// 
         /// </summary>
         public FormContent Content { get; set; } = new FormContent();
