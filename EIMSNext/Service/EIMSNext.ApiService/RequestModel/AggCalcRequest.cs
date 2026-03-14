@@ -9,6 +9,8 @@ namespace EIMSNext.ApiService.RequestModel
         public List<Dimension>? Dimensions { get; set; }
         public List<Metric>? Metrics { get; set; }
         public DynamicFilter? Filter { get; set; }
+        public List<SortItem>? Sort { get; set; }
+        public int? Take { get; set; }
     }
 
     public class AgDataSource
@@ -26,6 +28,12 @@ namespace EIMSNext.ApiService.RequestModel
         public string Id { get; set; } = string.Empty;
         public string Type { get; set; } = FieldType.Input;
         public string AggFun { get; set; } = "count";
+    }
+    public class SortItem
+    {
+        public string Id { get; set; } = string.Empty;
+        public string Type { get; set; } = FieldType.Number;
+        public SortDir Dir { get; set; }
     }
 
     public enum AgDataSourceType
