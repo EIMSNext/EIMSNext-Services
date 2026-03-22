@@ -11,6 +11,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
 		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entity\EIMSNext.Auth.Entity.csproj" />
+		<ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
 		<ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />

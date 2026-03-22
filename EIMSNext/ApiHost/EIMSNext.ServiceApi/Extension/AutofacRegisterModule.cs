@@ -3,6 +3,7 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService;
+using EIMSNext.CloudEvent;
 using EIMSNext.Common;
 using EIMSNext.Core.Repository;
 using EIMSNext.Repository;
@@ -38,6 +39,9 @@ namespace EIMSNext.ServiceApi.Extension
             //builder.RegisterType<CiticClient>().AsSelf().SingleInstance();
             //builder.RegisterType<TianyanchaClient>().AsSelf().SingleInstance();
             //builder.RegisterType<TencentCloudClient>().AsSelf().SingleInstance();
+
+            //TODO:注入测试，将来移到异步项目
+            builder.RegisterType<EventHub>().AsImplementedInterfaces().SingleInstance();
         }
     }
 }

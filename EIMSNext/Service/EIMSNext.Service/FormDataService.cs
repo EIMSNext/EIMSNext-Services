@@ -1,6 +1,12 @@
-﻿using EIMSNext.ApiClient.Flow;
+﻿using System.Dynamic;
+using System.Text.Json.Nodes;
+using EIMSNext.ApiClient.Flow;
+using EIMSNext.Cache;
+using EIMSNext.CloudEvent;
+using EIMSNext.Common.Extension;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Query;
 using EIMSNext.Core.Service;
 using EIMSNext.Entity;
 using EIMSNext.Service.Interface;
@@ -9,6 +15,7 @@ using HKH.Common;
 using HKH.Mef2.Integration;
 
 using MongoDB.Driver;
+using StackExchange.Redis;
 
 namespace EIMSNext.Service
 {
@@ -64,11 +71,49 @@ namespace EIMSNext.Service
             await SubmitAsync(entities, null, Entity.CascadeMode.NotSet, null);
         }
 
+        protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        {
+            //TODO 此处将任务压力队列，此处为测试
+            var eventHub = Resolver.Resolve<IEventHub>();
+            var entity = entities.First();
+            var webhookResp = Resolver.GetRepository<Webhook>();
+            var webhooks = webhookResp.Find(new MongoFindOptions<Webhook> { Filter = webhookResp.FilterBuilder.And(webhookResp.FilterBuilder.Eq(x => x.FormId, entity.FormId), webhookResp.FilterBuilder.BitsAllSet(x => x.Triggers, (long)WebHookTrigger.Data_Created)) }).ToList();
+            if (webhooks.Count > 0)
+            {
+                var testhook = webhooks.First();
+                await eventHub.SendAsync(testhook, WebHookTrigger.Data_Created, entity);
+            }
+            await base.AfterAdd(entities, session);
+        }
+
         public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
         {
             var result = await base.ReplaceAsync(entity);
             await SubmitAsync([entity], null, Entity.CascadeMode.NotSet, null);
             return result;
+        }
+
+        protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
+        {
+            //TODO 此处将任务压力队列，此处为测试
+            var eventHub = Resolver.Resolve<IEventHub>();
+            var old = SessionStore.Get<FormData>(entity.Id, DataVersion.Old);
+            var webhookResp = Resolver.GetRepository<Webhook>();
+            var webhooks = webhookResp.Find(new MongoFindOptions<Webhook> { Filter = webhookResp.FilterBuilder.And(webhookResp.FilterBuilder.Eq(x => x.FormId, entity.FormId), webhookResp.FilterBuilder.BitsAllSet(x => x.Triggers, (long)WebHookTrigger.Data_Updated)) }).ToList();
+            if (webhooks.Count > 0)
+            {
+                var testhook = webhooks.First();
+                var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
+                var oriValue = new ExpandoObject();
+                changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+
+                var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
+                formExp.TryAdd("oridata", oriValue);
+
+                await eventHub.SendAsync(testhook, WebHookTrigger.Data_Created, formExp);
+            }
+
+            await base.AfterReplace(entity, session);
         }
 
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, Entity.CascadeMode cascade, string? eventIds)

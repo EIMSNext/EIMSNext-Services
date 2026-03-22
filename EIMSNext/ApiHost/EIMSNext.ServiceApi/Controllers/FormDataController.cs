@@ -4,6 +4,7 @@ using EIMSNext.ApiHost.Extension;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModel;
 using EIMSNext.ApiService.ViewModel;
+using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extension;
 using EIMSNext.Component;
@@ -250,6 +251,8 @@ namespace EIMSNext.ServiceApi.Controllers
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
 
+            ServiceContext.SessionStore.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
+
             //保存原始实体的重要字段
             var originalCorpId = entity.CorpId;
             var originalDeleteFlag = entity.DeleteFlag;
@@ -300,6 +303,8 @@ namespace EIMSNext.ServiceApi.Controllers
 
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
+
+            ServiceContext.SessionStore.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
 
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 

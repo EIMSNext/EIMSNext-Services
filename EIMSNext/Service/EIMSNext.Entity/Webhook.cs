@@ -17,6 +17,11 @@ namespace EIMSNext.Entity
         public string FormId { get; set; } = "";
 
         /// <summary>
+        /// 
+        /// </summary>
+        public string SourceType { get; set; } = WebHookSource.Form;
+
+        /// <summary>
         /// 推送地址
         /// </summary>
         public string Url { get; set; } = "";
@@ -65,5 +70,16 @@ namespace EIMSNext.Entity
         /// 流程待办变更
         /// </summary>
         WfTodo_Updated = 1 << 4,
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    public static class WebHookSource
+    {
+        /// <summary>
+        /// 动态表单
+        /// </summary>
+        public const string Form = "form";
     }
 }

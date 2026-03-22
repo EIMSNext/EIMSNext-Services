@@ -17,7 +17,7 @@
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
 		<PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.0" />
 		<PackageReference Include="Microsoft.OData.Core" Version="8.4.0" />
-		<PackageReference Include="MongoDB.AspNetCore.OData" Version="1.1.1" />
+		<PackageReference Include="MongoDB.AspNetCore.OData" Version="1.1.2" />
 		<PackageReference Include="NLog.Web.AspNetCore" Version="6.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
 		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="9.0.4" />
