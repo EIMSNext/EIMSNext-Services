@@ -14,7 +14,7 @@ using NLog.Extensions.Logging;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.ConfigCommonServices();
+builder.ConfigWebEnvironment();
 
 // Add services to the container.
 builder.Host.UseAutofac<AutofacRegisterModule>();

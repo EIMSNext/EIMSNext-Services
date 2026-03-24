@@ -26,7 +26,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.ConfigCommonServices();
+builder.ConfigWebEnvironment();
 builder.Services.AddServiceComponents();
 
 builder.Host.UseAutofac<AutofacRegisterModule>();

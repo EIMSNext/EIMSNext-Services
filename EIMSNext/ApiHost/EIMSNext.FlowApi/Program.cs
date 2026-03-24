@@ -20,7 +20,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 using WorkflowCore.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.ConfigCommonServices();
+builder.ConfigWebEnvironment();
 builder.Services.AddServiceComponents();
 
 // Add services to the container.
