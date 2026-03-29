@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json.Serialization;
 
 namespace EIMSNext.Print.Pdf
 {
@@ -96,11 +94,8 @@ namespace EIMSNext.Print.Pdf
         public Dictionary<int, double>? ColumnWidth { get; set; } = new();
         public List<UniverImageData>? Images { get; set; } = new();
         public Dictionary<string, UniverRowData>? RowData { get; set; } = new(); // 行数据信息
-        public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息
-        
-        [JsonIgnore]
-        public UniverWorkbook? Workbook { get; set; } // 反向引用工作簿
-    }
+        public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息        
+      }
 
     public class UniverStyle
     {

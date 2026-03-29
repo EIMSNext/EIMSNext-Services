@@ -5,7 +5,7 @@ namespace EIMSNext.Print.Pdf
     public class PdfPrintMeta
     {
         /// <summary>
-        /// 字段ID
+        /// 字段ID, 
         /// </summary>
         public string? Id { get; set; }
 
@@ -19,7 +19,17 @@ namespace EIMSNext.Print.Pdf
             return Id != null && Id.Contains('>');
         }
 
-        public string GetJsonPath(int[] indexes)
+        public string GetTablePath()
+        {
+            if (IsTable())
+            {
+                return $"$.{Id!.Split('>')[0]}";
+            }
+
+            return string.Empty;
+        }
+
+        public string GetValuePath(int[] indexes)
         {
             var path = "";
             if (!string.IsNullOrEmpty(Id))

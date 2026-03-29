@@ -31,7 +31,7 @@ namespace EIMSNext.Print.Pdf
         }
         #endregion
 
-        #region 颜色转换（无System.Drawing，自定义解析十六进制→MigraDoc Color）
+        #region 颜色转换
         /// <summary>
         /// 十六进制颜色转MigraDoc原生Color（支持#RGB/#RRGGBB，空值返回黑色）
         /// 匹配前端UniverJS的颜色存储格式
@@ -47,7 +47,7 @@ namespace EIMSNext.Print.Pdf
             try
             {
                 byte r = 0, g = 0, b = 0;
-                // 处理短格式 #RGB → #RRGGBB
+                // 处理短格式 #RGB
                 if (hexColor.Length == 4)
                 {
                     r = Convert.ToByte($"{hexColor[1]}{hexColor[1]}", 16);
@@ -62,7 +62,7 @@ namespace EIMSNext.Print.Pdf
                     b = Convert.ToByte(hexColor.Substring(5, 2), 16);
                 }
 
-                // 返回MigraDoc原生Color，无任何外部依赖
+                // 返回MigraDoc原生Color
                 return Color.FromRgb(r, g, b);
             }
             catch
@@ -72,7 +72,7 @@ namespace EIMSNext.Print.Pdf
         }
         #endregion
 
-        #region 对齐方式转换（UniverJS → MigraDoc，可空判断）
+        #region 对齐方式转换
         /// <summary>
         /// 水平对齐（left/center/right）→ MigraDoc段落对齐
         /// </summary>

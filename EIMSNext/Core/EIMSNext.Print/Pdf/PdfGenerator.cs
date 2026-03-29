@@ -46,7 +46,6 @@ namespace EIMSNext.Print.Pdf
 
             #endregion
 
-            // 处理数据数组，为每个数据生成一个表格，并添加分页符
             RenderTables(document, workbook, worksheet, datas, option);
 
             using var ms = new MemoryStream();
@@ -60,19 +59,14 @@ namespace EIMSNext.Print.Pdf
             return ms.ToArray();
         }
 
-        /// <summary>
-        /// 处理数据数组，为每个数据生成一个表格，并添加分页符
-        /// </summary>
         private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option)
         {
             if (datas == null || datas.Count == 0) return;
 
             for (int i = 0; i < datas.Count; i++)
             {
-                // 为每个数据创建一个表格
                 var table = document.LastSection.AddTable();
               
-                // 使用PdfTableGenerator生成表格
                 var tableGenerator = new PdfTableGenerator(workbook, IsPreview);
                 tableGenerator.Generate(worksheet, table, datas[i]);
 
