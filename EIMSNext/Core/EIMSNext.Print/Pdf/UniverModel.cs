@@ -107,7 +107,7 @@ namespace EIMSNext.Print.Pdf
         [JsonPropertyName("bg")] public UniverColor? Background { get; set; }
         [JsonPropertyName("bl")] public int? Bold { get; set; }
         [JsonPropertyName("it")] public int? Italic { get; set; }
-        [JsonPropertyName("ff")] public string? FontFamily { get; set; } = "Arial";
+        [JsonPropertyName("ff")] public string? FontFamily { get; set; } = FallbackFontResolver.DefaultFontName;
         [JsonPropertyName("fs")] public double? FontSize { get; set; } = 10;
         [JsonPropertyName("cl")] public UniverColor? Color { get; set; }
         [JsonPropertyName("ht")] public UniverHorizontalAlignment? HorizontalAlign { get; set; }
@@ -125,11 +125,6 @@ namespace EIMSNext.Print.Pdf
         [JsonPropertyName("cl")] public UniverColor? Color { get; set; } // 下划线颜色
     }
 
-    public class UniverStyles
-    {
-        public Dictionary<string, UniverStyle> Styles { get; set; } = new();
-    }
-
     public class UniverBorder
     {
         [JsonPropertyName("t")] public UniverBorderSide? Top { get; set; }
@@ -140,8 +135,49 @@ namespace EIMSNext.Print.Pdf
 
     public class UniverBorderSide
     {
-        public string Style { get; set; } = "none";
+        [JsonPropertyName("s")]
+        public object Style { get; set; } = "none"; // 支持数字和字符串两种格式
+        
+        [JsonPropertyName("cl")]
         public UniverColor Color { get; set; } = new();
+        
+        [JsonIgnore]
+        public string StyleName
+        {
+            get
+            {
+                return Style switch
+                {
+                    string s => s,
+                    int i => i switch
+                    {
+                        1 => "single",
+                        2 => "dashed",
+                        3 => "dotted",
+                        4 => "double",
+                        _ => "single"
+                    },
+                    _ => "single"
+                };
+            }
+        }
+        
+        [JsonIgnore]
+        public double WidthValue
+        {
+            get
+            {
+                // 根据样式类型返回对应的边框宽度
+                return StyleName switch
+                {
+                    "thin" => 0.5,
+                    "medium" => 1.0,
+                    "thick" => 2.0,
+                    "double" => 1.5,
+                    _ => 0.75 // 默认宽度
+                };
+            }
+        }
     }
 
     public class UniverPadding
@@ -196,7 +232,7 @@ namespace EIMSNext.Print.Pdf
         public Dictionary<string, UniverWorksheet> Sheets { get; set; } = new();
         public object? Snapshot { get; set; }
         public List<UniverResource>? Resources { get; set; }
-        public UniverStyles? Styles { get; set; }
+        public Dictionary<string, UniverStyle>? Styles { get; set; }
         
         [JsonIgnore]
         public UniverWorksheet? ActiveSheet => Sheets?.Values.FirstOrDefault();

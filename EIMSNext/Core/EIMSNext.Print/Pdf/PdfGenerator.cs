@@ -27,27 +27,27 @@ namespace EIMSNext.Print.Pdf
 
             FontsCache.Initialize();
             PredefinedFontsAndChars.ErrorFontName = FallbackFontResolver.DefaultFontName;
-            //GlobalFontSettings.UseWindowsFontsUnderWindows = true;
             GlobalFontSettings.FontResolver = new FontResolver();
             GlobalFontSettings.FallbackFontResolver = new FallbackFontResolver();
 
-            var document = new Document() ;
+            var document = new Document();
             var normalStyle = document.Styles[StyleNames.Normal];
             normalStyle!.Font.Name = FallbackFontResolver.DefaultFontName;
 
             var section = document.AddSection();
             //TODO:纸张应读取页面设置
+            section.PageSetup=document.DefaultPageSetup.Clone();
             section.PageSetup.PageFormat = PageFormat.A4;
-            section.PageSetup.TopMargin = 1.0;
-            section.PageSetup.BottomMargin = 1.0;
-            section.PageSetup.LeftMargin = 1.0;
-            section.PageSetup.RightMargin = 1.0;
+            section.PageSetup.TopMargin = Unit.FromCentimeter(1.0);
+            section.PageSetup.BottomMargin = Unit.FromCentimeter(1.0);
+            section.PageSetup.LeftMargin = Unit.FromCentimeter(1.0);
+            section.PageSetup.RightMargin = Unit.FromCentimeter(1.0);
             section.PageSetup.Orientation = Orientation.Portrait;
 
             #endregion
 
             // 处理数据数组，为每个数据生成一个表格，并添加分页符
-            ProcessDataArray(document, workbook, worksheet, datas, option);
+            RenderTables(document, workbook, worksheet, datas, option);
 
             using var ms = new MemoryStream();
             var renderer = new PdfDocumentRenderer()
@@ -63,7 +63,7 @@ namespace EIMSNext.Print.Pdf
         /// <summary>
         /// 处理数据数组，为每个数据生成一个表格，并添加分页符
         /// </summary>
-        private void ProcessDataArray(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option)
+        private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option)
         {
             if (datas == null || datas.Count == 0) return;
 
@@ -71,7 +71,7 @@ namespace EIMSNext.Print.Pdf
             {
                 // 为每个数据创建一个表格
                 var table = document.LastSection.AddTable();
-
+              
                 // 使用PdfTableGenerator生成表格
                 var tableGenerator = new PdfTableGenerator(workbook, IsPreview);
                 tableGenerator.Generate(worksheet, table, datas[i]);

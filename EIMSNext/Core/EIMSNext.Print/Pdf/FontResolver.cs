@@ -1,4 +1,5 @@
-﻿using PdfSharp.Fonts;
+﻿using System.Text.RegularExpressions;
+using PdfSharp.Fonts;
 using SkiaSharp;
 
 namespace EIMSNext.Print.Pdf
@@ -79,20 +80,21 @@ namespace EIMSNext.Print.Pdf
                 foreach (var file in files)
                 {
                     try
-                    {                       
-                            using var typeface = SKTypeface.FromFile(file);
-                            if (typeface == null) continue;
+                    {
+                        using var typeface = SKTypeface.FromFile(file);
+                        if (typeface == null) continue;
 
-                            byte[] fileBytes = File.ReadAllBytes(file);
-                            string key = $"{typeface.FamilyName}|{typeface.IsBold}|{typeface.IsItalic}".ToLower();
+                        byte[] fileBytes = File.ReadAllBytes(file);
+                        var familyName = RemoveWhiteSpace(typeface.FamilyName);
+                        string key = $"{familyName}|{typeface.IsBold}|{typeface.IsItalic}".ToLower();
 
-                            _fontCache[key] = new FontCacheItem
-                            {
-                                FamilyName = typeface.FamilyName,
-                                IsBold = typeface.IsBold,
-                                IsItalic = typeface.IsItalic,
-                                FontData = fileBytes
-                            };                       
+                        _fontCache[key] = new FontCacheItem
+                        {
+                            FamilyName = familyName,
+                            IsBold = typeface.IsBold,
+                            IsItalic = typeface.IsItalic,
+                            FontData = fileBytes
+                        };
                     }
                     catch (Exception ex)
                     {
@@ -106,6 +108,7 @@ namespace EIMSNext.Print.Pdf
 
         public static FontCacheItem? GetFont(string familyName, bool isBold, bool isItalic)
         {
+            familyName = RemoveWhiteSpace(familyName);
             string key = $"{familyName}|{isBold}|{isItalic}".ToLower();
             //string suffix = isBold && isItalic ? "bi" : isBold ? "bd" : isItalic ? "i" : "";
 
@@ -115,6 +118,11 @@ namespace EIMSNext.Print.Pdf
 
             var fallback = _fontCache.Values.FirstOrDefault(x => x.FamilyName == familyName);
             return fallback;
+        }
+
+        public static string RemoveWhiteSpace(string text)
+        {
+            return Regex.Replace(text, @"\s+", "");
         }
     }
 }

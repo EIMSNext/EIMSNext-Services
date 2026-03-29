@@ -1,5 +1,4 @@
-﻿using System.Text.RegularExpressions;
-using MigraDoc.DocumentObjectModel;
+﻿using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 
 namespace EIMSNext.Print.Pdf
@@ -105,32 +104,6 @@ namespace EIMSNext.Print.Pdf
                 "top" => VerticalAlignment.Top,
                 "bottom" => VerticalAlignment.Bottom,
                 _ => VerticalAlignment.Center
-            };
-        }
-        #endregion
-
-        #region 跨平台字体兜底（Windows/Linux/Mac，解决中文字体显示问题）
-        /// <summary>
-        /// 获取跨平台兼容字体名（适配Windows/ Linux/Mac，可空判断）
-        /// </summary>
-        /// <param name="fontName">原始字体名（可空）</param>
-        /// <returns>跨平台兼容字体名</returns>
-        public static string GetCrossPlatFontName(string? fontName)
-        {
-            if (!string.IsNullOrEmpty(fontName))
-            {
-                var cleanFont = Regex.Replace(fontName, @"[^\w\u4e00-\u9fa5]", "");
-                if (!string.IsNullOrEmpty(cleanFont)) return cleanFont;
-            }
-
-            // 按系统自动适配兜底字体
-            var osPlatform = Environment.OSVersion.Platform;
-            return osPlatform switch
-            {
-                PlatformID.Win32NT => "微软雅黑",
-                PlatformID.Unix => "Noto Sans CJK SC",
-                PlatformID.MacOSX => "苹方-简",
-                _ => "Arial"
             };
         }
         #endregion

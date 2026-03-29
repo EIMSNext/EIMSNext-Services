@@ -9,6 +9,12 @@ namespace EIMSNext.Print.Pdf
     {
         private readonly UniverWorkbook _workbook;
         private readonly bool _isPreview;
+        
+        // 类级变量
+        private UniverWorksheet _worksheet;
+        private Table _table;
+        private JsonObject _data;
+        private int _maxCol;
 
         public PdfTableGenerator(UniverWorkbook workbook, bool isPreview = false)
         {
@@ -18,37 +24,62 @@ namespace EIMSNext.Print.Pdf
 
         public void Generate(UniverWorksheet worksheet, Table table, JsonObject data)
         {
-            // 单元格内边距，优化文字与边框间距
-            table.TopPadding = 2.0;
-            table.BottomPadding = 2.0;
-            table.LeftPadding = 2.0;
-            table.RightPadding = 2.0;
+            // 设置类级变量
+            _worksheet = worksheet;
+            _table = table;
+            _data = data;
+            
+            table.Format.LeftIndent = Unit.FromCentimeter(0);
+            table.Format.RightIndent = Unit.FromCentimeter(0);
+            table.Format.FirstLineIndent = Unit.FromCentimeter(0);
+            table.Format.Alignment = ParagraphAlignment.Left;
+            table.TopPadding = Unit.FromCentimeter(0);
+            table.BottomPadding = Unit.FromCentimeter(0);
+            table.LeftPadding = Unit.FromCentimeter(0);
+            table.RightPadding = Unit.FromCentimeter(0);
+            
             // 全局边框置0，逐单元格解析自定义边框
             table.Borders.Width = 0;
 
             var (maxRow, maxCol) = CalculateEffectiveRange(worksheet);
             if (maxRow == 0 || maxCol == 0) return;
+            
+            _maxCol = maxCol;
 
             var mergeMap = BuildMergeMap(worksheet);
 
             // 设置列宽
+            double totalWidth = 0;
             for (int i = 0; i < maxCol; i++)
             {
-                var columnWidth = GetColumnWidth(worksheet, i);
-                table.AddColumn(Unit.FromCentimeter(columnWidth));
+                var columnWidth = GetColumnWidth(_worksheet, i);
+                totalWidth += columnWidth;
+            }
+            
+            // 计算页面可用宽度（A4纸宽度21cm，减去左右边距）
+            double availableWidth = 21.0 - 1 - 1; // 左右边距为0
+            
+            // 如果总宽度超过可用宽度，按比例缩放列宽
+            double scaleFactor = totalWidth > availableWidth ? availableWidth / totalWidth : 1.0;
+            
+            // 添加列并设置宽度
+            for (int i = 0; i < maxCol; i++)
+            {
+                var columnWidth = GetColumnWidth(_worksheet, i) * scaleFactor;
+                _table.AddColumn(Unit.FromCentimeter(columnWidth));
             }
 
             // 处理每一行
             for (int r = 0; r < maxRow; r++)
             {
                 // 检查是否为重复行（包含>符号的字段）
-                if (IsRepeatRow(worksheet, r))
+                if (IsRepeatRow(_worksheet, r))
                 {
-                    ProcessRepeatRow(table, worksheet, r, data);
+                    ProcessRepeatRow(r);
                 }
                 else
                 {
-                    ProcessNormalRow(table, worksheet, r, data);
+                    ProcessNormalRow(r);
                 }
             }
         }
@@ -113,31 +144,31 @@ namespace EIMSNext.Print.Pdf
         {
             // 优先使用ColumnWidth字典
             if (sheet.ColumnWidth?.TryGetValue(colIndex, out var width) == true)
-                return PdfConvertUtil.PixelToCm(width / 10.0); // 转换为厘米
+                return PdfConvertUtil.PixelToCm(width); // 转换为厘米
             
             // 其次使用ColumnData中的宽度
             if (sheet.ColumnData?.TryGetValue(colIndex.ToString(), out var colData) == true && colData.Width.HasValue)
-                return PdfConvertUtil.PixelToCm(colData.Width.Value / 10.0); // 转换为厘米
+                return PdfConvertUtil.PixelToCm(colData.Width.Value); // 转换为厘米
             
-            return PdfConvertUtil.PixelToCm(sheet.DefaultColumnWidth / 10.0); // 默认列宽
+            return PdfConvertUtil.PixelToCm(sheet.DefaultColumnWidth); // 默认列宽
         }
 
         private double GetRowHeight(UniverWorksheet sheet, int rowIndex)
         {
             // 优先使用RowHeight字典
             if (sheet.RowHeight?.TryGetValue(rowIndex, out var height) == true)
-                return PdfConvertUtil.PixelToCm(height / 10.0); // 转换为厘米
+                return PdfConvertUtil.PixelToCm(height); // 转换为厘米
             
             // 其次使用RowData中的高度
             if (sheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true && rowData.Height.HasValue)
-                return PdfConvertUtil.PixelToCm(rowData.Height.Value / 10.0); // 转换为厘米
+                return PdfConvertUtil.PixelToCm(rowData.Height.Value); // 转换为厘米
             
-            return PdfConvertUtil.PixelToCm(sheet.DefaultRowHeight / 10.0); // 默认行高
+            return PdfConvertUtil.PixelToCm(sheet.DefaultRowHeight); // 默认行高
         }
 
-        private void ProcessRepeatRow(Table table, UniverWorksheet sheet, int rowIndex, JsonObject data)
+        private void ProcessRepeatRow(int rowIndex)
         {
-            if (sheet.CellData?.TryGetValue(rowIndex.ToString(), out var row) != true) return;
+            if (_worksheet.CellData?.TryGetValue(rowIndex.ToString(), out var row) != true) return;
 
             // 获取重复行的模板单元格
             var templateCells = new Dictionary<int, UniverCell>();
@@ -163,18 +194,18 @@ namespace EIMSNext.Print.Pdf
             if (string.IsNullOrEmpty(dataSourceKey)) return;
 
             // 获取子表数据
-            var subDataArray = data.GetJsonArray($"$.{dataSourceKey}") as JsonArray;
+            var subDataArray = _data.GetJsonArray($"$.{dataSourceKey}") as JsonArray;
             if (subDataArray == null || subDataArray.Count == 0) return;
 
             // 对子表中的每条数据生成一行
             for (int i = 0; i < subDataArray.Count; i++)
             {
-                var pdfRow = table.AddRow();
-                var rowHeight = GetRowHeight(sheet, rowIndex);
+                var pdfRow = _table.AddRow();
+                var rowHeight = GetRowHeight(_worksheet, rowIndex);
                 pdfRow.Height = Unit.FromCentimeter(rowHeight);
 
                 // 处理每一列
-                for (int colIndex = 0; colIndex < GetMaxColumnCount(sheet); colIndex++)
+                for (int colIndex = 0; colIndex < _maxCol; colIndex++)
                 {
                     var cell = pdfRow.Cells[colIndex];
 
@@ -184,65 +215,37 @@ namespace EIMSNext.Print.Pdf
                         ApplyCellStyle(cell, templateCell);
 
                         // 设置单元格值（从数据中取值）
-                        var cellValue = GetCellValue(templateCell, data, new[] { i });
+                        var cellValue = GetCellValue(templateCell, _data, new[] { i });
                         cell.AddParagraph(cellValue);
                     }
                 }
             }
         }
 
-        private void ProcessNormalRow(Table table, UniverWorksheet sheet, int rowIndex, JsonObject data)
+        private void ProcessNormalRow(int rowIndex)
         {
-            var pdfRow = table.AddRow();
-            var rowHeight = GetRowHeight(sheet, rowIndex);
+            var pdfRow = _table.AddRow();
+            var rowHeight = GetRowHeight(_worksheet, rowIndex);
             pdfRow.Height = Unit.FromCentimeter(rowHeight);
 
-            var maxCol = GetMaxColumnCount(sheet);
-
-            for (int colIndex = 0; colIndex < maxCol; colIndex++)
+            for (int colIndex = 0; colIndex < _maxCol; colIndex++)
             {
                 var cell = pdfRow.Cells[colIndex];
 
                 // 获取单元格数据
-                var univerCell = GetCell(sheet, rowIndex, colIndex);
+                var univerCell = GetCell(_worksheet, rowIndex, colIndex);
                 if (univerCell != null)
                 {
                     // 设置单元格样式
                     ApplyCellStyle(cell, univerCell);
 
                     // 设置单元格值
-                    var cellValue = GetCellValue(univerCell, data, Array.Empty<int>());
+                    var cellValue = GetCellValue(univerCell, _data, Array.Empty<int>());
                     cell.AddParagraph(cellValue);
                 }
             }
         }
 
-        private int GetMaxColumnCount(UniverWorksheet sheet)
-        {
-            int maxCol = 0;
-
-            if (sheet.CellData != null)
-            {
-                foreach (var row in sheet.CellData.Values)
-                {
-                    foreach (var colKey in row.Keys)
-                    {
-                        if (int.TryParse(colKey, out int colIndex))
-                            maxCol = Math.Max(maxCol, colIndex + 1);
-                    }
-                }
-            }
-
-            if (sheet.MergeData != null)
-            {
-                foreach (var merge in sheet.MergeData)
-                {
-                    maxCol = Math.Max(maxCol, merge.EndColumn + 1);
-                }
-            }
-
-            return maxCol;
-        }
 
         private UniverCell? GetCell(UniverWorksheet sheet, int rowIndex, int colIndex)
         {
@@ -255,15 +258,9 @@ namespace EIMSNext.Print.Pdf
 
         private void ApplyCellStyle(Cell cell, UniverCell univerCell)
         {
-            // 设置基本样式
-            //cell.TopPadding = 2.0;
-            //cell.BottomPadding = 2.0;
-            //cell.LeftPadding = 2.0;
-            //cell.RightPadding = 2.0;
-
             // 应用样式
             if (!string.IsNullOrEmpty(univerCell.Style) &&
-                _workbook.Styles?.Styles?.TryGetValue(univerCell.Style, out var style) == true)
+                _workbook.Styles?.TryGetValue(univerCell.Style, out var style) == true)
             {
                 var fmt = cell.Format;
 
@@ -286,10 +283,17 @@ namespace EIMSNext.Print.Pdf
                     fmt.Font.Name = style.FontFamily;
                 }
 
-                // 对齐方式
+                // 水平对齐方式
                 if (style.HorizontalAlign.HasValue)
                     fmt.Alignment = PdfConvertUtil.HAlignToMigra(style.HorizontalAlign.ToString());
-
+                
+                // 垂直对齐方式
+                if (style.VerticalAlign.HasValue)
+                    cell.VerticalAlignment = PdfConvertUtil.VAlignToMigra(style.VerticalAlign.ToString());
+                else
+                    // 默认居中
+                    cell.VerticalAlignment = VerticalAlignment.Center;
+                
                 // 边框
                 if (style.Border != null)
                 {
@@ -321,14 +325,14 @@ namespace EIMSNext.Print.Pdf
 
         private void SetBorderSide(Border border, UniverBorderSide side)
         {
-            if (side.Style == "none")
+            if (side.StyleName == "none")
             {
                 border.Visible = false;
                 return;
             }
 
             border.Visible = true;
-            border.Style = side.Style switch
+            border.Style = side.StyleName switch
             {
                 "dashed" => BorderStyle.DashSmallGap,
                 "dotted" => BorderStyle.Dot,
@@ -338,14 +342,8 @@ namespace EIMSNext.Print.Pdf
                 _ => BorderStyle.Single
             };
 
-            border.Width = side.Style switch
-            {
-                "thin" => Unit.FromPoint(0.5),
-                "medium" or "double" => Unit.FromPoint(1.5), // double 映射为加粗单线
-                "thick" => Unit.FromPoint(2.0),
-                "dashed" or "dotted" => Unit.FromPoint(0.75),
-                _ => Unit.FromPoint(0.75)
-            };
+            // 恢复边框粗细设置
+            border.Width = Unit.FromPoint(side.WidthValue);
 
             border.Color = PdfConvertUtil.HexToMigraColor(side.Color.Rgb);
         }
