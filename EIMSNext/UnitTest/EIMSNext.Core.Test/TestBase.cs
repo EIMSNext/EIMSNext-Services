@@ -1,13 +1,9 @@
 ﻿using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using EIMSNext.Common.Extension;
-using EIMSNext.Common.Serialization;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Serialization;
-
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Serializers;
+using EIMSNext.Json.Serialization;
 
 namespace EIMSNext.Core.Test
 {

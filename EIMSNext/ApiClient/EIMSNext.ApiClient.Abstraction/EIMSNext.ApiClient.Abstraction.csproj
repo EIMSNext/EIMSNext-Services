@@ -15,6 +15,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
+		<ProjectReference Include="..\..\Core\EIMSNext.Json\EIMSNext.Json.csproj" />
 	</ItemGroup>
 
 </Project>

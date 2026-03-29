@@ -1,5 +1,4 @@
 ﻿using System.Text.Json;
-using EIMSNext.Common.Extension;
 using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Test
