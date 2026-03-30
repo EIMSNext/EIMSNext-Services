@@ -94,16 +94,35 @@ namespace EIMSNext.Print.Pdf
         public Dictionary<int, double>? ColumnWidth { get; set; } = new();
         public List<UniverImageData>? Images { get; set; } = new();
         public Dictionary<string, UniverRowData>? RowData { get; set; } = new(); // 行数据信息
-        public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息        
-      }
+        public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息
+        [JsonPropertyName("pageSetup")] public UniverPageSetup? PageSetup { get; set; }
+        [JsonPropertyName("printSetup")] public UniverPageSetup? PrintSetup { get; set; }
+    }
+
+    public class UniverPageSetup
+    {
+        [JsonPropertyName("orientation")] public string? Orientation { get; set; }
+        [JsonPropertyName("pageFormat")] public string? PageFormat { get; set; }
+        [JsonPropertyName("pageSize")] public string? PageSize { get; set; }
+        [JsonPropertyName("paperSize")] public string? PaperSize { get; set; }
+        [JsonPropertyName("marginTop")] public double? MarginTop { get; set; }
+        [JsonPropertyName("marginBottom")] public double? MarginBottom { get; set; }
+        [JsonPropertyName("marginLeft")] public double? MarginLeft { get; set; }
+        [JsonPropertyName("marginRight")] public double? MarginRight { get; set; }
+        [JsonPropertyName("topMargin")] public double? TopMargin { get; set; }
+        [JsonPropertyName("bottomMargin")] public double? BottomMargin { get; set; }
+        [JsonPropertyName("leftMargin")] public double? LeftMargin { get; set; }
+        [JsonPropertyName("rightMargin")] public double? RightMargin { get; set; }
+        [JsonPropertyName("landscape")] public bool? Landscape { get; set; }
+    }
 
     public class UniverStyle
     {
         [JsonPropertyName("bg")] public UniverColor? Background { get; set; }
         [JsonPropertyName("bl")] public int? Bold { get; set; }
         [JsonPropertyName("it")] public int? Italic { get; set; }
-        [JsonPropertyName("ff")] public string? FontFamily { get; set; } = FallbackFontResolver.DefaultFontName;
-        [JsonPropertyName("fs")] public double? FontSize { get; set; } = 10;
+        [JsonPropertyName("ff")] public string? FontFamily { get; set; }
+        [JsonPropertyName("fs")] public double? FontSize { get; set; }
         [JsonPropertyName("cl")] public UniverColor? Color { get; set; }
         [JsonPropertyName("ht")] public UniverHorizontalAlignment? HorizontalAlign { get; set; }
         [JsonPropertyName("vt")] public UniverVerticalAlignment? VerticalAlign { get; set; }

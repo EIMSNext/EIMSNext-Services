@@ -5,19 +5,15 @@ namespace EIMSNext.Print.Pdf
 {
     public static class PdfConvertUtil
     {
-        public const double DefaultCellWidth = 3.0; //cm
-
-        private static readonly Color Black = Color.FromRgb(0, 0, 0);
-
         #region 单位转换（像素→厘米/点，跨平台一致）
         /// <summary>
         /// 像素转MigraDoc厘米（标准DPI：1cm=28.35像素）
         /// </summary>
         /// <param name="pixel">像素值（可空，空值返回1.0cm）</param>
         /// <returns>转换后的厘米值</returns>
-        public static double PixelToCm(double? pixel)
+        public static double PixelToCm(double? pixel, double defaultValueCm = PdfRenderDefaults.DefaultColumnWidthCm)
         {
-            return pixel <= 0 || pixel is null ? 1.0 : Math.Round(pixel.Value / 28.35, 2);
+            return pixel <= 0 || pixel is null ? defaultValueCm : Math.Round(pixel.Value / 28.35, 4);
         }
 
         /// <summary>
@@ -25,9 +21,9 @@ namespace EIMSNext.Print.Pdf
         /// </summary>
         /// <param name="pixel">像素值（可空，空值返回0.25pt）</param>
         /// <returns>转换后的点值</returns>
-        public static double PixelToPt(double? pixel)
+        public static double PixelToPt(double? pixel, double defaultValuePt = PdfRenderDefaults.DefaultBorderWidthPt)
         {
-            return pixel <= 0 || pixel is null ? 0.25 : Math.Round(pixel.Value / 1.333, 2);
+            return pixel <= 0 || pixel is null ? defaultValuePt : Math.Round(pixel.Value / 1.333, 2);
         }
         #endregion
 
@@ -38,11 +34,13 @@ namespace EIMSNext.Print.Pdf
         /// </summary>
         /// <param name="hexColor">十六进制颜色（可空，如#000/#000000）</param>
         /// <returns>MigraDoc原生Color</returns>
-        public static Color HexToMigraColor(string? hexColor)
+        public static Color HexToMigraColor(string? hexColor, Color? fallbackColor = null)
         {
+            var defaultColor = fallbackColor ?? PdfRenderDefaults.DefaultFontColor;
+
             // 空值/非十六进制，返回默认黑色
             if (string.IsNullOrEmpty(hexColor) || !hexColor.StartsWith("#") || (hexColor.Length != 4 && hexColor.Length != 7))
-                return Black;
+                return defaultColor;
 
             try
             {
@@ -67,7 +65,7 @@ namespace EIMSNext.Print.Pdf
             }
             catch
             {
-                return Black;
+                return defaultColor;
             }
         }
         #endregion
@@ -78,15 +76,29 @@ namespace EIMSNext.Print.Pdf
         /// </summary>
         /// <param name="hAlign">UniverJS水平对齐值（可空）</param>
         /// <returns>MigraDoc段落对齐</returns>
-        public static ParagraphAlignment HAlignToMigra(string? hAlign)
+        public static ParagraphAlignment HAlignToMigra(UniverHorizontalAlignment? hAlign, ParagraphAlignment defaultAlignment)
         {
-            if (string.IsNullOrEmpty(hAlign)) return ParagraphAlignment.Left;
-
-            return hAlign.ToLower() switch
+            return hAlign switch
             {
+                UniverHorizontalAlignment.Center => ParagraphAlignment.Center,
+                UniverHorizontalAlignment.Right => ParagraphAlignment.Right,
+                UniverHorizontalAlignment.Left => ParagraphAlignment.Left,
+                _ => defaultAlignment
+            };
+        }
+
+        public static ParagraphAlignment HAlignToMigra(string? hAlign, ParagraphAlignment defaultAlignment)
+        {
+            if (string.IsNullOrWhiteSpace(hAlign)) return defaultAlignment;
+
+            return hAlign.Trim().ToLowerInvariant() switch
+            {
+                "2" => ParagraphAlignment.Center,
+                "3" => ParagraphAlignment.Right,
                 "center" => ParagraphAlignment.Center,
                 "right" => ParagraphAlignment.Right,
-                _ => ParagraphAlignment.Left
+                "left" => ParagraphAlignment.Left,
+                _ => defaultAlignment
             };
         }
 
@@ -95,15 +107,30 @@ namespace EIMSNext.Print.Pdf
         /// </summary>
         /// <param name="vAlign">UniverJS垂直对齐值（可空）</param>
         /// <returns>MigraDoc单元格垂直对齐</returns>
-        public static VerticalAlignment VAlignToMigra(string? vAlign)
+        public static VerticalAlignment VAlignToMigra(UniverVerticalAlignment? vAlign, VerticalAlignment defaultAlignment)
         {
-            if (string.IsNullOrEmpty(vAlign)) return VerticalAlignment.Center;
-
-            return vAlign.ToLower() switch
+            return vAlign switch
             {
+                UniverVerticalAlignment.Top => VerticalAlignment.Top,
+                UniverVerticalAlignment.Bottom => VerticalAlignment.Bottom,
+                UniverVerticalAlignment.Middle => VerticalAlignment.Center,
+                _ => defaultAlignment
+            };
+        }
+
+        public static VerticalAlignment VAlignToMigra(string? vAlign, VerticalAlignment defaultAlignment)
+        {
+            if (string.IsNullOrWhiteSpace(vAlign)) return defaultAlignment;
+
+            return vAlign.Trim().ToLowerInvariant() switch
+            {
+                "1" => VerticalAlignment.Top,
+                "3" => VerticalAlignment.Bottom,
                 "top" => VerticalAlignment.Top,
                 "bottom" => VerticalAlignment.Bottom,
-                _ => VerticalAlignment.Center
+                "middle" => VerticalAlignment.Center,
+                "center" => VerticalAlignment.Center,
+                _ => defaultAlignment
             };
         }
         #endregion

@@ -9,29 +9,39 @@ namespace EIMSNext.Print.Pdf
     {
         private readonly UniverWorkbook _workbook;
         private readonly bool _isPreview;
+        private readonly PdfRenderOptions _options;
+        private readonly PdfStyleResolver _styleResolver;
+        private readonly PdfSheetLayoutCalculator _layoutCalculator;
 
         // 类级变量
         private UniverWorksheet? _worksheet;
         private Table? _table;
         private JsonObject? _data;
-        private int _maxCol;
+        private PdfSheetRenderPlan? _renderPlan;
+        private Row? _lastGeneratedNormalRow;
+        private bool _lastRenderedRowWasRepeat;
 
-        public PdfTableGenerator(UniverWorkbook workbook, bool isPreview = false)
+        public PdfTableGenerator(UniverWorkbook workbook, PdfRenderOptions options, bool isPreview = false)
         {
             _workbook = workbook;
+            _options = options;
             _isPreview = isPreview;
+            _styleResolver = new PdfStyleResolver(workbook, options);
+            _layoutCalculator = new PdfSheetLayoutCalculator(options);
         }
 
-        public void Generate(UniverWorksheet worksheet, Table table, JsonObject data)
+        public void Generate(UniverWorksheet worksheet, Table table, JsonObject data, PageSetup pageSetup)
         {
             _worksheet = worksheet;
             _table = table;
             _data = data;
+            _lastGeneratedNormalRow = null;
+            _lastRenderedRowWasRepeat = false;
 
             table.Format.LeftIndent = Unit.FromCentimeter(0);
             table.Format.RightIndent = Unit.FromCentimeter(0);
             table.Format.FirstLineIndent = Unit.FromCentimeter(0);
-            table.Format.Alignment = ParagraphAlignment.Left;
+            table.Format.Alignment = _options.DefaultHorizontalAlignment;
             table.TopPadding = Unit.FromCentimeter(0);
             table.BottomPadding = Unit.FromCentimeter(0);
             table.LeftPadding = Unit.FromCentimeter(0);
@@ -39,89 +49,31 @@ namespace EIMSNext.Print.Pdf
 
             table.Borders.Width = 0;
 
-            var (maxRow, maxCol) = CalculateEffectiveRange(worksheet);
-            if (maxRow == 0 || maxCol == 0) return;
+            _renderPlan = _layoutCalculator.CreatePlan(worksheet, pageSetup, rowIndex => IsRepeatRow(worksheet, rowIndex));
+            if (_renderPlan.VisibleRows.Count == 0 || _renderPlan.VisibleColumns.Count == 0) return;
 
-            _maxCol = maxCol;
-
-            var mergeMap = BuildMergeMap(worksheet);
-
-            double totalWidth = 0;
-            for (int i = 0; i < maxCol; i++)
+            foreach (var columnIndex in _renderPlan.VisibleColumns)
             {
-                var columnWidth = GetColumnWidth(_worksheet, i);
-                totalWidth += columnWidth;
-            }
-
-            double availableWidth = 21.0 - 1 - 1;
-            double scaleFactor = totalWidth > availableWidth ? availableWidth / totalWidth : 1.0;
-
-            for (int i = 0; i < maxCol; i++)
-            {
-                var columnWidth = GetColumnWidth(_worksheet, i) * scaleFactor;
+                var columnWidth = _renderPlan.ColumnWidthsCm.TryGetValue(columnIndex, out var width)
+                    ? width
+                    : _options.DefaultColumnWidthCm;
                 _table.AddColumn(Unit.FromCentimeter(columnWidth));
             }
 
-            for (int r = 0; r < maxRow; r++)
+            foreach (var rowIndex in _renderPlan.VisibleRows)
             {
-                if (IsRepeatRow(_worksheet, r))
+                if (IsRepeatRow(_worksheet, rowIndex))
                 {
-                    ProcessRepeatRow(r);
+                    MarkDetailHeaderBoundary();
+                    ProcessRepeatRow(rowIndex);
+                    _lastRenderedRowWasRepeat = true;
                 }
                 else
                 {
-                    ProcessNormalRow(r);
+                    _lastGeneratedNormalRow = ProcessNormalRow(rowIndex);
+                    _lastRenderedRowWasRepeat = false;
                 }
             }
-        }
-
-        private (int, int) CalculateEffectiveRange(UniverWorksheet sheet)
-        {
-            int maxRow = 0, maxCol = 0;
-
-            if (sheet.CellData != null)
-            {
-                foreach (var (rk, row) in sheet.CellData)
-                {
-                    if (!int.TryParse(rk, out int r)) continue;
-                    maxRow = Math.Max(maxRow, r + 1);
-                    foreach (var (ck, _) in row)
-                    {
-                        if (int.TryParse(ck, out int c))
-                            maxCol = Math.Max(maxCol, c + 1);
-                    }
-                }
-            }
-
-            if (sheet.MergeData != null)
-            {
-                foreach (var m in sheet.MergeData)
-                {
-                    maxRow = Math.Max(maxRow, m.EndRow + 1);
-                    maxCol = Math.Max(maxCol, m.EndColumn + 1);
-                }
-            }
-
-            return (maxRow, maxCol);
-        }
-
-        private (Dictionary<(int, int), (int, int)>, HashSet<(int, int)>) BuildMergeMap(UniverWorksheet sheet)
-        {
-            var starts = new Dictionary<(int, int), (int, int)>();
-            var occupied = new HashSet<(int, int)>();
-
-            if (sheet.MergeData == null) return (starts, occupied);
-
-            foreach (var m in sheet.MergeData)
-            {
-                var span = (m.EndRow - m.StartRow + 1, m.EndColumn - m.StartColumn + 1);
-                starts[(m.StartRow, m.StartColumn)] = span;
-
-                for (int r = m.StartRow; r <= m.EndRow; r++)
-                    for (int c = m.StartColumn; c <= m.EndColumn; c++)
-                        occupied.Add((r, c));
-            }
-            return (starts, occupied);
         }
 
         private bool IsRepeatRow(UniverWorksheet sheet, int rowIdx)
@@ -130,36 +82,15 @@ namespace EIMSNext.Print.Pdf
             return row!.Values.Any(cell => cell?.PrintMeta?.IsTable() == true);
         }
 
-        private double GetColumnWidth(UniverWorksheet sheet, int colIndex)
-        {
-            if (sheet.ColumnWidth?.TryGetValue(colIndex, out var width) == true)
-                return PdfConvertUtil.PixelToCm(width);
-
-            if (sheet.ColumnData?.TryGetValue(colIndex.ToString(), out var colData) == true && colData.Width.HasValue)
-                return PdfConvertUtil.PixelToCm(colData.Width.Value);
-
-            return PdfConvertUtil.PixelToCm(sheet.DefaultColumnWidth);
-        }
-
-        private double GetRowHeight(UniverWorksheet sheet, int rowIndex)
-        {
-            if (sheet.RowHeight?.TryGetValue(rowIndex, out var height) == true)
-                return PdfConvertUtil.PixelToCm(height);
-
-            if (sheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true && rowData.Height.HasValue)
-                return PdfConvertUtil.PixelToCm(rowData.Height.Value);
-
-            return PdfConvertUtil.PixelToCm(sheet.DefaultRowHeight);
-        }
-
         private void ProcessRepeatRow(int rowIndex)
         {
-            if (_worksheet!.CellData?.TryGetValue(rowIndex.ToString(), out var row) != true) return;
+            if (_worksheet == null || _worksheet.CellData?.TryGetValue(rowIndex.ToString(), out var row) != true || _renderPlan == null) return;
+            if (row == null) return;
 
             var templateCells = new Dictionary<int, UniverCell>();
             foreach (var (colKey, cell) in row)
             {
-                if (int.TryParse(colKey, out int colIndex) && cell != null)
+                if (int.TryParse(colKey, out int colIndex) && cell != null && _renderPlan.IsVisibleColumn(colIndex))
                 {
                     templateCells[colIndex] = cell;
                 }
@@ -178,47 +109,71 @@ namespace EIMSNext.Print.Pdf
             if (string.IsNullOrEmpty(tablePath)) return;
 
             var subDataArray = _data!.GetJsonArray(tablePath) as JsonArray;
-            if (subDataArray == null || subDataArray.Count == 0) return;
+            var repeatCount = subDataArray?.Count > 0 ? subDataArray.Count : 1;
 
-            for (int i = 0; i < subDataArray.Count; i++)
+            for (int i = 0; i < repeatCount; i++)
             {
                 var pdfRow = _table!.AddRow();
-                var rowHeight = GetRowHeight(_worksheet, rowIndex);
+                var rowHeight = _renderPlan.RowHeightsCm.TryGetValue(rowIndex, out var height)
+                    ? height
+                    : _options.DefaultRowHeightCm;
                 pdfRow.Height = Unit.FromCentimeter(rowHeight);
 
-                for (int colIndex = 0; colIndex < _maxCol; colIndex++)
+                for (int visibleColumnIndex = 0; visibleColumnIndex < _renderPlan.VisibleColumns.Count; visibleColumnIndex++)
                 {
-                    var cell = pdfRow.Cells[colIndex];
+                    var sourceColumnIndex = _renderPlan.VisibleColumns[visibleColumnIndex];
+                    var cell = pdfRow.Cells[visibleColumnIndex];
 
-                    if (templateCells.TryGetValue(colIndex, out var templateCell))
+                    if (TryApplyMerge(cell, rowIndex, sourceColumnIndex, repeatMergeOnly: true))
                     {
-                        ApplyCellStyle(cell, templateCell);
-                        var cellValue = GetCellValue(templateCell, _data!, new[] { i });
-                        var para = cell.AddParagraph(cellValue);
-                        para.Format.LeftIndent = Unit.FromCentimeter(0.1);
+                        continue;
+                    }
+
+                    if (templateCells.TryGetValue(sourceColumnIndex, out var templateCell))
+                    {
+                        _styleResolver.ApplyCellStyle(cell, templateCell);
+                        var cellValue = subDataArray != null && subDataArray.Count > 0
+                            ? GetCellValue(templateCell, _data!, new[] { i })
+                            : string.Empty;
+                        AddCellParagraph(cell, templateCell, cellValue, keepEmptyParagraph: true);
                     }
                 }
             }
         }
 
-        private void ProcessNormalRow(int rowIndex)
+        private Row ProcessNormalRow(int rowIndex)
         {
+            if (_renderPlan == null)
+            {
+                throw new InvalidOperationException("Render plan is required before rendering rows.");
+            }
+
             var pdfRow = _table!.AddRow();
-            var rowHeight = GetRowHeight(_worksheet!, rowIndex);
+            var rowHeight = _renderPlan.RowHeightsCm.TryGetValue(rowIndex, out var height)
+                ? height
+                : _options.DefaultRowHeightCm;
             pdfRow.Height = Unit.FromCentimeter(rowHeight);
 
-            for (int colIndex = 0; colIndex < _maxCol; colIndex++)
+            for (int visibleColumnIndex = 0; visibleColumnIndex < _renderPlan.VisibleColumns.Count; visibleColumnIndex++)
             {
-                var cell = pdfRow.Cells[colIndex];
+                var sourceColumnIndex = _renderPlan.VisibleColumns[visibleColumnIndex];
+                var cell = pdfRow.Cells[visibleColumnIndex];
 
-                var univerCell = GetCell(_worksheet!, rowIndex, colIndex);
+                if (TryApplyMerge(cell, rowIndex, sourceColumnIndex, repeatMergeOnly: false))
+                {
+                    continue;
+                }
+
+                var univerCell = GetCell(_worksheet!, rowIndex, sourceColumnIndex);
                 if (univerCell != null)
                 {
-                    ApplyCellStyle(cell, univerCell);
+                    _styleResolver.ApplyCellStyle(cell, univerCell);
                     var cellValue = GetCellValue(univerCell, _data!, Array.Empty<int>());
-                    cell.AddParagraph(cellValue);
+                    AddCellParagraph(cell, univerCell, cellValue, keepEmptyParagraph: false);
                 }
             }
+
+            return pdfRow;
         }
 
 
@@ -231,90 +186,26 @@ namespace EIMSNext.Print.Pdf
             return null;
         }
 
-        private void ApplyCellStyle(Cell cell, UniverCell univerCell)
+        private bool TryApplyMerge(Cell cell, int rowIndex, int columnIndex, bool repeatMergeOnly)
         {
-            if (!string.IsNullOrEmpty(univerCell.Style) &&
-                _workbook.Styles?.TryGetValue(univerCell.Style, out var style) == true)
+            if (_renderPlan?.MergeCells.TryGetValue((rowIndex, columnIndex), out var mergePlan) != true || mergePlan == null)
             {
-                var fmt = cell.Format;
-
-                if (style.Color?.Rgb != null)
-                    fmt.Font.Color = PdfConvertUtil.HexToMigraColor(style.Color.Rgb);
-
-                if (style.Background?.Rgb != null)
-                    cell.Shading.Color = PdfConvertUtil.HexToMigraColor(style.Background.Rgb);
-
-                if (style.Bold == 1) fmt.Font.Bold = true;
-                if (style.Italic == 1) fmt.Font.Italic = true;
-                if (style.FontSize.HasValue) fmt.Font.Size = style.FontSize.Value;
-
-                if (!string.IsNullOrEmpty(style.FontFamily))
-                {
-                    fmt.Font.Name = style.FontFamily;
-                }
-
-                if (style.Underline != null && style.Underline.Style.HasValue && style.Underline.Style.Value > 0)
-                {
-                    fmt.Font.Underline = Underline.Single;
-                    if (style.Underline.Color?.Rgb != null)
-                    {
-                        fmt.Font.Color = PdfConvertUtil.HexToMigraColor(style.Underline.Color.Rgb);
-                    }
-                }
-
-                if (style.HorizontalAlign.HasValue)
-                    fmt.Alignment = PdfConvertUtil.HAlignToMigra(style.HorizontalAlign.ToString());
-
-                if (style.VerticalAlign.HasValue)
-                    cell.VerticalAlignment = PdfConvertUtil.VAlignToMigra(style.VerticalAlign.ToString());
-                else
-                    cell.VerticalAlignment = VerticalAlignment.Center;
-
-                if (style.Border != null)
-                {
-                    ApplyBorderStyle(cell, style.Border);
-                }
-            }
-        }
-
-        private void ApplyBorderStyle(Cell cell, UniverBorder border)
-        {
-            cell.Borders.Visible = true;
-
-            if (border.Top != null)
-                SetBorderSide(cell.Borders.Top, border.Top);
-
-            if (border.Bottom != null)
-                SetBorderSide(cell.Borders.Bottom, border.Bottom);
-
-            if (border.Left != null)
-                SetBorderSide(cell.Borders.Left, border.Left);
-
-            if (border.Right != null)
-                SetBorderSide(cell.Borders.Right, border.Right);
-        }
-
-        private void SetBorderSide(Border border, UniverBorderSide side)
-        {
-            if (side.StyleName == "none")
-            {
-                border.Visible = false;
-                return;
+                return false;
             }
 
-            border.Visible = true;
-            border.Style = side.StyleName switch
+            if (repeatMergeOnly && mergePlan.MergeDown > 0)
             {
-                "dashed" => BorderStyle.DashSmallGap,
-                "dotted" => BorderStyle.Dot,
-                "dashDot" => BorderStyle.DashDot,
-                "dashDotDot" => BorderStyle.DashDotDot,
-                "double" => BorderStyle.Single,
-                _ => BorderStyle.Single
-            };
+                return false;
+            }
 
-            border.Width = Unit.FromPoint(side.WidthValue);
-            border.Color = PdfConvertUtil.HexToMigraColor(side.Color.Rgb);
+            if (mergePlan.IsCoveredCell)
+            {
+                return true;
+            }
+
+            cell.MergeRight = mergePlan.MergeRight;
+            cell.MergeDown = mergePlan.MergeDown;
+            return false;
         }
 
         private string GetCellValue(UniverCell cell, JsonObject data, int[] indexes)
@@ -324,6 +215,28 @@ namespace EIMSNext.Print.Pdf
             if (cell.PrintMeta == null) return cell.Value?.ToString() ?? string.Empty;
 
             return data.GetJsonValue(cell.PrintMeta.GetValuePath(indexes));
+        }
+
+        private void AddCellParagraph(Cell cell, UniverCell univerCell, string cellValue, bool keepEmptyParagraph)
+        {
+            if (string.IsNullOrEmpty(cellValue) && !keepEmptyParagraph)
+            {
+                return;
+            }
+
+            var paragraph = cell.AddParagraph(cellValue ?? string.Empty);
+            _styleResolver.ApplyParagraphPadding(paragraph, univerCell);
+        }
+
+        private void MarkDetailHeaderBoundary()
+        {
+            if (_lastGeneratedNormalRow == null || _lastRenderedRowWasRepeat)
+            {
+                return;
+            }
+
+            _lastGeneratedNormalRow.HeadingFormat = true;
+            _lastGeneratedNormalRow.KeepWith = Math.Max(_lastGeneratedNormalRow.KeepWith, 1);
         }
     }
 }
