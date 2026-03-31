@@ -11,7 +11,7 @@ using NLog.Extensions.Logging;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.ConfigCommonServices();
+builder.ConfigWebEnvironment();
 builder.Services.AddLogging(c => { c.AddNLog("nlog.config"); });
 
 // Add services to the container.

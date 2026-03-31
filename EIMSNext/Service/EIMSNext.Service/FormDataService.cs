@@ -43,6 +43,7 @@ namespace EIMSNext.Service
                 //TODO:此处需要循环
                 var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
             }
+
             var dataLog = new DataUpdateLog();
             //TODO: 保存变更日志
             switch (action)
