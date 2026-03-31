@@ -1,9 +1,9 @@
-﻿using HKH.Mef2.Integration;
+using HKH.Mef2.Integration;
 
 using EIMSNext.Cache;
-using EIMSNext.Core.Entity;
-using EIMSNext.Core.Repository;
-using EIMSNext.Core.Service;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Services;
 
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;

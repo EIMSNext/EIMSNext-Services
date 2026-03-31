@@ -1,4 +1,4 @@
-﻿using EIMSNext.Entity;
+using EIMSNext.Service.Entities;
 
 namespace EIMSNext.CloudEvent
 {

@@ -1,11 +1,11 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
-using EIMSNext.Entity;
+using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Component
 {

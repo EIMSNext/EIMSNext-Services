@@ -1,12 +1,12 @@
-﻿using System.Net.Mime;
+using System.Net.Mime;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.Http;
 using CloudNative.CloudEvents.SystemTextJson;
 using EIMSNext.Common;
-using EIMSNext.Core.Repository;
-using EIMSNext.Entity;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Service.Entities;
 using Microsoft.Extensions.Logging;
 
 namespace EIMSNext.CloudEvent

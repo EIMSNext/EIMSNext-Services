@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -10,13 +10,13 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
-		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entity\EIMSNext.Auth.Entity.csproj" />
+		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
 		<ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
-		<ProjectReference Include="..\EIMSNext.Entity\EIMSNext.Entity.csproj" />
-		<ProjectReference Include="..\EIMSNext.Service.Interface\EIMSNext.Service.Interface.csproj" />
+		<ProjectReference Include="..\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+		<ProjectReference Include="..\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
 	</ItemGroup>
 
 </Project>

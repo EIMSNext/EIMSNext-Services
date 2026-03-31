@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -17,10 +17,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entity\EIMSNext.Auth.Entity.csproj" />
+		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
-		<ProjectReference Include="..\..\Service\EIMSNext.ApiService.Interface\EIMSNext.ApiService.Interface.csproj" />
-		<ProjectReference Include="..\..\Service\EIMSNext.Entity\EIMSNext.Entity.csproj" />
+		<ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
+		<ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
 	</ItemGroup>
 
 </Project>

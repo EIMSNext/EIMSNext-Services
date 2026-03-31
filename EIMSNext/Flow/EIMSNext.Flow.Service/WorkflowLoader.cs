@@ -1,10 +1,10 @@
-﻿using System.Dynamic;
+using System.Dynamic;
 using System.Linq.Expressions;
 using System.Reflection;
-using EIMSNext.Entity;
-using EIMSNext.Flow.Core.Interface;
-using EIMSNext.Flow.Core.Node;
-using EIMSNext.Service.Interface;
+using EIMSNext.Service.Entities;
+using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Flow.Core.Nodes;
+using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
@@ -267,7 +267,7 @@ namespace EIMSNext.Flow.Service
             if (result != null)
                 return result;
 
-            result = Type.GetType($"EIMSNext.Flow.Core.Node.{name}, EIMSNext.Flow.Core", false, true);
+            result = Type.GetType($"EIMSNext.Flow.Core.Nodes.{name}, EIMSNext.Flow.Core", false, true);
 
             if (result != null)
                 return result;

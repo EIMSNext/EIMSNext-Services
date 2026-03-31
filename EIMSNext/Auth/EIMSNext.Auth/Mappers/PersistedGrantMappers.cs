@@ -13,17 +13,17 @@ namespace EIMSNext.Auth.Mappers
 
         internal static IMapper Mapper { get; }
 
-        public static PersistedGrant ToModel(this Entity.PersistedGrant token)
+        public static PersistedGrant ToModel(this Entities.PersistedGrant token)
         {
             return Mapper.Map<PersistedGrant>(token);
         }
 
-        public static Entity.PersistedGrant ToEntity(this PersistedGrant token)
+        public static Entities.PersistedGrant ToEntity(this PersistedGrant token)
         {
-            return Mapper.Map<Entity.PersistedGrant>(token);
+            return Mapper.Map<Entities.PersistedGrant>(token);
         }
 
-        public static void UpdateEntity(this PersistedGrant token, Entity.PersistedGrant target)
+        public static void UpdateEntity(this PersistedGrant token, Entities.PersistedGrant target)
         {
             Mapper.Map(token, target);
         }

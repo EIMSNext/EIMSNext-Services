@@ -1,6 +1,6 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using System.Text.Json.Nodes;
-using EIMSNext.Print.Common;
+using EIMSNext.Print.Abstractions;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.Rendering;
 

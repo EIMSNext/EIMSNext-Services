@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 using HKH.Mef2.Integration;
 
-using EIMSNext.Entity;
+using EIMSNext.Service.Entities;
 using EIMSNext.Scripting;
 
 namespace EIMSNext.Component

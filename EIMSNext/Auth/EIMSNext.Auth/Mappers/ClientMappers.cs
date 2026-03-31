@@ -21,7 +21,7 @@ namespace EIMSNext.Auth.Mappers
         /// </summary>
         /// <param name="entity">The entity.</param>
         /// <returns></returns>
-        public static Models.Client ToModel(this Entity.Client entity)
+        public static Models.Client ToModel(this Entities.Client entity)
         {
             return Mapper.Map<Models.Client>(entity);
         }
@@ -31,9 +31,9 @@ namespace EIMSNext.Auth.Mappers
         /// </summary>
         /// <param name="model">The model.</param>
         /// <returns></returns>
-        public static Entity.Client ToEntity(this Models.Client model)
+        public static Entities.Client ToEntity(this Models.Client model)
         {
-            return Mapper.Map<Entity.Client>(model);
+            return Mapper.Map<Entities.Client>(model);
         }
     }
 }

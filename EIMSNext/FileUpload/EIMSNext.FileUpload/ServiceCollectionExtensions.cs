@@ -1,5 +1,5 @@
-﻿using EIMSNext.Service;
-using EIMSNext.Service.Interface;
+using EIMSNext.Service;
+using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.FileUpload

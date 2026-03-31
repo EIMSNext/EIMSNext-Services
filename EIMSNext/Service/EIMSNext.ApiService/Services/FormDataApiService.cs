@@ -1,0 +1,38 @@
+using EIMSNext.ApiClient.Flow;
+using EIMSNext.Core.Entities;
+using EIMSNext.Service.Entities;
+using EIMSNext.Service.Contracts;
+using HKH.Common;
+using HKH.Mef2.Integration;
+
+namespace EIMSNext.ApiService
+{
+    public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
+    {
+        private FlowApiClient _flowClient;
+        private IFormDefService _formDefService;
+        private IWfDefinitionService _wfDefinitionService;
+        public FormDataApiService(IResolver resolver) : base(resolver)
+        {
+            _flowClient = resolver.Resolve<FlowApiClient>();
+            _formDefService = resolver.Resolve<IFormDefService>();
+            _wfDefinitionService = resolver.Resolve<IWfDefinitionService>();
+        }
+
+        public override Task AddAsync(FormData entity)
+        {
+            throw new UnLogException("Please use AddAsync(FormData,DataAction) instead");
+        }
+        public Task AddAsync(FormData entity, DataAction action)
+        {
+            ServiceContext.Action = action;
+            return base.AddAsync(entity);
+        }
+
+        public Task ReplaceAsync(FormData entity, DataAction action)
+        {
+            ServiceContext.Action = action;
+            return base.ReplaceAsync(entity);
+        }
+    }
+}

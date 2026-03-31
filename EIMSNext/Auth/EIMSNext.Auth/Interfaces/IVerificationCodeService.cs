@@ -1,4 +1,4 @@
-﻿using EIMSNext.Auth.Entity;
+using EIMSNext.Auth.Entities;
 
 namespace EIMSNext.Auth.Interfaces
 {
