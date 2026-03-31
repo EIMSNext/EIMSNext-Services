@@ -3,12 +3,14 @@ namespace EIMSNext.Print.Pdf
     internal sealed class PdfTemporaryFileSession : IDisposable
     {
         private readonly string _rootDirectory;
+        private readonly string _sessionDirectory;
         private readonly List<string> _filePaths = new();
         private bool _disposed;
 
         public PdfTemporaryFileSession(string rootDirectory)
         {
             _rootDirectory = rootDirectory;
+            _sessionDirectory = Path.Combine(_rootDirectory, Guid.NewGuid().ToString("N"));
         }
 
         public IReadOnlyList<string> FilePaths => _filePaths;
@@ -21,8 +23,8 @@ namespace EIMSNext.Print.Pdf
             }
 
             var sanitizedExtension = string.IsNullOrWhiteSpace(extension) ? "bin" : extension.Trim().TrimStart('.');
-            Directory.CreateDirectory(_rootDirectory);
-            var filePath = Path.Combine(_rootDirectory, $"eimsnext-print-{Guid.NewGuid():N}.{sanitizedExtension}");
+            Directory.CreateDirectory(_sessionDirectory);
+            var filePath = Path.Combine(_sessionDirectory, $"eimsnext-print-{Guid.NewGuid():N}.{sanitizedExtension}");
             File.WriteAllBytes(filePath, content);
             _filePaths.Add(filePath);
             return filePath;
@@ -46,7 +48,6 @@ namespace EIMSNext.Print.Pdf
                 }
                 catch
                 {
-                    // Best-effort cleanup. Rendering should not fail because temp files cannot be deleted.
                 }
             }
 
@@ -54,6 +55,11 @@ namespace EIMSNext.Print.Pdf
 
             try
             {
+                if (Directory.Exists(_sessionDirectory))
+                {
+                    Directory.Delete(_sessionDirectory, true);
+                }
+
                 if (Directory.Exists(_rootDirectory) && !Directory.EnumerateFileSystemEntries(_rootDirectory).Any())
                 {
                     Directory.Delete(_rootDirectory, false);
@@ -61,7 +67,6 @@ namespace EIMSNext.Print.Pdf
             }
             catch
             {
-                // Best-effort cleanup. Rendering should not fail because temp directories cannot be deleted.
             }
 
             _disposed = true;

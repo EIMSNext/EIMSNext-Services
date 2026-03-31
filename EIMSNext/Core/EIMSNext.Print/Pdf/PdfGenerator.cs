@@ -1,10 +1,8 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using EIMSNext.Print.Common;
-using MigraDoc;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.Rendering;
-using PdfSharp.Fonts;
 
 namespace EIMSNext.Print.Pdf
 {
@@ -25,24 +23,13 @@ namespace EIMSNext.Print.Pdf
 
             var worksheet = workbook.Sheets!.Values.First();
 
-            #region 初始化文档
-
-            FontsCache.Initialize();
-            PdfFontResolverRuntime.Configure(renderOptions);
-            PredefinedFontsAndChars.ErrorFontName = renderOptions.DefaultFontFamily;
-            GlobalFontSettings.FontResolver = new FontResolver();
-            GlobalFontSettings.FallbackFontResolver = new FallbackFontResolver();
+            PdfDocumentInitializer.InitializeFonts(renderOptions);
 
             var document = new Document();
-            var normalStyle = document.Styles[StyleNames.Normal];
-            normalStyle!.Font.Name = renderOptions.DefaultFontFamily;
-            normalStyle.Font.Size = renderOptions.DefaultFontSize;
-            normalStyle.Font.Color = renderOptions.DefaultFontColor;
+            PdfDocumentInitializer.InitializeDocumentDefaults(document, renderOptions);
 
             var section = document.AddSection();
             ApplyPageSetup(section, worksheet, renderOptions);
-
-            #endregion
 
             using var temporaryFileSession = new PdfTemporaryFileSession(renderOptions.TemporaryDirectory);
             RenderTables(document, workbook, worksheet, datas, option, renderOptions, temporaryFileSession);
@@ -78,7 +65,6 @@ namespace EIMSNext.Print.Pdf
                 tableGenerator.Generate(worksheet, table, datas[i], document.LastSection.PageSetup);
                 imageRenderer.RenderImages(document.LastSection, workbook, worksheet);
 
-                // 如果不是最后一个数据，添加分页符
                 if (i < datas.Count - 1)
                 {
                     document.LastSection.AddPageBreak();

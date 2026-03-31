@@ -152,11 +152,6 @@ namespace EIMSNext.Print.Pdf
 
             if (sheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true)
             {
-                if (rowData.ActualHeight.HasValue)
-                {
-                    return PdfConvertUtil.PixelToCm(rowData.ActualHeight.Value, _options.DefaultRowHeightCm);
-                }
-
                 if (rowData.Height.HasValue)
                 {
                     return PdfConvertUtil.PixelToCm(rowData.Height.Value, _options.DefaultRowHeightCm);

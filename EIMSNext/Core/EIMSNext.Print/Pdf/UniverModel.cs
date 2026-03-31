@@ -6,10 +6,10 @@ namespace EIMSNext.Print.Pdf
     public enum UniverRangeType { Normal, Column, Row, All }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum UniverHorizontalAlignment { Left, Center, Right }
+    public enum UniverHorizontalAlignment { Left = 1, Center = 2, Right = 3 }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum UniverVerticalAlignment { Top, Middle, Bottom }
+    public enum UniverVerticalAlignment { Top = 1, Middle = 2, Bottom = 3 }
 
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public enum UniverTextWrap { Overflow, Wrap, Clip }

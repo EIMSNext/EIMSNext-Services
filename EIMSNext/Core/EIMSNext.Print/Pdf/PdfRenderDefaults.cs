@@ -38,11 +38,11 @@ namespace EIMSNext.Print.Pdf
                 ["simsun-extb"] = "SimSun",
                 ["nsimsun"] = "NSimSun",
                 ["新宋体"] = "NSimSun",
-                ["simfang"] = "simfang",
-                ["仿宋"] = "simfang",
-                ["fangsong"] = "simfang",
-                ["microsoftyahei"] = "MicrosoftYaHei",
-                ["微软雅黑"] = "MicrosoftYaHei",
+                ["simfang"] = "FangSong",
+                ["仿宋"] = "FangSong",
+                ["fangsong"] = "FangSong",
+                ["microsoftyahei"] = "MicrosoftYaHeiUI",
+                ["微软雅黑"] = "MicrosoftYaHeiUI",
                 ["microsoftyaheiui"] = "MicrosoftYaHeiUI",
                 ["微软雅黑ui"] = "MicrosoftYaHeiUI",
                 ["timesnewroman"] = "Times New Roman",
@@ -56,7 +56,7 @@ namespace EIMSNext.Print.Pdf
         [
             "SimSun",
             "NSimSun",
-            "MicrosoftYaHei",
+            "MicrosoftYaHeiUI",
             "Arial",
             "Times New Roman"
         ];

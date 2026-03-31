@@ -16,9 +16,6 @@ namespace EIMSNext.Print.Pdf
 
         public void ApplyCellStyle(Cell cell, UniverCell? univerCell)
         {
-            var format = cell.Format;
-            ApplyDefaults(cell);
-
             if (univerCell == null || string.IsNullOrEmpty(univerCell.Style))
             {
                 return;
@@ -29,6 +26,7 @@ namespace EIMSNext.Print.Pdf
                 return;
             }
 
+            var format = cell.Format;
             var fontFamily = PdfFontResolverRuntime.ResolveFontFamily(style.FontFamily, style.Bold == 1, style.Italic == 1);
             format.Font.Name = fontFamily;
             format.Font.Size = style.FontSize ?? _options.DefaultFontSize;
@@ -41,8 +39,19 @@ namespace EIMSNext.Print.Pdf
                 cell.Shading.Color = PdfConvertUtil.HexToMigraColor(style.Background.Rgb, _options.DefaultFontColor);
             }
 
-            format.Alignment = PdfConvertUtil.HAlignToMigra(style.HorizontalAlign, _options.DefaultHorizontalAlignment);
-            cell.VerticalAlignment = PdfConvertUtil.VAlignToMigra(style.VerticalAlign, _options.DefaultVerticalAlignment);
+            if (style.HorizontalAlign.HasValue)
+            {
+                format.Alignment = PdfConvertUtil.HAlignToMigra(style.HorizontalAlign.ToString(), ParagraphAlignment.Left);
+            }
+
+            if (style.VerticalAlign.HasValue)
+            {
+                cell.VerticalAlignment = PdfConvertUtil.VAlignToMigra(style.VerticalAlign.ToString(), VerticalAlignment.Center);
+            }
+            else
+            {
+                cell.VerticalAlignment = VerticalAlignment.Center;
+            }
 
             if (style.Underline?.Style.GetValueOrDefault() > 0)
             {
@@ -53,43 +62,32 @@ namespace EIMSNext.Print.Pdf
                 }
             }
 
-            ApplyPadding(cell, style.Padding);
             ApplyBorders(cell, style.Border);
-            ApplyWrap(cell, style.TextWrap);
+        }
+
+        public void ApplyMergedOuterBorders(Cell cell, UniverCell? rightEdgeCell, UniverCell? bottomEdgeCell, UniverCell? bottomRightEdgeCell)
+        {
+            cell.Borders.Visible = true;
+            ApplyMergedBorderSide(cell.Borders.Right, rightEdgeCell, style => style.Border?.Right);
+            ApplyMergedBorderSide(cell.Borders.Bottom, bottomEdgeCell, style => style.Border?.Bottom);
+
+            if ((rightEdgeCell == null || GetStyle(rightEdgeCell)?.Border?.Right == null) && bottomRightEdgeCell != null)
+            {
+                ApplyMergedBorderSide(cell.Borders.Right, bottomRightEdgeCell, style => style.Border?.Right);
+            }
+
+            if ((bottomEdgeCell == null || GetStyle(bottomEdgeCell)?.Border?.Bottom == null) && bottomRightEdgeCell != null)
+            {
+                ApplyMergedBorderSide(cell.Borders.Bottom, bottomRightEdgeCell, style => style.Border?.Bottom);
+            }
         }
 
         public void ApplyParagraphPadding(Paragraph paragraph, UniverCell? univerCell)
         {
-            var padding = ResolvePadding(univerCell);
-            paragraph.Format.LeftIndent = Unit.FromPoint(padding.Left);
-            paragraph.Format.RightIndent = Unit.FromPoint(padding.Right);
-            paragraph.Format.SpaceBefore = Unit.FromPoint(padding.Top);
-            paragraph.Format.SpaceAfter = Unit.FromPoint(padding.Bottom);
-        }
-
-        private void ApplyDefaults(Cell cell)
-        {
-            var format = cell.Format;
-            format.Font.Name = _options.DefaultFontFamily;
-            format.Font.Size = _options.DefaultFontSize;
-            format.Font.Color = _options.DefaultFontColor;
-            format.Font.Underline = _options.DefaultUnderline;
-            format.Alignment = _options.DefaultHorizontalAlignment;
-            cell.VerticalAlignment = _options.DefaultVerticalAlignment;
-
-            format.LeftIndent = Unit.FromCentimeter(_options.DefaultCellPaddingCm);
-            format.RightIndent = Unit.FromCentimeter(_options.DefaultCellPaddingCm);
-            format.SpaceBefore = Unit.FromCentimeter(_options.DefaultCellPaddingCm);
-            format.SpaceAfter = Unit.FromCentimeter(_options.DefaultCellPaddingCm);
-        }
-
-        private void ApplyPadding(Cell cell, UniverPadding? padding)
-        {
-            var resolvedPadding = padding ?? ResolvePadding(null);
-            cell.Format.LeftIndent = Unit.FromPoint(resolvedPadding.Left);
-            cell.Format.RightIndent = Unit.FromPoint(resolvedPadding.Right);
-            cell.Format.SpaceBefore = Unit.FromPoint(resolvedPadding.Top);
-            cell.Format.SpaceAfter = Unit.FromPoint(resolvedPadding.Bottom);
+            paragraph.Format.LeftIndent = Unit.FromCentimeter(0.06);
+            paragraph.Format.RightIndent = Unit.FromCentimeter(0.06);
+            paragraph.Format.SpaceBefore = Unit.FromCentimeter(0.01);
+            paragraph.Format.SpaceAfter = Unit.FromCentimeter(0.01);
         }
 
         private void ApplyBorders(Cell cell, UniverBorder? border)
@@ -134,32 +132,27 @@ namespace EIMSNext.Print.Pdf
             border.Color = PdfConvertUtil.HexToMigraColor(side.Color?.Rgb, _options.DefaultBorderColor);
         }
 
-        private static void ApplyWrap(Cell cell, UniverTextWrap? textWrap)
+        private void ApplyMergedBorderSide(Border border, UniverCell? univerCell, Func<UniverStyle, UniverBorderSide?> selector)
         {
-            if (textWrap == UniverTextWrap.Wrap)
+            var style = GetStyle(univerCell);
+            var side = style == null ? null : selector(style);
+            if (side == null)
             {
-                cell.Format.KeepTogether = false;
+                return;
             }
+
+            ApplyBorderSide(border, side);
+            border.Visible = true;
         }
 
-        private UniverPadding ResolvePadding(UniverCell? univerCell)
+        private UniverStyle? GetStyle(UniverCell? univerCell)
         {
-            if (univerCell != null &&
-                !string.IsNullOrEmpty(univerCell.Style) &&
-                _workbook.Styles?.TryGetValue(univerCell.Style, out var style) == true &&
-                style?.Padding != null)
+            if (univerCell == null || string.IsNullOrEmpty(univerCell.Style))
             {
-                return style.Padding;
+                return null;
             }
 
-            var defaultPaddingPt = Unit.FromCentimeter(_options.DefaultCellPaddingCm).Point;
-            return new UniverPadding
-            {
-                Top = defaultPaddingPt,
-                Bottom = defaultPaddingPt,
-                Left = defaultPaddingPt,
-                Right = defaultPaddingPt
-            };
+            return _workbook.Styles?.TryGetValue(univerCell.Style, out var style) == true ? style : null;
         }
     }
 }

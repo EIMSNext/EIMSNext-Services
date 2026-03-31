@@ -61,7 +61,6 @@ namespace EIMSNext.Print.Pdf
                 }
                 catch
                 {
-                    // Ignore invalid image data and keep rendering the document.
                 }
             }
         }

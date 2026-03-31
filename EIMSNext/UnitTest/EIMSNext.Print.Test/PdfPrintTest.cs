@@ -28,6 +28,9 @@ namespace EIMSNext.Print.Test
 
             Assert.IsNotNull(bytes);
             Assert.IsTrue(bytes.Length > 0);
+
+            var fileName = $"D:/Temp/{Guid.NewGuid()}.pdf";
+            File.WriteAllBytes(fileName, bytes);
         }
     }
 }

@@ -35,15 +35,64 @@ namespace EIMSNext.Print.Pdf
 
         public static string ResolveFontFamily(string? familyName, bool isBold, bool isItalic)
         {
+            // YaHei italic metrics are unstable in the current MigraDoc/PDFsharp pipeline,
+            // so all YaHei requests are constrained to the UI family and degrade within it.
+            if (IsYaHeiFamily(familyName))
+            {
+                var yaHeiFamily = ResolvePreferredFamily(["MicrosoftYaHeiUI"], isBold, isItalic);
+                if (!string.IsNullOrEmpty(yaHeiFamily))
+                {
+                    return yaHeiFamily;
+                }
+            }
+
+            if (IsFangSongFamily(familyName))
+            {
+                var fangSongFamily = ResolvePreferredFamily(["FangSong"], isBold, isItalic);
+                if (!string.IsNullOrEmpty(fangSongFamily))
+                {
+                    return fangSongFamily;
+                }
+            }
+
             foreach (var candidate in GetCandidates(familyName))
             {
-                if (FontsCache.HasFont(candidate, isBold, isItalic) || FontsCache.HasFamily(candidate))
+                if (FontsCache.HasFont(candidate, isBold, isItalic))
                 {
                     return FontsCache.GetCanonicalFamilyName(candidate) ?? candidate;
                 }
             }
 
+            foreach (var candidate in GetCandidates(familyName))
+            {
+                if (FontsCache.TryGetBestFont(candidate, isBold, isItalic, out var bestFont))
+                {
+                    return bestFont.FamilyName;
+                }
+            }
+
             return DefaultFontFamily;
+        }
+
+        private static string? ResolvePreferredFamily(IEnumerable<string> families, bool isBold, bool isItalic)
+        {
+            foreach (var family in families)
+            {
+                if (FontsCache.HasFont(family, isBold, isItalic))
+                {
+                    return FontsCache.GetCanonicalFamilyName(family) ?? family;
+                }
+            }
+
+            foreach (var family in families)
+            {
+                if (FontsCache.TryGetBestFont(family, isBold, isItalic, out var bestFont))
+                {
+                    return bestFont.FamilyName;
+                }
+            }
+
+            return null;
         }
 
         private static IEnumerable<string> GetCandidates(string? familyName)
@@ -68,6 +117,11 @@ namespace EIMSNext.Print.Pdf
                 AddCandidate(alias);
             }
 
+            if (normalized.Contains("microsoftyahei") || normalized.Contains("微软雅黑"))
+            {
+                AddCandidate("MicrosoftYaHeiUI");
+            }
+
             AddCandidate(DefaultFontFamily);
 
             foreach (var fallback in _options.FontFallbackChain)
@@ -76,6 +130,18 @@ namespace EIMSNext.Print.Pdf
             }
 
             return candidates;
+        }
+
+        private static bool IsYaHeiFamily(string? familyName)
+        {
+            var normalized = FontsCache.RemoveWhiteSpace(familyName ?? string.Empty).ToLowerInvariant();
+            return normalized.Contains("microsoftyahei") || normalized.Contains("微软雅黑");
+        }
+
+        private static bool IsFangSongFamily(string? familyName)
+        {
+            var normalized = FontsCache.RemoveWhiteSpace(familyName ?? string.Empty).ToLowerInvariant();
+            return normalized.Contains("fangsong") || normalized.Contains("simfang") || normalized.Contains("仿宋");
         }
     }
 
@@ -203,6 +269,27 @@ namespace EIMSNext.Print.Pdf
             return fallback;
         }
 
+        public static bool TryGetBestFont(string familyName, bool isBold, bool isItalic, out FontCacheItem bestFont)
+        {
+            var normalizedFamilyName = RemoveWhiteSpace(familyName);
+            var familyFonts = _fontCache.Values
+                .Where(x => string.Equals(RemoveWhiteSpace(x.FamilyName), normalizedFamilyName, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            if (familyFonts.Count == 0)
+            {
+                bestFont = null!;
+                return false;
+            }
+
+            bestFont = familyFonts
+                .OrderByDescending(x => GetStyleMatchScore(x, isBold, isItalic))
+                .ThenByDescending(x => x.IsBold == isBold)
+                .ThenByDescending(x => x.IsItalic == isItalic)
+                .First();
+            return true;
+        }
+
         public static bool HasFont(string familyName, bool isBold, bool isItalic)
         {
             return _fontCache.ContainsKey(BuildKey(familyName, isBold, isItalic));
@@ -225,6 +312,32 @@ namespace EIMSNext.Print.Pdf
         private static string BuildKey(string familyName, bool isBold, bool isItalic)
         {
             return $"{RemoveWhiteSpace(familyName)}|{isBold}|{isItalic}".ToLowerInvariant();
+        }
+
+        private static int GetStyleMatchScore(FontCacheItem font, bool isBold, bool isItalic)
+        {
+            var score = 0;
+            if (font.IsBold == isBold)
+            {
+                score += 2;
+            }
+
+            if (font.IsItalic == isItalic)
+            {
+                score += 2;
+            }
+
+            if (isBold && font.IsBold)
+            {
+                score += 1;
+            }
+
+            if (isItalic && font.IsItalic)
+            {
+                score += 1;
+            }
+
+            return score;
         }
 
         public static string RemoveWhiteSpace(string text)
