@@ -1,10 +1,10 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-using EIMSNext.Async.Core.Interface;
+using EIMSNext.Async.Core.Interfaces;
 
 using Microsoft.Extensions.Logging;
 

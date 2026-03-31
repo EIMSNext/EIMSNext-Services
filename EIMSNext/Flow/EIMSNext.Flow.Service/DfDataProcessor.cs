@@ -1,9 +1,9 @@
-﻿using EIMSNext.Core;
-using EIMSNext.Core.Repository;
-using EIMSNext.Entity;
+using EIMSNext.Core;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core;
-using EIMSNext.Flow.Core.Interface;
-using EIMSNext.Service.Interface;
+using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 using WorkflowCore.Interface;

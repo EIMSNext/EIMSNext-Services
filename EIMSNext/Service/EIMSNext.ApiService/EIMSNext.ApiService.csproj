@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -14,9 +14,9 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
-		<ProjectReference Include="..\EIMSNext.ApiService.Interface\EIMSNext.ApiService.Interface.csproj" />
+		<ProjectReference Include="..\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
 		<ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
-		<ProjectReference Include="..\EIMSNext.Service.Interface\EIMSNext.Service.Interface.csproj" />
+		<ProjectReference Include="..\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
 	</ItemGroup>
 
 </Project>

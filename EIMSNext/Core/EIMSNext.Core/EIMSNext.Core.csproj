@@ -11,10 +11,11 @@
 		<PackageReference Include="HKH.Common" Version="5.2.0" />
 		<PackageReference Include="HKH.Mef2.Integration.Abstractions" Version="2.0.0" />
 		<PackageReference Include="Microsoft.Extensions.Options" Version="9.0.9" />
-		<PackageReference Include="MongoDB.Driver" Version="3.5.0" />
+		<PackageReference Include="MongoDB.Driver" Version="3.7.1" />
 	</ItemGroup>
 	<ItemGroup>
 		<ProjectReference Include="..\EIMSNext.Cache\EIMSNext.Cache.csproj" />
 		<ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
+		<ProjectReference Include="..\EIMSNext.Json\EIMSNext.Json.csproj" />
 	</ItemGroup>
 </Project>

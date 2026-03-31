@@ -1,5 +1,5 @@
-﻿using AutoMapper;
-using EIMSNext.Auth.Entity;
+using AutoMapper;
+using EIMSNext.Auth.Entities;
 using Models = IdentityServer4.Models;
 
 namespace EIMSNext.Auth.Mappers

@@ -1,5 +1,5 @@
-﻿
-using EIMSNext.ApiClient.Abstraction;
+
+using EIMSNext.ApiClient.Contracts;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 

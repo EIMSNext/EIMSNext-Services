@@ -4,12 +4,10 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 
 using EIMSNext.Cache;
-using EIMSNext.Common.Extension;
-using EIMSNext.Common.Serialization;
 using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
+using EIMSNext.Json.Serialization;
 using EIMSNext.MongoDb;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -19,9 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-
 using StackExchange.Redis;
-
 using ISessionStore = EIMSNext.Cache.ISessionStore;
 
 namespace EIMSNext.ApiCore
