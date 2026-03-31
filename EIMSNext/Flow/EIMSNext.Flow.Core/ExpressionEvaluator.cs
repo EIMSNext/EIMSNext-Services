@@ -1,8 +1,8 @@
 using System.Dynamic;
-using EIMSNext.Core.Repository;
-using EIMSNext.Entity;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core;
-using EIMSNext.Flow.Core.Interface;
+using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;
 using WorkflowCore.Interface;
 

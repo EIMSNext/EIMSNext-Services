@@ -18,12 +18,12 @@ namespace EIMSNext.Auth.Mappers
         public PersistedGrantMapperProfile()
         {
             // entity to model
-            CreateMap<Entity.PersistedGrant, Models.PersistedGrant>(MemberList.Destination)
+            CreateMap<Entities.PersistedGrant, Models.PersistedGrant>(MemberList.Destination)
                 .ForMember(x => x.Key, opt => opt.MapFrom(src => src.Id))
                 .ForMember(x => x.SubjectId, opt => opt.MapFrom(src => src.UserId));
 
             // model to entity
-            CreateMap<Models.PersistedGrant, Entity.PersistedGrant>(MemberList.Source)
+            CreateMap<Models.PersistedGrant, Entities.PersistedGrant>(MemberList.Source)
                 .ForMember(x => x.Id, opt => opt.MapFrom(src => src.Key))
                 .ForMember(x => x.UserId, opt => opt.MapFrom(src => src.SubjectId));
         }

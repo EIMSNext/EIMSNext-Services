@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -11,5 +11,11 @@
 	<ItemGroup>
 		<PackageReference Include="CloudNative.CloudEvents" Version="2.8.0" />
 		<PackageReference Include="CloudNative.CloudEvents.SystemTextJson" Version="2.8.0" />
+		<PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.9" />
+	</ItemGroup>
+
+	<ItemGroup>
+	  <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+	  <ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
 	</ItemGroup>
 </Project>

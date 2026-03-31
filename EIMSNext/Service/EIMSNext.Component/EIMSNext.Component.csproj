@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -10,7 +10,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
-		<ProjectReference Include="..\EIMSNext.Entity\EIMSNext.Entity.csproj" />
+		<ProjectReference Include="..\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
 	</ItemGroup>
 
 </Project>

@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net8.0</TargetFramework>
@@ -13,6 +13,6 @@
 		<PackageReference Include="RestSharp" Version="112.1.0" />
 	</ItemGroup>
 	<ItemGroup>
-		<ProjectReference Include="..\EIMSNext.Plugin.Interface\EIMSNext.Plugin.Interface.csproj" />
+		<ProjectReference Include="..\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
 	</ItemGroup>
 </Project>

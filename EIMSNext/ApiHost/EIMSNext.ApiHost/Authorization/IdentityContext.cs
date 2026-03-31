@@ -1,9 +1,9 @@
-﻿using EIMSNext.ApiCore;
+using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
-using EIMSNext.Auth.Entity;
+using EIMSNext.Auth.Entities;
 using EIMSNext.Core;
-using EIMSNext.Core.Entity;
-using EIMSNext.Entity;
+using EIMSNext.Core.Entities;
+using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -45,7 +45,7 @@ namespace EIMSNext.ApiHost.Authorization
                 var clientId = client_idClaim?.Value ?? string.Empty;
                 if (!string.IsNullOrEmpty(clientId))
                 {
-                    var client = resolver.GetService<Auth.Entity.Client>().Get(clientId);
+                    var client = resolver.GetService<EIMSNext.Auth.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
                         CurrentCorpId = client.CorpId;

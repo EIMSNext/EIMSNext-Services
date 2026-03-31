@@ -1,6 +1,6 @@
-﻿using System.Composition;
+using System.Composition;
 
-using EIMSNext.Plugin.Interface;
+using EIMSNext.Plugin.Contracts;
 
 using HKH.Mef2.Integration;
 

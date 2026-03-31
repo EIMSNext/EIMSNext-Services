@@ -2,46 +2,54 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+
 using EIMSNext.Cache;
-using EIMSNext.Common.Extension;
-using EIMSNext.Common.Serialization;
 using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
+using EIMSNext.Json.Serialization;
 using EIMSNext.MongoDb;
-
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
-
 using StackExchange.Redis;
-
 using ISessionStore = EIMSNext.Cache.ISessionStore;
 
 namespace EIMSNext.ApiCore
 {
     public static class ServiceCollectionExtensions
     {
-        public static void ConfigCommonServices(this IHostApplicationBuilder builder)
+        public static void ConfigWebEnvironment(this IHostApplicationBuilder builder)
+        {
+            EIMSNext.Common.Constants.ContentRootPath = builder.Environment.ContentRootPath;
+
+            if (builder.Environment is IWebHostEnvironment)
+            {
+                EIMSNext.Common.Constants.WebRootPath = (builder.Environment as IWebHostEnvironment)!.WebRootPath;
+            }
+
+            builder.Services.AddBasicServices(builder.Configuration);
+            builder.Services.AddCustomCache(builder.Configuration);
+            builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
+            builder.Services.AddCustomAuthentication(builder.Configuration);
+        }
+               
+        public static void AddBasicServices(this IServiceCollection services,IConfiguration configuration)
         {
             MongoDatabase.RegisterConventions();
             MongoDatabase.RegisterSerializers();
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
-            EIMSNext.Common.Constants.ContentRootPath = builder.Environment.ContentRootPath;
-            if (builder.Environment is IWebHostEnvironment)
-            {
-                EIMSNext.Common.Constants.WebRootPath = (builder.Environment as IWebHostEnvironment)!.WebRootPath;
-            }
 
-            builder.Services.Configure<MongoDbConfiguration>(builder.Configuration.GetSection("MongoDb"));
+            services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
 
-            builder.Services.Configure<JsonOptions>(opt =>
+            services.Configure<JsonOptions>(opt =>
             {
                 opt.JsonSerializerOptions.Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping;
                 opt.JsonSerializerOptions.NumberHandling = JsonNumberHandling.AllowReadingFromString;
@@ -59,17 +67,10 @@ namespace EIMSNext.ApiCore
 
                 JsonSerializerExtension.SetOptions(opt.JsonSerializerOptions);
             });
-
-            //将Redis分布式缓存服务添加到服务中
-            builder.AddCustomCache();
-
-            builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
-            builder.AddCustomAuthentication();
         }
-
-        public static void AddCustomCache(this IHostApplicationBuilder builder)
+        public static void AddCustomCache(this IServiceCollection services, IConfiguration configuration)
         {
-            builder.Services.AddStackExchangeRedisCache(options =>
+            services.AddStackExchangeRedisCache(options =>
             {
                 //Redis实例名
                 options.InstanceName = "RedisDistributedCache";
@@ -78,27 +79,27 @@ namespace EIMSNext.ApiCore
                     // User
                     //Password = "xxxxxx",
                     //AllowAdmin = true,
-                    DefaultDatabase = (builder.Configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1),
+                    DefaultDatabase = (configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1),
                     AbortOnConnectFail = false,//当为true时，当没有可用的服务器时则不会创建一个连接
                 };
-                options.ConfigurationOptions.EndPoints.Add(builder.Configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
+                options.ConfigurationOptions.EndPoints.Add(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
             });
 
-            builder.Services.AddSingleton<ICacheClient, DistributedCacheClient>();
+            services.AddSingleton<ICacheClient, DistributedCacheClient>();
 
-            builder.Services.AddScoped<ISessionStore, SessionStore>();
+            services.AddScoped<ISessionStore, SessionStore>();
         }
 
-        public static void AddCustomAuthentication(this IHostApplicationBuilder builder)
+        public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            builder.Services.AddAuthentication(o =>
+            services.AddAuthentication(o =>
             {
                 o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
                 o.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
             }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme,
              opt =>
              {
-                 opt.Authority = builder.Configuration.GetSection("OAuth:Authority").Value;
+                 opt.Authority = configuration.GetSection("OAuth:Authority").Value;
                  opt.SaveToken = true;
                  opt.RequireHttpsMetadata = false;
 

@@ -1,14 +1,14 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.IO.Pipelines;
 using System.Text;
 
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
-using EIMSNext.ApiService.Extension;
+using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
-using EIMSNext.Core.Entity;
+using EIMSNext.Core.Entities;
 using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Authorization;
