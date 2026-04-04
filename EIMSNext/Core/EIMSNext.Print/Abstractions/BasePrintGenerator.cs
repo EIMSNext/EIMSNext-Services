@@ -14,18 +14,28 @@ namespace EIMSNext.Print.Abstractions
         protected ILogger Loggger = LogManager.GetCurrentClassLogger();
         protected bool IsPreview { get; set; } = false;
 
-        public byte[] Preview(PrintTemplate template, PrintOption option)
+        public PrintResult Preview(PrintTemplate template, PrintOption option)
         {
             IsPreview = true;
-            return Generate(template, option, new List<JsonObject> { });
+            var content = Generate(template, option, new List<JsonObject> { });
+            return new PrintResult { Content = content, FileName = GetFileName(null, option) };
         }
 
-        public byte[] Print(PrintTemplate template, PrintOption option, List<object> datas)
+        public PrintResult Print(PrintTemplate template, PrintOption option, IEnumerable<object> datas)
         {
-            return Generate(template, option, datas.ConvertToJsonObject());
+            var content = Generate(template, option, datas.ConvertToJsonObject());
+            return new PrintResult { Content = content, FileName = GetFileName(datas.FirstOrDefault(), option) };
         }
 
         protected abstract byte[] Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas);
+
+        protected virtual string GetFileName(object? data, PrintOption option)
+        {
+            var fileName = "print";
+
+            var time = DateTime.Now.ToString("yyyyMMddhhmmssfff");
+            return $"{fileName}_{time}";
+        }
 
     }
 }

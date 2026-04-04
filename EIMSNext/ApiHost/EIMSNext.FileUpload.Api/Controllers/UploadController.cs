@@ -71,6 +71,43 @@ namespace EIMSNext.FileUpload.Api.Controllers
             });
         }
 
+        /// <summary>
+        /// 上传附件
+        /// </summary>
+        /// <returns></returns>
+        [HttpPost, Route("UploadTemp")]
+        public async Task<IActionResult> UploadTemp()
+        {
+            var files = Request.Form.Files;
+            _logger.LogDebug($"收到{files.Count}个上传的文件");
+
+            var attachments = new List<UploadedFile>();
+            foreach (var file in files)
+            {
+                var fileExt = new FileInfo(file.FileName).Extension;
+                var saveName = GeneratFileName() + fileExt;
+                var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{saveName}";
+
+                var attachment = new UploadedFile() { FileName = file.FileName, SavePath = savePath, FileExt = fileExt, FileSize = Convert.ToInt64(Math.Floor(file.Length / 1000.0)) };
+
+                var saveFolder = Path.Combine(Common.Constants.WebRootPath, AppSetting.FileBasePath, "Temp", IdentityContext.CurrentCorpId);
+                if (!Directory.Exists(saveFolder)) Directory.CreateDirectory(saveFolder);
+
+                var saveToPath = Path.Combine(Common.Constants.WebRootPath, savePath);
+                _logger.LogDebug($"{saveToPath}");
+
+                using (var targetStream = System.IO.File.Create(saveToPath))
+                {
+                    await file.CopyToAsync(targetStream);
+                }
+            }
+
+            return Ok(new
+            {
+                value = attachments.Select(x => new { x.Id, x.FileName, x.SavePath, x.FileExt, x.FileSize })
+            });
+        }
+
         private string GeneratFileName()
         {
             var alphabet = "_0123456789abcdefghijklmnopqrstuvwxyz";
