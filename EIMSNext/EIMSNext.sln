@@ -1,7 +1,6 @@
-
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.13.35919.96
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
@@ -98,11 +97,14 @@ EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Async", "Async", "{F017BAF4-EB4F-4FDE-97E3-E01A2B4A3775}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Async.Core", "Async\EIMSNext.Async.Core\EIMSNext.Async.Core.csproj", "{47250652-8991-418B-94C5-7BFFDDD234EC}"
+EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Print", "Core\EIMSNext.Print\EIMSNext.Print.csproj", "{90823DB6-0538-4628-BB5C-0E2E64276AC4}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Print.Tests", "Tests\EIMSNext.Print.Tests\EIMSNext.Print.Tests.csproj", "{502F6E9D-54ED-42B2-9640-108E2DF9A4C7}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Json", "Core\EIMSNext.Json\EIMSNext.Json.csproj", "{822AA329-4D72-4E29-9AA0-E093B1C9CB6F}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Json.Tests", "Tests\EIMSNext.Json.Tests\EIMSNext.Json.Tests.csproj", "{3BD4512D-1B08-D74D-8601-22673437D770}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -274,6 +276,10 @@ Global
 		{822AA329-4D72-4E29-9AA0-E093B1C9CB6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{822AA329-4D72-4E29-9AA0-E093B1C9CB6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{822AA329-4D72-4E29-9AA0-E093B1C9CB6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3BD4512D-1B08-D74D-8601-22673437D770}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3BD4512D-1B08-D74D-8601-22673437D770}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3BD4512D-1B08-D74D-8601-22673437D770}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3BD4512D-1B08-D74D-8601-22673437D770}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -320,6 +326,7 @@ Global
 		{90823DB6-0538-4628-BB5C-0E2E64276AC4} = {76407934-BF39-42DF-9357-6B6BAD278049}
 		{502F6E9D-54ED-42B2-9640-108E2DF9A4C7} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 		{822AA329-4D72-4E29-9AA0-E093B1C9CB6F} = {76407934-BF39-42DF-9357-6B6BAD278049}
+		{3BD4512D-1B08-D74D-8601-22673437D770} = {02EA681E-C7D8-13C7-8484-4AC65E1B71E8}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3F6D4B86-C3E1-4B8A-BC00-5FE767E5D475}

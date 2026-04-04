@@ -22,6 +22,27 @@ namespace EIMSNext.Core.Tests
             Assert.IsNotNull(opt);
             Assert.IsNotNull(opt.Filter);
             Assert.IsNotNull(opt.Filter.Items);
-        }       
+        }
+
+        [TestMethod]
+        public void DeserializeDynamicFindOptions()
+        {
+            var jsonFilter = "{\"filter\":{\"rel\": \"And\",\"items\": [{\"field\": \"formId\",\"type\": \"none\",\"op\": \"Eq\",\"value\": \"68298220d23e843cb3001645\"}]},\"skip\":0,\"take\":20}";
+            var opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
+            Assert.IsNotNull(opt);
+            Assert.IsNotNull(opt.Filter);
+        }
+
+        [TestMethod]
+        public void CountDocuments()
+        {
+            var jsonFilter = "{\"filter\":{\"rel\": \"And\",\"items\": [{\"field\": \"formId\",\"type\": \"none\",\"op\": \"Eq\",\"value\": \"68298220d23e843cb3001645\"}]},\"skip\":0,\"take\":20}";
+            var opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
+
+            var resp = new FormDataRepository(_dbContext!);
+            var result = resp.Find(opt!).CountDocuments();
+
+            Assert.IsTrue(result > 0);
+        }
     }
 }
