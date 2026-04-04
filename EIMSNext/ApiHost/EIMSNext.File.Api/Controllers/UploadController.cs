@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 
 using NanoidDotNet;
 
-namespace EIMSNext.FileUpload.Api.Controllers
+namespace EIMSNext.File.Api.Controllers
 {
     [ApiVersion(1.0)]
     public class UploadController : MefControllerBase
@@ -100,11 +100,13 @@ namespace EIMSNext.FileUpload.Api.Controllers
                 {
                     await file.CopyToAsync(targetStream);
                 }
+
+                attachments.Add(attachment);
             }
 
             return Ok(new
             {
-                value = attachments.Select(x => new { x.Id, x.FileName, x.SavePath, x.FileExt, x.FileSize })
+                value = attachments.Select(x => new { x.FileName, x.SavePath, x.FileExt, x.FileSize })
             });
         }
 

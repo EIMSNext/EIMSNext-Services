@@ -55,6 +55,16 @@ namespace EIMSNext.ApiClient.Contracts
             return HandleResponse<T>(response);
         }
 
+        protected virtual async Task<RestResponse<T>> UploadFileAsync<T>(string url, byte[] content, string fileName, string? token = null, string fieldName = "files", string fileContentType = "application/octet-stream")
+        {
+            var request = new RestRequest(url, Method.Post);
+            BuilderRequest(request, null, token);
+            request.AddFile(fieldName, content, fileName, fileContentType);
+
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response);
+        }
+
         protected virtual void BuilderRequest(RestRequest request, object? data, string? token, WebContentType contentType = WebContentType.Json)
         {
             if (!string.IsNullOrEmpty(token))

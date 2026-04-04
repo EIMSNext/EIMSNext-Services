@@ -4,7 +4,7 @@ using EIMSNext.ApiCore;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Component;
 using EIMSNext.FileUpload;
-using EIMSNext.FileUpload.Api.Extensions;
+using EIMSNext.File.Api.Extensions;
 
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;

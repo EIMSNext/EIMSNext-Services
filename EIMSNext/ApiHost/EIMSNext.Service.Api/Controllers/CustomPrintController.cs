@@ -1,4 +1,5 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
+using EIMSNext.ApiClient.File;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
@@ -19,7 +20,7 @@ namespace EIMSNext.Service.Api.Controllers
     public class CustomPrintController(IResolver resolver) : MefControllerBase(resolver)
     {
         [HttpPost]
-        public IActionResult Print(PrintRequest request)
+        public async Task<IActionResult> Print(PrintRequest request)
         {
             if (string.IsNullOrEmpty(request.TemplateId) || request.DataIds == null || request.DataIds.Count == 0)
                 return BadRequest("数据或模板为空");
@@ -41,10 +42,12 @@ namespace EIMSNext.Service.Api.Controllers
 
             var printResult = new Print.CustomPrintService().Print(new PrintTemplate { Content = template.Content, PrintType = (PrintType)(int)template.PrintType }, new PrintOption(), datas.Select(x => FormDataFormatter.Format(x, formDef.Content.Items)).ToList());
 
-            //TODO: Upload
-            var downloadUrl = "";
+            var fileClient = Resolver.Resolve<FileApiClient>();
+            var uploadResult = await fileClient.UploadTemp(printResult.Content, printResult.FileName, IdentityContext.AccessToken);
+            if (uploadResult == null || string.IsNullOrEmpty(uploadResult.DownloadUrl))
+                return BadRequest("上传打印文件失败");
 
-            return ApiResult.Success(new { downloadUrl, printResult.FileName }).ToActionResult();
+            return ApiResult.Success(new { downloadUrl = uploadResult.DownloadUrl, fileName = printResult.FileName }).ToActionResult();
         }
     }
 }
