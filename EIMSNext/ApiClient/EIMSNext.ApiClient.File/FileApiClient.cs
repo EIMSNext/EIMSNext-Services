@@ -21,9 +21,7 @@ namespace EIMSNext.ApiClient.File
 
             return new FileUploadResult
             {
-                SavePath = file.SavePath,
                 FileName = file.FileName,
-                FileExt = file.FileExt,
                 FileSize = file.FileSize,
                 DownloadUrl = $"{Setting.BaseUrl.TrimEnd('/')}/{file.SavePath.TrimStart('/', '\\')}"
             };

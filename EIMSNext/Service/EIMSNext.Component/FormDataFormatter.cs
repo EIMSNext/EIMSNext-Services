@@ -47,7 +47,7 @@ namespace EIMSNext.Component
                 return null;
             }
 
-            return fieldDef.Type.ToLowerInvariant() switch
+            return fieldDef.Type switch
             {
                 FieldType.TimeStamp => FormatTimestampValue(value, fieldDef.Props.Format),
                 FieldType.Number => FormatNumberValue(value, fieldDef.Props.Format),
@@ -58,12 +58,7 @@ namespace EIMSNext.Component
 
         private static object? FormatTableFormValue(object? value, IList<FieldDef>? columns)
         {
-            if (value == null)
-            {
-                return value;
-            }
-
-            if (columns == null || columns.Count == 0)
+            if (value == null || columns == null || columns.Count == 0)
             {
                 return new List<ExpandoObject>();
             }
@@ -153,13 +148,9 @@ namespace EIMSNext.Component
 
             return value switch
             {
-                long l => l,
-                int i => i,
-                double d when d >= long.MinValue && d <= long.MaxValue => Convert.ToInt64(d),
-                decimal m when m >= long.MinValue && m <= long.MaxValue => Convert.ToInt64(m),
                 JsonElement jsonElement => TryGetTimestampFromJsonElement(jsonElement),
-                string s when long.TryParse(s, out var parsed) => parsed,
-                _ => null,
+                string s when long.TryParse(s.ToString(), out var parsed) => parsed,
+                _ => Convert.ToInt64(value),
             };
         }
 
@@ -172,16 +163,9 @@ namespace EIMSNext.Component
 
             return value switch
             {
-                byte b => b,
-                short s => s,
-                int i => i,
-                long l => l,
-                float f => Convert.ToDecimal(f),
-                double d => Convert.ToDecimal(d),
-                decimal m => m,
                 JsonElement jsonElement => TryGetDecimalFromJsonElement(jsonElement),
                 string s when decimal.TryParse(s, NumberStyles.Any, CultureInfo.InvariantCulture, out var parsed) => parsed,
-                _ => null,
+                _ => Convert.ToDecimal(value),
             };
         }
 

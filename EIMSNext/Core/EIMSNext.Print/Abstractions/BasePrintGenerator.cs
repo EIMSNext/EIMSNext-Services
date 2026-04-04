@@ -34,7 +34,7 @@ namespace EIMSNext.Print.Abstractions
             var fileName = "print";
 
             var time = DateTime.Now.ToString("yyyyMMddhhmmssfff");
-            return $"{fileName}_{time}";
+            return $"{fileName}_{time}.pdf";
         }
 
     }
