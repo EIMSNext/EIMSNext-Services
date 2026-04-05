@@ -55,7 +55,7 @@ namespace EIMSNext.Json.Serialization
                     var el = (JsonElement)x;
                     if (el.ValueKind == JsonValueKind.Array)
                         list.Add(ConvertJsonArray(el));
-                    else if (el.ValueKind != JsonValueKind.Object)
+                    else if (el.ValueKind == JsonValueKind.Object)
                         list.Add(ConvertJsonObject(el));
                     else
                         list.Add(el);
@@ -76,7 +76,7 @@ namespace EIMSNext.Json.Serialization
             {
                 if (el.ValueKind == JsonValueKind.Array)
                     list.Add(ConvertJsonArray(el));
-                else if (el.ValueKind != JsonValueKind.Object)
+                else if (el.ValueKind == JsonValueKind.Object)
                     list.Add(ConvertJsonObject(el));
                 else
                     list.Add(el);
@@ -88,12 +88,12 @@ namespace EIMSNext.Json.Serialization
             var expando = new ExpandoObject();
             foreach (var kvp in dict.EnumerateObject())
             {
-                var key = kvp.Name.ToLower();
+                var key = kvp.Name;
                 var el = kvp.Value;
 
                 if (el.ValueKind == JsonValueKind.Array)
                     (expando as IDictionary<string, object>).Add(key, ConvertJsonArray(el));
-                else if (el.ValueKind != JsonValueKind.Object)
+                else if (el.ValueKind == JsonValueKind.Object)
                     (expando as IDictionary<string, object>).Add(key, ConvertJsonObject(el));
                 else
                     (expando as IDictionary<string, object>).Add(key, el);

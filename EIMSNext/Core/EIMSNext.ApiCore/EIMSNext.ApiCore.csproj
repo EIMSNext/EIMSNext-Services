@@ -18,5 +18,6 @@
 	  <ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
 	  <ProjectReference Include="..\EIMSNext.Core\EIMSNext.Core.csproj" />
 	  <ProjectReference Include="..\EIMSNext.Json\EIMSNext.Json.csproj" />
+	  <ProjectReference Include="..\EIMSNext.Storage\EIMSNext.Storage.csproj" />
 	</ItemGroup>
 </Project>

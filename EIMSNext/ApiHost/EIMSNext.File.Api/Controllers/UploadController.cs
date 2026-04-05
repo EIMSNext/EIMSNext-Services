@@ -1,14 +1,10 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.Core;
-using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
-
+using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
-
 using Microsoft.AspNetCore.Mvc;
-
 using NanoidDotNet;
 
 namespace EIMSNext.File.Api.Controllers
@@ -30,6 +26,8 @@ namespace EIMSNext.File.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost, Route("Upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = 1024 * 1024 * 1024)]
+        [RequestSizeLimit(1024 * 1024 * 1024)]
         public async Task<IActionResult> Upload()
         {
             var files = Request.Form.Files;
@@ -68,45 +66,6 @@ namespace EIMSNext.File.Api.Controllers
             return Ok(new
             {
                 value = attachments.Select(x => new { x.Id, x.FileName, x.SavePath, x.ThumbPath, x.FileExt, x.FileSize })
-            });
-        }
-
-        /// <summary>
-        /// 上传附件
-        /// </summary>
-        /// <returns></returns>
-        [HttpPost, Route("UploadTemp")]
-        public async Task<IActionResult> UploadTemp()
-        {
-            var files = Request.Form.Files;
-            _logger.LogDebug($"收到{files.Count}个上传的文件");
-
-            var attachments = new List<UploadedFile>();
-            foreach (var file in files)
-            {
-                var fileExt = new FileInfo(file.FileName).Extension;
-                var saveName = GeneratFileName() + fileExt;
-                var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{saveName}";
-
-                var attachment = new UploadedFile() { FileName = file.FileName, SavePath = savePath, FileExt = fileExt, FileSize = Convert.ToInt64(Math.Floor(file.Length / 1000.0)) };
-
-                var saveFolder = Path.Combine(Common.Constants.WebRootPath, AppSetting.FileBasePath, "Temp", IdentityContext.CurrentCorpId);
-                if (!Directory.Exists(saveFolder)) Directory.CreateDirectory(saveFolder);
-
-                var saveToPath = Path.Combine(Common.Constants.WebRootPath, savePath);
-                _logger.LogDebug($"{saveToPath}");
-
-                using (var targetStream = System.IO.File.Create(saveToPath))
-                {
-                    await file.CopyToAsync(targetStream);
-                }
-
-                attachments.Add(attachment);
-            }
-
-            return Ok(new
-            {
-                value = attachments.Select(x => new { x.FileName, x.SavePath, x.FileExt, x.FileSize })
             });
         }
 

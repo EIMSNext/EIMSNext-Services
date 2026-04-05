@@ -1,18 +1,10 @@
 using Autofac;
-
-using EIMSNext.ApiClient.File;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.CloudEvent;
-using EIMSNext.Common;
-using EIMSNext.Core.Repositories;
-using EIMSNext.Service.Persistence;
-using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Api.Authorization;
-
-using HKH.Mef2.Integration;
+using EIMSNext.Service.Persistence;
 
 namespace EIMSNext.Service.Api.Extensions
 {
@@ -34,7 +26,6 @@ namespace EIMSNext.Service.Api.Extensions
             builder.RegisterAssemblyTypes(typeof(CorporateService).Assembly).AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterAssemblyTypes(typeof(CorporateApiService).Assembly).AsSelf().AsImplementedInterfaces().InstancePerLifetimeScope();
 
-            builder.RegisterType<FileApiClient>().AsSelf().SingleInstance();
             builder.RegisterType<FlowApiClient>().AsSelf().SingleInstance();
             //builder.RegisterType<WeChatPublicClient>().AsSelf().SingleInstance();
             //builder.RegisterType<SmsClient>().AsSelf().SingleInstance();
