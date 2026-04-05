@@ -4,7 +4,7 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.FileUpload;
 using EIMSNext.Service.Contracts;
 
-namespace EIMSNext.FileUpload.Api.Extensions
+namespace EIMSNext.File.Api.Extensions
 {
     /// <summary>
     /// 

@@ -5,7 +5,7 @@ using EIMSNext.Common;
 
 using Microsoft.AspNetCore.Mvc;
 
-namespace EIMSNext.FileUpload.Api.Controllers
+namespace EIMSNext.File.Api.Controllers
 {
     /// <summary>
     /// 所有方法都允许匿名访问，无需登录
@@ -21,7 +21,7 @@ namespace EIMSNext.FileUpload.Api.Controllers
         [Route("api/v{version:apiVersion}/ping")]
         public IActionResult Ping()
         {
-            return ApiResult.Success("File Upload API Server is running.").ToActionResult();
+            return ApiResult.Success("File API Server is running.").ToActionResult();
         }
     }
 }

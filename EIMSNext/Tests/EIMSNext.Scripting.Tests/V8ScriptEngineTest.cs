@@ -1,4 +1,5 @@
 using System.Dynamic;
+using System.Collections.Generic;
 
 namespace EIMSNext.Scripting.Tests
 {
@@ -141,6 +142,17 @@ namespace EIMSNext.Scripting.Tests
             Assert.AreEqual(200, wfResult.Value);
             wfResult = pool.Evaluate("data.subform2[2].numbervalue", data);
             Assert.AreEqual(false, wfResult.Success);
+        }
+
+        [TestMethod]
+        public void TestEval_WithParameters_HostObject()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption() { MinPoolSize = 1 });
+            var host = new ExpandoObject();
+            host.TryAdd("A", 5);
+            var parameters = new Dictionary<string, object> { { "data", host } };
+            var result = pool.Evaluate<int>("data.A + 1", parameters);
+            Assert.AreEqual(6, result.Value);
         }
     }
 }

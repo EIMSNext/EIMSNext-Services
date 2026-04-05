@@ -1,17 +1,13 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.Core;
-using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
-
+using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
-
 using Microsoft.AspNetCore.Mvc;
-
 using NanoidDotNet;
 
-namespace EIMSNext.FileUpload.Api.Controllers
+namespace EIMSNext.File.Api.Controllers
 {
     [ApiVersion(1.0)]
     public class UploadController : MefControllerBase
@@ -30,6 +26,8 @@ namespace EIMSNext.FileUpload.Api.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpPost, Route("Upload")]
+        [RequestFormLimits(MultipartBodyLengthLimit = 1024 * 1024 * 1024)]
+        [RequestSizeLimit(1024 * 1024 * 1024)]
         public async Task<IActionResult> Upload()
         {
             var files = Request.Form.Files;

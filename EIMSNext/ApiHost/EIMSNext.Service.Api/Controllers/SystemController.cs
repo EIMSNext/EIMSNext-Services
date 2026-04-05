@@ -1,22 +1,16 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Core;
-using EIMSNext.Service.Entities;
 using EIMSNext.Service.Api.Requests;
-
+using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
-
 using IdentityServer4.Models;
-
 using Microsoft.AspNetCore.Mvc;
-using NLog.Web.LayoutRenderers;
 
 namespace EIMSNext.Service.Api.Controllers
 {

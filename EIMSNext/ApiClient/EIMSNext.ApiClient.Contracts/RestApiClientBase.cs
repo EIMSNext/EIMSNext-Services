@@ -24,7 +24,7 @@ namespace EIMSNext.ApiClient.Contracts
         protected virtual T? Get<T>(string url, string? token = null)
         {
             var request = new RestRequest(url, Method.Get);
-            BuilderRequest(request, null, token);
+            BuildRequest(request, null, token);
 
             var response = Client.Execute(request);
             return HandleResponse<T>(response).Data;
@@ -32,7 +32,7 @@ namespace EIMSNext.ApiClient.Contracts
         protected virtual async Task<RestResponse<T>> GetAsync<T>(string url, string? token = null)
         {
             var request = new RestRequest(url, Method.Get);
-            BuilderRequest(request, null, token);
+            BuildRequest(request, null, token);
 
             var response = await Client.ExecuteAsync(request);
             return HandleResponse<T>(response);
@@ -41,7 +41,7 @@ namespace EIMSNext.ApiClient.Contracts
         protected virtual RestResponse<T> Post<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
         {
             var request = new RestRequest(url, Method.Post);
-            BuilderRequest(request, data, token, contentType);
+            BuildRequest(request, data, token, contentType);
 
             var response = Client.Execute(request);
             return HandleResponse<T>(response);
@@ -49,13 +49,23 @@ namespace EIMSNext.ApiClient.Contracts
         protected virtual async Task<RestResponse<T>> PostAsync<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
         {
             var request = new RestRequest(url, Method.Post);
-            BuilderRequest(request, data, token, contentType);
+            BuildRequest(request, data, token, contentType);
 
             var response = await Client.ExecuteAsync(request);
             return HandleResponse<T>(response);
         }
 
-        protected virtual void BuilderRequest(RestRequest request, object? data, string? token, WebContentType contentType = WebContentType.Json)
+        protected virtual async Task<RestResponse<T>> UploadFileAsync<T>(string url, byte[] content, string fileName, string? token = null, string fieldName = "files", string fileContentType = "application/octet-stream")
+        {
+            var request = new RestRequest(url, Method.Post);
+            BuildRequest(request, null, token);
+            request.AddFile(fieldName, content, fileName, fileContentType);
+
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response);
+        }
+
+        protected virtual void BuildRequest(RestRequest request, object? data, string? token, WebContentType contentType = WebContentType.Json)
         {
             if (!string.IsNullOrEmpty(token))
                 request.AddHeader("Authorization", token.StartsWith("Bearer ") ? token : "Bearer " + token);

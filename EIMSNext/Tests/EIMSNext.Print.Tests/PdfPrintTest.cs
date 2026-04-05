@@ -24,13 +24,13 @@ namespace EIMSNext.Print.Tests
             }
 
             Pdf.PdfGenerator pdfGenerator = new Pdf.PdfGenerator();
-            var bytes = pdfGenerator.Print(template, option, datas);
+            var result = pdfGenerator.Print(template, option, datas);
 
-            Assert.IsNotNull(bytes);
-            Assert.IsTrue(bytes.Length > 0);
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Content.Length > 0);
 
             var fileName = $"D:/Temp/{Guid.NewGuid()}.pdf";
-            File.WriteAllBytes(fileName, bytes);
+            File.WriteAllBytes(fileName, result.Content);
         }
     }
 }

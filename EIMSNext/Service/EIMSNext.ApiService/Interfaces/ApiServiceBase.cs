@@ -6,7 +6,6 @@ using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
-using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Memory;
 using MongoDB.Driver;
@@ -149,7 +148,7 @@ namespace EIMSNext.ApiService
 
         protected virtual IQueryable<V> FilterByPermission()
         {
-            return CoreService.All().Select(TVConvertor);
+            return CoreService.All().FilterByCorpId(IdentityContext.CurrentCorpId).Select(TVConvertor);
         }
 
         protected virtual Expression<Func<T, V>> TVConvertor => ObjectConvert.CastExp<T, V>();

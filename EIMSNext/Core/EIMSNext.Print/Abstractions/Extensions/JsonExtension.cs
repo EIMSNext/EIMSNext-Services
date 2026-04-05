@@ -14,7 +14,7 @@ namespace EIMSNext.Print.Extensions
         private const string FidReg = " fid=\\s*(\\x27|\\x22)([^\\x27\\x22]*)(\\x27|\\x22)";
 
         static ILogger logger = LogManager.GetCurrentClassLogger();
-        public static List<JsonObject> ConvertToJsonObject(this List<object> datas)
+        public static List<JsonObject> ConvertToJsonObject(this IEnumerable<object> datas)
         {
             var result = new List<JsonObject>();
             var options = new JsonSerializerOptions();

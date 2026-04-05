@@ -8,7 +8,7 @@ namespace EIMSNext.Print.Abstractions
 {
     public interface IPrintGenerator
     {
-        byte[] Preview(PrintTemplate template, PrintOption option);
-        byte[] Print(PrintTemplate template, PrintOption option, List<object> datas);
+        PrintResult Preview(PrintTemplate template, PrintOption option);
+        PrintResult Print(PrintTemplate template, PrintOption option, IEnumerable<object> datas);
     }
 }
