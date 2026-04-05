@@ -5,7 +5,7 @@ namespace EIMSNext.Print.Pdf
 {
     public static class PdfRenderDefaults
     {
-        public const string DefaultFontFamily = "SimSun";
+        public const string DefaultFontFamily = "FangSong";
         public const double DefaultFontSize = 10;
         public const double DefaultCellPaddingCm = 0.1;
         public const double DefaultBorderWidthPt = 0.75;
@@ -54,8 +54,7 @@ namespace EIMSNext.Print.Pdf
 
         public static readonly IReadOnlyList<string> FontFallbackChain =
         [
-            "SimSun",
-            "NSimSun",
+            "FangSong",
             "MicrosoftYaHeiUI",
             "Arial",
             "Times New Roman"

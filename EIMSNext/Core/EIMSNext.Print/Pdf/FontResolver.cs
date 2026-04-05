@@ -173,7 +173,8 @@ namespace EIMSNext.Print.Pdf
             bool.TryParse(parts[1], out var bold);
             bool.TryParse(parts[2], out var italic);
 
-            return FontsCache.GetFont(family, bold, italic);
+            var font = FontsCache.GetFont(family, bold, italic);
+            return font ?? FontsCache.GetFont(PdfRenderDefaults.DefaultFontFamily, bold, italic);
         }
     }
 
@@ -183,7 +184,10 @@ namespace EIMSNext.Print.Pdf
         {
             var resolvedFamily = PdfFontResolverRuntime.ResolveFontFamily(familyName, isBold, isItalic);
             var font = FontsCache.GetFont(resolvedFamily, isBold, isItalic);
-            if (font == null) return null;
+            if (font == null)
+            {
+                return new FontResolverInfo(FallbackFontResolver.CreateFaceName(PdfRenderDefaults.DefaultFontFamily, isBold, isItalic));
+            }
 
             return new FontResolverInfo(FallbackFontResolver.CreateFaceName(font.FamilyName, isBold, isItalic));
         }
