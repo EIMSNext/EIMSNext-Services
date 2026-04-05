@@ -20,6 +20,29 @@ namespace EIMSNext.Service.Api.Controllers
     [ApiVersion(1.0)]
     public class CustomPrintController(IResolver resolver) : MefControllerBase(resolver)
     {
+        [HttpPost("Preview")]
+        public async Task<IActionResult> Preview(PrintPreviewRequest request)
+        {
+            if (string.IsNullOrEmpty(request.Content))
+                return ApiResult.Fail(400, "模板为空").ToActionResult();
+
+
+            var printResult = new Print.CustomPrintService().Preview(new PrintTemplate { Content = request.Content, PrintType = (PrintType)(int)request.PrintType }, new PrintOption());
+
+            if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
+            {
+                var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
+                var storage = Resolver.Resolve<IStorageProvider>();
+                if (!storage.Upload(printResult.Content, savePath))
+                    return ApiResult.Fail(500, "上传打印文件失败").ToActionResult();
+
+                return ApiResult.Success(new { downloadUrl = $"{storage.Setting.BaseUrl.TrimEnd('/')}/{savePath.TrimStart('/', '\\').Replace("\\", "/")}", fileName = printResult.FileName }).ToActionResult();
+
+            }
+            else
+                return ApiResult.Fail(500, "打印文件失败").ToActionResult();
+        }
+
         [HttpPost("Print")]
         public async Task<IActionResult> Print(PrintRequest request)
         {

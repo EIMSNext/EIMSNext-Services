@@ -1,9 +1,4 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Text.Json.Nodes;
-using System.Threading.Tasks;
 using EIMSNext.Print.Extensions;
 using NLog;
 
@@ -31,7 +26,7 @@ namespace EIMSNext.Print.Abstractions
 
         protected virtual string GetFileName(object? data, PrintOption option)
         {
-            var fileName = "print";
+            var fileName = IsPreview ? "preview" : "print";
 
             var time = DateTime.Now.ToString("yyyyMMddhhmmssfff");
             return $"{fileName}_{time}.pdf";
