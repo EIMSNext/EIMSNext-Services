@@ -12,7 +12,7 @@ namespace EIMSNext.Print.Abstractions
         public PrintResult Preview(PrintTemplate template, PrintOption option)
         {
             IsPreview = true;
-            var content = Generate(template, option, new List<JsonObject> { });
+            var content = Generate(template, option, new List<JsonObject> { new JsonObject { } });
             return new PrintResult { Content = content, FileName = GetFileName(null, option) };
         }
 
