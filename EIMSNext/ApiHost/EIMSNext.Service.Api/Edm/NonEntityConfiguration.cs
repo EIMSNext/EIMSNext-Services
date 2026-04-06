@@ -38,6 +38,8 @@ namespace EIMSNext.Service.Api.Edm
             //builder.EnumType<DataPerms>();
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
+            builder.EnumType<FormNotifyTriggerMode>();
+            builder.EnumType<FormNotifyChannel>();
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();

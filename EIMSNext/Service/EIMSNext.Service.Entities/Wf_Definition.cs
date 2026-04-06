@@ -701,6 +701,10 @@ namespace EIMSNext.Service.Entities
         /// 
         /// </summary>
         Dynamic,
+        /// <summary>
+        /// 
+        /// </summary>
+        FormField,
     }
 
     /// <summary>
