@@ -8,12 +8,12 @@ namespace EIMSNext.Service.Entities
     public class DashboardDef : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// 仪表盘名称
         /// </summary>
         public string Name { get; set; } = string.Empty;
 

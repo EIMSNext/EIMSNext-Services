@@ -66,35 +66,35 @@ namespace EIMSNext.Service.Entities
         public List<EmpRole> Roles { get; set; } = new List<EmpRole>();
 
         /// <summary>
-        /// 
+        /// 转换为操作员对象
         /// </summary>
-        /// <returns></returns>
+        /// <returns>操作员实例</returns>
         public Operator ToOperator()
         {
             return new Operator(Id, Code, EmpName);
         }
 
         /// <summary>
-        /// 
+        /// 是否为系统用户
         /// </summary>
         public bool IsSystem => IsDummy && Id.StartsWith("system_");
         /// <summary>
-        /// 
+        /// 是否为匿名用户
         /// </summary>
         public bool IsAnonymous => IsDummy && Id.StartsWith("anonymous_");
     }
 
     /// <summary>
-    /// 
+    /// 员工角色关联
     /// </summary>
     public class EmpRole
     {
         /// <summary>
-        /// 
+        /// 角色ID
         /// </summary>
         public string RoleId { get; set; } = "";
         /// <summary>
-        /// 
+        /// 角色名称
         /// </summary>
         public string RoleName { get; set; } = "";
     }

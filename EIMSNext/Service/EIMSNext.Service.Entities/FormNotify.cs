@@ -8,11 +8,11 @@ namespace EIMSNext.Service.Entities
     public class FormNotify : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = "";
         /// <summary>
-        /// 
+        /// 表单ID
         /// </summary>
         public string FormId { get; set; } = "";
 
@@ -42,7 +42,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string? Notifiers { get; set; }
         /// <summary>
-        /// 消息管道
+        /// 消息管道 <see cref="FormNotifyChannel"/>
         /// </summary>
         public long Channels { get; set; }
         /// <summary>
@@ -94,11 +94,26 @@ namespace EIMSNext.Service.Entities
         Email = 1 << 1,
     }
 
+    /// <summary>
+    /// 消息分类
+    /// </summary>
     public enum MessageCategory
     {
+        /// <summary>
+        /// 数据通知
+        /// </summary>
         DataNotify,
+        /// <summary>
+        /// 应用通知
+        /// </summary>
         AppNotify,
+        /// <summary>
+        /// 系统通知
+        /// </summary>
         SystemNotify,
+        /// <summary>
+        /// 系统公告
+        /// </summary>
         SystemNotice
     }
 }

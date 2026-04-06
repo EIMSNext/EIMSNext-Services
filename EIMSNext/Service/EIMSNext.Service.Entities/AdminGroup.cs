@@ -8,7 +8,7 @@ namespace EIMSNext.Service.Entities
     public class AdminGroup : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 管理组名称
         /// </summary>
         public string Name { get; set; }=string.Empty;
     }

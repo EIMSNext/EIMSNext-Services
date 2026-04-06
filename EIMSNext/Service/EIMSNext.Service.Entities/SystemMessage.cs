@@ -3,48 +3,48 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 
+    /// ç³»ç»Ÿæ¶ˆæ¯
     /// </summary>
     public class SystemMessage : CorpEntityBase
     {
         /// <summary>
-        /// ¹ØÁªµÄFormNotifyId
+        /// å…³è”çš„FormNotifyId
         /// </summary>
         public string? NotifyId { get; set; }
         /// <summary>
-        /// ÏûÏ¢±êÌâ
+        /// æ¶ˆæ¯æ ‡é¢˜
         /// </summary>
         public string? Title { get; set; } 
         /// <summary>
-        /// ÏûÏ¢ÏêÇé
+        /// æ¶ˆæ¯è¯¦æƒ…
         /// </summary>
         public string? Detail { get; set; } 
         /// <summary>
-        /// Á´½ÓµØÖ·
+        /// é“¾æ¥åœ°å€
         /// </summary>
         public string? Url { get; set; }
         /// <summary>
-        /// ÏûÏ¢½ÓÊÕÈË£¬Èç¹û¹«¸æÔòÎª¿Õ
+        /// æ¶ˆæ¯æ¥æ”¶äººï¼Œå‘˜å·¥ID
         /// </summary>
         public string? ReceiverEmpId { get; set; } 
         /// <summary>
-        /// ½ÓÊÕÈËÃû³Æ
+        /// æ¥æ”¶äººå§“å
         /// </summary>
         public string? ReceiverName { get; set; }
         /// <summary>
-        /// ÊÇ·ñÒÑ¶Á
+        /// æ˜¯å¦å·²è¯»
         /// </summary>
         public bool IsRead { get; set; }
         /// <summary>
-        /// ÔÄ¶ÁÊ±¼ä
+        /// è¯»å–æ—¶é—´
         /// </summary>
         public long? ReadTime { get; set; }
         /// <summary>
-        /// ¹ıÆÚÊ±¼ä
+        /// è¿‡æœŸæ—¶é—´
         /// </summary>
         public long ExpireTime { get; set; }
         /// <summary>
-        /// ÏûÏ¢·ÖÀà
+        /// æ¶ˆæ¯åˆ†ç±»
         /// </summary>
         public MessageCategory Category { get; set; } = MessageCategory.DataNotify;
     }

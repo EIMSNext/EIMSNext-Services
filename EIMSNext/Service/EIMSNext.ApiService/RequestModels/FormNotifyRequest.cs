@@ -2,45 +2,48 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
+    /// <summary>
+    /// è¡¨å•é€šçŸ¥è¯·æ±‚
+    /// </summary>
     public class FormNotifyRequest : RequestBase
     {
         /// <summary>
-        /// 
+        /// åº”ç”¨ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// è¡¨å•ID
         /// </summary>
         public string FormId { get; set; } = string.Empty;
 
         /// <summary>
-        /// ÌáĞÑÀàĞÍ
+        /// æé†’ç±»å‹
         /// </summary>
         public FormNotifyTriggerMode TriggerMode { get; set; }
         /// <summary>
-        /// Êı¾İ±ä¸üºóÌáĞÑÊ±£¬´¥·¢ÌáĞÑµÄ×Ö¶Î
+        /// æ•°æ®å˜æ›´åæé†’æ—¶ï¼Œè§¦å‘æé†’çš„å­—æ®µ
         /// </summary>
         public List<string>? ChangeFields { get; set; }
         /// <summary>
-        /// ´¥·¢ÌáĞÑµÄÊı¾İÌõ¼ş
+        /// è§¦å‘æé†’çš„æ•°æ®æ¡ä»¶
         /// </summary>
         public string? DataFilter { get; set; }
 
         /// <summary>
-        /// ÌáĞÑÎÄ×Ö/ÏûÏ¢±êÌâ
+        /// æé†’æ–‡å­—/æ¶ˆæ¯æ ‡é¢˜
         /// </summary>
         public string? NotifyText { get; set; }
         /// <summary>
-        /// Í¨ÖªÈË
+        /// é€šçŸ¥äºº
         /// </summary>
         public string? Notifiers { get; set; }
         /// <summary>
-        /// ÏûÏ¢¹ÜµÀ
+        /// æ¶ˆæ¯ç®¡é“
         /// </summary>
-        public FormNotifyChannel Channels { get; set; }
+        public long Channels { get; set; }
         /// <summary>
-        /// ÊÇ·ñ½ûÓÃ
+        /// æ˜¯å¦ç¦ç”¨
         /// </summary>
         public bool Disabled { get; set; }
     }

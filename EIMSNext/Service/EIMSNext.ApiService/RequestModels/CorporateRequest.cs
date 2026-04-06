@@ -1,5 +1,8 @@
 namespace EIMSNext.ApiService.RequestModels
 {
+    /// <summary>
+    /// 企业请求
+    /// </summary>
     public class CorporateRequest : RequestBase
     {
         /// <summary>
@@ -12,4 +15,3 @@ namespace EIMSNext.ApiService.RequestModels
         public string Description { get; set; } = "";
     }
 }
-

@@ -1,7 +1,7 @@
 namespace EIMSNext.ApiService.RequestModels
 {
     /// <summary>
-    /// 
+    /// 部门请求
     /// </summary>
     public class DepartmentRequest : RequestBase
     {
