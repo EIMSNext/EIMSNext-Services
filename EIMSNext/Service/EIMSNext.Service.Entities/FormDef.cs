@@ -113,6 +113,11 @@ namespace EIMSNext.Service.Entities
         /// 子表单中的列
         /// </summary>
         public IList<FieldDef>? Columns { get; set; }
+
+        /// <summary>
+        /// 是否隐藏
+        /// </summary>
+        public bool Hidden { get; set; }
     }
 
     /// <summary>

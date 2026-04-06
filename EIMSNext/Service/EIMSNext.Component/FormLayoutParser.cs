@@ -106,6 +106,7 @@ namespace EIMSNext.Component
             fieldDef.Type = field["type"]!.GetValue<string>();
             fieldDef.Field = field["field"]!.GetValue<string>();
             fieldDef.Title = field["title"]!.GetValue<string>();
+            fieldDef.Hidden = field["hidden"]?.GetValue<bool>() ?? false;
 
             var computed = field["computed"]?.AsObject();
             if (computed != null)

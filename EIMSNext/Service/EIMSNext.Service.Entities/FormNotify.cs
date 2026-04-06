@@ -44,7 +44,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 消息管道
         /// </summary>
-        public FormNotifyChannel Channels { get; set; }
+        public long Channels { get; set; }
         /// <summary>
         /// 是否禁用
         /// </summary>
@@ -92,5 +92,13 @@ namespace EIMSNext.Service.Entities
         /// 邮件
         /// </summary>
         Email = 1 << 1,
+    }
+
+    public enum MessageCategory
+    {
+        DataNotify,
+        AppNotify,
+        SystemNotify,
+        SystemNotice
     }
 }

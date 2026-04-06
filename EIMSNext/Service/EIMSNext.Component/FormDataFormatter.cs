@@ -40,6 +40,29 @@ namespace EIMSNext.Component
             return result;
         }
 
+        public static ExpandoObject FormatForDisplay(FormData data, IList<FieldDef> fieldDefs)
+        {
+            var result = new ExpandoObject();
+            var resultDict = (IDictionary<string, object?>)result;
+
+            var fieldMap = fieldDefs
+                .Where(x => !string.IsNullOrWhiteSpace(x.Field))
+                .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
+
+            var dataDict = (IDictionary<string, object?>)data.Data;
+            foreach (var item in dataDict)
+            {
+                if (!fieldMap.TryGetValue(item.Key, out var fieldDef))
+                {
+                    continue;
+                }
+
+                resultDict[item.Key] = FormatDisplayFieldValue(item.Value, fieldDef);
+            }
+
+            return result;
+        }
+
         private static object? FormatFieldValue(object? value, FieldDef fieldDef)
         {
             if (value == null)
@@ -52,6 +75,26 @@ namespace EIMSNext.Component
                 FieldType.TimeStamp => FormatTimestampValue(value, fieldDef.Props.Format),
                 FieldType.Number => FormatNumberValue(value, fieldDef.Props.Format),
                 FieldType.TableForm => FormatTableFormValue(value, fieldDef.Columns),
+                _ => value,
+            };
+        }
+
+        private static object? FormatDisplayFieldValue(object? value, FieldDef fieldDef)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            return fieldDef.Type switch
+            {
+                FieldType.TimeStamp => FormatTimestampValue(value, fieldDef.Props.Format),
+                FieldType.Number => FormatNumberValue(value, fieldDef.Props.Format),
+                FieldType.Radio or FieldType.CheckBox or FieldType.Select1 or FieldType.Select2
+                    or FieldType.Employee1 or FieldType.Employee2
+                    or FieldType.Department1 or FieldType.Department2
+                    => FormatLabelValue(value),
+                FieldType.TableForm => FormatDisplayTableFormValue(value, fieldDef.Columns),
                 _ => value,
             };
         }
@@ -92,6 +135,72 @@ namespace EIMSNext.Component
             }
 
             return rows;
+        }
+
+        private static object? FormatDisplayTableFormValue(object? value, IList<FieldDef>? columns)
+        {
+            if (value == null || columns == null || columns.Count == 0)
+            {
+                return new List<ExpandoObject>();
+            }
+
+            var visibleColumns = columns
+                .Where(x => !x.Hidden && !string.IsNullOrWhiteSpace(x.Field))
+                .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
+
+            var rows = new List<ExpandoObject>();
+            foreach (var row in EnumerateItemsOrSingle(value))
+            {
+                var rowDict = AsDictionary(row);
+                if (rowDict == null)
+                {
+                    continue;
+                }
+
+                var rowResult = new ExpandoObject();
+                var rowResultDict = (IDictionary<string, object?>)rowResult;
+                foreach (var item in rowDict)
+                {
+                    if (!visibleColumns.TryGetValue(item.Key, out var columnDef))
+                    {
+                        continue;
+                    }
+
+                    rowResultDict[item.Key] = FormatDisplayFieldValue(item.Value, columnDef);
+                }
+
+                rows.Add(rowResult);
+            }
+
+            return rows;
+        }
+
+        private static object? FormatLabelValue(object? value)
+        {
+            var labels = new List<string>();
+            foreach (var item in EnumerateItemsOrSingle(value))
+            {
+                var dict = AsDictionary(item);
+                if (dict != null && dict.TryGetValue("label", out var labelObj))
+                {
+                    var label = labelObj?.ToString();
+                    if (!string.IsNullOrWhiteSpace(label))
+                    {
+                        labels.Add(label);
+                    }
+                }
+                else if (item != null)
+                {
+                    labels.Add(item.ToString()!);
+                }
+            }
+
+            return labels.Count switch
+            {
+                0 => null,
+                1 => labels[0],
+                _ => string.Join(',', labels),
+            };
         }
 
         private static object? FormatTimestampValue(object value, string? format)
@@ -208,6 +317,36 @@ namespace EIMSNext.Component
                     yield return item;
                 }
             }
+        }
+
+        private static IEnumerable<object?> EnumerateItemsOrSingle(object? value)
+        {
+            if (value == null)
+            {
+                yield break;
+            }
+
+            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in jsonElement.EnumerateArray())
+                {
+                    yield return item;
+                }
+
+                yield break;
+            }
+
+            if (value is IEnumerable enumerable and not string)
+            {
+                foreach (var item in enumerable)
+                {
+                    yield return item;
+                }
+
+                yield break;
+            }
+
+            yield return value;
         }
 
         private static IDictionary<string, object?>? AsDictionary(object? value)
