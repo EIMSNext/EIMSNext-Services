@@ -1,17 +1,13 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Dynamic;
 using System.Text.Json;
-
 using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
-
 using HKH.Mef2.Integration;
-
 using MongoDB.Driver;
 
 namespace EIMSNext.Service
@@ -76,10 +72,11 @@ namespace EIMSNext.Service
 
             await EmployeeRepository.Find(x => empIds.Contains(x.Id) && !x.IsDummy && x.Status == 0).ForEachAsync(x =>
             {
-                if (x.Id.Equals(operatorEmpId, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
+                //TODO: 暂时不排除当前操作人，方便测试
+                //if (x.Id.Equals(operatorEmpId, StringComparison.OrdinalIgnoreCase))
+                //{
+                //    return;
+                //}
 
                 if (!receivers.ContainsKey(x.Id))
                 {
@@ -91,7 +88,7 @@ namespace EIMSNext.Service
                 }
             });
 
-            return receivers.Values.Take(100).ToList();
+            return receivers.Values.Take(200).ToList();
         }
 
         private static void ExpandFormFieldCandidate(FormData data, FormDef formDef, string fieldKey, ISet<string> deptIds, ISet<string> empIds)

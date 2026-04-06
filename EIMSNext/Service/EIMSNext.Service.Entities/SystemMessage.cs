@@ -1,4 +1,4 @@
-using EIMSNext.Core.Entities;
+﻿using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Service.Entities
 {
@@ -14,11 +14,11 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 消息标题
         /// </summary>
-        public string? Title { get; set; } 
+        public string? Title { get; set; }
         /// <summary>
         /// 消息详情
         /// </summary>
-        public string? Detail { get; set; } 
+        public string? Detail { get; set; }
         /// <summary>
         /// 链接地址
         /// </summary>
@@ -26,7 +26,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 消息接收人，员工ID
         /// </summary>
-        public string? ReceiverEmpId { get; set; } 
+        public string? ReceiverEmpId { get; set; }
         /// <summary>
         /// 接收人姓名
         /// </summary>
