@@ -14,7 +14,7 @@ namespace EIMSNext.Service.Api.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class FormNotificationController(IResolver resolver) : ODataController<FormNotificationApiService, FormNotification, FormNotificationViewModel, FormNotificationRequest>(resolver)
+	public class FormNotifyController(IResolver resolver) : ODataController<FormNotifyApiService, FormNotify, FormNotifyViewModel, FormNotifyRequest>(resolver)
 	{
 		
 	}

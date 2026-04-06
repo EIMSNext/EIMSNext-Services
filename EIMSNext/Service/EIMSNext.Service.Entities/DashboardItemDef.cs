@@ -13,7 +13,7 @@ namespace EIMSNext.Service.Entities
     public class DashboardItemDef : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 应用Id
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
@@ -23,7 +23,7 @@ namespace EIMSNext.Service.Entities
         public string DashboardId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// 项目类型
         /// </summary>
         public string ItemType { get; set; } = string.Empty;
 

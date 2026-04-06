@@ -77,8 +77,8 @@ namespace EIMSNext.Service
 
         protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
-            //TODO 此处将任务压力队列，此处为测试
             var eventHub = Resolver.Resolve<IEventHub>();
+            var notifyPublisher = Resolver.Resolve<IFormNotifyTaskPublisher>();
             var entity = entities.First();
             var webhookResp = Resolver.GetRepository<Webhook>();
             var webhooks = webhookResp.Find(new MongoFindOptions<Webhook> { Filter = webhookResp.FilterBuilder.And(webhookResp.FilterBuilder.Eq(x => x.FormId, entity.FormId), webhookResp.FilterBuilder.BitsAllSet(x => x.Triggers, (long)WebHookTrigger.Data_Created)) }).ToList();
@@ -87,6 +87,8 @@ namespace EIMSNext.Service
                 var testhook = webhooks.First();
                 await eventHub.SendAsync(testhook, WebHookTrigger.Data_Created, entity);
             }
+
+            EnqueueFormNotify(notifyPublisher, entity, null, FormNotifyTriggerMode.DataAdded);
             await base.AfterAdd(entities, session);
         }
 
@@ -99,8 +101,8 @@ namespace EIMSNext.Service
 
         protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
         {
-            //TODO 此处将任务压力队列，此处为测试
             var eventHub = Resolver.Resolve<IEventHub>();
+            var notifyPublisher = Resolver.Resolve<IFormNotifyTaskPublisher>();
             var old = SessionStore.Get<FormData>(entity.Id, DataVersion.Old);
             var webhookResp = Resolver.GetRepository<Webhook>();
             var webhooks = webhookResp.Find(new MongoFindOptions<Webhook> { Filter = webhookResp.FilterBuilder.And(webhookResp.FilterBuilder.Eq(x => x.FormId, entity.FormId), webhookResp.FilterBuilder.BitsAllSet(x => x.Triggers, (long)WebHookTrigger.Data_Updated)) }).ToList();
@@ -116,6 +118,8 @@ namespace EIMSNext.Service
 
                 await eventHub.SendAsync(testhook, WebHookTrigger.Data_Created, formExp);
             }
+
+            EnqueueFormNotify(notifyPublisher, entity, old, FormNotifyTriggerMode.DataChanged);
 
             await base.AfterReplace(entity, session);
         }
@@ -153,6 +157,19 @@ namespace EIMSNext.Service
                     }
                 }
             }
+        }
+
+        private void EnqueueFormNotify(IFormNotifyTaskPublisher notifyPublisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
+        {
+            notifyPublisher.Publish(new FormNotifyDispatchTaskArgs
+            {
+                CorpId = Context.CorpId,
+                DataId = newData.Id,
+                TriggerMode = triggerMode,
+                Operator = Context.Operator,
+                NewData = newData.SerializeToJson().DeserializeFromJson<FormData>()!,
+                OldData = oldData?.SerializeToJson().DeserializeFromJson<FormData>()
+            });
         }
     }
 }

@@ -1,9 +1,12 @@
 namespace EIMSNext.ApiService.RequestModels
 {
+    /// <summary>
+    /// 仪表盘项目定义请求
+    /// </summary>
     public class DashboardItemDefRequest : RequestBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
@@ -13,7 +16,7 @@ namespace EIMSNext.ApiService.RequestModels
         public string DashboardId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// 项目类型
         /// </summary>
         public string ItemType { get; set; } = string.Empty;
 
@@ -33,4 +36,3 @@ namespace EIMSNext.ApiService.RequestModels
         public string Details { get; set; } = string.Empty;
     }
 }
-

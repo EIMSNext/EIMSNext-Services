@@ -14,7 +14,7 @@ namespace EIMSNext.Async.Core.Messaging
 
         public TaskProducer(IConnection rabbitConnection) => _connection = rabbitConnection;
 
-        public void Enqueue<T>(Expression<Action<T>> task, string? explicitQueue = null) where T : new()
+        public void Enqueue<T>(Expression<Action<T>> task, string? explicitQueue = null)
         {
             var methodCall = (MethodCallExpression)task.Body;
             var methodInfo = methodCall.Method;

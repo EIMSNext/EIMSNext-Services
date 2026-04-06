@@ -8,26 +8,26 @@ namespace EIMSNext.Service.Entities
     public class WebPushLog : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = "";
         /// <summary>
-        /// 
+        /// 表单ID
         /// </summary>
         public string FormId { get; set; } = "";
 
         /// <summary>
-        /// 
+        /// WebHook标识
         /// </summary>
         public string WebHookId { get; set; } = "";
 
         /// <summary>
-        /// 
+        /// 来源类型
         /// </summary>
         public string SourceType { get; set; } = WebHookSource.Form;
 
         /// <summary>
-        /// 
+        /// 触发类型
         /// </summary>
         public string TriggerType { get; set; } = "unknown";
         /// <summary>
@@ -39,7 +39,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string EventId { get; set; } = "";
         /// <summary>
-        /// 
+        /// 推送内容对象
         /// </summary>
         public string? PushObject { get; set; }
 

@@ -6,6 +6,8 @@ using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
 
+using EIMSNext.Service.Entities;
+
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Hosting;
@@ -16,12 +18,16 @@ using RabbitMQ.Client.Events;
 
 namespace EIMSNext.Async.Core.Messaging
 {
-    public abstract class TaskConsumerBase<T> : BackgroundService where T : TaskConsumerBase<T>
+    public abstract class TaskConsumerBase<T, TArgs> : BackgroundService where T : TaskConsumerBase<T, TArgs> where TArgs : class
     {
         protected IResolver Resolver { get; private set; }
         protected IConnection MQConn { get; private set; }// 由 Host 项目通过 DI 注入，确保非空
         protected ILogger<T> Logger { get; private set; }
-        protected string QueueName {  get; private set; }
+        protected string QueueName { get; private set; }
+
+        public void Enqueue(TArgs args)
+        {
+        }
 
         protected TaskConsumerBase(IResolver resolver)
         {
@@ -30,7 +36,7 @@ namespace EIMSNext.Async.Core.Messaging
             Logger = resolver.Resolve<ILogger<T>>();
 
             var attr = typeof(T).GetCustomAttribute<QueueAttribute>();
-           QueueName = (attr?.QueueName ?? "default").ToLower();
+            QueueName = (attr?.QueueName ?? "default").ToLower();
 
             Logger.LogInformation("Consumer [{Type}] listening to: {Queue}",
                 GetType().Name, QueueName);

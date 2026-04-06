@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Api.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class FormNotificationController(IResolver resolver) : ApiControllerBase<FormNotificationApiService, FormNotification, FormNotificationViewModel>(resolver)
+	public class FormNotifyController(IResolver resolver) : ApiControllerBase<FormNotifyApiService, FormNotify, FormNotifyViewModel>(resolver)
 	{
 		
 	}

@@ -4,6 +4,7 @@ using EIMSNext.Async.Core.Messaging;
 using EIMSNext.Async.Core.Messaging.Consumers;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace EIMSNext.Async.Core
 {
@@ -38,7 +39,9 @@ namespace EIMSNext.Async.Core
             services.AddSingleton<TaskProducer>(); // 生产者供其他服务使用
 
             // ========== 消费者注册（自动发现 Attribute） ==========
-            services.AddScoped<EmailConsumer>();
+            services.AddSingleton<IHostedService, FormNotifyDispatchConsumer>();
+            services.AddSingleton<IHostedService, SystemMessageConsumer>();
+            services.AddSingleton<IHostedService, EmailConsumer>();
 
             return services;
         }

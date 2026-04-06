@@ -3,7 +3,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-	public interface IFormNotificationService : IService<FormNotification>
+	public interface IFormNotifyService : IService<FormNotify>
 	{
 	}
 }

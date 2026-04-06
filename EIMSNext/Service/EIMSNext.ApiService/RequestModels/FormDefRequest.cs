@@ -2,20 +2,23 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
+    /// <summary>
+    /// 表单定义请求
+    /// </summary>
     public class FormDefRequest : RequestBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// 表单名称
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// 
+        /// 表单内容
         /// </summary>
         public FormContent Content { get; set; } = new FormContent();
 
@@ -30,4 +33,3 @@ namespace EIMSNext.ApiService.RequestModels
         public bool UsingWorkflow { get; set; }
     }
 }
-

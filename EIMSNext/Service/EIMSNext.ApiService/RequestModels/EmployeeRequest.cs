@@ -1,5 +1,8 @@
 namespace EIMSNext.ApiService.RequestModels
 {
+    /// <summary>
+    /// 员工请求
+    /// </summary>
     public class EmployeeRequest : RequestBase
     {
         /// <summary>
