@@ -29,7 +29,8 @@
 		<ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Print\EIMSNext.Print.csproj" />
-		<ProjectReference Include="..\..\Async\EIMSNext.Async.Core\EIMSNext.Async.Core.csproj" />
+		<ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
+		<ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />

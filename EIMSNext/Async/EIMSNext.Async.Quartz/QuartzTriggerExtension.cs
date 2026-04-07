@@ -1,20 +1,14 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using EIMSNext.Async.Core.Jobs;
+using EIMSNext.Async.Quartz.Jobs;
 
 using Microsoft.Extensions.Configuration;
 
 using Quartz;
 
-namespace EIMSNext.Async.Core
+namespace EIMSNext.Async.Quartz
 {
     public static class QuartzTriggerExtension
     {
-        public static void AddQuartzTriggers(this IServiceCollectionQuartzConfigurator qz, IConfiguration configuration)
+        public static IServiceCollectionQuartzConfigurator AddAsyncQuartzTriggers(this IServiceCollectionQuartzConfigurator qz, IConfiguration configuration)
         {
             var jobKey = new JobKey("DailyTestJob", "Business");
             qz.AddJob<TestJob>(opts => opts
@@ -27,10 +21,11 @@ namespace EIMSNext.Async.Core
                 .WithIdentity("DailyTestTrigger", "Business")
                 .WithCronSchedule(
                     configuration["Quartz:TestJob:Cron"] ?? "0 0 0 * * ?",
-                    cs => cs.InTimeZone(TimeZoneInfo.Local)
-                )
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
                 .WithDescription("每天0点触发测试作业")
                 .StartNow());
+
+            return qz;
         }
     }
 }

@@ -1,11 +1,11 @@
 using System.Diagnostics;
 
-using EIMSNext.Async.Core;
-using EIMSNext.Async.Core.Jobs;
+using EIMSNext.Async.Quartz;
+using EIMSNext.Async.RabbitMQ;
+using EIMSNext.Async.Tasks;
 
 using Quartz;
 
-using RabbitMQ.Client;
 using EIMSNext.ApiCore;
 using Serilog;
 using EIMSNext.Component;
@@ -41,21 +41,9 @@ try
         services.AddCustomCache(hostContext.Configuration);
         services.AddServiceComponents();
         services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
-
-        services.AddSingleton<IConnection>(sp =>
-        {
-            var factory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-            return factory.CreateConnection();
-        });
-
-        services.AddConsumers();
-
-        services.AddJobs();
+        services.AddRabbitMqMessaging(hostContext.Configuration);
+        services.AddAsyncTaskConsumers();
+        services.AddAsyncQuartzJobs();
 
         services.AddQuartz(q =>
         {
@@ -72,7 +60,7 @@ try
                 });
             });
 
-            q.AddQuartzTriggers(hostContext.Configuration);
+            q.AddAsyncQuartzTriggers(hostContext.Configuration);
         });
 
         services.AddQuartzHostedService(q =>

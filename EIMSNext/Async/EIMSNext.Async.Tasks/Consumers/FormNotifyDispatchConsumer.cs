@@ -1,5 +1,5 @@
-using System.Text.Json;
-
+using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
@@ -11,30 +11,24 @@ using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 
 using MongoDB.Driver;
-using MongoDB.Driver.Linq;
 
-namespace EIMSNext.Async.Core.Messaging.Consumers
+using System.Text.Json;
+
+namespace EIMSNext.Async.Tasks.Consumers
 {
-    [Queue("formnotify-dispatch")]
-    public class FormNotifyDispatchConsumer : TaskConsumerBase<FormNotifyDispatchConsumer,FormNotifyDispatchTaskArgs>
+    public class FormNotifyDispatchConsumer : TaskConsumerBase<FormNotifyDispatchTaskArgs, FormNotifyDispatchConsumer>
     {
-        public FormNotifyDispatchConsumer(IResolver resolver) : base(resolver)
+        public FormNotifyDispatchConsumer(IResolver resolver)
+            : base(resolver)
         {
-        }               
+        }
 
-        protected override async Task HandleTaskAsync(string taskType, string argsJson, CancellationToken ct)
+        protected override async Task HandleAsync(FormNotifyDispatchTaskArgs args, CancellationToken ct)
         {
-            var invoke = JsonSerializer.Deserialize<TaskInvokeArgs<FormNotifyDispatchTaskArgs>>(argsJson);
-            var args = invoke?.Parameters?.FirstOrDefault();
-            if (args == null)
-            {
-                return;
-            }
-
             var notifyRepo = Resolver.GetRepository<FormNotify>();
             var formDataRepo = Resolver.GetRepository<FormData>();
             var formDefRepo = Resolver.GetRepository<FormDef>();
-            var producer = Resolver.Resolve<TaskProducer>();
+            var publisher = Resolver.Resolve<IMessagePublisher>();
             var detailBuilder = Resolver.Resolve<IFormNotifyDetailBuilder>();
             var recipientResolver = Resolver.Resolve<IFormNotifyRecipientResolver>();
 
@@ -75,7 +69,7 @@ namespace EIMSNext.Async.Core.Messaging.Consumers
 
                 if (channels.HasFlag(FormNotifyChannel.System))
                 {
-                    producer.Enqueue<SystemMessageConsumer>(x => x.Enqueue(new SystemMessageTaskArgs
+                    await publisher.PublishAsync(new SystemMessageTaskArgs
                     {
                         CorpId = args.CorpId,
                         NotifyId = notify.Id,
@@ -85,12 +79,12 @@ namespace EIMSNext.Async.Core.Messaging.Consumers
                         ExpireTime = expireTime,
                         Category = MessageCategory.DataNotify,
                         Receivers = receivers
-                    }));
+                    }, ct);
                 }
 
                 if (channels.HasFlag(FormNotifyChannel.Email))
                 {
-                    producer.Enqueue<EmailConsumer>(x => x.Enqueue(new EmailNotifyTaskArgs
+                    await publisher.PublishAsync(new EmailNotifyTaskArgs
                     {
                         CorpId = args.CorpId,
                         NotifyId = notify.Id,
@@ -98,7 +92,7 @@ namespace EIMSNext.Async.Core.Messaging.Consumers
                         Detail = detail,
                         Url = url,
                         Receivers = receivers
-                    }));
+                    }, ct);
                 }
             }
         }

@@ -5,6 +5,8 @@ using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
+using EIMSNext.Async.Abstractions.Messaging;
+
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;

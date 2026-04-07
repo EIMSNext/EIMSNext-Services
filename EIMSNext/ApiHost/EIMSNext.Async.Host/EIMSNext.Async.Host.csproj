@@ -24,7 +24,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\Async\EIMSNext.Async.Core\EIMSNext.Async.Core.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
   </ItemGroup>
 

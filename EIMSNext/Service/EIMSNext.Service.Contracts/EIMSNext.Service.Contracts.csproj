@@ -9,6 +9,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
+		<ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
 		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
 		<ProjectReference Include="..\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />

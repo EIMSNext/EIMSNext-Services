@@ -1,5 +1,7 @@
 using EIMSNext.Service.Entities;
 
+using EIMSNext.Async.Abstractions.Messaging;
+
 namespace EIMSNext.Service.Contracts
 {
     public interface IFormNotifyRecipientResolver
