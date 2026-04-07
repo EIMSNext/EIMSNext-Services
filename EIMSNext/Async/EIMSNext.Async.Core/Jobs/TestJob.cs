@@ -1,11 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-using EIMSNext.Async.Core.Interfaces;
-
 using Microsoft.Extensions.Logging;
 
 using Quartz;
@@ -19,13 +11,11 @@ namespace EIMSNext.Async.Core.Jobs
     public class TestJob : IJob, ITestJob
     {
         private readonly ILogger<TestJob> _logger;
-        private readonly IDateTimeProvider _dateTimeProvider;
 
         // Quartz 通过 DI 解析此构造函数
-        public TestJob(ILogger<TestJob> logger, IDateTimeProvider dateTimeProvider)
+        public TestJob(ILogger<TestJob> logger)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _dateTimeProvider = dateTimeProvider ?? throw new ArgumentNullException(nameof(dateTimeProvider));
         }
 
         /// <summary>
@@ -39,20 +29,10 @@ namespace EIMSNext.Async.Core.Jobs
         /// </summary>
         public async Task ExecuteAsync()
         {
-            var startTime = _dateTimeProvider.Now;
-            _logger.LogInformation(
-                "🚀 [TestJob] Started | Server: {Server} | Time: {StartTime:yyyy-MM-dd HH:mm:ss}",
-                Environment.MachineName,
-                startTime);
-
             try
             {
                 // 模拟业务处理（异步友好）
                 await Task.Delay(800);
-
-                _logger.LogInformation(
-                    "✅ [TestJob] Completed successfully | Duration: {Duration}ms | Result: ValidationPassed",
-                    (int)(_dateTimeProvider.Now - startTime).TotalMilliseconds);
             }
             catch (Exception ex)
             {

@@ -1,4 +1,3 @@
-using EIMSNext.Async.Core.Interfaces;
 using EIMSNext.Async.Core.Jobs;
 using EIMSNext.Async.Core.Messaging;
 using EIMSNext.Async.Core.Messaging.Consumers;
@@ -19,7 +18,6 @@ namespace EIMSNext.Async.Core
         public static IServiceCollection AddJobs(this IServiceCollection services)
         {
             // 注册业务服务（Quartz 作业依赖）
-            services.AddSingleton<IDateTimeProvider, SystemDateTimeProvider>();
             services.AddTransient<TestJob>(); // Quartz 通过 DI 解析作业
 
             // 注册业务接口（便于测试/替换）
