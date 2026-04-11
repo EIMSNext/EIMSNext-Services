@@ -1,4 +1,5 @@
-using EIMSNext.Async.Abstractions.Messaging;
+ using EIMSNext.Async.Abstractions.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
@@ -18,19 +19,19 @@ namespace EIMSNext.Async.Tasks.Consumers
 {
     public class FormNotifyDispatchConsumer : TaskConsumerBase<FormNotifyDispatchTaskArgs, FormNotifyDispatchConsumer>
     {
-        public FormNotifyDispatchConsumer(IResolver resolver)
-            : base(resolver)
+        public FormNotifyDispatchConsumer(IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
         }
 
-        protected override async Task HandleAsync(FormNotifyDispatchTaskArgs args, CancellationToken ct)
+        protected override async Task HandleAsync(FormNotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
         {
-            var notifyRepo = Resolver.GetRepository<FormNotify>();
-            var formDataRepo = Resolver.GetRepository<FormData>();
-            var formDefRepo = Resolver.GetRepository<FormDef>();
-            var publisher = Resolver.Resolve<IMessagePublisher>();
-            var detailBuilder = Resolver.Resolve<IFormNotifyDetailBuilder>();
-            var recipientResolver = Resolver.Resolve<IFormNotifyRecipientResolver>();
+            var notifyRepo = resolver.GetRepository<FormNotify>();
+            var formDataRepo = resolver.GetRepository<FormData>();
+            var formDefRepo = resolver.GetRepository<FormDef>();
+            var publisher = resolver.Resolve<IMessagePublisher>();
+            var detailBuilder = resolver.Resolve<IFormNotifyDetailBuilder>();
+            var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
 
             var formDef = formDefRepo.Get(args.NewData.FormId);
             if (formDef == null)

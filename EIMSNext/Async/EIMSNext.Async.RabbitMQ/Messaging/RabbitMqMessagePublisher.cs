@@ -9,9 +9,9 @@ using RabbitMQ.Client;
 
 namespace EIMSNext.Async.RabbitMQ.Messaging
 {
-    public class RabbitMqMessagePublisher(IConnection connection, IMessageRouteResolver routeResolver, ILogger<RabbitMqMessagePublisher> logger) : IMessagePublisher
+    public class RabbitMqMessagePublisher(IConnectionFactory connectionFactory, IMessageRouteResolver routeResolver, ILogger<RabbitMqMessagePublisher> logger) : IMessagePublisher
     {
-        private readonly IConnection _connection = connection;
+        private readonly IConnectionFactory _connectionFactory = connectionFactory;
         private readonly IMessageRouteResolver _routeResolver = routeResolver;
         private readonly ILogger<RabbitMqMessagePublisher> _logger = logger;
 
@@ -24,8 +24,11 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
 
             try
             {
-                using var channel = _connection.CreateModel();
-                channel.QueueDeclare(queueName, durable: true);
+            // Create a new connection per publish to avoid startup-time dependency on RabbitMQ availability
+            using var connection = _connectionFactory.CreateConnection();
+            using var channel = connection.CreateModel();
+            // Ensure queue is non-exclusive by default
+            channel.QueueDeclare(queueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
 
                 var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(message));
                 channel.BasicPublish(exchange: string.Empty, routingKey: queueName, basicProperties: null, body: body);

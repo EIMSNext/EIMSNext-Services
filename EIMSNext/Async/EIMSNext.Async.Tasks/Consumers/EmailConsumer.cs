@@ -1,4 +1,5 @@
 using EIMSNext.Async.Abstractions.Messaging;
+using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Core;
 using EIMSNext.Core.Repositories;
@@ -15,19 +16,19 @@ namespace EIMSNext.Async.Tasks.Consumers
 {
     public class EmailConsumer : TaskConsumerBase<EmailNotifyTaskArgs, EmailConsumer>
     {
-        public EmailConsumer(IResolver resolver)
-            : base(resolver)
+        public EmailConsumer(IServiceProvider serviceProvider)
+            : base(serviceProvider)
         {
         }
 
-        protected override Task HandleAsync(EmailNotifyTaskArgs args, CancellationToken ct)
+        protected override Task HandleAsync(EmailNotifyTaskArgs args, CancellationToken ct, IResolver resolver)
         {
             if (args.Receivers.Count == 0)
             {
                 return Task.CompletedTask;
             }
 
-            var empRepo = Resolver.GetRepository<Employee>();
+            var empRepo = resolver.GetRepository<Employee>();
             var targetEmpIds = args.Receivers.Select(x => x.EmpId).ToHashSet(StringComparer.OrdinalIgnoreCase);
             var employees = empRepo.Find(x => targetEmpIds.Contains(x.Id) && !string.IsNullOrEmpty(x.WorkEmail))
                 .ToList();

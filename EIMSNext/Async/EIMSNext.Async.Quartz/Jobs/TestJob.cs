@@ -1,3 +1,4 @@
+using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 
 using Quartz;
@@ -5,24 +6,14 @@ using Quartz;
 namespace EIMSNext.Async.Quartz.Jobs
 {
     [DisallowConcurrentExecution]
-    public class TestJob(ILogger<TestJob> logger) : IJob, ITestJob
+    public class TestJob : JobBase<TestJob>, IJob, ITestJob
     {
-        private readonly ILogger<TestJob> _logger = logger;
+        public TestJob(IResolver resolver) : base(resolver) { }
 
-        public Task Execute(IJobExecutionContext context)
-            => ExecuteAsync();
 
-        public async Task ExecuteAsync()
+        protected override async Task ExecuteAsync(IJobExecutionContext context)
         {
-            try
-            {
-                await Task.Delay(800);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "[TestJob] Failed: {ErrorMessage}", ex.Message);
-                throw;
-            }
+            await Task.Delay(800);
         }
     }
 }

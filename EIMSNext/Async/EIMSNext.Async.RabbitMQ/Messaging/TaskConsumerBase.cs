@@ -6,6 +6,7 @@ using EIMSNext.Async.Abstractions.Messaging;
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 using RabbitMQ.Client;
@@ -17,29 +18,32 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
         where TMessage : class
         where TConsumer : class
     {
-        protected IResolver Resolver { get; }
-
-        protected IConnection MQConn { get; }
+        // Resolver is scoped; do not inject into singleton. Use per-message scope.
+        protected IServiceProvider ServiceProvider { get; }
+        protected IConnectionFactory MQConnFactory { get; }
 
         protected ILogger<TConsumer> Logger { get; }
 
         protected string QueueName { get; }
 
-        protected TaskConsumerBase(IResolver resolver)
+        protected TaskConsumerBase(IServiceProvider serviceProvider)
         {
-            Resolver = resolver;
-            MQConn = resolver.Resolve<IConnection>();
-            Logger = resolver.Resolve<ILogger<TConsumer>>();
-            var routeResolver = resolver.Resolve<IMessageRouteResolver>();
+            ServiceProvider = serviceProvider;
+            // Resolve non-scoped dependencies from root container when possible
+            MQConnFactory = serviceProvider.GetRequiredService<IConnectionFactory>();
+            Logger = serviceProvider.GetRequiredService<ILogger<TConsumer>>();
+            var routeResolver = serviceProvider.GetRequiredService<IMessageRouteResolver>();
             QueueName = routeResolver.ResolveQueueName(typeof(TMessage));
         }
 
-        protected abstract Task HandleAsync(TMessage message, CancellationToken cancellationToken);
+        protected abstract Task HandleAsync(TMessage message, CancellationToken cancellationToken, IResolver resolver);
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var channel = MQConn.CreateModel();
-            channel.QueueDeclare(QueueName, durable: true);
+            using var connection = MQConnFactory.CreateConnection();
+            using var channel = connection.CreateModel();
+            // Ensure queue is non-exclusive by default
+            channel.QueueDeclare(QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
             channel.BasicQos(0, 1, false);
 
             var consumer = new EventingBasicConsumer(channel);
@@ -56,8 +60,11 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
                         return;
                     }
 
-                    await HandleAsync(message, stoppingToken);
-                    channel.BasicAck(ea.DeliveryTag, false);
+                    using (var scope = ServiceProvider.CreateScope())
+                    {
+                        await HandleAsync(message, stoppingToken, scope.ServiceProvider.GetRequiredService<IResolver>());
+                        channel.BasicAck(ea.DeliveryTag, false);
+                    }
                 }
                 catch (Exception ex)
                 {
