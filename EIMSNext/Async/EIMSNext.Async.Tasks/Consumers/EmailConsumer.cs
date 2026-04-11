@@ -16,8 +16,8 @@ namespace EIMSNext.Async.Tasks.Consumers
 {
     public class EmailConsumer : TaskConsumerBase<EmailNotifyTaskArgs, EmailConsumer>
     {
-        public EmailConsumer(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public EmailConsumer(IServiceScopeFactory scopeFactory)
+            : base(scopeFactory)
         {
         }
 

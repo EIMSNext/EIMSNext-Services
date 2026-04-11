@@ -18,18 +18,19 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
         where TMessage : class
         where TConsumer : class
     {
-        // Resolver is scoped; do not inject into singleton. Use per-message scope.
-        protected IServiceProvider ServiceProvider { get; }
+        private readonly IServiceScopeFactory _scopeFactory;
         protected IConnectionFactory MQConnFactory { get; }
 
         protected ILogger<TConsumer> Logger { get; }
 
         protected string QueueName { get; }
 
-        protected TaskConsumerBase(IServiceProvider serviceProvider)
+        protected TaskConsumerBase(IServiceScopeFactory scopeFactory)
         {
-            ServiceProvider = serviceProvider;
-            // Resolve non-scoped dependencies from root container when possible
+            _scopeFactory = scopeFactory;
+
+            using var scope = _scopeFactory.CreateScope();
+            var serviceProvider = scope.ServiceProvider;
             MQConnFactory = serviceProvider.GetRequiredService<IConnectionFactory>();
             Logger = serviceProvider.GetRequiredService<ILogger<TConsumer>>();
             var routeResolver = serviceProvider.GetRequiredService<IMessageRouteResolver>();
@@ -60,11 +61,8 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
                         return;
                     }
 
-                    using (var scope = ServiceProvider.CreateScope())
-                    {
-                        await HandleAsync(message, stoppingToken, scope.ServiceProvider.GetRequiredService<IResolver>());
-                        channel.BasicAck(ea.DeliveryTag, false);
-                    }
+                    await ExecuteInScopeAsync(message, stoppingToken);
+                    channel.BasicAck(ea.DeliveryTag, false);
                 }
                 catch (Exception ex)
                 {
@@ -75,6 +73,13 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
 
             channel.BasicConsume(QueueName, autoAck: false, consumer);
             await Task.Delay(Timeout.Infinite, stoppingToken);
+        }
+
+        protected internal virtual async Task ExecuteInScopeAsync(TMessage message, CancellationToken cancellationToken)
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var resolver = scope.ServiceProvider.GetRequiredService<IResolver>();
+            await HandleAsync(message, cancellationToken, resolver);
         }
     }
 }

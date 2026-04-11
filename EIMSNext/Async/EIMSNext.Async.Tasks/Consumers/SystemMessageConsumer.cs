@@ -11,8 +11,8 @@ namespace EIMSNext.Async.Tasks.Consumers
 {
     public class SystemMessageConsumer : TaskConsumerBase<SystemMessageTaskArgs, SystemMessageConsumer>
     {
-        public SystemMessageConsumer(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public SystemMessageConsumer(IServiceScopeFactory scopeFactory)
+            : base(scopeFactory)
         {
         }
         protected override async Task HandleAsync(SystemMessageTaskArgs args, CancellationToken ct, IResolver resolver)

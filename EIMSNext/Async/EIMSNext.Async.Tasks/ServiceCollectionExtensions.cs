@@ -9,9 +9,9 @@ namespace EIMSNext.Async.Tasks
     {
         public static IServiceCollection AddAsyncTaskConsumers(this IServiceCollection services)
         {
-            services.AddSingleton<IHostedService, FormNotifyDispatchConsumer>();
-            services.AddSingleton<IHostedService, SystemMessageConsumer>();
-            services.AddSingleton<IHostedService, EmailConsumer>();
+            services.AddHostedService<FormNotifyDispatchConsumer>();
+            services.AddHostedService<SystemMessageConsumer>();
+            services.AddHostedService<EmailConsumer>();
 
             return services;
         }

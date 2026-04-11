@@ -19,8 +19,8 @@ namespace EIMSNext.Async.Tasks.Consumers
 {
     public class FormNotifyDispatchConsumer : TaskConsumerBase<FormNotifyDispatchTaskArgs, FormNotifyDispatchConsumer>
     {
-        public FormNotifyDispatchConsumer(IServiceProvider serviceProvider)
-            : base(serviceProvider)
+        public FormNotifyDispatchConsumer(IServiceScopeFactory scopeFactory)
+            : base(scopeFactory)
         {
         }
 

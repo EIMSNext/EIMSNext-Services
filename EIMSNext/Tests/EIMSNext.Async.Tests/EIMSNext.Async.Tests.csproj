@@ -10,9 +10,15 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
     <PackageReference Include="MSTest" Version="3.10.4" />
+    <PackageReference Include="Quartz" Version="3.16.1" />
+    <PackageReference Include="Quartz.Extensions.DependencyInjection" Version="3.16.1" />
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Json\EIMSNext.Json.csproj" />
   </ItemGroup>

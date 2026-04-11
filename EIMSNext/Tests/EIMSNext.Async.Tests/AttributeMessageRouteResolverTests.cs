@@ -1,7 +1,7 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 
-namespace EIMSNext.Core.Tests.Async
+namespace EIMSNext.Async.Tests
 {
     [TestClass]
     public class AttributeMessageRouteResolverTests
