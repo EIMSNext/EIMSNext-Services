@@ -1,13 +1,15 @@
 using System.Diagnostics;
 using EIMSNext.ApiCore;
+using EIMSNext.Async.Host.Extensions;
 using EIMSNext.Async.Quartz;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
+using Microsoft.AspNetCore.Http;
 using Quartz;
 using Serilog;
 
-Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory); // 设置工作目录
+Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
 var appBasePath = AppContext.BaseDirectory;
 var isService = !(Debugger.IsAttached || args.Contains("--console"));
@@ -18,6 +20,8 @@ try
 {
     var builder = Host.CreateDefaultBuilder(args)
         .UseContentRoot(appBasePath);
+
+    builder.UseAutofac<AutofacRegisterModule>();
 
     builder.UseSerilog((ctx, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)

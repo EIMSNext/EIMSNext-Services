@@ -43,7 +43,6 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
         {
             using var connection = MQConnFactory.CreateConnection();
             using var channel = connection.CreateModel();
-            // Ensure queue is non-exclusive by default
             channel.QueueDeclare(QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
             channel.BasicQos(0, 1, false);
 

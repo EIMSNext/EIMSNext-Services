@@ -1,4 +1,4 @@
- using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Async.Abstractions.Messaging;
 using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Common.Extensions;
