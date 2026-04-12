@@ -115,11 +115,13 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.WaitForActivity(context.ExecutionPointer.EventKey, context.Workflow.Data, DateTime.Now);
         }
 
-        protected async Task CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
+        protected async Task<List<Wf_Todo>> CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
         {
             var empIds = await PopulateEmpIds(dataContext, wfStep.WfNodeSetting?.ApproveSetting?.Candidates);
 
             var todos = new List<Wf_Todo>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var expireTime = GetExpireTime(wfStep.WfNodeSetting?.ApproveSetting);
             empIds.ForEach(empId =>
             {
                 todos.Add(new Wf_Todo
@@ -132,11 +134,13 @@ namespace EIMSNext.Flow.Core.Nodes
                     ApproveNodeId = wfStep.Id,
                     ApproveNodeName = wfStep.Name,
                     EmployeeId = empId,
-                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                    UpdateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    CreateTime = now,
+                    UpdateTime = now,
                     Starter = dataContext.WfStarter,
-                    ApproveNodeStartTime = DateTime.UtcNow.ToTimeStampMs(),
-                    DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId)
+                    ApproveNodeStartTime = now,
+                    DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
+                    ExpireTime = expireTime,
+                    ExpireHandled = false
                 });
             });
 
@@ -144,6 +148,28 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 TodoRepository.Insert(todos, session);
             }
+
+            return todos;
+        }
+
+        private static long? GetExpireTime(ApproveSetting? approveSetting)
+        {
+            var expireSetting = approveSetting?.ExpireSetting;
+            if (expireSetting == null || expireSetting.TimeValue <= 0)
+            {
+                return null;
+            }
+
+            var utcNow = DateTime.UtcNow;
+            var expireAt = expireSetting.TimeUnit switch
+            {
+                TimeUnit.Minute => utcNow.AddMinutes(expireSetting.TimeValue),
+                TimeUnit.Hour => utcNow.AddHours(expireSetting.TimeValue),
+                TimeUnit.Day => utcNow.AddDays(expireSetting.TimeValue),
+                _ => utcNow
+            };
+
+            return expireAt.ToTimeStampMs();
         }
 
         protected async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)

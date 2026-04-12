@@ -48,7 +48,7 @@ namespace EIMSNext.Workflow.Repository
                         if (item.Value.ActionDatas.Count > 0)
                         {
                             var actionData = item.Value.ActionDatas.First();
-                            var pData = actionData.FormData. Data;
+                            var pData = actionData.FormData.Data;
                             pData.TryAdd("createBy", actionData.FormData.CreateBy);
 
                             wrapData.TryAdd($"n_{item.Value.NodeId}", pData);

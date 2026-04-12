@@ -46,7 +46,7 @@ namespace EIMSNext.ApiService.RequestModels
         /// <summary>
         /// 消息管道
         /// </summary>
-        public FormNotifyChannel Channel { get; set; } = FormNotifyChannel.System;
+        public NotifyChannel Channel { get; set; } = NotifyChannel.System;
         /// <summary>
         /// 消息分类
         /// </summary>

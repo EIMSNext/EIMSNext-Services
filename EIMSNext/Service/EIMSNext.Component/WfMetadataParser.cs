@@ -104,7 +104,25 @@ namespace EIMSNext.Component
                     wfNodeSetting.ApproveSetting = new ApproveSetting
                     {
                         ApprovalMode = flowNode.Metadata.ApproveMeta?.ApproveMode ?? WfApprovalMode.None,
-                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>()
+                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
+                        EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
+                        CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
+                        NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
+                        ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
+                        {
+                            ActionType = flowNode.Metadata.ApproveMeta.ExpireSetting.ActionType,
+                            TimeValue = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeValue,
+                            TimeUnit = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeUnit,
+                            NotifySetting = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
+                            {
+                                Channels = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Channels,
+                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Candidates
+                            },
+                            TransferSetting = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
+                            {
+                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting.Candidates
+                            }
+                        }
                     };
                     break;
                 case WfNodeType.CopyTo:
@@ -305,156 +323,7 @@ namespace EIMSNext.Component
         {
             if (cond == null) return ScriptExpression.TRUE;
 
-            if (cond.Items != null && cond.Items.Count > 0)
-            {
-                List<string> subExps = new List<string>();
-                cond.Items.ForEach(x => subExps.Add(ParseConditionList(x)));
-
-                var rel = (cond.Rel == FilterRel.Or) ? "||" : "&&";
-                return string.Join(rel, subExps.Select(x => $"({x})"));
-            }
-            else
-            {
-                if (string.IsNullOrEmpty(cond.Field?.Field))
-                    return ScriptExpression.TRUE;
-
-                return FormatExp(cond.Field, cond.Op ?? FilterOp.Eq, cond.Value);
-            }
-        }
-        private string FormatExp(FormFieldDef condField, string op, ConditionValue? condValue)
-        {
-            var field = condField.ToFieldExp();
-            var oper = ParseOp(condField.Type, op);
-            var value = ParseValue(condField.Type, condValue, out FieldValueType valueType);
-
-            var exp = "";
-
-            if ((condField.IsSubField))
-            {
-                //子表字段使用Match方法计算
-                var fields = field.Split('>', StringSplitOptions.RemoveEmptyEntries);
-                var arrField = fields[0];
-                var subField = fields[1];
-                var subExp = "";
-
-                if (valueType == FieldValueType.Field)
-                {
-                    var valueFields = value.Split('>', StringSplitOptions.RemoveEmptyEntries);
-                    var valueArrField = valueFields[0];
-                    var valueSubField = valueFields[1];
-
-                    switch (op)
-                    {
-                        //TODO: 值为字段时，需要更详细的处理
-                        case FilterOp.In:
-                        case FilterOp.Nin:
-                            subExp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},x.{subField})}})";
-                            break;
-                        default:
-                            subExp = $"MATCH({valueArrField}, y=>{{return {oper}(x.{subField},y.{valueSubField})}})";
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (op)
-                    {
-                        case FilterOp.Empty:
-                        case FilterOp.NotEmpty:
-                            subExp = $" {oper}(x.{subField}) ";
-                            break;
-                        case FilterOp.In:
-                        case FilterOp.Nin:
-                            subExp = $" {oper}({value},x.{subField}) ";
-                            break;
-                        default:
-                            subExp = $" {oper}(x.{subField},{value}) ";
-                            break;
-                    }
-                }
-
-                exp = $"MATCH({arrField}, x=>{{return {subExp}}})";
-            }
-            else
-            {
-                if (valueType == FieldValueType.Field)
-                {
-                    var valueFields = value.Split('>', StringSplitOptions.RemoveEmptyEntries);
-                    var valueArrField = valueFields[0];
-                    var valueSubField = valueFields[1];
-
-                    switch (op)
-                    {
-                        //TODO: 值为字段时，需要更详细的处理
-                        case FilterOp.In:
-                        case FilterOp.Nin:
-                            exp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},{field})}})";
-                            break;
-                        default:
-                            exp = $"MATCH({valueArrField}, y=>{{return {oper}({field},y.{valueSubField})}})";
-                            break;
-                    }
-                }
-                else
-                {
-                    switch (op)
-                    {
-                        case FilterOp.Empty:
-                        case FilterOp.NotEmpty:
-                            exp = $" {oper}({field}) ";
-                            break;
-                        case FilterOp.In:
-                        case FilterOp.Nin:
-                            exp = $" {oper}({value},{field}) ";
-                            break;
-                        default:
-                            exp = $" {oper}({field},{value}) ";
-                            break;
-                    }
-                }
-            }
-
-            return exp;
-        }
-
-        private string ParseOp(string fieldType, string op)
-        {
-            var oper = op.ToUpper();
-            switch (op.ToLower())
-            {
-                case FilterOp.Lte:
-                    oper = "LE";
-                    break;
-                case FilterOp.Gte:
-                    oper = "GE";
-                    break;
-            }
-
-            return oper;
-        }
-        private string ParseValue(string fieldType, ConditionValue? value, out FieldValueType valueType)
-        {
-            valueType = FieldValueType.Custom;
-
-            if (value == null) return string.Empty;
-
-            valueType = string.IsNullOrEmpty(value.Type) ? FieldValueType.Custom : Enum.Parse<FieldValueType>(value.Type, true);
-
-            if (valueType == FieldValueType.Field)
-            {
-                return value.FieldValue!.ToFieldExp();
-            }
-            else
-            {
-                var fType = fieldType.ToLower();
-                var valStr = "";
-                if (fType == FieldType.Number)
-                    valStr = $"{value?.Value ?? "0"}";
-                else
-                    valStr = $"'{value?.Value}'";
-
-                return valStr;
-            }
+            return cond.ToScriptExpression();
         }
         #endregion
 
@@ -589,6 +458,28 @@ namespace EIMSNext.Component
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
+            public NotifyChannel NotifyChannels { get; set; }
+            public ExpireMeta? ExpireSetting { get; set; }
+        }
+
+        private class ExpireMeta
+        {
+            public WfExpireActionType ActionType { get; set; } = WfExpireActionType.AutoNotify;
+            public int TimeValue { get; set; }
+            public TimeUnit TimeUnit { get; set; } = TimeUnit.Minute;
+            public NotifyMeta? NotifySetting { get; set; }
+            public TransferMeta? TransferSetting { get; set; }
+        }
+
+        private class NotifyMeta
+        {
+            public NotifyChannel Channels { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
+        }
+
+        private class TransferMeta
+        {
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
         private class CopytoMeta
         {

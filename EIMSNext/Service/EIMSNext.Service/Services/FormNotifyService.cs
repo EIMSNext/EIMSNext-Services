@@ -14,46 +14,47 @@ namespace EIMSNext.Service
         {
             var entity = entities.First();
 
-            if (!string.IsNullOrEmpty(entity.DataFilter))
-            {
-                var condList = entity.DataFilter.DeserializeFromJson<ConditionList>();
-                if (condList != null)
-                {
-                    entity.DataDynamicFilter = condList.ToDynamicFilter().SerializeToJson();
-                }
-                else
-                {
-                    entity.DataDynamicFilter = null;
-                }
-            }
-            else
-            {
-                entity.DataDynamicFilter = null;
-            }
+            ParseDataFilter(entity);
 
             return Task.CompletedTask;
         }
 
         protected override Task BeforeReplace(FormNotify entity, IClientSessionHandle? session)
         {
+            ParseDataFilter(entity);
+
+            return Task.CompletedTask;
+        }
+
+        private void ParseDataFilter(FormNotify entity)
+        {
             if (!string.IsNullOrEmpty(entity.DataFilter))
             {
                 var condList = entity.DataFilter.DeserializeFromJson<ConditionList>();
                 if (condList != null)
                 {
-                    entity.DataDynamicFilter = condList.ToDynamicFilter().SerializeToJson();
+                    if (entity.TriggerMode == FormNotifyTriggerMode.DataAdded || entity.TriggerMode == FormNotifyTriggerMode.DataChanged)
+                    {
+                        entity.DataDynamicFilter = null;
+                        entity.DataExpressFilter = condList.ToScriptExpression();
+                    }
+                    else
+                    {
+                        entity.DataDynamicFilter = condList.ToDynamicFilter().SerializeToJson();
+                        entity.DataExpressFilter = null;
+                    }
                 }
                 else
                 {
                     entity.DataDynamicFilter = null;
+                    entity.DataExpressFilter = null;
                 }
             }
             else
             {
                 entity.DataDynamicFilter = null;
+                entity.DataExpressFilter = null;
             }
-
-            return Task.CompletedTask;
         }
     }
 }

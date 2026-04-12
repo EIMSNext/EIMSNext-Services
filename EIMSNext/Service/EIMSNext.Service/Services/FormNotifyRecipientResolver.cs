@@ -5,6 +5,8 @@ using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
+using EIMSNext.Async.Abstractions.Messaging;
+
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -18,18 +20,23 @@ namespace EIMSNext.Service
 
         public async Task<List<NotifyReceiver>> ResolveAsync(FormData data, FormDef formDef, string? notifiersJson, string? operatorEmpId)
         {
-            var receivers = new Dictionary<string, NotifyReceiver>(StringComparer.OrdinalIgnoreCase);
             if (string.IsNullOrWhiteSpace(notifiersJson))
             {
-                return receivers.Values.ToList();
+                return [];
             }
 
             var notifiers = notifiersJson.DeserializeFromJson<List<ApprovalCandidate>>() ?? [];
+            return await ResolveCandidatesAsync(data, formDef, notifiers, operatorEmpId);
+        }
+
+        public async Task<List<NotifyReceiver>> ResolveCandidatesAsync(FormData data, FormDef formDef, IEnumerable<ApprovalCandidate> candidates, string? operatorEmpId)
+        {
+            var receivers = new Dictionary<string, NotifyReceiver>(StringComparer.OrdinalIgnoreCase);
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var roleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var empIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var notifier in notifiers)
+            foreach (var notifier in candidates)
             {
                 switch (notifier.CandidateType)
                 {
@@ -57,20 +64,33 @@ namespace EIMSNext.Service
                 }
             }
 
+            var filters = new List<FilterDefinition<Employee>>();
+            if (empIds.Count > 0)
+            {
+                filters.Add(Builders<Employee>.Filter.In(x => x.Id, empIds));
+            }
+
             if (deptIds.Count > 0)
             {
-                await EmployeeRepository.Find(x => deptIds.Contains(x.DepartmentId)).ForEachAsync(x => empIds.Add(x.Id));
+                filters.Add(Builders<Employee>.Filter.In(x => x.DepartmentId, deptIds));
             }
 
             if (roleIds.Count > 0)
             {
-                await EmployeeRepository.Find(new MongoFindOptions<Employee>
-                {
-                    Filter = Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId))
-                }).ForEachAsync(x => empIds.Add(x.Id));
+                filters.Add(Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId)));
             }
 
-            await EmployeeRepository.Find(x => empIds.Contains(x.Id) && !x.IsDummy && x.Status == 0).ForEachAsync(x =>
+            if (filters.Count == 0)
+            {
+                return [];
+            }
+
+            var filter = Builders<Employee>.Filter.And(
+                Builders<Employee>.Filter.Eq(x => x.IsDummy, false),
+                Builders<Employee>.Filter.Eq(x => x.Status, 0),
+                Builders<Employee>.Filter.Or(filters));
+
+            await EmployeeRepository.Find(new MongoFindOptions<Employee> { Filter = filter }).ForEachAsync(x =>
             {
                 //TODO: 暂时不排除当前操作人，方便测试
                 //if (x.Id.Equals(operatorEmpId, StringComparison.OrdinalIgnoreCase))
@@ -83,7 +103,8 @@ namespace EIMSNext.Service
                     receivers[x.Id] = new NotifyReceiver
                     {
                         EmpId = x.Id,
-                        EmpName = x.EmpName
+                        EmpName = x.EmpName,
+                        Email = x.WorkEmail
                     };
                 }
             });

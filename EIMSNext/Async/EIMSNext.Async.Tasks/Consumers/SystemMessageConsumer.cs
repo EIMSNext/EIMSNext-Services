@@ -1,29 +1,28 @@
-using System.Text.Json;
-
+using EIMSNext.Async.Abstractions.Messaging;
+using Microsoft.Extensions.DependencyInjection;
+using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Core;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
-namespace EIMSNext.Async.Core.Messaging.Consumers
+namespace EIMSNext.Async.Tasks.Consumers
 {
-    [Queue("system-message")]
-    public class SystemMessageConsumer : TaskConsumerBase<SystemMessageConsumer, SystemMessageTaskArgs>
+    public class SystemMessageConsumer : TaskConsumerBase<SystemMessageTaskArgs, SystemMessageConsumer>
     {
-        public SystemMessageConsumer(IResolver resolver) : base(resolver)
+        public SystemMessageConsumer(IServiceScopeFactory scopeFactory)
+            : base(scopeFactory)
         {
         }
-
-        protected override async Task HandleTaskAsync(string taskType, string argsJson, CancellationToken ct)
+        protected override async Task HandleAsync(SystemMessageTaskArgs args, CancellationToken ct, IResolver resolver)
         {
-            var invoke = JsonSerializer.Deserialize<TaskInvokeArgs<SystemMessageTaskArgs>>(argsJson);
-            var args = invoke?.Parameters?.FirstOrDefault();
-            if (args == null || args.Receivers.Count == 0)
+            if (args.Receivers.Count == 0)
             {
                 return;
             }
 
-            var repo = Resolver.GetRepository<SystemMessage>();
+            var repo = resolver.GetRepository<SystemMessage>();
             var messages = args.Receivers.Select(x => new SystemMessage
             {
                 CorpId = args.CorpId,

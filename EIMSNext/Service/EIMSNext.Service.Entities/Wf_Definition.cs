@@ -202,6 +202,113 @@ namespace EIMSNext.Service.Entities
         /// 抄送候选人列表
         /// </summary>
         public List<ApprovalCandidate>? CopytoCandidates { get; set; }
+        /// <summary>
+        /// 待办创建通知通道
+        /// </summary>
+        public NotifyChannel NotifyChannels { get; set; } = NotifyChannel.None;
+        /// <summary>
+        /// 超时处理设置
+        /// </summary>
+        public ExpireSetting? ExpireSetting { get; set; }
+    }
+
+    /// <summary>
+    /// 超时处理设置
+    /// </summary>
+    public class ExpireSetting
+    {
+        /// <summary>
+        /// 超时处理方式
+        /// </summary>
+        public WfExpireActionType ActionType { get; set; } = WfExpireActionType.AutoNotify;
+        /// <summary>
+        /// 超时数值
+        /// </summary>
+        public int TimeValue { get; set; }
+        /// <summary>
+        /// 超时时间单位
+        /// </summary>
+        public TimeUnit TimeUnit { get; set; } = TimeUnit.Minute;
+        /// <summary>
+        /// 超时提醒设置
+        /// </summary>
+        public NotifySetting? NotifySetting { get; set; }
+        /// <summary>
+        /// 超时转交设置
+        /// </summary>
+        public TransferSetting? TransferSetting { get; set; }
+    }
+
+    /// <summary>
+    /// 通知设置
+    /// </summary>
+    public class NotifySetting
+    {
+        /// <summary>
+        /// 通知通道
+        /// </summary>
+        public NotifyChannel Channels { get; set; } = NotifyChannel.None;
+        /// <summary>
+        /// 通知候选人
+        /// </summary>
+        public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 转交设置
+    /// </summary>
+    public class TransferSetting
+    {
+        /// <summary>
+        /// 转交目标候选人
+        /// </summary>
+        public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 超时处理动作
+    /// </summary>
+    public enum WfExpireActionType
+    {
+        /// <summary>
+        /// 自动提醒
+        /// </summary>
+        AutoNotify,
+        /// <summary>
+        /// 自动通过
+        /// </summary>
+        AutoApprove,
+        /// <summary>
+        /// 自动转交
+        /// </summary>
+        AutoTransfer,
+        /// <summary>
+        /// 自动驳回
+        /// </summary>
+        AutoReject,
+        /// <summary>
+        /// 自动回退
+        /// </summary>
+        AutoReturn
+    }
+
+    /// <summary>
+    /// 时间单位
+    /// </summary>
+    public enum TimeUnit
+    {
+        /// <summary>
+        /// 分钟
+        /// </summary>
+        Minute,
+        /// <summary>
+        /// 小时
+        /// </summary>
+        Hour,
+        /// <summary>
+        /// 天
+        /// </summary>
+        Day
     }
 
     /// <summary>

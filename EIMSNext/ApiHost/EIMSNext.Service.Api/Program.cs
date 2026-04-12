@@ -23,9 +23,7 @@ using MongoDB.Driver;
 
 using NLog.Extensions.Logging;
 
-using RabbitMQ.Client;
-
-using EIMSNext.Async.Core.Messaging;
+using EIMSNext.Async.RabbitMQ;
 
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -80,18 +78,7 @@ builder.Services.AddApiVersioning(opt =>
 });
 
 builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
-builder.Services.AddSingleton<IConnection>(sp =>
-{
-    var factory = new ConnectionFactory
-    {
-        HostName = "localhost",
-        UserName = "guest",
-        Password = "guest"
-    };
-    return factory.CreateConnection();
-});
-builder.Services.AddSingleton<TaskProducer>();
-builder.Services.AddSingleton<IFormNotifyTaskPublisher, FormNotifyTaskPublisher>();
+builder.Services.AddRabbitMqMessaging(builder.Configuration);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
