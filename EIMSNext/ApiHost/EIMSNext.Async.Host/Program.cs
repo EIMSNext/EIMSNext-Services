@@ -65,7 +65,10 @@ try
 
         if (isService)
         {
-            builder.UseWindowsService();
+            builder.UseWindowsService(cfg =>
+            {
+                cfg.ServiceName = "EIMSNext Async Service";
+            });
         }
     });
 
