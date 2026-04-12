@@ -32,6 +32,10 @@ namespace EIMSNext.Service.Entities
         /// 解析后的DataFilter, 用于数据库数据过滤
         /// </summary>
         public string? DataDynamicFilter { get; set; }
+        /// <summary>
+        /// 解析后的公式， 用于内存过滤
+        /// </summary>
+        public string? DataExpressFilter { get; set; }
 
         /// <summary>
         /// 提醒文字/消息标题

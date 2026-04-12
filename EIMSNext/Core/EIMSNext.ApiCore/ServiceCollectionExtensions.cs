@@ -68,8 +68,26 @@ namespace EIMSNext.ApiCore
                 opt.JsonSerializerOptions.Converters.Add(new ExpandoObjectJsonConverter());
                 //opt.JsonSerializerOptions.Converters.Add(new UnixMillisecondsDateTimeJsonConverter());
 
-                JsonSerializerExtension.SetOptions(opt.JsonSerializerOptions);
             });
+
+            var jsonOpt = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                ReferenceHandler = ReferenceHandler.IgnoreCycles,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            jsonOpt.Converters.Add(new BsonDocumentJsonConverter());
+            jsonOpt.Converters.Add(new ExceptionJsonConverter());
+            jsonOpt.Converters.Add(new FlexibleEnumConverterFactory());
+            jsonOpt.Converters.Add(new ObjectJsonConverter());
+            jsonOpt.Converters.Add(new ExpandoObjectJsonConverter());
+
+            JsonSerializerExtension.SetOptions(jsonOpt);
+
 
             services.AddSingleton<IStorageProvider, LocalStorageProvider>();
         }

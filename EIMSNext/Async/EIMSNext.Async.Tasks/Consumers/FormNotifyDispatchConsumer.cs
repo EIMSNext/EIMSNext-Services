@@ -1,19 +1,17 @@
+using System.Dynamic;
+using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
-using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Scripting;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
-
 using HKH.Mef2.Integration;
-
+using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;
-
-using System.Text.Json;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -48,7 +46,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             foreach (var notify in notifies)
             {
-                if (!ShouldNotify(formDataRepo, notify, args))
+                if (!ShouldNotify(resolver, notify, args))
                 {
                     continue;
                 }
@@ -98,42 +96,60 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
         }
 
-        private static bool ShouldNotify(IRepository<FormData> formDataRepo, FormNotify notify, FormNotifyDispatchTaskArgs args)
+        private static bool ShouldNotify(IResolver resolver, FormNotify notify, FormNotifyDispatchTaskArgs args)
         {
-            if (args.TriggerMode == FormNotifyTriggerMode.DataChanged && notify.ChangeFields?.Count > 0 && args.OldData != null)
+            if (args.TriggerMode == FormNotifyTriggerMode.DataChanged && args.OldData != null)
             {
                 var changedFields = ExpandoComparer.Compare(args.OldData.Data, args.NewData.Data)
                     .Select(x => x.FieldId)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-                if (!notify.ChangeFields.Any(changedFields.Contains))
+                if (notify.ChangeFields?.Count > 0 && !notify.ChangeFields.Any(changedFields.Contains))
                 {
                     return false;
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(notify.DataDynamicFilter))
+            if (notify.TriggerMode == FormNotifyTriggerMode.DataAdded || notify.TriggerMode == FormNotifyTriggerMode.DataChanged)
             {
+                if (!string.IsNullOrEmpty(notify.DataExpressFilter))
+                {
+                    var pData = args.NewData.Data;
+                    pData.TryAdd("createBy", args.NewData.CreateBy);
+                    return resolver.Resolve<IScriptEngine>().Evaluate<bool>(notify.DataExpressFilter, new Dictionary<string, object>()
+                    {
+                        ["data"] = pData
+                    }).Value;
+                }
+
                 return true;
             }
-
-            var filter = notify.DataDynamicFilter.DeserializeFromJson<DynamicFilter>();
-            if (filter == null)
+            else
             {
-                return true;
+                // TODO: 对于非新增/修改的，有可能是运算一个结果，有可能是取合条件的数据
+                if (string.IsNullOrWhiteSpace(notify.DataDynamicFilter))
+                {
+                    return true;
+                }
+
+                var filter = notify.DataDynamicFilter.DeserializeFromJson<DynamicFilter>();
+                if (filter == null)
+                {
+                    return true;
+                }
+
+                var composed = new DynamicFilter
+                {
+                    Rel = FilterRel.And,
+                    Items =
+                    [
+                        new DynamicFilter { Field = nameof(FormData.Id), Op = FilterOp.Eq, Value = args.DataId },
+                        filter
+                    ]
+                };
+
+                return resolver.GetRepository<FormData>().Count(composed) > 0;
             }
-
-            var composed = new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items =
-                [
-                    new DynamicFilter { Field = nameof(FormData.Id), Op = FilterOp.Eq, Value = args.DataId },
-                    filter
-                ]
-            };
-
-            return formDataRepo.Count(composed) > 0;
         }
     }
 }
