@@ -104,7 +104,25 @@ namespace EIMSNext.Component
                     wfNodeSetting.ApproveSetting = new ApproveSetting
                     {
                         ApprovalMode = flowNode.Metadata.ApproveMeta?.ApproveMode ?? WfApprovalMode.None,
-                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>()
+                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
+                        EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
+                        CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
+                        NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
+                        ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
+                        {
+                            ActionType = flowNode.Metadata.ApproveMeta.ExpireSetting.ActionType,
+                            TimeValue = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeValue,
+                            TimeUnit = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeUnit,
+                            NotifySetting = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
+                            {
+                                Channels = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Channels,
+                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Candidates
+                            },
+                            TransferSetting = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
+                            {
+                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting.Candidates
+                            }
+                        }
                     };
                     break;
                 case WfNodeType.CopyTo:
@@ -440,6 +458,28 @@ namespace EIMSNext.Component
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
+            public NotifyChannel NotifyChannels { get; set; }
+            public ExpireMeta? ExpireSetting { get; set; }
+        }
+
+        private class ExpireMeta
+        {
+            public WfExpireActionType ActionType { get; set; } = WfExpireActionType.AutoNotify;
+            public int TimeValue { get; set; }
+            public TimeUnit TimeUnit { get; set; } = TimeUnit.Minute;
+            public NotifyMeta? NotifySetting { get; set; }
+            public TransferMeta? TransferSetting { get; set; }
+        }
+
+        private class NotifyMeta
+        {
+            public NotifyChannel Channels { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
+        }
+
+        private class TransferMeta
+        {
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
         private class CopytoMeta
         {

@@ -10,19 +10,34 @@ namespace EIMSNext.Async.Quartz
     {
         public static IServiceCollectionQuartzConfigurator AddAsyncQuartzTriggers(this IServiceCollectionQuartzConfigurator qz, IConfiguration configuration)
         {
-            var jobKey = new JobKey("DailyTestJob", "Business");
-            qz.AddJob<TestJob>(opts => opts
-                .WithIdentity(jobKey)
+            var formNotifyJobKey = new JobKey("FormNotifyScheduleJob", "Business");
+            var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Business");
+            qz.AddJob<FormNotifyScheduleJob>(opts => opts
+                .WithIdentity(formNotifyJobKey)
                 .StoreDurably()
-                .WithDescription("每日业务验证作业"));
+                .WithDescription("表单通知定时扫描作业"));
+
+            qz.AddJob<WfExpireNotifyJob>(opts => opts
+                .WithIdentity(wfExpireJobKey)
+                .StoreDurably()
+                .WithDescription("流程待办超时扫描作业"));
 
             qz.AddTrigger(opts => opts
-                .ForJob(jobKey)
-                .WithIdentity("DailyTestTrigger", "Business")
+                .ForJob(formNotifyJobKey)
+                .WithIdentity("FormNotifyScheduleTrigger", "Business")
                 .WithCronSchedule(
-                    configuration["Quartz:TestJob:Cron"] ?? "0 0 0 * * ?",
+                    configuration["Quartz:FormNotifyScheduleJob:Cron"] ?? "0 0/1 * * * ?",
                     cs => cs.InTimeZone(TimeZoneInfo.Local))
-                .WithDescription("每天0点触发测试作业")
+                .WithDescription("每分钟触发表单通知定时扫描")
+                .StartNow());
+
+            qz.AddTrigger(opts => opts
+                .ForJob(wfExpireJobKey)
+                .WithIdentity("WfExpireNotifyTrigger", "Notify")
+                .WithCronSchedule(
+                    configuration["Quartz:WfExpireNotifyJob:Cron"] ?? "0 0/1 * * * ?",
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
+                .WithDescription("每分钟触发流程待办超时扫描")
                 .StartNow());
 
             return qz;

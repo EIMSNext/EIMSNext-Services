@@ -51,6 +51,14 @@ namespace EIMSNext.Service.Entities
         /// 数据摘要字段列表
         /// </summary>
         public List<BriefField> DataBrief { get; set; } = new List<BriefField>();
+        /// <summary>
+        /// 超时时间
+        /// </summary>
+        public long? ExpireTime { get; set; }
+        /// <summary>
+        /// 超时动作是否已处理
+        /// </summary>
+        public bool ExpireHandled { get; set; }
     }
 
     /// <summary>

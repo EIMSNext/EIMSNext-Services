@@ -162,11 +162,14 @@ namespace EIMSNext.Service
 
         private Task EnqueueFormNotify(IMessagePublisher messagePublisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
         {
-            return messagePublisher.PublishAsync(new FormNotifyDispatchTaskArgs
+            return messagePublisher.PublishAsync(new NotifyDispatchTaskArgs
             {
                 CorpId = Context.CorpId,
+                MessageType = MessageType.FormNotify,
+                AppId = newData.AppId,
+                FormId = newData.FormId,
                 DataId = newData.Id,
-                TriggerMode = triggerMode,
+                FormTriggerMode = triggerMode,
                 Operator = Context.Operator,
                 NewData = newData.SerializeToJson().DeserializeFromJson<FormData>()!,
                 OldData = oldData?.SerializeToJson().DeserializeFromJson<FormData>()

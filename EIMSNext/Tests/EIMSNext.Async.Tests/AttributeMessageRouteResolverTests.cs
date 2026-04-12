@@ -11,9 +11,9 @@ namespace EIMSNext.Async.Tests
         [TestMethod]
         public void ResolveQueueName_ReturnsQueueFromAttribute()
         {
-            var queueName = _resolver.ResolveQueueName(typeof(FormNotifyDispatchTaskArgs));
+            var queueName = _resolver.ResolveQueueName(typeof(NotifyDispatchTaskArgs));
 
-            Assert.AreEqual("formnotify-dispatch", queueName);
+            Assert.AreEqual("notify-dispatch", queueName);
         }
 
         [TestMethod]

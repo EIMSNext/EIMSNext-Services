@@ -15,21 +15,34 @@ namespace EIMSNext.Async.Abstractions.Messaging
     public enum MessageType
     {
         FormNotify,
-        TodoNotify
+        WfTodoNotify,
+        WfExpireNotify
     }
 
-    [Queue("formnotify-dispatch")]
-    public class FormNotifyDispatchTaskArgs
+    [Queue("notify-dispatch")]
+    public class NotifyDispatchTaskArgs
     {
         public string CorpId { get; set; } = string.Empty;
 
+        public MessageType MessageType { get; set; }
+
+        public string? AppId { get; set; }
+
+        public string? FormId { get; set; }
+
         public string DataId { get; set; } = string.Empty;
 
-        public FormNotifyTriggerMode TriggerMode { get; set; }
+        public string? TodoId { get; set; }
+
+        public string? WfInstanceId { get; set; }
+
+        public string? ApproveNodeId { get; set; }
+
+        public FormNotifyTriggerMode? FormTriggerMode { get; set; }
 
         public Operator? Operator { get; set; }
 
-        public FormData NewData { get; set; } = null!;
+        public FormData? NewData { get; set; }
 
         public FormData? OldData { get; set; }
     }
@@ -43,7 +56,7 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string Url { get; set; } = string.Empty;
 
-        MessageType MessageType { get; set; }
+        public MessageType MessageType { get; set; }
 
         public List<NotifyReceiver> Receivers { get; set; } = new();
     }

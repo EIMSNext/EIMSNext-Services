@@ -46,7 +46,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string? Notifiers { get; set; }
         /// <summary>
-        /// 消息管道 <see cref="FormNotifyChannel"/>
+        /// 消息管道 <see cref="NotifyChannel"/>
         /// </summary>
         public long Channels { get; set; }
         /// <summary>
@@ -82,7 +82,7 @@ namespace EIMSNext.Service.Entities
     /// 通知管道
     /// </summary>
     [Flags]
-    public enum FormNotifyChannel
+    public enum NotifyChannel
     {
         /// <summary>
         /// 不发送
@@ -118,6 +118,10 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 系统公告
         /// </summary>
-        SystemNotice
+        SystemNotice,
+        /// <summary>
+        /// 流程通知
+        /// </summary>
+        FlowNotify
     }
 }

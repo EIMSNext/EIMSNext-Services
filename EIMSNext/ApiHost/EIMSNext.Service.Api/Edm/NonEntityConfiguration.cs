@@ -39,7 +39,9 @@ namespace EIMSNext.Service.Api.Edm
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
             builder.EnumType<FormNotifyTriggerMode>();
-            builder.EnumType<FormNotifyChannel>();
+            builder.EnumType<NotifyChannel>();
+            builder.EnumType<WfExpireActionType>();
+            builder.EnumType<TimeUnit>();
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();

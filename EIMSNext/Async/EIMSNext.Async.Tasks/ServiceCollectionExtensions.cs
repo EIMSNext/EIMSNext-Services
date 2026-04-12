@@ -9,7 +9,7 @@ namespace EIMSNext.Async.Tasks
     {
         public static IServiceCollection AddAsyncTaskConsumers(this IServiceCollection services)
         {
-            services.AddHostedService<FormNotifyDispatchConsumer>();
+            services.AddHostedService<NotifyDispatchConsumer>();
             services.AddHostedService<SystemMessageConsumer>();
             services.AddHostedService<EmailConsumer>();
 
