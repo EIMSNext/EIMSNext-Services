@@ -1,6 +1,7 @@
 using System.Dynamic;
 
 using EIMSNext.Core;
+using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 
@@ -148,7 +149,21 @@ namespace EIMSNext.Flow.Core.Nodes
             else
             {
                 //写入待办记录
-                await CreateTodos(context.Workflow, dataContext, meta, null);
+                var todos = await CreateTodos(context.Workflow, dataContext, meta, null);
+                var notifyChannels = meta.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
+                if (todos.Count > 0 && notifyChannels != NotifyChannel.None)
+                {
+                    await Resolver.Resolve<IMessagePublisher>().PublishAsync(new NotifyDispatchTaskArgs
+                    {
+                        CorpId = dataContext.CorpId,
+                        MessageType = MessageType.WfTodoNotify,
+                        AppId = dataContext.AppId,
+                        FormId = dataContext.FormId,
+                        DataId = dataContext.DataId,
+                        WfInstanceId = context.Workflow.Id,
+                        ApproveNodeId = meta.Id
+                    });
+                }
 
                 var activityKey = $"{context.Workflow.Id}_{dataContext.DataId}_{context.Step.ExternalId}";
                 return ExecutionResult.WaitForActivity(activityKey, context.Workflow.Data, DateTime.Now);

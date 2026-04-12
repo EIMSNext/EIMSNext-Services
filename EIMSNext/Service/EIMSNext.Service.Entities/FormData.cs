@@ -10,11 +10,11 @@ namespace EIMSNext.Service.Entities
     public class FormData : DynamicEntity
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
         /// <summary>
-        /// 
+        /// 表单ID
         /// </summary>
         public string FormId { get; set; } = string.Empty;
         /// <summary>

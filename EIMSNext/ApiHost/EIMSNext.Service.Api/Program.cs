@@ -5,6 +5,7 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Api.Extensions;
 using EIMSNext.Service.Api.OData;
@@ -21,6 +22,8 @@ using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
 using NLog.Extensions.Logging;
+
+using EIMSNext.Async.RabbitMQ;
 
 using Swashbuckle.AspNetCore.SwaggerGen;
 
@@ -75,6 +78,7 @@ builder.Services.AddApiVersioning(opt =>
 });
 
 builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
+builder.Services.AddRabbitMqMessaging(builder.Configuration);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();

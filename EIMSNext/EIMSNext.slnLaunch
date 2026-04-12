@@ -11,5 +11,39 @@
         "Action": "Start"
       }
     ]
+  },
+  {
+    "Name": "API+Flow+File",
+    "Projects": [
+      {
+        "Path": "ApiHost\\EIMSNext.Flow.Api\\EIMSNext.Flow.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Service.Api\\EIMSNext.Service.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.File.Api\\EIMSNext.File.Api.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "API+Flow+Async",
+    "Projects": [
+      {
+        "Path": "ApiHost\\EIMSNext.Flow.Api\\EIMSNext.Flow.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Service.Api\\EIMSNext.Service.Api.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
+        "Action": "Start"
+      }
+    ]
   }
 ]

@@ -8,6 +8,8 @@ using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
 using EIMSNext.Json.Serialization;
 using EIMSNext.MongoDb;
+using EIMSNext.Storage;
+using EIMSNext.Storage.Abstractions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
@@ -38,8 +40,8 @@ namespace EIMSNext.ApiCore
             builder.Services.AddSingleton<IHttpContextAccessor, HttpContextAccessor>();
             builder.Services.AddCustomAuthentication(builder.Configuration);
         }
-               
-        public static void AddBasicServices(this IServiceCollection services,IConfiguration configuration)
+
+        public static void AddBasicServices(this IServiceCollection services, IConfiguration configuration)
         {
             MongoDatabase.RegisterConventions();
             MongoDatabase.RegisterSerializers();
@@ -48,6 +50,7 @@ namespace EIMSNext.ApiCore
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
+            services.Configure<StorageConfiguration>(configuration.GetSection("Storage"));
 
             services.Configure<JsonOptions>(opt =>
             {
@@ -65,8 +68,28 @@ namespace EIMSNext.ApiCore
                 opt.JsonSerializerOptions.Converters.Add(new ExpandoObjectJsonConverter());
                 //opt.JsonSerializerOptions.Converters.Add(new UnixMillisecondsDateTimeJsonConverter());
 
-                JsonSerializerExtension.SetOptions(opt.JsonSerializerOptions);
             });
+
+            var jsonOpt = new JsonSerializerOptions
+            {
+                Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+                NumberHandling = JsonNumberHandling.AllowReadingFromString,
+                PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+                PropertyNameCaseInsensitive = true,
+                ReferenceHandler = ReferenceHandler.IgnoreCycles,
+                DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+            };
+
+            jsonOpt.Converters.Add(new BsonDocumentJsonConverter());
+            jsonOpt.Converters.Add(new ExceptionJsonConverter());
+            jsonOpt.Converters.Add(new FlexibleEnumConverterFactory());
+            jsonOpt.Converters.Add(new ObjectJsonConverter());
+            jsonOpt.Converters.Add(new ExpandoObjectJsonConverter());
+
+            JsonSerializerExtension.SetOptions(jsonOpt);
+
+
+            services.AddSingleton<IStorageProvider, LocalStorageProvider>();
         }
         public static void AddCustomCache(this IServiceCollection services, IConfiguration configuration)
         {
@@ -86,7 +109,6 @@ namespace EIMSNext.ApiCore
             });
 
             services.AddSingleton<ICacheClient, DistributedCacheClient>();
-
             services.AddScoped<ISessionStore, SessionStore>();
         }
 

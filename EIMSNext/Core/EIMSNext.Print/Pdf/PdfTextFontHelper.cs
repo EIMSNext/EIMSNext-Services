@@ -4,14 +4,11 @@ namespace EIMSNext.Print.Pdf
     {
         public static string ResolveParagraphFontName(string? text, string? currentFontName, bool isBold)
         {
-            if (string.IsNullOrEmpty(text))
-            {
-                return currentFontName ?? "FangSong";
-            }
+            string safeFontName = string.IsNullOrEmpty(currentFontName) ? "FangSong" : currentFontName;
 
-            if (!ContainsChinese(text))
+            if (string.IsNullOrEmpty(text) || !ContainsChinese(text))
             {
-                return currentFontName ?? "FangSong";
+                return safeFontName;
             }
 
             var normalized = FontsCache.RemoveWhiteSpace(currentFontName ?? string.Empty).ToLowerInvariant();
@@ -19,7 +16,7 @@ namespace EIMSNext.Print.Pdf
             // render with broken metrics or missing glyphs in PDF output.
             if (normalized.Contains("microsoftyaheiui") || normalized.Contains("microsoftyahei"))
             {
-                return isBold ? (currentFontName ?? "FangSong") : "FangSong";
+                return isBold ? safeFontName : "FangSong";
             }
 
             if (normalized.Contains("simsun") ||
@@ -29,7 +26,7 @@ namespace EIMSNext.Print.Pdf
                 normalized.Contains("simhei") ||
                 normalized.Contains("simkai"))
             {
-                return currentFontName ?? "FangSong";
+                return safeFontName;
             }
 
             return "FangSong";

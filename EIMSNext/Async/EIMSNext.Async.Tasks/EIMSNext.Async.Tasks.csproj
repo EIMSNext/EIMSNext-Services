@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.9" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
+    <ProjectReference Include="..\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+  </ItemGroup>
+
+</Project>

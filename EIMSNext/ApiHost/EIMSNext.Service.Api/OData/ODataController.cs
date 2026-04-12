@@ -40,7 +40,6 @@ namespace EIMSNext.Service.Api.OData
         where V : class, T, new()
     {
         protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
-        protected static readonly Type ICorpOwnedType = typeof(ICorpOwned);
 
         /// <summary>
         /// 从ODATA内部类获取属性访问器
@@ -127,7 +126,7 @@ namespace EIMSNext.Service.Api.OData
         /// <returns></returns>
         protected virtual IQueryable<V> FilterResult(IQueryable<V> query, ODataQueryOptions<V> options)
         {
-            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)), options);
+            return FilterByPermission(FilterByDeleted(query), options);
         }
         protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
         {
@@ -136,13 +135,7 @@ namespace EIMSNext.Service.Api.OData
             else
                 return query;
         }
-        protected IQueryable<V> FilterByCorpId(IQueryable<V> query)
-        {
-            if (ICorpOwnedType.IsAssignableFrom(typeof(V)))
-                return query.Where(x => (x as ICorpOwned)!.CorpId == IdentityContext.CurrentCorpId);
-            else
-                return query;
-        }
+       
         protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query, ODataQueryOptions<V> options)
         {
             return query;

@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
+using EIMSNext.Scripting;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Component
@@ -107,6 +103,160 @@ namespace EIMSNext.Component
             }
 
             return match;
+        }
+
+        public string ToScriptExpression()
+        {
+            if (Items != null && Items.Count > 0)
+            {
+                List<string> subExps = new List<string>();
+                Items.ForEach(x => subExps.Add(x.ToScriptExpression()));
+
+                var rel = (Rel == FilterRel.Or) ? "||" : "&&";
+                return string.Join(rel, subExps.Select(x => $"({x})"));
+            }
+            else
+            {
+                if (string.IsNullOrEmpty(Field?.Field))
+                    return ScriptExpression.TRUE;
+
+                return FormatExp(Field, Op ?? FilterOp.Eq, Value);
+            }
+        }
+        private string FormatExp(FormFieldDef condField, string op, ConditionValue? condValue)
+        {
+            var field = condField.ToFieldExp();
+            var oper = ParseOp(condField.Type, op);
+            var value = ParseValue(condField.Type, condValue, out FieldValueType valueType);
+
+            var exp = "";
+
+            if ((condField.IsSubField))
+            {
+                //子表字段使用Match方法计算
+                var fields = field.Split('>', StringSplitOptions.RemoveEmptyEntries);
+                var arrField = fields[0];
+                var subField = fields[1];
+                var subExp = "";
+
+                if (valueType == FieldValueType.Field)
+                {
+                    var valueFields = value.Split('>', StringSplitOptions.RemoveEmptyEntries);
+                    var valueArrField = valueFields[0];
+                    var valueSubField = valueFields[1];
+
+                    switch (op)
+                    {
+                        //TODO: 值为字段时，需要更详细的处理
+                        case FilterOp.In:
+                        case FilterOp.Nin:
+                            subExp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},x.{subField})}})";
+                            break;
+                        default:
+                            subExp = $"MATCH({valueArrField}, y=>{{return {oper}(x.{subField},y.{valueSubField})}})";
+                            break;
+                    }
+                }
+                else
+                {
+                    switch (op)
+                    {
+                        case FilterOp.Empty:
+                        case FilterOp.NotEmpty:
+                            subExp = $" {oper}(x.{subField}) ";
+                            break;
+                        case FilterOp.In:
+                        case FilterOp.Nin:
+                            subExp = $" {oper}({value},x.{subField}) ";
+                            break;
+                        default:
+                            subExp = $" {oper}(x.{subField},{value}) ";
+                            break;
+                    }
+                }
+
+                exp = $"MATCH({arrField}, x=>{{return {subExp}}})";
+            }
+            else
+            {
+                if (valueType == FieldValueType.Field)
+                {
+                    var valueFields = value.Split('>', StringSplitOptions.RemoveEmptyEntries);
+                    var valueArrField = valueFields[0];
+                    var valueSubField = valueFields[1];
+
+                    switch (op)
+                    {
+                        //TODO: 值为字段时，需要更详细的处理
+                        case FilterOp.In:
+                        case FilterOp.Nin:
+                            exp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},{field})}})";
+                            break;
+                        default:
+                            exp = $"MATCH({valueArrField}, y=>{{return {oper}({field},y.{valueSubField})}})";
+                            break;
+                    }
+                }
+                else
+                {
+                    switch (op)
+                    {
+                        case FilterOp.Empty:
+                        case FilterOp.NotEmpty:
+                            exp = $" {oper}({field}) ";
+                            break;
+                        case FilterOp.In:
+                        case FilterOp.Nin:
+                            exp = $" {oper}({value},{field}) ";
+                            break;
+                        default:
+                            exp = $" {oper}({field},{value}) ";
+                            break;
+                    }
+                }
+            }
+
+            return exp;
+        }
+
+        private string ParseOp(string fieldType, string op)
+        {
+            var oper = op.ToUpper();
+            switch (op.ToLower())
+            {
+                case FilterOp.Lte:
+                    oper = "LE";
+                    break;
+                case FilterOp.Gte:
+                    oper = "GE";
+                    break;
+            }
+
+            return oper;
+        }
+        private string ParseValue(string fieldType, ConditionValue? value, out FieldValueType valueType)
+        {
+            valueType = FieldValueType.Custom;
+
+            if (value == null) return string.Empty;
+
+            valueType = string.IsNullOrEmpty(value.Type) ? FieldValueType.Custom : Enum.Parse<FieldValueType>(value.Type, true);
+
+            if (valueType == FieldValueType.Field)
+            {
+                return value.FieldValue!.ToFieldExp();
+            }
+            else
+            {
+                var fType = fieldType.ToLower();
+                var valStr = "";
+                if (fType == FieldType.Number)
+                    valStr = $"{value?.Value ?? "0"}";
+                else
+                    valStr = $"'{value?.Value}'";
+
+                return valStr;
+            }
         }
     }
 

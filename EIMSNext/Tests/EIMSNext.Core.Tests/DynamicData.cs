@@ -3,15 +3,15 @@ using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Core.Tests
 {
-    public class DynamicData : DynamicEntity
+    public class FormData : DynamicEntity
     {
-        public DynamicData()
+        public FormData()
         {
             CreateTime = DateTime.UtcNow.ToTimeStampMs();
             UpdateTime = CreateTime;
         }
 
-        public DynamicData(
+        public FormData(
             string jsonData)
             : base(jsonData)
         {
@@ -21,21 +21,6 @@ namespace EIMSNext.Core.Tests
 
         public string AppId { get; set; } = "";
         public string FormId { get; set; } = "";
-    }
-
-    public class FormData : DynamicEntity
-    {
-        /// <summary>
-        /// 
-        /// </summary>
-        public string AppId { get; set; } = string.Empty;
-        /// <summary>
-        /// 
-        /// </summary>
-        public string FormId { get; set; } = string.Empty;
-        /// <summary>
-        /// 流程状态
-        /// </summary>
         public FlowStatus FlowStatus { get; set; }
     }
 }

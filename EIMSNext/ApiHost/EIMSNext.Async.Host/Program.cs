@@ -1,16 +1,15 @@
 using System.Diagnostics;
-
-using EIMSNext.Async.Core;
-using EIMSNext.Async.Core.Jobs;
-
-using Quartz;
-
-using RabbitMQ.Client;
 using EIMSNext.ApiCore;
-using Serilog;
+using EIMSNext.Async.Host.Extensions;
+using EIMSNext.Async.Quartz;
+using EIMSNext.Async.RabbitMQ;
+using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
+using Microsoft.AspNetCore.Http;
+using Quartz;
+using Serilog;
 
-Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory); //服务启动时，当前目录默认为system32
+Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
 var appBasePath = AppContext.BaseDirectory;
 var isService = !(Debugger.IsAttached || args.Contains("--console"));
@@ -22,17 +21,15 @@ try
     var builder = Host.CreateDefaultBuilder(args)
         .UseContentRoot(appBasePath);
 
-    builder.UseSerilog((hostingContext, config) =>
-        config.ReadFrom.Configuration(hostingContext.Configuration)
+    builder.UseAutofac<AutofacRegisterModule>();
+
+    builder.UseSerilog((ctx, cfg) =>
+        cfg.ReadFrom.Configuration(ctx.Configuration)
             .Enrich.FromLogContext()
             .Enrich.WithProperty("Application", "EIMSNext.Async.Host")
             .WriteTo.Console()
-            .WriteTo.File(
-                Path.Combine(logDirectory, "quartz-.log"),
-                rollingInterval: RollingInterval.Day,
-                retainedFileCountLimit: 31,
-                outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}"
-            )
+           .WriteTo.File(Path.Combine(logDirectory, "quartz-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 31,
+               outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
     );
 
     builder.ConfigureServices((hostContext, services) =>
@@ -41,21 +38,9 @@ try
         services.AddCustomCache(hostContext.Configuration);
         services.AddServiceComponents();
         services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
-
-        services.AddSingleton<IConnection>(sp =>
-        {
-            var factory = new ConnectionFactory
-            {
-                HostName = "localhost",
-                UserName = "guest",
-                Password = "guest"
-            };
-            return factory.CreateConnection();
-        });
-
-        services.AddConsumers();
-
-        services.AddJobs();
+        services.AddRabbitMqMessaging(hostContext.Configuration);
+        services.AddAsyncTaskConsumers();
+        services.AddAsyncQuartzJobs();
 
         services.AddQuartz(q =>
         {
@@ -65,14 +50,12 @@ try
                 store.UseSystemTextJsonSerializer();
                 store.UseSqlServer(sqlServer =>
                 {
-                    sqlServer.ConnectionString = hostContext.Configuration
-                        .GetConnectionString("Quartz:ConnectionString")
+                    sqlServer.ConnectionString = hostContext.Configuration.GetSection("Quartz")?.GetValue<string>("ConnectionString")
                         ?? throw new InvalidOperationException("Missing Quartz connection string");
                     sqlServer.TablePrefix = "QRTZ_";
                 });
             });
-
-            q.AddQuartzTriggers(hostContext.Configuration);
+            q.AddAsyncQuartzTriggers(hostContext.Configuration);
         });
 
         services.AddQuartzHostedService(q =>
@@ -82,7 +65,10 @@ try
 
         if (isService)
         {
-            builder.UseWindowsService();
+            builder.UseWindowsService(cfg =>
+            {
+                cfg.ServiceName = "EIMSNext Async Service";
+            });
         }
     });
 

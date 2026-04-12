@@ -15,7 +15,7 @@ namespace EIMSNext.Service.Entities
     public class FormDef : CorpEntityBase
     {
         /// <summary>
-        /// 
+        /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
 
@@ -25,12 +25,12 @@ namespace EIMSNext.Service.Entities
         public string? TemplateId { get; set; }
 
         /// <summary>
-        /// 
+        /// 表单名称
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
          /// <summary>
-        /// 
+        /// 表单内容
         /// </summary>
         public FormContent Content { get; set; } = new FormContent();
 
@@ -84,7 +84,7 @@ namespace EIMSNext.Service.Entities
     }
 
     /// <summary>
-    /// 
+    /// 字段定义
     /// </summary>
     public class FieldDef
     {
@@ -113,10 +113,15 @@ namespace EIMSNext.Service.Entities
         /// 子表单中的列
         /// </summary>
         public IList<FieldDef>? Columns { get; set; }
+
+        /// <summary>
+        /// 是否隐藏
+        /// </summary>
+        public bool Hidden { get; set; }
     }
 
     /// <summary>
-    /// 
+    /// 字段属性配置
     /// </summary>
     public class FieldProp
     {
@@ -134,21 +139,21 @@ namespace EIMSNext.Service.Entities
         public ValueProp? ValueProp { get; set; }
     }
     /// <summary>
-    /// 
+    /// 值选项
     /// </summary>
     public class ValueOption
     {
         /// <summary>
-        /// 
+        /// 选项值
         /// </summary>
         public string Value {  get; set; } = string.Empty;
         /// <summary>
-        /// 
+        /// 选项显示文本
         /// </summary>
         public string Label {  get; set; } = string.Empty;
     }
     /// <summary>
-    /// 
+    /// 值配置
     /// </summary>
     public class ValueProp
     {
@@ -163,24 +168,24 @@ namespace EIMSNext.Service.Entities
     }
 
     /// <summary>
-    /// 
+    /// 字段变更日志
     /// </summary>
     public class FieldChangeLog
     {
         /// <summary>
-        /// 
+        /// 变动类型
         /// </summary>
         public FieldChangeType ChangeType { get; set; }
         /// <summary>
-        /// 
+        /// 变更时间
         /// </summary>
         public long ChangeTime { get; set; }
         /// <summary>
-        /// 
+        /// 字段定义
         /// </summary>
         public FieldDef Field { get; set; } = new FieldDef();
         /// <summary>
-        /// 
+        /// 操作人
         /// </summary>
         public Operator ChangedBy { get; set; } = Operator.Empty;
     }
@@ -191,11 +196,11 @@ namespace EIMSNext.Service.Entities
     public enum FieldChangeType
     {
         /// <summary>
-        /// 
+        /// 移除
         /// </summary>
         Remove,
         /// <summary>
-        /// 
+        /// 恢复
         /// </summary>
         Restore
     }

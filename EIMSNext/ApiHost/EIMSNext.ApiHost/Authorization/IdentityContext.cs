@@ -98,7 +98,7 @@ namespace EIMSNext.ApiHost.Authorization
         {
             if (!_retrieved)
             {
-                _user = _resolver.GetService<User>().Get(CurrentUserID);
+                _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
                     _employee = _resolver.GetRepository<Employee>().Queryable.FirstOrDefault(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id);
