@@ -6,8 +6,16 @@ namespace EIMSNext.Async.Abstractions.Messaging
     public class NotifyReceiver
     {
         public string EmpId { get; set; } = string.Empty;
+        public string? Phone {  get; set; }
+        public string? Email {  get; set; }
 
         public string EmpName { get; set; } = string.Empty;
+    }
+
+    public enum MessageType
+    {
+        FormNotify,
+        TodoNotify
     }
 
     [Queue("formnotify-dispatch")]
@@ -26,39 +34,38 @@ namespace EIMSNext.Async.Abstractions.Messaging
         public FormData? OldData { get; set; }
     }
 
-    [Queue("system-message")]
-    public class SystemMessageTaskArgs
+    public abstract class NotifyTaskArgsBase
     {
-        public string CorpId { get; set; } = string.Empty;
 
-        public string NotifyId { get; set; } = string.Empty;
+        public string CorpId { get; set; } = string.Empty;
 
         public string Title { get; set; } = string.Empty;
 
-        public string Detail { get; set; } = string.Empty;
-
         public string Url { get; set; } = string.Empty;
+
+        MessageType MessageType { get; set; }
+
+        public List<NotifyReceiver> Receivers { get; set; } = new();
+    }
+
+    [Queue("system-message")]
+    public class SystemMessageTaskArgs : NotifyTaskArgsBase
+    {
+        public string NotifyId { get; set; } = string.Empty;
+
+        public string Detail { get; set; } = string.Empty;
 
         public long ExpireTime { get; set; }
 
         public MessageCategory Category { get; set; } = MessageCategory.DataNotify;
 
-        public List<NotifyReceiver> Receivers { get; set; } = new();
     }
 
     [Queue("email")]
-    public class EmailNotifyTaskArgs
+    public class EmailNotifyTaskArgs : NotifyTaskArgsBase
     {
-        public string CorpId { get; set; } = string.Empty;
-
         public string NotifyId { get; set; } = string.Empty;
 
-        public string Title { get; set; } = string.Empty;
-
         public string Detail { get; set; } = string.Empty;
-
-        public string Url { get; set; } = string.Empty;
-
-        public List<NotifyReceiver> Receivers { get; set; } = new();
     }
 }
