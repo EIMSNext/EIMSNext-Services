@@ -1,4 +1,4 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 18
 VisualStudioVersion = 18.2.11415.280
@@ -17,11 +17,11 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Service", "Service", "{6AD7
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ApiClient", "ApiClient", "{A251A455-C08B-4F5B-B6B4-5F99F0803D23}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Auth.Api", "ApiHost\EIMSNext.Auth.Api\EIMSNext.Auth.Api.csproj", "{A867BADE-9E41-4533-83DC-ECC36D3E681C}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Auth.Host", "ApiHost\EIMSNext.Auth.Host\EIMSNext.Auth.Host.csproj", "{A867BADE-9E41-4533-83DC-ECC36D3E681C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Flow.Api", "ApiHost\EIMSNext.Flow.Api\EIMSNext.Flow.Api.csproj", "{66EB6867-9C9B-4EBB-8822-3BB6D79D2EF6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Flow.Host", "ApiHost\EIMSNext.Flow.Host\EIMSNext.Flow.Host.csproj", "{66EB6867-9C9B-4EBB-8822-3BB6D79D2EF6}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Service.Api", "ApiHost\EIMSNext.Service.Api\EIMSNext.Service.Api.csproj", "{993FC2B9-730E-48D8-A970-896B3AA2737B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Service.Host", "ApiHost\EIMSNext.Service.Host\EIMSNext.Service.Host.csproj", "{993FC2B9-730E-48D8-A970-896B3AA2737B}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Common", "Core\EIMSNext.Common\EIMSNext.Common.csproj", "{546D162D-3A1C-4573-8A5B-5E913A59691A}"
 EndProject
@@ -81,7 +81,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Plugin.Public", "P
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.ApiHost", "ApiHost\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj", "{06142CEF-B25F-41DF-A759-549700A4E9E2}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Plugin.Api", "ApiHost\EIMSNext.Plugin.Api\EIMSNext.Plugin.Api.csproj", "{78425E2C-42DD-40C8-95D5-865DA1BE0C13}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Plugin.Host", "ApiHost\EIMSNext.Plugin.Host\EIMSNext.Plugin.Host.csproj", "{78425E2C-42DD-40C8-95D5-865DA1BE0C13}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.ApiService.Contracts", "Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj", "{DE530934-143A-449D-801D-1B12F8C0D8BA}"
 EndProject
@@ -101,7 +101,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Json", "Core\EIMSN
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Json.Tests", "Tests\EIMSNext.Json.Tests\EIMSNext.Json.Tests.csproj", "{3BD4512D-1B08-D74D-8601-22673437D770}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.File.Api", "ApiHost\EIMSNext.File.Api\EIMSNext.File.Api.csproj", "{4EF74785-A771-10B7-6A57-D180A7EBFAC6}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.File.Host", "ApiHost\EIMSNext.File.Host\EIMSNext.File.Host.csproj", "{4EF74785-A771-10B7-6A57-D180A7EBFAC6}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Storage", "Core\EIMSNext.Storage\EIMSNext.Storage.csproj", "{B42A7BC1-39B1-4D50-B268-DD91CF9281E1}"
 EndProject
