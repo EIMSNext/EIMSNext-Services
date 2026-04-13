@@ -1,12 +1,8 @@
 using System.Linq.Expressions;
-
-using HKH.Mef2.Integration;
-
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
-
+using HKH.Mef2.Integration;
 using MongoDB.Driver;
-using EIMSNext.Common;
 
 namespace EIMSNext.Core.Services
 {

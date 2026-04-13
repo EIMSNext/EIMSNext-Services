@@ -10,8 +10,8 @@ namespace EIMSNext.Async.Quartz
     {
         public static IServiceCollectionQuartzConfigurator AddAsyncQuartzTriggers(this IServiceCollectionQuartzConfigurator qz, IConfiguration configuration)
         {
-            var formNotifyJobKey = new JobKey("FormNotifyScheduleJob", "Business");
-            var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Business");
+            var formNotifyJobKey = new JobKey("FormNotifyScheduleJob", "Notify");
+            var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Notify");
             qz.AddJob<FormNotifyScheduleJob>(opts => opts
                 .WithIdentity(formNotifyJobKey)
                 .StoreDurably()
@@ -24,7 +24,7 @@ namespace EIMSNext.Async.Quartz
 
             qz.AddTrigger(opts => opts
                 .ForJob(formNotifyJobKey)
-                .WithIdentity("FormNotifyScheduleTrigger", "Business")
+                .WithIdentity("FormNotifyScheduleTrigger", "Notify")
                 .WithCronSchedule(
                     configuration["Quartz:FormNotifyScheduleJob:Cron"] ?? "0 0/1 * * * ?",
                     cs => cs.InTimeZone(TimeZoneInfo.Local))
