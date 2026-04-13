@@ -47,7 +47,7 @@ namespace EIMSNext.Service
                 var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
             }
 
-            var dataLog = new DataUpdateLog();
+            var dataLog = new DataChangeLog();
             //TODO: 保存变更日志
             switch (action)
             {
