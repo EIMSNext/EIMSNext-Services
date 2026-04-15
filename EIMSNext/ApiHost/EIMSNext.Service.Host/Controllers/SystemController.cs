@@ -35,6 +35,8 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 userId = user.Id,
                 userName = user.Name,
+                phone = user.Phone,
+                email = user.Email,
                 empId = emp?.Id,
                 empCode = emp?.Code,
                 empName = emp?.EmpName,

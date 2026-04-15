@@ -17,6 +17,9 @@ builder.Services.AddLogging(c => { c.AddNLog("nlog.config"); });
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.AddMemoryCache();
+builder.Services.AddAuthorization();
+builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>

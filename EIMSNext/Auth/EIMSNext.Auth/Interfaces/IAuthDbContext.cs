@@ -20,6 +20,7 @@ namespace EIMSNext.Auth.Interfaces
         Task AddApiScope(ApiScope entity);
 
         Task AddUser(User entity);
+        Task UpdateUser(User entity);
         Task AddAuditLogin(AuditLogin entity);
 
         // TODO: 考虑把Grant放到缓存里
