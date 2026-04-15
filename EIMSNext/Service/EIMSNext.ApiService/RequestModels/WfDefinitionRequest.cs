@@ -30,15 +30,6 @@ namespace EIMSNext.ApiService.RequestModels
         public string Description { get; set; } = string.Empty;
 
         /// <summary>
-        /// 版本号
-        /// </summary>
-        public int Version { get; set; }
-        /// <summary>
-        /// 是否为当前生效版本
-        /// </summary>
-        public bool IsCurrent { get; set; }
-
-        /// <summary>
         /// 工作流定义内容（JSON格式的流程配置）
         /// </summary>
         public string Content { get; set; } = string.Empty;

@@ -2,6 +2,7 @@ using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiService;
 using EIMSNext.Core;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
@@ -29,9 +30,21 @@ namespace EIMSNext.Service.Host.Controllers
             if (data != null)
             {
                 var approvalLogService = this.Resolver.GetService<Wf_ApprovalLog>();
+                var wfDefinitionService = this.Resolver.Resolve<IWfDefinitionService>();
                 var approvalLog = approvalLogService.Query(x => x.DataId == request.DataId).FirstOrDefault();
+                var currentDef = wfDefinitionService.Find(data.FormId);
 
-                var startReq = new StartRequest { DataId = data.Id, WfDefinitionId = data.FormId };
+                if (currentDef == null && approvalLog == null)
+                {
+                    return Error(-1, "发起流程失败：未找到已启用流程版本");
+                }
+
+                var startReq = new StartRequest
+                {
+                    DataId = data.Id,
+                    WfDefinitionId = data.FormId,
+                    Version = currentDef?.Version ?? 0,
+                };
 
                 //此处有可能是重新发起流程，应使用之前的流程版本
                 if (approvalLog != null)

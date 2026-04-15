@@ -37,6 +37,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public bool IsCurrent { get; set; }
         /// <summary>
+        /// 是否已发布过，发布后仅允许修改节点配置
+        /// </summary>
+        public bool Released { get; set; }
+        /// <summary>
         /// 工作流定义内容（JSON格式的流程配置）
         /// </summary>
         public string Content { get; set; } = string.Empty;

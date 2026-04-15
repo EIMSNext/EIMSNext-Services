@@ -6,5 +6,7 @@ namespace EIMSNext.Service.Contracts
 	public interface IWfDefinitionService : IService<Wf_Definition>
 	{
         Wf_Definition? Find(string wfExternalId, int? version = null);
+        Task<Wf_Definition> CreateVersionAsync(string id);
+        Task<Wf_Definition> ActivateAsync(string id);
     }
 }

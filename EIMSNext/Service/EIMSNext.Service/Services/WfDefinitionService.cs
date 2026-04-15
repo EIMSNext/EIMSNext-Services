@@ -1,5 +1,3 @@
-using System.Text.Json;
-
 using HKH.Mef2.Integration;
 
 using EIMSNext.Component;
@@ -33,13 +31,46 @@ namespace EIMSNext.Service
             }
         }
 
+        public async Task<Wf_Definition> CreateVersionAsync(string id)
+        {
+            var source = Get(id) ?? throw new InvalidOperationException("源流程版本不存在");
+            var entity = new Wf_Definition
+            {
+                AppId = source.AppId,
+                Name = source.Name,
+                FlowType = source.FlowType,
+                ExternalId = source.ExternalId,
+                Description = source.Description,
+                Content = source.Content,
+                EventSource = source.EventSource,
+                SourceId = source.SourceId,
+                Disabled = source.Disabled,
+            };
+
+            await AddAsync(entity);
+            return entity;
+        }
+
+        public async Task<Wf_Definition> ActivateAsync(string id)
+        {
+            var entity = Get(id) ?? throw new InvalidOperationException("流程版本不存在");
+
+            Repository.UpdateMany(
+                FilterBuilder.Eq(x => x.ExternalId, entity.ExternalId),
+                UpdateBuilder.Set(x => x.IsCurrent, false));
+
+            entity.IsCurrent = true;
+            entity.Released = true;
+            await ReplaceAsync(entity);
+            return entity;
+        }
+
         protected override Task BeforeAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)
         {
             var entity = entities.First();
 
             var content = metadataParser.Parse(entity);
             entity.Metadata = content.Metadata;
-            entity.IsCurrent = true;
             if (entity.FlowType == FlowType.Dataflow)
             {
                 //数据流有多种流程定义，所以不使用FormId
@@ -48,24 +79,47 @@ namespace EIMSNext.Service
                 entity.EventSetting = content.EventSetting;
             }
 
-            if (entity.Version > 1)
-            {
-                var filter = FilterBuilder.Eq(x => x.ExternalId, entity.ExternalId);
-                var update = UpdateBuilder.Set(x => x.IsCurrent, false);
-                Repository.UpdateMany(filter, update, session: session);
-            }
+            var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag)
+                .Select(x => x.Version)
+                .DefaultIfEmpty(0)
+                .Max();
+
+            entity.Version = maxVersion + 1;
+            entity.IsCurrent = false;
+            entity.Released = false;
 
             return Task.CompletedTask;
         }
 
         protected override Task BeforeReplace(Wf_Definition entity, IClientSessionHandle? session)
         {
+            var exist = Get(entity.Id) ?? throw new InvalidOperationException("流程版本不存在");
+
+            entity.Version = exist.Version;
+            entity.IsCurrent = exist.IsCurrent;
+            entity.Released = exist.Released;
+
             var content = metadataParser.Parse(entity);
             entity.Metadata = content.Metadata;
             if (entity.FlowType == FlowType.Dataflow)
             {
                 entity.EventSetting = content.EventSetting;
             }
+
+            return Task.CompletedTask;
+        }
+
+        protected override Task BeforeDelete(FilterDefinition<Wf_Definition> filter, IClientSessionHandle? session)
+        {
+            var releasedDefs = Repository.Find(new MongoFindOptions<Wf_Definition> { Filter = filter }, session)
+                .ToList()
+                .Where(x => x.Released)
+                .ToList();
+            if (releasedDefs.Count > 0)
+            {
+                throw new InvalidOperationException("已启用或历史版本不允许删除");
+            }
+
             return Task.CompletedTask;
         }
     }
