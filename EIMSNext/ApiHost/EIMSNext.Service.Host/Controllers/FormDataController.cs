@@ -89,6 +89,13 @@ namespace EIMSNext.Service.Host.Controllers
             return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
         }
 
+        [Permission(Operation = Operation.Read)]
+        [HttpPost("Export")]
+        public async Task<ActionResult> Export([FromBody] FormDataExportRequest request)
+        {
+            return Ok(ApiResult.Success(await ApiService.ExportAsync(FilterByPermission(FilterByDeleted(FilterByCorpId(request))))));
+        }
+
         /// <summary>
         /// 对按请求的上下文进行数据过滤，比如用户只能访问被授权的数据
         /// </summary>
@@ -178,6 +185,89 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             return query;
+        }
+
+        protected virtual FormDataExportRequest FilterByPermission(FormDataExportRequest request)
+        {
+            if (!string.IsNullOrEmpty(request.AuthGroupId))
+            {
+                var authGrp = Resolver.GetService<AuthGroup>().Get(request.AuthGroupId);
+                if (authGrp != null)
+                {
+                    var filter = request.Filter;
+                    if (filter == null) { filter = new DynamicFilter(); }
+
+                    if (authGrp.Type == AuthGroupType.ManageSelfData)
+                    {
+                        if (filter.IsGroup && filter.Rel == FilterRel.And)
+                        {
+                            filter.Items!.Add(new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
+                        }
+                        else
+                        {
+                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
+                        }
+                    }
+                    else if (authGrp.Type == AuthGroupType.Custom)
+                    {
+                        if (!string.IsNullOrEmpty(authGrp.DataFilter))
+                        {
+                            var condList = authGrp.DataFilter.DeserializeFromJson<ConditionList>();
+                            if (condList != null)
+                            {
+                                var dataFilter = condList.ToDynamicFilter();
+
+                                if (filter.IsGroup && filter.Rel == FilterRel.And)
+                                {
+                                    filter.Items!.Add(dataFilter);
+                                }
+                                else
+                                {
+                                    filter = new DynamicFilter() { Rel = FilterRel.And, Items = [dataFilter, filter] };
+                                }
+                            }
+                        }
+                    }
+
+                    request.Filter = filter;
+                }
+            }
+
+            return request;
+        }
+
+        protected virtual FormDataExportRequest FilterByDeleted(FormDataExportRequest request)
+        {
+            var filter = request.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
+            }
+
+            request.Filter = filter;
+            return request;
+        }
+
+        protected virtual FormDataExportRequest FilterByCorpId(FormDataExportRequest request)
+        {
+            var filter = request.Filter;
+            if (filter == null) { filter = new DynamicFilter(); }
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
+            }
+            else
+            {
+                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
+            }
+
+            request.Filter = filter;
+            return request;
         }
 
         /// <summary>

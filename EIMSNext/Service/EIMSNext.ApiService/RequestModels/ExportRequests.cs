@@ -1,3 +1,4 @@
+using EIMSNext.Core.Query;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
@@ -39,6 +40,19 @@ namespace EIMSNext.ApiService.RequestModels
         public long? StartTime { get; set; }
 
         public long? EndTime { get; set; }
+    }
+
+    public class FormDataExportRequest
+    {
+        public ExportFormat Format { get; set; } = ExportFormat.Csv;
+
+        public List<ExportColumn> Columns { get; set; } = [];
+
+        public string FormId { get; set; } = string.Empty;
+
+        public DynamicFilter? Filter { get; set; }
+
+        public string? AuthGroupId { get; set; }
     }
 
     public class ExportResponse

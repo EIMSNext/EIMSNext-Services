@@ -33,6 +33,7 @@ namespace EIMSNext.Service.Entities
     {
         AuditLogin = 0,
         AuditLog = 1,
+        FormData = 2,
     }
 
     public enum ExportFormat

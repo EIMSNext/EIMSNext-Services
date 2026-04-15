@@ -1,9 +1,6 @@
 using System.Text;
-using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
 using EIMSNext.ApiService.RequestModels;
+using EIMSNext.Service.Entities;
 using HKH.CSV;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.Streaming;
@@ -43,101 +40,6 @@ namespace EIMSNext.Async.Tasks.Export
             public required ICellStyle Date { get; init; }
         }
 
-        public static ExportFileResult BuildAuditLogin(ExportFormat format, List<ExportColumn> columns, List<AuditLogin> rows)
-        {
-            return new ExportFileResult
-            {
-                FileName = $"login-log-{DateTime.Now:yyyyMMdd-HHmmss}.{GetFileExtension(format)}",
-                Content = format == ExportFormat.Excel
-                    ? BuildAuditLoginExcel(columns, rows)
-                    : BuildAuditLoginCsv(columns, rows),
-                TotalCount = rows.Count,
-            };
-        }
-
-        public static ExportFileResult BuildAuditLog(ExportFormat format, List<ExportColumn> columns, List<AuditLog> rows)
-        {
-            return new ExportFileResult
-            {
-                FileName = $"action-log-{DateTime.Now:yyyyMMdd-HHmmss}.{GetFileExtension(format)}",
-                Content = format == ExportFormat.Excel
-                    ? BuildAuditLogExcel(columns, rows)
-                    : BuildAuditLogCsv(columns, rows),
-                TotalCount = rows.Count,
-            };
-        }
-
-        public static byte[] BuildAuditLoginCsv(List<ExportColumn> columns, List<AuditLogin> rows)
-        {
-            using var ms = new MemoryStream();
-            using var writer = CreateCsvWriter(ms);
-            WriteCsvHeader(writer, columns);
-            WriteAuditLoginCsvRows(writer, columns, rows);
-            writer.Flush();
-            return ms.ToArray();
-        }
-
-        public static byte[] BuildAuditLogCsv(List<ExportColumn> columns, List<AuditLog> rows)
-        {
-            using var ms = new MemoryStream();
-            using var writer = CreateCsvWriter(ms);
-            WriteCsvHeader(writer, columns);
-            WriteAuditLogCsvRows(writer, columns, rows);
-            writer.Flush();
-            return ms.ToArray();
-        }
-
-        public static byte[] BuildAuditLoginExcel(List<ExportColumn> columns, List<AuditLogin> rows)
-        {
-            using var workbook = new SXSSFWorkbook(100);
-            var sheet = InitializeExcelSheet(workbook, "登录日志", columns, out var styles);
-            WriteAuditLoginExcelRows(sheet, styles, columns, rows, 1);
-
-            using var ms = new MemoryStream();
-            workbook.Write(ms, false);
-            workbook.Dispose();
-            return ms.ToArray();
-        }
-
-        public static byte[] BuildAuditLogExcel(List<ExportColumn> columns, List<AuditLog> rows)
-        {
-            using var workbook = new SXSSFWorkbook(100);
-            var sheet = InitializeExcelSheet(workbook, "操作日志", columns, out var styles);
-            WriteAuditLogExcelRows(sheet, styles, columns, rows, 1);
-
-            using var ms = new MemoryStream();
-            workbook.Write(ms, false);
-            workbook.Dispose();
-            return ms.ToArray();
-        }
-
-        public static ExportCellValue GetAuditLoginCellValue(ExportColumn column, AuditLogin row)
-        {
-            return column.Key switch
-            {
-                "userName" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.UserName ?? row.CreateBy?.Label ?? "-") },
-                "createTime" => new ExportCellValue { Type = ExportColumnType.Date, DateTime = ToLocalDateTime(row.CreateTime) },
-                "loginId" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.LoginId ?? "-") },
-                "failReason" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.FailReason ?? "-") },
-                "clientIp" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.ClientIp ?? "-") },
-                _ => new ExportCellValue(),
-            };
-        }
-
-        public static ExportCellValue GetAuditLogCellValue(ExportColumn column, AuditLog row)
-        {
-            return column.Key switch
-            {
-                "operatorName" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.CreateBy?.Label ?? "-") },
-                "createTime" => new ExportCellValue { Type = ExportColumnType.Date, DateTime = ToLocalDateTime(row.CreateTime) },
-                "action" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.Action.ToString()) },
-                "entityType" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.EntityType ?? "-") },
-                "detail" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.Detail ?? "-") },
-                "clientIp" => new ExportCellValue { Type = ExportColumnType.String, Text = SanitizeForExcel(row.ClientIp ?? "-") },
-                _ => new ExportCellValue(),
-            };
-        }
-
         public static CSVWriter CreateCsvWriter(Stream stream)
         {
             return new CSVWriter(stream, ',', '"', '"', "\r\n");
@@ -146,22 +48,6 @@ namespace EIMSNext.Async.Tasks.Export
         public static void WriteCsvHeader(CSVWriter writer, List<ExportColumn> columns)
         {
             writer.Write(columns.Select(x => x.Header), false);
-        }
-
-        public static void WriteAuditLoginCsvRows(CSVWriter writer, List<ExportColumn> columns, IEnumerable<AuditLogin> rows)
-        {
-            foreach (var row in rows)
-            {
-                writer.Write(columns.Select(x => FormatCsvCell(GetAuditLoginCellValue(x, row))), false);
-            }
-        }
-
-        public static void WriteAuditLogCsvRows(CSVWriter writer, List<ExportColumn> columns, IEnumerable<AuditLog> rows)
-        {
-            foreach (var row in rows)
-            {
-                writer.Write(columns.Select(x => FormatCsvCell(GetAuditLogCellValue(x, row))), false);
-            }
         }
 
         public static byte[] WriteCsv(List<List<string>> rows)
@@ -304,36 +190,6 @@ namespace EIMSNext.Async.Tasks.Export
             }
         }
 
-        public static int WriteAuditLoginExcelRows(ISheet sheet, ExcelStyles styles, List<ExportColumn> columns, IEnumerable<AuditLogin> rows, int startRowIndex)
-        {
-            var rowIndex = startRowIndex;
-            foreach (var item in rows)
-            {
-                var row = sheet.CreateRow(rowIndex++);
-                for (var colIndex = 0; colIndex < columns.Count; colIndex++)
-                {
-                    WriteExcelCell(row.CreateCell(colIndex), GetAuditLoginCellValue(columns[colIndex], item), styles);
-                }
-            }
-
-            return rowIndex;
-        }
-
-        public static int WriteAuditLogExcelRows(ISheet sheet, ExcelStyles styles, List<ExportColumn> columns, IEnumerable<AuditLog> rows, int startRowIndex)
-        {
-            var rowIndex = startRowIndex;
-            foreach (var item in rows)
-            {
-                var row = sheet.CreateRow(rowIndex++);
-                for (var colIndex = 0; colIndex < columns.Count; colIndex++)
-                {
-                    WriteExcelCell(row.CreateCell(colIndex), GetAuditLogCellValue(columns[colIndex], item), styles);
-                }
-            }
-
-            return rowIndex;
-        }
-
         public static DateTime? ToLocalDateTime(long? timestamp)
         {
             if (!timestamp.HasValue || timestamp.Value <= 0)
@@ -354,9 +210,5 @@ namespace EIMSNext.Async.Tasks.Export
             return value[0] is '=' or '+' or '-' or '@' ? $"'{value}" : value;
         }
 
-        public static string GetFileExtension(ExportFormat format)
-        {
-            return format == ExportFormat.Excel ? "xlsx" : "csv";
-        }
     }
 }

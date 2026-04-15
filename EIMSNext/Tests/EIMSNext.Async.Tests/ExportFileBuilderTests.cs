@@ -58,7 +58,7 @@ namespace EIMSNext.Async.Tests
             var column = new ExportColumn { Key = "userName", Header = "登录人", Type = ExportColumnType.String };
             var row = new AuditLogin { UserName = "=cmd|' /C calc'!A0" };
 
-            var value = ExportFileBuilder.GetAuditLoginCellValue(column, row);
+            var value = AuditLoginExportProcessor.GetCellValue(column, row);
 
             Assert.AreEqual("'=cmd|' /C calc'!A0", value.Text);
         }
@@ -81,11 +81,18 @@ namespace EIMSNext.Async.Tests
                 }
             };
 
-            var bytes = ExportFileBuilder.BuildAuditLogExcel(columns, rows);
+            using var workbookBuilder = ExportFileBuilder.CreateWorkbook();
+            var sheet = ExportFileBuilder.InitializeExcelSheet(workbookBuilder, "操作日志", columns, out var styles);
+            AuditLogExportProcessor.WriteExcelRows(sheet, styles, columns, rows, 1);
+
+            using var ms = new MemoryStream();
+            workbookBuilder.Write(ms, false);
+            workbookBuilder.Dispose();
+            var bytes = ms.ToArray();
 
             using var workbook = new XSSFWorkbook(new MemoryStream(bytes));
-            var sheet = workbook.GetSheetAt(0);
-            var dataRow = sheet.GetRow(1);
+            var outputSheet = workbook.GetSheetAt(0);
+            var dataRow = outputSheet.GetRow(1);
 
             Assert.IsNotNull(dataRow);
             Assert.AreEqual("detail text", dataRow.GetCell(1).StringCellValue);
@@ -120,7 +127,14 @@ namespace EIMSNext.Async.Tests
             };
             var rows = new List<AuditLogin> { new() { UserName = "Alice" } };
 
-            var bytes = ExportFileBuilder.BuildAuditLoginExcel(columns, rows);
+            using var workbookBuilder = ExportFileBuilder.CreateWorkbook();
+            var sheet = ExportFileBuilder.InitializeExcelSheet(workbookBuilder, "登录日志", columns, out var styles);
+            AuditLoginExportProcessor.WriteExcelRows(sheet, styles, columns, rows, 1);
+
+            using var ms = new MemoryStream();
+            workbookBuilder.Write(ms, false);
+            workbookBuilder.Dispose();
+            var bytes = ms.ToArray();
 
             using var workbook = new XSSFWorkbook(new MemoryStream(bytes));
             var pane = workbook.GetSheetAt(0).PaneInformation;

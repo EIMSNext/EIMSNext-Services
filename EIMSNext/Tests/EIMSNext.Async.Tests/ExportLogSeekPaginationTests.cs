@@ -1,4 +1,4 @@
-using EIMSNext.Async.Tasks.Consumers;
+using EIMSNext.Async.Tasks.Export;
 using EIMSNext.Core.Entities;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
@@ -19,7 +19,7 @@ namespace EIMSNext.Async.Tests
             var builder = Builders<TestEntity>.Filter;
             var baseFilter = builder.Eq(x => x.DeleteFlag, false);
 
-            var filter = ExportLogConsumer.BuildSeekFilter(baseFilter, builder, null, null);
+            var filter = ExportProcessorBase.BuildSeekFilter(baseFilter, builder, null, null);
             var rendered = Render(filter);
 
             StringAssert.Contains(rendered, "DeleteFlag");
@@ -33,7 +33,7 @@ namespace EIMSNext.Async.Tests
             var builder = Builders<TestEntity>.Filter;
             var baseFilter = builder.Eq(x => x.DeleteFlag, false);
 
-            var filter = ExportLogConsumer.BuildSeekFilter(baseFilter, builder, 1000L, "id-002");
+            var filter = ExportProcessorBase.BuildSeekFilter(baseFilter, builder, 1000L, "id-002");
             var rendered = Render(filter);
 
             StringAssert.Contains(rendered, "DeleteFlag");
