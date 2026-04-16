@@ -499,6 +499,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         Field,
         /// <summary>
+        /// 公式
+        /// </summary>
+        Formula,
+        /// <summary>
         /// 空值
         /// </summary>
         Empty

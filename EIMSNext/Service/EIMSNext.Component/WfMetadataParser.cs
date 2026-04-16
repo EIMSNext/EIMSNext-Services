@@ -347,20 +347,9 @@ namespace EIMSNext.Component
                     ValueType = Enum.Parse<FieldValueType>(item.Value!.Type, true),
                     ValueExp = valueObj.Exp
                 };
-                if (field.ValueType == FieldValueType.Field)
+                if (valueObj.ValueField != null)
                 {
-                    field.ValueField = new FormFieldValueSetting
-                    {
-                        Field = new FormField
-                        {
-                            FormId = item.Value.FieldValue!.FormId,
-                            Field = item.Value.FieldValue!.Field,
-                            NodeId = item.Value.FieldValue!.NodeId,
-                            Type = item.Value.FieldValue!.Type,
-                            IsSubField = item.Value.FieldValue!.IsSubField
-                        },
-                        SingleResultNode = item.Value.FieldValue!.SingleResultNode,
-                    };
+                    field.ValueField = valueObj.ValueField;
                 }
 
                 result.Add(field);
@@ -369,10 +358,11 @@ namespace EIMSNext.Component
             return result;
         }
 
-        private (string Exp, bool IsSubField) ParseFieldFieldValue(FormFieldItem item)
+        private (string Exp, bool IsSubField, FormFieldValueSetting? ValueField) ParseFieldFieldValue(FormFieldItem item)
         {
             var exp = string.Empty;
             var isSubField = false;
+            FormFieldValueSetting? valueField = null;
 
             var valueType = Enum.Parse<FieldValueType>(item.Value!.Type, true);
 
@@ -383,6 +373,27 @@ namespace EIMSNext.Component
                     {
                         exp = item.Value.FieldValue.ToFieldExp();
                         isSubField = item.Value.FieldValue.IsSubField;
+                        valueField = BuildFormFieldValueSetting(item.Value.FieldValue);
+                    }
+                    else
+                    {
+                        exp = "null";
+                    }
+                    break;
+                case FieldValueType.Formula:
+                    if (item.Value.FormulaValue != null)
+                    {
+                        exp = item.Value.FormulaValue.Expression;
+                        foreach (var formulaRef in item.Value.FormulaValue.Refs)
+                        {
+                            exp = exp.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+                        }
+
+                        if (item.Value.FormulaValue.DrivingField != null)
+                        {
+                            isSubField = item.Value.FormulaValue.DrivingField.IsSubField;
+                            valueField = BuildFormFieldValueSetting(item.Value.FormulaValue.DrivingField);
+                        }
                     }
                     else
                     {
@@ -403,7 +414,23 @@ namespace EIMSNext.Component
                     break;
             }
 
-            return (exp, isSubField);
+            return (exp, isSubField, valueField);
+        }
+
+        private FormFieldValueSetting BuildFormFieldValueSetting(FormFieldDef field)
+        {
+            return new FormFieldValueSetting
+            {
+                Field = new FormField
+                {
+                    FormId = field.FormId,
+                    Field = field.Field,
+                    NodeId = field.NodeId,
+                    Type = field.Type,
+                    IsSubField = field.IsSubField
+                },
+                SingleResultNode = field.SingleResultNode,
+            };
         }
         #endregion
 
@@ -528,6 +555,18 @@ namespace EIMSNext.Component
             public string Type { get; set; } = string.Empty;
             public object? Value { get; set; }
             public FormFieldDef? FieldValue { get; set; }
+            public FormulaValue? FormulaValue { get; set; }
+        }
+        private class FormulaValue
+        {
+            public string Expression { get; set; } = string.Empty;
+            public List<FormulaRef> Refs { get; set; } = new List<FormulaRef>();
+            public FormFieldDef? DrivingField { get; set; }
+        }
+        private class FormulaRef
+        {
+            public string Key { get; set; } = string.Empty;
+            public FormFieldDef Field { get; set; } = new FormFieldDef();
         }
         private class UpdateMeta
         {
