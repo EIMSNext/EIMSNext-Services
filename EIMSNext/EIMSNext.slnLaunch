@@ -3,11 +3,11 @@
     "Name": "API+Flow",
     "Projects": [
       {
-        "Path": "ApiHost\\EIMSNext.Flow.Api\\EIMSNext.Flow.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Flow.Host\\EIMSNext.Flow.Host.csproj",
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.Service.Api\\EIMSNext.Service.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Service.Host\\EIMSNext.Service.Host.csproj",
         "Action": "Start"
       }
     ]
@@ -16,15 +16,15 @@
     "Name": "API+Flow+File",
     "Projects": [
       {
-        "Path": "ApiHost\\EIMSNext.Flow.Api\\EIMSNext.Flow.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Flow.Host\\EIMSNext.Flow.Host.csproj",
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.Service.Api\\EIMSNext.Service.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Service.Host\\EIMSNext.Service.Host.csproj",
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.File.Api\\EIMSNext.File.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.File.Host\\EIMSNext.File.Host.csproj",
         "Action": "Start"
       }
     ]
@@ -33,15 +33,36 @@
     "Name": "API+Flow+Async",
     "Projects": [
       {
-        "Path": "ApiHost\\EIMSNext.Flow.Api\\EIMSNext.Flow.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.Service.Api\\EIMSNext.Service.Api.csproj",
+        "Path": "ApiHost\\EIMSNext.Flow.Host\\EIMSNext.Flow.Host.csproj",
         "Action": "Start"
       },
+      {
+        "Path": "ApiHost\\EIMSNext.Service.Host\\EIMSNext.Service.Host.csproj",
+        "Action": "Start"
+      }
+    ]
+  },
+  {
+    "Name": "API+Flow+Async+File",
+    "Projects": [
       {
         "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Flow.Host\\EIMSNext.Flow.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Service.Host\\EIMSNext.Service.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.File.Host\\EIMSNext.File.Host.csproj",
         "Action": "Start"
       }
     ]

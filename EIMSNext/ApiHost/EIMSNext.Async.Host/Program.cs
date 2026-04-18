@@ -37,7 +37,7 @@ try
         services.AddBasicServices(hostContext.Configuration);
         services.AddCustomCache(hostContext.Configuration);
         services.AddServiceComponents();
-        services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
+        services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "EIMSNext.*.dll");
         services.AddRabbitMqMessaging(hostContext.Configuration);
         services.AddAsyncTaskConsumers();
         services.AddAsyncQuartzJobs();

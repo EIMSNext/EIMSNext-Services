@@ -98,8 +98,7 @@ namespace EIMSNext.ApiService
             var builder = Builders<AuditLogin>.Filter;
             var filters = new List<FilterDefinition<AuditLogin>>
             {
-                builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId),
-                builder.Ne(x => x.DeleteFlag, true),
+                builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId)
             };
 
             if (!string.IsNullOrWhiteSpace(request.UserName))

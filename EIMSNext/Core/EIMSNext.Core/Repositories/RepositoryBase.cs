@@ -1,5 +1,4 @@
 using System.Linq.Expressions;
-using EIMSNext.Common;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
@@ -86,15 +85,15 @@ namespace EIMSNext.Core.Repositories
         }
         public virtual Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null)
         {
-            return CountAsync(filter.ToFilterDefinition<T>(), session, options);
+            return CountCoreAsync(filter.ToFilterDefinition<T>(), session, options);
         }
         public virtual Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null)
         {
-            return CountAsync(filter, session, options);
+            return CountCoreAsync(filter, session, options);
         }
         public virtual Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null)
         {
-            return CountAsync(filter, session, options);
+            return CountCoreAsync(filter, session, options);
         }
 
         public virtual T? Get(string id, IClientSessionHandle? session = null)
