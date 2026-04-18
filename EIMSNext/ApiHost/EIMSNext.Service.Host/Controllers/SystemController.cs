@@ -1,11 +1,13 @@
 using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Core;
+using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Host.Requests;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -19,8 +21,10 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param> 
     [ApiVersion(1.0)]
-    public class SystemController(IResolver resolver) : MefControllerBase(resolver)
+    public class SystemController(IResolver resolver, IPluginRuntimeManager pluginRuntimeManager) : MefControllerBase(resolver)
     {
+        private IPluginRuntimeManager PluginRuntimeManager { get; } = pluginRuntimeManager;
+
         /// <summary>
         /// 获取当前用户信息
         /// </summary>
@@ -110,6 +114,19 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             return NotFound();
+        }
+
+        [HttpGet("Plugins")]
+        public IActionResult GetPlugins()
+        {
+            return ApiResult.Success(PluginRuntimeManager.GetPlugins()).ToActionResult();
+        }
+
+        [HttpPost("ReloadPlugin")]
+        public async Task<IActionResult> ReloadPlugin(CancellationToken cancellationToken)
+        {
+            var result = await PluginRuntimeManager.ReloadAsync(cancellationToken);
+            return ApiResult.Success(result).ToActionResult();
         }
     }
 }

@@ -6,6 +6,7 @@ namespace EIMSNext.Print.Tests
         [TestMethod]
         public void ResolveFontFamily_ShouldMapChineseAlias()
         {
+            Pdf.FontsCache.Initialize();
             Pdf.PdfFontResolverRuntime.Configure(new Pdf.PdfRenderOptions());
 
             var family = Pdf.PdfFontResolverRuntime.ResolveFontFamily("宋体", false, false);
@@ -16,6 +17,7 @@ namespace EIMSNext.Print.Tests
         [TestMethod]
         public void ResolveFontFamily_ShouldFallbackToDefaultFont()
         {
+            Pdf.FontsCache.Initialize();
             Pdf.PdfFontResolverRuntime.Configure(new Pdf.PdfRenderOptions());
 
             var family = Pdf.PdfFontResolverRuntime.ResolveFontFamily("Unknown Font Family", false, false);

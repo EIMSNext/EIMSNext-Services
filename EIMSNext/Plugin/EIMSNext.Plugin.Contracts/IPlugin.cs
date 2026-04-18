@@ -10,18 +10,20 @@ namespace EIMSNext.Plugin.Contracts
     public interface IPlugin : IDisposable
     {
         PluginDesc Description { get; }
-        public PluginExecResult Execute(PluginSetting setting, PluginExecArgs execArgs);
+        public PluginExecResult Execute(PluginSetting setting, PluginExecArgs execArgs, PluginInvocationContext? context = null);
     }
 
     public abstract class PluginBase<TSetting> : IPlugin where TSetting : class, new()
     {
         protected ILogger Logger = LogManager.GetCurrentClassLogger();
         public TSetting Setting { get; set; } = new TSetting();
+        protected PluginInvocationContext? Context { get; private set; }
 
         public PluginDesc Description => BuildPluginDesc();
              
-        public virtual PluginExecResult Execute(PluginSetting pluginP, PluginExecArgs execArgs)
+        public virtual PluginExecResult Execute(PluginSetting pluginP, PluginExecArgs execArgs, PluginInvocationContext? context = null)
         {
+            Context = context;
             if (TryParse(pluginP.Settings, out var setting))
             {
                 //TODO: update default setting to json
@@ -80,6 +82,10 @@ namespace EIMSNext.Plugin.Contracts
                 result.Code = -3;
                 result.Message = ex.Message;
                 Logger.Error(ex, $"Plugin [{execArgs.FunName}] occurs error with {execArgs.FunArgs}");
+            }
+            finally
+            {
+                Context = null;
             }
             return result;
         }

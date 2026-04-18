@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
+using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Scripting;
 using MongoDB.Driver;
@@ -254,6 +255,16 @@ namespace EIMSNext.Component
 
                     otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
                     break;
+                case WfNodeType.Plugin:
+                    dfNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
+                    dfNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
+                    {
+                        PluginId = flowNode.Metadata.PluginMeta.PluginId,
+                        PluginVersion = flowNode.Metadata.PluginMeta.PluginVersion,
+                        FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
+                        FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings)
+                    };
+                    break;
             }
 
             return dfNodeSetting;
@@ -431,6 +442,40 @@ namespace EIMSNext.Component
                 },
                 SingleResultNode = field.SingleResultNode,
             };
+        }
+
+        private List<PluginFieldSetting> ParsePluginFieldList(PluginFieldList? fieldList)
+        {
+            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            {
+                return new List<PluginFieldSetting>();
+            }
+
+            return fieldList.Items.Select(item =>
+            {
+                var fieldSetting = new PluginFieldSetting
+                {
+                    FieldKey = item.FieldKey,
+                    FieldType = item.FieldType,
+                    ValueType = Enum.Parse<PluginValueType>(item.Value!.Type, true),
+                    Value = item.Value.Value,
+                };
+
+                if (item.Value.FieldValue != null)
+                {
+                    fieldSetting.ValueField = new PluginFieldReference
+                    {
+                        NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
+                        FormId = item.Value.FieldValue.FormId,
+                        Field = item.Value.FieldValue.Field,
+                        FieldType = item.Value.FieldValue.Type,
+                        IsSubField = item.Value.FieldValue.IsSubField,
+                        SingleResultNode = item.Value.FieldValue.SingleResultNode,
+                    };
+                }
+
+                return fieldSetting;
+            }).ToList();
         }
         #endregion
 
@@ -610,6 +655,22 @@ namespace EIMSNext.Component
         private class PluginMeta
         {
             public bool SingleResult { get; set; }
+            public string PluginId { get; set; } = string.Empty;
+            public string? PluginVersion { get; set; }
+            public string FunctionId { get; set; } = string.Empty;
+            public PluginFieldList FieldSettings { get; set; } = new PluginFieldList();
+        }
+
+        private class PluginFieldList
+        {
+            public List<PluginFieldItem> Items { get; set; } = new List<PluginFieldItem>();
+        }
+
+        private class PluginFieldItem
+        {
+            public string FieldKey { get; set; } = string.Empty;
+            public string FieldType { get; set; } = string.Empty;
+            public FormFieldValue? Value { get; set; }
         }
 
 

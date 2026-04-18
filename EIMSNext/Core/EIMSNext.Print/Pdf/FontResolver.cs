@@ -228,8 +228,7 @@ namespace EIMSNext.Print.Pdf
                 var files = Directory.EnumerateFiles(fontsPath, "*.*")
                     .Where(f =>
                         f.EndsWith(".otf", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase) ||
-                        f.EndsWith(".ttc", StringComparison.OrdinalIgnoreCase));
+                        f.EndsWith(".ttf", StringComparison.OrdinalIgnoreCase));
 
                 foreach (var file in files)
                 {

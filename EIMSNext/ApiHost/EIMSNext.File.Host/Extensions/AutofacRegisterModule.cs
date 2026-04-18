@@ -1,7 +1,7 @@
 using Autofac;
 
 using EIMSNext.ApiHost.Extensions;
-using EIMSNext.FileUpload;
+using EIMSNext.File;
 using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.File.Host.Extensions

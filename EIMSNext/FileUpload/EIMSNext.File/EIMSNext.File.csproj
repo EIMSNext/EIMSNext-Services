@@ -6,6 +6,8 @@
 		<Nullable>enable</Nullable>
 		<Authors>EIMSNext Team</Authors>
 		<Version>1.1.0.0</Version>
+		<AssemblyName>EIMSNext.File</AssemblyName>
+		<RootNamespace>EIMSNext.File</RootNamespace>
 	</PropertyGroup>
 
 	<ItemGroup>

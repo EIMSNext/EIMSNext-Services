@@ -27,7 +27,7 @@
 	<ItemGroup>
 		<ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
-		<ProjectReference Include="..\..\FileUpload\EIMSNext.FileUpload\EIMSNext.FileUpload.csproj" />
+		<ProjectReference Include="..\..\FileUpload\EIMSNext.File\EIMSNext.File.csproj" />
 		<ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
 	</ItemGroup>
 
