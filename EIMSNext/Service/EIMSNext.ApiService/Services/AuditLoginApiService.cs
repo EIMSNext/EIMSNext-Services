@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Async.Abstractions.Messaging;
@@ -9,7 +10,9 @@ using EIMSNext.Core;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
+
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
@@ -98,7 +101,8 @@ namespace EIMSNext.ApiService
             var builder = Builders<AuditLogin>.Filter;
             var filters = new List<FilterDefinition<AuditLogin>>
             {
-                builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId)
+                builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId),
+                builder.Ne(x => x.DeleteFlag, true),
             };
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
