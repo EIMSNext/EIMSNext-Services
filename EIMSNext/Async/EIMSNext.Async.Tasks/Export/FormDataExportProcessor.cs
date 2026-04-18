@@ -1,4 +1,4 @@
-using System.ComponentModel.Composition;
+using System.Composition;
 using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
@@ -15,10 +15,9 @@ using MongoDB.Driver;
 namespace EIMSNext.Async.Tasks.Export
 {
     [Export(typeof(IExportProcessor))]
+    [ExportMetadata(MefMetadata.Id, ExportProcessorIds.FormData)]
     public class FormDataExportProcessor : ExportProcessorBase
     {
-        public override string Id => ExportProcessorIds.FormData;
-
         public override Task<ExportFileBuilder.ExportFileResult> ExportAsync(
             ExportLog exportLog,
             IResolver resolver,

@@ -1,20 +1,21 @@
-using System.ComponentModel.Composition;
+using System.Composition;
 using System.Text.Json;
+
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Service.Entities;
+
 using HKH.Mef2.Integration;
+
 using MongoDB.Driver;
 
 namespace EIMSNext.Async.Tasks.Export
 {
     [Export(typeof(IExportProcessor))]
+    [ExportMetadata(MefMetadata.Id, ExportProcessorIds.AuditLog)]
     public class AuditLogExportProcessor : ExportProcessorBase
     {
-        public override string Id => ExportProcessorIds.AuditLog;
-
         public override Task<ExportFileBuilder.ExportFileResult> ExportAsync(
             ExportLog exportLog,
             IResolver resolver,

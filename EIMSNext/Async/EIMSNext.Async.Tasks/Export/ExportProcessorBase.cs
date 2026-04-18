@@ -12,8 +12,6 @@ namespace EIMSNext.Async.Tasks.Export
 {
     public abstract class ExportProcessorBase : IExportProcessor
     {
-        public abstract string Id { get; }
-
         public abstract Task<ExportFileBuilder.ExportFileResult> ExportAsync(
             EIMSNext.Service.Entities.ExportLog exportLog,
             IResolver resolver,

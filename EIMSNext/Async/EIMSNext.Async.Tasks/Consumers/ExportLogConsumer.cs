@@ -4,6 +4,7 @@ using EIMSNext.Async.Tasks.Export;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
+using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Contracts;
@@ -58,15 +59,7 @@ namespace EIMSNext.Async.Tasks.Consumers
         private static IExportProcessor ResolveProcessor(ExportLog exportLog, IResolver resolver)
         {
             var processorId = ExportProcessorIds.FromExportType(exportLog.ExportType);
-            var export = resolver.GetExports<IExportProcessor>()
-                .FirstOrDefault(x => string.Equals(x.Id, processorId, StringComparison.OrdinalIgnoreCase));
-
-            if (export == null)
-            {
-                throw new NotSupportedException($"未找到导出处理器: {processorId}");
-            }
-
-            return export;
+            return resolver.ResolveExport<IExportProcessor>(processorId);
         }
 
         private static async Task PublishSuccessMessageAsync(ExportLog exportLog, long totalCount, string downloadUrl, IResolver resolver, CancellationToken ct)
