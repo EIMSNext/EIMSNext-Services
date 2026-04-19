@@ -33,7 +33,6 @@ namespace EIMSNext.Async.Tasks.Export
             var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<FormData>(
                     $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
-                    formDef.Name,
                     columns,
                     filter,
                     resolver,

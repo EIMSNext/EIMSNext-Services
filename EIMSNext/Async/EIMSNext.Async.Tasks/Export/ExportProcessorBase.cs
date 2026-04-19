@@ -75,7 +75,6 @@ namespace EIMSNext.Async.Tasks.Export
 
         protected static async Task<ExportFileBuilder.ExportFileResult> ExportExcelByBatchAsync<TEntity>(
             string fileName,
-            string sheetName,
             List<ExportColumn> columns,
             FilterDefinition<TEntity> filter,
             IResolver resolver,
@@ -89,7 +88,7 @@ namespace EIMSNext.Async.Tasks.Export
 
             using (var workbook = ExportFileBuilder.CreateWorkbook())
             {
-                var sheet = ExportFileBuilder.InitializeExcelSheet(workbook, sheetName, columns, out var styles);
+                var sheet = ExportFileBuilder.InitializeExcelSheet(workbook, "Sheet1", columns, out var styles);
                 var repo = resolver.Resolve<IRepository<TEntity>>();
                 var rowIndex = 1;
                 long? lastCreateTime = null;

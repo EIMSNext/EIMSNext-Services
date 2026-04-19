@@ -28,7 +28,6 @@ namespace EIMSNext.Async.Tasks.Export
             var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<AuditLogin>(
                     $"login-log-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
-                    "登录日志",
                     columns,
                     filter,
                     resolver,
