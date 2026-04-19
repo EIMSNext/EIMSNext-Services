@@ -43,7 +43,7 @@ namespace EIMSNext.Service
                 .Set(x => x.IsRead, true)
                 .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
 
-            Repository.UpdateMany(new DynamicFilter { Field = Fields.Id, Op = FilterOp.In, Value = ids }, update, upsert: false);
+            Repository.UpdateMany(Repository.FilterBuilder.In(x => x.Id, ids), update, upsert: false);
             return Task.CompletedTask;
         }
     }
