@@ -22,7 +22,7 @@ namespace EIMSNext.Print.Abstractions
             return new PrintResult { Content = content, FileName = GetFileName(datas.FirstOrDefault(), option) };
         }
 
-        protected abstract byte[] Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas);
+        protected abstract Stream Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas);
 
         protected virtual string GetFileName(object? data, PrintOption option)
         {

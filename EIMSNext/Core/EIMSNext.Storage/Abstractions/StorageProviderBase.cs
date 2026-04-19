@@ -20,6 +20,8 @@ namespace EIMSNext.Storage.Abstractions
 
         public abstract bool Upload(byte[] content, string objKey);
 
+        public abstract bool Upload(Stream content, string objKey);
+
         public abstract Stream? Download(string objKey);
 
         public abstract bool Exists(string objKey);

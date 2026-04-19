@@ -36,8 +36,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             try
             {
                 var processor = ResolveProcessor(exportLog, resolver);
-                var result = await processor.ExportAsync(exportLog, resolver, ct);
-
+                await using var result = await processor.ExportAsync(exportLog, resolver, ct);
                 var savePath = $"Export\\{exportLog.CorpId}\\Logs\\{DateTime.UtcNow:yyyyMMdd}\\{result.FileName}";
                 var storage = resolver.Resolve<IStorageProvider>();
                 if (!storage.Upload(result.Content, savePath))

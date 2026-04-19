@@ -142,5 +142,30 @@ namespace EIMSNext.Async.Tests
             Assert.IsNotNull(pane);
             Assert.AreEqual((short)1, pane.HorizontalSplitTopRow);
         }
+
+        [TestMethod]
+        public async Task ExportFileResult_DisposeAsync_ShouldDeleteTempFile()
+        {
+            var fileName = "cleanup-test.csv";
+            var tempFile = ExportProcessorBase.CreateTempFilePath(fileName);
+            await File.WriteAllTextAsync(tempFile, "header\r\nvalue");
+
+            Assert.IsTrue(File.Exists(tempFile));
+
+            await using (var result = new ExportFileBuilder.ExportFileResult
+            {
+                FileName = fileName,
+                Content = ExportProcessorBase.OpenTempFileForRead(tempFile),
+                TotalCount = 1,
+            })
+            {
+                Assert.IsTrue(File.Exists(tempFile));
+                using var reader = new StreamReader(result.Content, Encoding.UTF8, leaveOpen: true);
+                var content = await reader.ReadToEndAsync();
+                StringAssert.Contains(content, "value");
+            }
+
+            Assert.IsFalse(File.Exists(tempFile));
+        }
     }
 }

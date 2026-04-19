@@ -1,15 +1,25 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-using Org.BouncyCastle.Utilities;
-
 namespace EIMSNext.Print.Abstractions
 {
-    public class PrintResult
+    public sealed class PrintResult : IDisposable, IAsyncDisposable
     {
-        public byte[] Content { get; internal set; } = Array.Empty<byte>();
+        public Stream Content { get; internal set; } = Stream.Null;
         public string FileName { get; internal set; } = string.Empty;
+
+        public void Dispose()
+        {
+            Content.Dispose();
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            if (Content is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else
+            {
+                Content.Dispose();
+            }
+        }
     }
 }

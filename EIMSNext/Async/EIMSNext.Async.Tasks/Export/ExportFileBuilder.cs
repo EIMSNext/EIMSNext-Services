@@ -10,12 +10,30 @@ namespace EIMSNext.Async.Tasks.Export
     public static class ExportFileBuilder
     {
         public sealed class ExportFileResult
+            : IDisposable, IAsyncDisposable
         {
             public string FileName { get; init; } = string.Empty;
 
-            public byte[] Content { get; init; } = [];
+            public required Stream Content { get; init; }
 
             public long TotalCount { get; init; }
+
+            public void Dispose()
+            {
+                Content.Dispose();
+            }
+
+            public async ValueTask DisposeAsync()
+            {
+                if (Content is IAsyncDisposable asyncDisposable)
+                {
+                    await asyncDisposable.DisposeAsync();
+                }
+                else
+                {
+                    Content.Dispose();
+                }
+            }
         }
 
         public sealed class ExportCellValue

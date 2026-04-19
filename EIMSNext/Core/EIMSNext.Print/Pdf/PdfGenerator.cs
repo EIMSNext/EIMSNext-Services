@@ -8,9 +8,9 @@ namespace EIMSNext.Print.Pdf
 {
     public class PdfGenerator : BasePrintGenerator<PdfGenerator>
     {
-        protected override byte[] Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas)
+        protected override Stream Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas)
         {
-            if (string.IsNullOrEmpty(template.Content)) return Array.Empty<byte>();
+            if (string.IsNullOrEmpty(template.Content)) return Stream.Null;
 
             var renderOptions = new PdfRenderOptions();
 
@@ -19,7 +19,7 @@ namespace EIMSNext.Print.Pdf
                 PropertyNameCaseInsensitive = true,
             });
 
-            if (workbook == null || workbook.Sheets?.Count == 0) return Array.Empty<byte>();
+            if (workbook == null || workbook.Sheets?.Count == 0) return Stream.Null;
 
             var worksheet = workbook.Sheets!.Values.First();
 
@@ -34,15 +34,16 @@ namespace EIMSNext.Print.Pdf
             using var temporaryFileSession = new PdfTemporaryFileSession(renderOptions.TemporaryDirectory);
             RenderTables(document, workbook, worksheet, datas, option, renderOptions, temporaryFileSession);
 
-            using var ms = new MemoryStream();
+            var ms = new MemoryStream();
             var renderer = new PdfDocumentRenderer()
             {
                 Document = document
             };
             renderer.RenderDocument();
             renderer.PdfDocument.Save(ms);
+            ms.Position = 0;
 
-            return ms.ToArray();
+            return ms;
         }
 
         private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option, PdfRenderOptions renderOptions, PdfTemporaryFileSession temporaryFileSession)

@@ -27,12 +27,11 @@ namespace EIMSNext.Async.Tasks.Export
             Action<CSVWriter, List<ExportColumn>, IEnumerable<TEntity>> writeRows)
             where TEntity : EntityBase
         {
-            var tempFile = Path.GetTempFileName();
+            var tempFile = CreateTempFilePath(fileName);
             long totalCount = 0;
 
-            try
+            await using (var stream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
             {
-                await using var stream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None);
                 using var writer = ExportFileBuilder.CreateCsvWriter(stream);
                 ExportFileBuilder.WriteCsvHeader(writer, columns);
 
@@ -65,20 +64,14 @@ namespace EIMSNext.Async.Tasks.Export
                 }
 
                 await stream.FlushAsync(ct);
-                return new ExportFileBuilder.ExportFileResult
-                {
-                    FileName = fileName,
-                    Content = await File.ReadAllBytesAsync(tempFile, ct),
-                    TotalCount = totalCount,
-                };
             }
-            finally
+
+            return new ExportFileBuilder.ExportFileResult
             {
-                if (File.Exists(tempFile))
-                {
-                    File.Delete(tempFile);
-                }
-            }
+                FileName = fileName,
+                Content = OpenTempFileForRead(tempFile),
+                TotalCount = totalCount,
+            };
         }
 
         protected static async Task<ExportFileBuilder.ExportFileResult> ExportExcelByBatchAsync<TEntity>(
@@ -92,12 +85,11 @@ namespace EIMSNext.Async.Tasks.Export
             Func<ISheet, ExportFileBuilder.ExcelStyles, List<ExportColumn>, IEnumerable<TEntity>, int, int> writeRows)
             where TEntity : EntityBase
         {
-            var tempFile = Path.GetTempFileName();
+            var tempFile = CreateTempFilePath(fileName);
             long totalCount = 0;
 
-            try
+            using (var workbook = ExportFileBuilder.CreateWorkbook())
             {
-                using var workbook = ExportFileBuilder.CreateWorkbook();
                 var sheet = ExportFileBuilder.InitializeExcelSheet(workbook, sheetName, columns, out var styles);
                 var repo = resolver.Resolve<IRepository<TEntity>>();
                 var rowIndex = 1;
@@ -129,23 +121,31 @@ namespace EIMSNext.Async.Tasks.Export
 
                 await using var stream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None);
                 workbook.Write(stream, false);
-                workbook.Dispose();
                 await stream.FlushAsync(ct);
+            }
 
-                return new ExportFileBuilder.ExportFileResult
-                {
-                    FileName = fileName,
-                    Content = await File.ReadAllBytesAsync(tempFile, ct),
-                    TotalCount = totalCount,
-                };
-            }
-            finally
+            return new ExportFileBuilder.ExportFileResult
             {
-                if (File.Exists(tempFile))
-                {
-                    File.Delete(tempFile);
-                }
-            }
+                FileName = fileName,
+                Content = OpenTempFileForRead(tempFile),
+                TotalCount = totalCount,
+            };
+        }
+
+        internal static string CreateTempFilePath(string fileName)
+        {
+            var baseDirectory = string.IsNullOrWhiteSpace(EIMSNext.Common.Constants.BaseDirectory)
+                ? AppContext.BaseDirectory
+                : EIMSNext.Common.Constants.BaseDirectory;
+            var tempDirectory = Path.Combine(baseDirectory, "temp", "export", DateTime.UtcNow.ToString("yyyyMMdd"));
+            Directory.CreateDirectory(tempDirectory);
+            var tempFileName = $"{Guid.NewGuid():N}_{SanitizeFileName(fileName)}";
+            return Path.Combine(tempDirectory, tempFileName);
+        }
+
+        internal static FileStream OpenTempFileForRead(string tempFile)
+        {
+            return new FileStream(tempFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
         }
 
         internal static FilterDefinition<T> BuildSeekFilter<T>(

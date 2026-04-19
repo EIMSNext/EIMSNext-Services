@@ -21,13 +21,13 @@ namespace EIMSNext.Service.Host.Controllers
     public class CustomPrintController(IResolver resolver) : MefControllerBase(resolver)
     {
         [HttpPost("Preview")]
-        public async Task<IActionResult> Preview(PrintPreviewRequest request)
+        public IActionResult Preview(PrintPreviewRequest request)
         {
             if (string.IsNullOrEmpty(request.Content))
                 return ApiResult.Fail(400, "模板为空").ToActionResult();
 
 
-            var printResult = new Print.CustomPrintService().Preview(new PrintTemplate { Content = request.Content, PrintType = (PrintType)(int)request.PrintType }, new PrintOption());
+            using var printResult = new Print.CustomPrintService().Preview(new PrintTemplate { Content = request.Content, PrintType = (PrintType)(int)request.PrintType }, new PrintOption());
 
             if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
             {
@@ -44,7 +44,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("Print")]
-        public async Task<IActionResult> Print(PrintRequest request)
+        public IActionResult Print(PrintRequest request)
         {
             if (string.IsNullOrEmpty(request.TemplateId) || request.DataIds == null || request.DataIds.Count == 0)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
@@ -64,7 +64,7 @@ namespace EIMSNext.Service.Host.Controllers
             if (formDef == null || formDef.Content.Items == null)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
 
-            var printResult = new Print.CustomPrintService().Print(new PrintTemplate { Content = template.Content, PrintType = (PrintType)(int)template.PrintType }, new PrintOption(), datas.Select(x => FormDataFormatter.Format(x, formDef.Content.Items)).ToList());
+            using var printResult = new Print.CustomPrintService().Print(new PrintTemplate { Content = template.Content, PrintType = (PrintType)(int)template.PrintType }, new PrintOption(), datas.Select(x => FormDataFormatter.Format(x, formDef.Content.Items)).ToList());
 
             if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
             {
