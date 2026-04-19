@@ -16,7 +16,7 @@ namespace EIMSNext.Async.Tasks.Export
     [ExportMetadata(MefMetadata.Id, ExportProcessorIds.AuditLog)]
     public class AuditLogExportProcessor : ExportProcessorBase
     {
-        public override Task<ExportFileBuilder.ExportFileResult> ExportAsync(
+        public override async Task<ExportFileBuilder.ExportFileResult> ExportAsync(
             ExportLog exportLog,
             IResolver resolver,
             CancellationToken ct)
@@ -25,7 +25,7 @@ namespace EIMSNext.Async.Tasks.Export
             var request = exportLog.FilterJson?.DeserializeFromJson<AuditLogExportRequest>() ?? new AuditLogExportRequest();
             var filter = BuildFilter(exportLog.CorpId ?? string.Empty, request);
 
-            return exportLog.ActualFormat == ExportFormat.Excel
+            var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<AuditLog>(
                     $"action-log-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
                     "操作日志",
@@ -42,7 +42,9 @@ namespace EIMSNext.Async.Tasks.Export
                     resolver,
                     ct,
                     2000,
-                    WriteCsvRows);
+                    WriteCsvRows));
+            result.FormName = "操作日志";
+            return result;
         }
 
         internal static ExportFileBuilder.ExportCellValue GetCellValue(ExportColumn column, AuditLog row)

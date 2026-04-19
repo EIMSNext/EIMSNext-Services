@@ -124,4 +124,27 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         FlowNotify
     }
+
+    /// <summary>
+    /// 消息类型
+    /// </summary>
+    public enum MessageType
+    {
+        /// <summary>
+        /// 表单提醒
+        /// </summary>
+        FormNotify,
+        /// <summary>
+        /// 待办提醒
+        /// </summary>
+        WfTodoNotify,
+        /// <summary>
+        /// 待办超时提醒
+        /// </summary>
+        WfExpireNotify,
+        /// <summary>
+        /// 导出提醒
+        /// </summary>
+        ExportNotify
+    }
 }

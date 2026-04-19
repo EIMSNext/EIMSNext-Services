@@ -1,30 +1,22 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiCore;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
-using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
-
 using HKH.Mef2.Integration;
-
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-
 using MongoDB.Driver;
-
 using NLog.Extensions.Logging;
-
-using EIMSNext.Async.RabbitMQ;
-
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);

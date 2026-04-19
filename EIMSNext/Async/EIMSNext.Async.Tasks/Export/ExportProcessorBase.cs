@@ -1,7 +1,6 @@
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Core.Query;
 using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
 using HKH.CSV;
 using HKH.Mef2.Integration;

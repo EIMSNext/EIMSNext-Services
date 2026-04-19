@@ -1,4 +1,3 @@
-using System.Text;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Service.Entities;
 using HKH.CSV;
@@ -12,6 +11,7 @@ namespace EIMSNext.Async.Tasks.Export
         public sealed class ExportFileResult
             : IDisposable, IAsyncDisposable
         {
+            public string? FormName {  get; set; }
             public string FileName { get; init; } = string.Empty;
 
             public required Stream Content { get; init; }

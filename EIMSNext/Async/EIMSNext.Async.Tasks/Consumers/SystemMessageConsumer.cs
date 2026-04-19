@@ -2,7 +2,6 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
@@ -35,7 +34,8 @@ namespace EIMSNext.Async.Tasks.Consumers
                 IsRead = false,
                 ExpireTime = args.ExpireTime,
                 Category = args.Category,
-                CreateTime = DateTime.UtcNow.ToTimeStampMs()
+                CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                MessageType = args.MessageType,
             }).ToList();
 
             await repo.InsertAsync(messages);

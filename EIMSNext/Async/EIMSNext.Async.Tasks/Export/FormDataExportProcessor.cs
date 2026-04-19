@@ -3,7 +3,6 @@ using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
@@ -18,7 +17,7 @@ namespace EIMSNext.Async.Tasks.Export
     [ExportMetadata(MefMetadata.Id, ExportProcessorIds.FormData)]
     public class FormDataExportProcessor : ExportProcessorBase
     {
-        public override Task<ExportFileBuilder.ExportFileResult> ExportAsync(
+        public override async Task<ExportFileBuilder.ExportFileResult> ExportAsync(
             ExportLog exportLog,
             IResolver resolver,
             CancellationToken ct)
@@ -31,7 +30,7 @@ namespace EIMSNext.Async.Tasks.Export
             var filter = request.Filter?.ToFilterDefinition<FormData>() ?? Builders<FormData>.Filter.Empty;
             var fileNamePrefix = SanitizeFileName(formDef.Name);
 
-            return exportLog.ActualFormat == ExportFormat.Excel
+            var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<FormData>(
                     $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
                     formDef.Name,
@@ -48,7 +47,10 @@ namespace EIMSNext.Async.Tasks.Export
                     resolver,
                     ct,
                     1000,
-                    (writer, exportColumns, rows) => WriteCsvRows(writer, exportColumns, fields, rows));
+                    (writer, exportColumns, rows) => WriteCsvRows(writer, exportColumns, fields, rows)));
+
+            result.FormName = formDef.Name;
+            return result;
         }
 
         private sealed class FormDataColumnBinding

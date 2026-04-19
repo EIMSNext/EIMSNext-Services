@@ -47,5 +47,9 @@ namespace EIMSNext.Service.Entities
         /// 消息分类
         /// </summary>
         public MessageCategory Category { get; set; } = MessageCategory.DataNotify;
+        /// <summary>
+        /// 消息类型
+        /// </summary>
+        public MessageType MessageType {  get; set; }
     }
 }

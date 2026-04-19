@@ -15,12 +15,12 @@ namespace EIMSNext.ApiService
 
         public Task MarkReadAsync(string id)
         {
-            return CoreService.MarkReadAsync(id, GetCurrentEmpId());
+            return CoreService.MarkReadAsync(id);
         }
 
         public Task MarkReadBatchAsync(IEnumerable<string> ids)
         {
-            return CoreService.MarkReadBatchAsync(ids, GetCurrentEmpId());
+            return CoreService.MarkReadBatchAsync(ids);
         }
 
         protected override IQueryable<SystemMessageViewModel> FilterByPermission()
