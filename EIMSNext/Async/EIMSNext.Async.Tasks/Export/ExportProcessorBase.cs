@@ -119,7 +119,6 @@ namespace EIMSNext.Async.Tasks.Export
 
                 await using var stream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None);
                 workbook.Write(stream, false);
-                await stream.FlushAsync(ct);
             }
 
             return new ExportFileBuilder.ExportFileResult
@@ -137,7 +136,7 @@ namespace EIMSNext.Async.Tasks.Export
                 : EIMSNext.Common.Constants.BaseDirectory;
             var tempDirectory = Path.Combine(baseDirectory, "temp", "export", DateTime.UtcNow.ToString("yyyyMMdd"));
             Directory.CreateDirectory(tempDirectory);
-            var tempFileName = $"{Guid.NewGuid():N}_{SanitizeFileName(fileName)}";
+            var tempFileName = $"{SanitizeFileName(fileName)}";
             return Path.Combine(tempDirectory, tempFileName);
         }
 

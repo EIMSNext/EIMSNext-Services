@@ -32,7 +32,7 @@ namespace EIMSNext.Async.Tasks.Export
 
             var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<FormData>(
-                    $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
+                    $"{fileNamePrefix}-{Guid.NewGuid():N}.xlsx",
                     columns,
                     filter,
                     resolver,
@@ -40,7 +40,7 @@ namespace EIMSNext.Async.Tasks.Export
                     1000,
                     (sheet, styles, exportColumns, rows, rowIndex) => WriteExcelRows(sheet, styles, exportColumns, fields, rows, rowIndex))
                 : ExportCsvByBatchAsync<FormData>(
-                    $"{fileNamePrefix}-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+                    $"{fileNamePrefix}-{Guid.NewGuid():N}.csv",
                     columns,
                     filter,
                     resolver,

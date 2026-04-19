@@ -27,7 +27,7 @@ namespace EIMSNext.Async.Tasks.Export
 
             var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<AuditLogin>(
-                    $"login-log-{DateTime.Now:yyyyMMdd-HHmmss}.xlsx",
+                    $"login-log-{Guid.NewGuid():N}.xlsx",
                     columns,
                     filter,
                     resolver,
@@ -35,7 +35,7 @@ namespace EIMSNext.Async.Tasks.Export
                     2000,
                     WriteExcelRows)
                 : ExportCsvByBatchAsync<AuditLogin>(
-                    $"login-log-{DateTime.Now:yyyyMMdd-HHmmss}.csv",
+                    $"login-log-{Guid.NewGuid():N}.csv",
                     columns,
                     filter,
                     resolver,
