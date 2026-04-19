@@ -1,16 +1,11 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiCore;
 using EIMSNext.ApiHost.Extensions;
-using EIMSNext.Component;
-using EIMSNext.FileUpload;
 using EIMSNext.File.Host.Extensions;
-
+using EIMSNext.FileUpload;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-
 using NLog.Extensions.Logging;
-
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);

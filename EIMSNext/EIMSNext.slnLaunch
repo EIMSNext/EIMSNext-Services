@@ -66,5 +66,30 @@
         "Action": "Start"
       }
     ]
+  },
+  {
+    "Name": "All",
+    "Projects": [
+      {
+        "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Flow.Host\\EIMSNext.Flow.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Service.Host\\EIMSNext.Service.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.File.Host\\EIMSNext.File.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.Auth.Host\\EIMSNext.Auth.Host.csproj",
+        "Action": "Start"
+      }
+    ]
   }
 ]
