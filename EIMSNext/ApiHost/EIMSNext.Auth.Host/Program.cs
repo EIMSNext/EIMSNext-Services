@@ -6,6 +6,7 @@ using EIMSNext.Auth.Mappers;
 using EIMSNext.Auth.Services;
 using EIMSNext.Auth.Host;
 using EIMSNext.Core;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.OpenApi.Models;
 using NLog.Extensions.Logging;
 
@@ -44,6 +45,13 @@ builder.Services.AddIdentityServer(options =>
   .AddResourceOwnerValidator<ResourceUserPasswordValidator>()
   .AddProfileService<UserProfileService>()
   .AddJwtBearerClientAuthentication();
+
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+});
 
 //.AddAppAuthRedirectUriValidator()              
 
