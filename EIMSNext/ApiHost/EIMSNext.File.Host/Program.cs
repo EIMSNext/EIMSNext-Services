@@ -1,6 +1,9 @@
 using Asp.Versioning;
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Component;
+using EIMSNext.File;
 using EIMSNext.File.Host.Extensions;
 using EIMSNext.FileUpload;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -38,7 +41,8 @@ builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSwaggerGenOptions>();
 builder.Services.AddSwaggerGen();
 
-builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
+builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
+builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 
 var app = builder.Build();
 

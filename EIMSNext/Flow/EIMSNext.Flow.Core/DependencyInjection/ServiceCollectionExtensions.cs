@@ -38,6 +38,7 @@ namespace EIMSNext.Flow.Core
             services.AddTransient<DfUpdateNode>();
             services.AddTransient<DfDeleteNode>();
             services.AddTransient<DfPrintNode>();
+            services.AddTransient<DfPluginNode>();
         }
     }
 }

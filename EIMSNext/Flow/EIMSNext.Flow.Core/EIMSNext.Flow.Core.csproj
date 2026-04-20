@@ -12,6 +12,7 @@
 		<PackageReference Include="WorkflowCore" Version="3.17.0" />
 	</ItemGroup>
 	<ItemGroup>
+		<ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Cache\EIMSNext.Cache.csproj" />
 		<ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
 		<ProjectReference Include="..\..\Service\EIMSNext.Component\EIMSNext.Component.csproj" />

@@ -12,6 +12,7 @@
 
 	<ItemGroup>
 		<ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
+		<ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
 	</ItemGroup>
 
 </Project>

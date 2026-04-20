@@ -14,6 +14,7 @@
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="8.0.10" />
 	</ItemGroup>
 	<ItemGroup>
+	  <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
 	  <ProjectReference Include="..\EIMSNext.Cache\EIMSNext.Cache.csproj" />
 	  <ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
 	  <ProjectReference Include="..\EIMSNext.Core\EIMSNext.Core.csproj" />

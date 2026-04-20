@@ -1,5 +1,6 @@
 using EIMSNext.Common;
 using EIMSNext.Core.Entities;
+using EIMSNext.Plugin.Contracts;
 
 namespace EIMSNext.Service.Entities
 {
@@ -653,11 +654,6 @@ namespace EIMSNext.Service.Entities
     public class PrintSetting { }
 
     /// <summary>
-    /// 插件设置
-    /// </summary>
-    public class PluginSetting { }
-
-    /// <summary>
     /// 流程类型枚举
     /// </summary>
     public enum FlowType
@@ -739,6 +735,10 @@ namespace EIMSNext.Service.Entities
         /// 打印
         /// </summary>
         Print,
+        /// <summary>
+        /// 插件
+        /// </summary>
+        Plugin,
         /// <summary>
         /// 分支节点（第二种类型）
         /// </summary>

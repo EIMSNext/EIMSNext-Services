@@ -1,7 +1,7 @@
 ﻿using EIMSNext.MongoDb;
 using Microsoft.Extensions.Options;
 
-namespace EIMSNext.FileUpload
+namespace EIMSNext.File
 {
     public class UploadDbContext : MongoDbContextBase
     {

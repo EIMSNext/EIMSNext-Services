@@ -1,5 +1,6 @@
 using Asp.Versioning;
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
@@ -69,7 +70,8 @@ builder.Services.AddApiVersioning(opt =>
     opt.GroupNameFormat = "'v'VVV";
 });
 
-builder.Services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
+builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
+builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddRabbitMqMessaging(builder.Configuration);
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle

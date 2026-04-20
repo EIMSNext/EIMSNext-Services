@@ -2,7 +2,7 @@ using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace EIMSNext.FileUpload
+namespace EIMSNext.File
 {
     public static class ServiceCollectionExtensions
     {
