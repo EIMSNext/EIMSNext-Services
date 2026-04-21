@@ -113,18 +113,33 @@ namespace EIMSNext.ApiClient.Contracts
             {
                 Logger.LogError("API返回错误。StatusCode={StatusCode}, Content={ResponseContent}", response.StatusCode, response.Content);
                 var errMsg = "";
-                if (response.ErrorException != null)
+                if (!string.IsNullOrEmpty(response.Content))
                 {
-                    errMsg = response.ErrorException.Message;
-                    Logger.LogError(response.ErrorException, "API请求异常。Resource={Resource}", response.Request.Resource);
-                    //throw new UnLogException(response.Content, response.ErrorException);
+                    try
+                    {
+                        var err = JsonObject.Parse(response.Content)?.AsObject();
+                        if (err != null && err.ContainsKey("message"))
+                            errMsg = err["message"]!.GetValue<string>();
+                    }
+                    catch { }
                 }
-                else
+
+                if (string.IsNullOrEmpty(errMsg))
                 {
-                    errMsg = response.ErrorMessage;
-                    Logger.LogError("API请求异常。Resource={Resource}, ErrorMessage={ErrorMessage}", response.Request.Resource, response.ErrorMessage);
-                    //throw new UnLogException(response.ErrorMessage);
+                    if (response.ErrorException != null)
+                    {
+                        errMsg = response.ErrorException.Message;
+                        Logger.LogError(response.ErrorException, "API请求异常。Resource={Resource}", response.Request.Resource);
+                        //throw new UnLogException(response.Content, response.ErrorException);
+                    }
+                    else
+                    {
+                        errMsg = response.ErrorMessage;
+                        Logger.LogError("API请求异常。Resource={Resource}, ErrorMessage={ErrorMessage}", response.Request.Resource, response.ErrorMessage);
+                        //throw new UnLogException(response.ErrorMessage);
+                    }
                 }
+
                 throw new UnLogException(errMsg);
             }
 
