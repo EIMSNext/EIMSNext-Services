@@ -31,7 +31,7 @@ namespace EIMSNext.File.Host.Controllers
         public async Task<IActionResult> Upload()
         {
             var files = Request.Form.Files;
-            _logger.LogDebug($"收到{files.Count}个上传的文件");
+            _logger.LogDebug("收到上传文件 {FileCount} 个", files.Count);
 
             var attachments = new List<UploadedFile>();
             foreach (var file in files)
@@ -49,7 +49,7 @@ namespace EIMSNext.File.Host.Controllers
                 if (!Directory.Exists(thumbFolder)) Directory.CreateDirectory(thumbFolder);
 
                 var saveToPath = Path.Combine(Common.Constants.WebRootPath, savePath);
-                _logger.LogDebug($"{saveToPath}");
+                _logger.LogDebug("保存上传文件到 {SavePath}", saveToPath);
 
                 using (var targetStream = System.IO.File.Create(saveToPath))
                 {

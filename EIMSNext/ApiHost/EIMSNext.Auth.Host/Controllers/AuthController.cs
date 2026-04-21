@@ -1,6 +1,6 @@
 using EIMSNext.Auth.AccountSecurity;
+using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
-using IdentityModel;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -138,7 +138,7 @@ namespace EIMSNext.Auth.Host.Controllers
 
         private string GetCurrentUserId()
         {
-            var userId = User.FindFirst(JwtClaimTypes.Id)?.Value ?? User.FindFirst("sub")?.Value;
+            var userId = User.FindFirst(AuthClaimTypes.Id)?.Value ?? User.FindFirst(AuthClaimTypes.Subject)?.Value;
             if (string.IsNullOrWhiteSpace(userId))
             {
                 throw new UnauthorizedAccessException("未登录");

@@ -1,18 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<Authors>EIMSNext Team</Authors>
-		<Version>1.1.0.0</Version>
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="AutoMapper" Version="14.0.0" />
-		<PackageReference Include="IdentityServer4" Version="4.1.2" />
-	</ItemGroup>
-	<ItemGroup>
-	  <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
-	  <ProjectReference Include="..\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
-	</ItemGroup>
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenIddict.Server.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
+  </ItemGroup>
 </Project>

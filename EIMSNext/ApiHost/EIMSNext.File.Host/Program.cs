@@ -6,7 +6,7 @@ using EIMSNext.File;
 using EIMSNext.File.Host.Extensions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-using NLog.Extensions.Logging;
+using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -15,7 +15,10 @@ builder.ConfigWebEnvironment();
 // Add services to the container.
 builder.Host.UseAutofac<AutofacRegisterModule>();
 
-builder.Services.AddLogging(c => { c.AddNLog("nlog.config"); });
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "EIMSNext.File.Host"));
 builder.Services.AddHealthChecks().AddCheck("health", () => HealthCheckResult.Healthy());
 
 builder.Services.AddControllers();
@@ -61,6 +64,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseSerilogRequestLogging();
 app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>

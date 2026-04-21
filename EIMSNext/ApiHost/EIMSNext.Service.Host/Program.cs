@@ -17,7 +17,7 @@ using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
-using NLog.Extensions.Logging;
+using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -27,7 +27,10 @@ builder.Services.AddServiceComponents();
 
 builder.Host.UseAutofac<AutofacRegisterModule>();
 
-builder.Services.AddLogging(c => { c.AddNLog("nlog.config"); });
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "EIMSNext.Service.Host"));
 // Add services to the container.
 builder.Services.AddControllers().AddOData(
          options =>
@@ -102,6 +105,7 @@ if (app.Environment.IsDevelopment())
     });
 }
 
+app.UseSerilogRequestLogging();
 app.UseCustomMiddlewares();
 app.UseMiddleware<ODataMetadataMiddleware>();
 app.UseMiddleware<ODataCountRequestMiddleware>();

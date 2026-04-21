@@ -1,12 +1,11 @@
 using System.Text.Json.Nodes;
 using EIMSNext.Print.Extensions;
-using NLog;
 
 namespace EIMSNext.Print.Abstractions
 {
     public abstract class BasePrintGenerator<T> : IPrintGenerator where T : IPrintGenerator
     {
-        protected ILogger Loggger = LogManager.GetCurrentClassLogger();
+        protected Serilog.ILogger Logger => Serilog.Log.ForContext(GetType());
         protected bool IsPreview { get; set; } = false;
 
         public PrintResult Preview(PrintTemplate template, PrintOption option)

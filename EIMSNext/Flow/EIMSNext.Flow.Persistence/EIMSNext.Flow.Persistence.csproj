@@ -1,15 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<Authors>EIMSNext Team</Authors>
-		<Version>1.1.0.0</Version>
-	</PropertyGroup>
-	<ItemGroup>
-		<PackageReference Include="MongoDB.Driver" Version="3.7.1" />
-		<PackageReference Include="WorkflowCore" Version="3.15.0" />
-	</ItemGroup>
-
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="MongoDB.Driver" />
+    <PackageReference Include="WorkflowCore" />
+  </ItemGroup>
 </Project>

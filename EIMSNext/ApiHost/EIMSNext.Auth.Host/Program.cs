@@ -1,56 +1,37 @@
-using System.Security.Cryptography.X509Certificates;
 using EIMSNext.ApiCore;
-using EIMSNext.Auth.GrantValidators;
+using EIMSNext.Auth.Extensions;
 using EIMSNext.Auth.Interfaces;
-using EIMSNext.Auth.Mappers;
 using EIMSNext.Auth.Services;
 using EIMSNext.Auth.Host;
 using EIMSNext.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.OpenApi.Models;
-using NLog.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.OpenApi;
+using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigWebEnvironment();
-builder.Services.AddLogging(c => { c.AddNLog("nlog.config"); });
+builder.Host.UseSerilog((ctx, cfg) =>
+    cfg.ReadFrom.Configuration(ctx.Configuration)
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("Application", "EIMSNext.Auth.Host"));
 
 // Add services to the container.
 
 builder.Services.AddControllers();
 builder.Services.AddMemoryCache();
 builder.Services.AddAuthorization();
+builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
+builder.Services.AddAuthServices(builder.Configuration, builder.Environment.ContentRootPath);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo() { Title = "EIMSNext.Auth", Version = "v1" });
-});
-
-builder.Services.AddIdentityServer(options =>
-    {
-        options.Events.RaiseSuccessEvents = true;
-        options.Events.RaiseFailureEvents = true;
-        options.Events.RaiseErrorEvents = true;
-        options.IssuerUri = "https://auth.eimsnext.com";
-    })
-  .AddMongoDbStore(builder.Configuration.GetSection("MongoDB"))
-  .AddSigningCredential(new X509Certificate2(
-      Path.Combine(builder.Environment.ContentRootPath, builder.Configuration.GetSection("Certificates:CerPath").Value!),
-      builder.Configuration.GetSection("Certificates:Password").Value))
-  .AddExtensionGrantValidator<VerificationCodeGrantValidator>()
-  .AddExtensionGrantValidator<SingleSignOnGrantValidator>()
-  .AddExtensionGrantValidator<IntegrationGrantValidator>()
-  .AddResourceOwnerValidator<ResourceUserPasswordValidator>()
-  .AddProfileService<UserProfileService>()
-  .AddJwtBearerClientAuthentication();
-
-builder.Services.AddAuthentication(options =>
-{
-    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
 });
 
 //.AddAppAuthRedirectUriValidator()              
@@ -74,9 +55,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+app.UseSerilogRequestLogging();
 app.UseCustomMiddlewares();
 
-app.UseIdentityServer();
 //app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
@@ -91,33 +72,10 @@ void EnsureSeedData(IAuthDbContext context)
     {
         foreach (var client in SeedData.GetClients().ToList())
         {
-            context.AddClient(client.ToEntity());
+            context.AddClient(client);
         }
     }
 
-    if (!context.IdentityResources.Any())
-    {
-        foreach (var resource in SeedData.GetIdentityResources())
-        {
-            context.AddIdentityResource(resource.ToEntity());
-        }
-    }
-
-    if (!context.ApiResources.Any())
-    {
-        foreach (var resource in SeedData.GetApiResources())
-        {
-            context.AddApiResource(resource.ToEntity());
-        }
-    }
-
-    if (!context.ApiScopes.Any())
-    {
-        foreach (var resource in SeedData.GetApiScopes())
-        {
-            context.AddApiScope(resource.ToEntity());
-        }
-    }
     if (!context.Users.Any())
     {
         foreach (var user in SeedData.GetUsers())

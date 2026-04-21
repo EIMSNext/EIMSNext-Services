@@ -40,7 +40,7 @@ namespace EIMSNext.Service.Host.Authorization
         {
             if (_identity.IdentityType == IdentityType.Disabled)
             {
-                _logger.LogDebug($"禁止访问:{context.HttpContext.Request.Path}, 原因：用户已被禁用");
+                _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "用户已被禁用");
                 context.Result = new UnauthorizedResult();
                 return;
             }
@@ -56,7 +56,7 @@ namespace EIMSNext.Service.Host.Authorization
             }
             else if (perAttr.AccessControlLevel == AccessControlLevel.Forbid)
             {
-                _logger.LogDebug($"禁止访问:{context.HttpContext.Request.Path}, 原因：Acl=Forbid");
+                _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "Acl=Forbid");
                 //如果标记为禁止访问
                 context.Result = new ForbidResult();
             }

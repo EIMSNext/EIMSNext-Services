@@ -41,13 +41,13 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
 
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {
-            using var connection = MQConnFactory.CreateConnection();
-            using var channel = connection.CreateModel();
-            channel.QueueDeclare(QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null);
-            channel.BasicQos(0, 1, false);
+            await using var connection = await MQConnFactory.CreateConnectionAsync(stoppingToken);
+            await using var channel = await connection.CreateChannelAsync(cancellationToken: stoppingToken);
+            await channel.QueueDeclareAsync(QueueName, durable: true, exclusive: false, autoDelete: false, arguments: null, cancellationToken: stoppingToken);
+            await channel.BasicQosAsync(0, 1, false, stoppingToken);
 
-            var consumer = new EventingBasicConsumer(channel);
-            consumer.Received += async (_, ea) =>
+            var consumer = new AsyncEventingBasicConsumer(channel);
+            consumer.ReceivedAsync += async (_, ea) =>
             {
                 try
                 {
@@ -56,21 +56,21 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
 
                     if (message == null)
                     {
-                        channel.BasicAck(ea.DeliveryTag, false);
+                        await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                         return;
                     }
 
                     await ExecuteInScopeAsync(message, stoppingToken);
-                    channel.BasicAck(ea.DeliveryTag, false);
+                    await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                 }
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Task processing failed for queue {QueueName}", QueueName);
-                    channel.BasicNack(ea.DeliveryTag, false, requeue: false);
+                    await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: false, cancellationToken: stoppingToken);
                 }
             };
 
-            channel.BasicConsume(QueueName, autoAck: false, consumer);
+            await channel.BasicConsumeAsync(QueueName, autoAck: false, consumer: consumer, cancellationToken: stoppingToken);
             await Task.Delay(Timeout.Infinite, stoppingToken);
         }
 

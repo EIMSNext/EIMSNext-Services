@@ -45,7 +45,7 @@ namespace EIMSNext.Flow.Service
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, $"Error loading definition {definition.Id}");
+                    _logger.LogError(ex, "Error loading workflow definition {DefinitionId}", definition.Id);
                 }
             }
         }

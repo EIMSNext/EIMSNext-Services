@@ -30,9 +30,9 @@ namespace EIMSNext.Service.Host.Authorization
         /// <returns></returns>
         public Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
-            if (_identity.IdentityType== IdentityType.None || _identity.IdentityType == IdentityType.Disabled)
+            if (_identity.IdentityType == IdentityType.None || _identity.IdentityType == IdentityType.Disabled)
             {
-                _logger.LogDebug($"禁止访问:{context.HttpContext.Request.Path}, 原因：无身份用户或用户已被禁用");
+                _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "无身份用户或用户已被禁用");
                 context.Result = new UnauthorizedResult();
                 return Task.CompletedTask;
             }
@@ -46,7 +46,7 @@ namespace EIMSNext.Service.Host.Authorization
                 //{
                     if (!idAttr.IdentityType.HasFlag(_identity.IdentityType))
                     {
-                        _logger.LogDebug($"禁止访问:{context.HttpContext.Request.Path}, 原因：身份不允许 - IDT（{idAttr.IdentityType}），USR（{_identity.IdentityType}）");
+                        _logger.LogDebug("禁止访问 {Path}, 原因 身份不允许 - IDT({AllowedIdentityType}), USR({CurrentIdentityType})", context.HttpContext.Request.Path, idAttr.IdentityType, _identity.IdentityType);
                         //如果配置了明确身份限制并且不包含超管理员，则禁止访问
                         context.Result = new ForbidResult();
                     }

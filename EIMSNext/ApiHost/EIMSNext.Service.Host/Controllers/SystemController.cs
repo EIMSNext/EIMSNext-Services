@@ -11,7 +11,6 @@ using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Host.Requests;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
-using IdentityServer4.Models;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Controllers

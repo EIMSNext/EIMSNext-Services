@@ -83,7 +83,7 @@ namespace EIMSNext.Flow.Service
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, $"Dataflow自动提交表单失败：{x.Id}");
+                    Logger.LogError(ex, "Dataflow自动提交表单失败。FormDataId={FormDataId}", x.Id);
                 }
             });
         }

@@ -1,0 +1,70 @@
+<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="Asp.Versioning.OData.ApiExplorer" Version="8.2.1" />
+    <PackageVersion Include="Autofac" Version="9.1.0" />
+    <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="11.0.0" />
+    <PackageVersion Include="AutoMapper" Version="16.1.1" />
+    <PackageVersion Include="CloudNative.CloudEvents" Version="2.8.0" />
+    <PackageVersion Include="CloudNative.CloudEvents.AspNetCore" Version="2.8.0" />
+    <PackageVersion Include="CloudNative.CloudEvents.SystemTextJson" Version="2.8.0" />
+    <PackageVersion Include="Haukcode.WkHtmlToPdfDotNet" Version="1.5.95" />
+    <PackageVersion Include="HKH.Common" Version="5.2.0" />
+    <PackageVersion Include="HKH.CSV" Version="6.0.0" />
+    <PackageVersion Include="HKH.Mef2.Integration.Abstractions" Version="2.0.0" />
+    <PackageVersion Include="JsonPath.Net" Version="3.0.2" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.AspNetCore.OData" Version="9.4.1" />
+    <PackageVersion Include="Microsoft.ClearScript.V8" Version="7.5.0" />
+    <PackageVersion Include="Microsoft.ClearScript.V8.Native.win-x64" Version="7.5.0" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="7.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.Caching.StackExchangeRedis" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Logging" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Logging.Abstractions" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.Extensions.Options" Version="10.0.6" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.4.0" />
+    <PackageVersion Include="Microsoft.OData.Core" Version="8.4.3" />
+    <PackageVersion Include="MongoDB.AspNetCore.OData" Version="1.1.2" />
+    <PackageVersion Include="MongoDB.Driver" Version="3.7.1" />
+    <PackageVersion Include="OpenIddict.Server.AspNetCore" Version="7.4.0" />
+    <PackageVersion Include="MSTest" Version="4.2.1" />
+    <PackageVersion Include="Nanoid" Version="3.1.0" />
+    <PackageVersion Include="NPOI" Version="2.8.0" />
+    <PackageVersion Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <PackageVersion Include="PinYinConverter.Core" Version="1.1.0" />
+    <PackageVersion Include="Quartz" Version="3.18.0" />
+    <PackageVersion Include="Quartz.Extensions.DependencyInjection" Version="3.18.0" />
+    <PackageVersion Include="Quartz.Extensions.Hosting" Version="3.18.0" />
+    <PackageVersion Include="Quartz.Serialization.Json" Version="3.18.0" />
+    <PackageVersion Include="Quartz.Serialization.SystemTextJson" Version="3.18.0" />
+    <PackageVersion Include="RabbitMQ.Client" Version="7.2.1" />
+    <PackageVersion Include="RestSharp" Version="114.0.0" />
+    <PackageVersion Include="Serilog" Version="4.3.1" />
+    <PackageVersion Include="Serilog.AspNetCore" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Settings.Configuration" Version="10.0.0" />
+    <PackageVersion Include="Serilog.Sinks.Console" Version="6.1.1" />
+    <PackageVersion Include="Serilog.Sinks.File" Version="7.0.0" />
+    <PackageVersion Include="SharpZipLib" Version="1.4.2" />
+    <PackageVersion Include="SixLabors.ImageSharp" Version="3.1.12" />
+    <PackageVersion Include="SkiaSharp" Version="3.119.2" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.12.14" />
+    <PackageVersion Include="Swashbuckle.AspNetCore" Version="10.1.7" />
+    <PackageVersion Include="Swashbuckle.AspNetCore.Annotations" Version="10.1.7" />
+    <PackageVersion Include="System.ComponentModel.Composition" Version="10.0.6" />
+    <PackageVersion Include="System.Composition.AttributedModel" Version="10.0.6" />
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.6" />
+    <PackageVersion Include="WorkflowCore" Version="3.17.0" />
+    <PackageVersion Include="ZXing.Net" Version="0.16.11" />
+    <PackageVersion Include="ZXing.Net.Bindings.ImageSharp.V3" Version="0.16.18" />
+  </ItemGroup>
+</Project>

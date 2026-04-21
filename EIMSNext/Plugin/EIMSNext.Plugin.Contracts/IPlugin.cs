@@ -2,8 +2,7 @@ using System.Linq.Expressions;
 using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Nodes;
-
-using NLog;
+using Serilog;
 
 namespace EIMSNext.Plugin.Contracts
 {
@@ -15,7 +14,7 @@ namespace EIMSNext.Plugin.Contracts
 
     public abstract class PluginBase<TSetting> : IPlugin where TSetting : class, new()
     {
-        protected ILogger Logger = LogManager.GetCurrentClassLogger();
+        protected ILogger Logger => Log.ForContext(GetType());
         public TSetting Setting { get; set; } = new TSetting();
         protected PluginInvocationContext? Context { get; private set; }
 
@@ -81,7 +80,7 @@ namespace EIMSNext.Plugin.Contracts
             {
                 result.Code = -3;
                 result.Message = ex.Message;
-                Logger.Error(ex, $"Plugin [{execArgs.FunName}] occurs error with {execArgs.FunArgs}");
+                Logger.Error(ex, "Plugin execution failed. Function={FunctionName}, Args={FunctionArgs}", execArgs.FunName, execArgs.FunArgs);
             }
             finally
             {

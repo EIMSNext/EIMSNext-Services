@@ -56,7 +56,7 @@ namespace EIMSNext.Storage
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, $"从LocalStorageProvider读取资源失败:{objKey}");
+                    Logger.LogError(ex, "从LocalStorageProvider读取资源失败。ObjectKey={ObjectKey}", objKey);
                 }
             }
 
