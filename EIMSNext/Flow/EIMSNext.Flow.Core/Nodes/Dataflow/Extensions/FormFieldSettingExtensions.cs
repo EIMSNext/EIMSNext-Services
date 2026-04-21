@@ -8,11 +8,13 @@ namespace EIMSNext.Flow.Core.Nodes.Dataflow
     {
         public static bool ValueIsSingleResultNode(this FormFieldSetting fieldSetting)
         {
-            return fieldSetting.ValueType != FieldValueType.Field || (fieldSetting.ValueField!.SingleResultNode ?? true);
+            return (fieldSetting.ValueType != FieldValueType.Field && fieldSetting.ValueType != FieldValueType.Formula)
+                || (fieldSetting.ValueField!.SingleResultNode ?? true);
         }
         public static bool ValueIsSubField(this FormFieldSetting fieldSetting)
         {
-            return fieldSetting.ValueType == FieldValueType.Field && fieldSetting.ValueField!.Field.IsSubField;
+            return (fieldSetting.ValueType == FieldValueType.Field || fieldSetting.ValueType == FieldValueType.Formula)
+                && fieldSetting.ValueField!.Field.IsSubField;
         }
 
         public static bool IsEmpty(this DataMatchSetting matchSetting)

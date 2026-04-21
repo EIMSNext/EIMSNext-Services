@@ -9,7 +9,8 @@ namespace EIMSNext.Print.Pdf
 
         public PdfTemporaryFileSession(string rootDirectory)
         {
-            _rootDirectory = rootDirectory;
+            _rootDirectory = Path.GetFullPath(rootDirectory);
+            Directory.CreateDirectory(_rootDirectory);
             _sessionDirectory = Path.Combine(_rootDirectory, Guid.NewGuid().ToString("N"));
         }
 

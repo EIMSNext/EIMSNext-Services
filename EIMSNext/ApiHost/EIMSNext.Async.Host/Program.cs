@@ -1,13 +1,13 @@
-using System.Diagnostics;
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Async.Host.Extensions;
 using EIMSNext.Async.Quartz;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
-using Microsoft.AspNetCore.Http;
 using Quartz;
 using Serilog;
+using System.Diagnostics;
 
 Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
@@ -25,11 +25,6 @@ try
 
     builder.UseSerilog((ctx, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)
-            .Enrich.FromLogContext()
-            .Enrich.WithProperty("Application", "EIMSNext.Async.Host")
-            .WriteTo.Console()
-           .WriteTo.File(Path.Combine(logDirectory, "quartz-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 31,
-               outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
     );
 
     builder.ConfigureServices((hostContext, services) =>
@@ -37,7 +32,8 @@ try
         services.AddBasicServices(hostContext.Configuration);
         services.AddCustomCache(hostContext.Configuration);
         services.AddServiceComponents();
-        services.AddDefaultMef(EIMSNext.Common.Constants.BaseDirectory, "*Plugin.dll");
+        services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
+        services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
         services.AddRabbitMqMessaging(hostContext.Configuration);
         services.AddAsyncTaskConsumers();
         services.AddAsyncQuartzJobs();

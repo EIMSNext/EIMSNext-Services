@@ -4,7 +4,6 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using EIMSNext.Json.Serialization;
 using Json.Path;
-using NLog;
 
 namespace EIMSNext.Print.Extensions
 {
@@ -13,7 +12,7 @@ namespace EIMSNext.Print.Extensions
         private const string FieldReg = @"<field.*?.*?[^>]*?>.*?</field>";
         private const string FidReg = " fid=\\s*(\\x27|\\x22)([^\\x27\\x22]*)(\\x27|\\x22)";
 
-        static ILogger logger = LogManager.GetCurrentClassLogger();
+        private static readonly Serilog.ILogger Logger = Serilog.Log.ForContext(typeof(JsonExtension));
         public static List<JsonObject> ConvertToJsonObject(this IEnumerable<object> datas)
         {
             var result = new List<JsonObject>();
@@ -25,8 +24,8 @@ namespace EIMSNext.Print.Extensions
                 var expandoObj = obj.SerializeToJson(options).DeserializeFromJson<ExpandoObject>(options)!;
                 var lowerExpandoObj = ConvertKeysToLowerCase(expandoObj);
 
-                  var str = JsonSerializer.Serialize(lowerExpandoObj, options);
-                logger.Info($"格式化后表单数据: {str}");
+                var str = JsonSerializer.Serialize(lowerExpandoObj, options);
+                Logger.Information("格式化后表单数据。Data={Data}", lowerExpandoObj);
 
                 var jObj = JsonSerializer.Deserialize<JsonNode>(str);
                 if (jObj != null)
@@ -78,7 +77,7 @@ namespace EIMSNext.Print.Extensions
         public static string GetJsonValue(this object data, string jsonPath)
         {
             var result = data.GetJsonNode(jsonPath);
-            logger.Debug($"GetJsonValueByPath - {jsonPath}:{result}");
+            Logger.Debug("GetJsonValueByPath. Path={JsonPath}, Result={Result}", jsonPath, result);
             if (result is JsonObject)
             {
                 var jobj = result.AsObject();

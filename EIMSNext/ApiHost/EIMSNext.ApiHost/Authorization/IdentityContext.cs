@@ -4,11 +4,7 @@ using EIMSNext.Auth.Entities;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Service.Entities;
-
 using HKH.Mef2.Integration;
-
-using IdentityModel;
-
 using Microsoft.AspNetCore.Http;
 
 namespace EIMSNext.ApiHost.Authorization
@@ -34,7 +30,7 @@ namespace EIMSNext.ApiHost.Authorization
             _resolver = resolver;
             IHttpContextAccessor httpContextAccessor = resolver.Resolve<IHttpContextAccessor>();
             AccessToken = httpContextAccessor.HttpContext?.Request.Headers.Authorization.FirstOrDefault() ?? "";
-            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(JwtClaimTypes.Id);
+            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Id);
             var corpClaim = httpContextAccessor.HttpContext?.User.FindFirst("corp");
             CurrentUserID = idClaim?.Value ?? string.Empty;
             CurrentCorpId = corpClaim?.Value ?? string.Empty;

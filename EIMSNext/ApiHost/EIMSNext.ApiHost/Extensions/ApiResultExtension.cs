@@ -20,7 +20,7 @@ namespace EIMSNext.ApiHost.Extensions
         {
             if (apiResult.Code.HasValue && apiResult.Code.Value != 0)
             {
-                return new ErrorResult(apiResult.Code.Value, apiResult.Message ?? string.Empty);
+                return new ErrorResult(apiResult.Code.Value == -1 ? 400 : apiResult.Code.Value, apiResult.Message ?? string.Empty);
             }
             else
             {

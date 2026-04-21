@@ -49,7 +49,7 @@ namespace EIMSNext.CloudEvent
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, $"WebPush失败: ");
+                Logger.LogError(ex, "WebPush失败。WebhookUrl={WebhookUrl}, TriggerType={TriggerType}", webhook.Url, cloudEvent.Type);
             }
 
             var log = new WebPushLog()

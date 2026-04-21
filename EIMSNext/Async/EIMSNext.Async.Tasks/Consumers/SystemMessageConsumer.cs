@@ -1,11 +1,10 @@
 using EIMSNext.Async.Abstractions.Messaging;
-using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
-
 using HKH.Mef2.Integration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -34,7 +33,9 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ReceiverName = x.EmpName,
                 IsRead = false,
                 ExpireTime = args.ExpireTime,
-                Category = args.Category
+                Category = args.Category,
+                CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                MessageType = args.MessageType,
             }).ToList();
 
             await repo.InsertAsync(messages);

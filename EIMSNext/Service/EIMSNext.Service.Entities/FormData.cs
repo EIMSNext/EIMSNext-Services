@@ -25,12 +25,12 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 数据更新日志
         /// </summary>
-        public List<DataUpdateLog> UpdateLog { get; set; } = new List<DataUpdateLog>();
+        public List<DataChangeLog> ChangeLog { get; set; } = new List<DataChangeLog>();
     }
     /// <summary>
     /// 数据修改日志
     /// </summary>
-    public class DataUpdateLog
+    public class DataChangeLog
     {
         /// <summary>
         /// 操作人
@@ -43,12 +43,12 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 修改内容
         /// </summary>
-        public List<DataUpdateContent> Content { get; set; } = new List<DataUpdateContent>();
+        public List<DataChangeContent> Content { get; set; } = new List<DataChangeContent>();
     }
     /// <summary>
     /// 修改内容
     /// </summary>
-    public class DataUpdateContent
+    public class DataChangeContent
     {
         /// <summary>
         /// 字段ID

@@ -1,13 +1,13 @@
 -- 创建专用数据库
-CREATE DATABASE Quartz;
-GO
+--CREATE DATABASE Quartz;
+--GO
 
--- 创建专用用户（最小权限原则）
-USE Quartz;
-CREATE LOGIN quartz_user WITH PASSWORD = 'eims@next666888!!!';
-CREATE USER quartz_user FOR LOGIN quartz_user;
-ALTER ROLE db_owner ADD MEMBER quartz_user; -- 生产环境应使用更细粒度权限
-GO
+---- 创建专用用户（最小权限原则）
+--USE Quartz;
+--CREATE LOGIN quartz_user WITH PASSWORD = 'eims@next666888!!!';
+--CREATE USER quartz_user FOR LOGIN quartz_user;
+--ALTER ROLE db_owner ADD MEMBER quartz_user; -- 生产环境应使用更细粒度权限
+--GO
 
 -- this script is for SQL Server and Azure SQL
 
@@ -18,7 +18,14 @@ GO
 USE [Quartz];
 GO
 
-DECLARE @DropDb BIT = 0; -- Set this to 0 to skip DROP statements, 1 to include them
+-- this script is for SQL Server and Azure SQL
+
+-- This initializes the database to pristine for Quartz, by first removing any existing Quartz tables
+-- and then recreating them from scratch.
+-- Should you only require it to create the tables, set @DropDb to 0.
+
+
+DECLARE @DropDb BIT = 1; -- Set this to 0 to skip DROP statements, 1 to include them
 
 IF @DropDb = 1
 BEGIN
@@ -130,12 +137,13 @@ CREATE TABLE [dbo].[QRTZ_FIRED_TRIGGERS] (
   [JOB_NAME] nvarchar(150) NULL,
   [JOB_GROUP] nvarchar(150) NULL,
   [IS_NONCONCURRENT] bit NULL,
-  [REQUESTS_RECOVERY] bit NULL 
+  [REQUESTS_RECOVERY] bit NULL,
+  [EXECUTION_GROUP] nvarchar(200) NULL
 );
 
 CREATE TABLE [dbo].[QRTZ_PAUSED_TRIGGER_GRPS] (
   [SCHED_NAME] nvarchar(120) NOT NULL,
-  [TRIGGER_GROUP] nvarchar(150) NOT NULL 
+  [TRIGGER_GROUP] nvarchar(150) NOT NULL
 );
 
 CREATE TABLE [dbo].[QRTZ_SCHEDULER_STATE] (
@@ -213,6 +221,8 @@ CREATE TABLE [dbo].[QRTZ_TRIGGERS] (
   [END_TIME] bigint NULL,
   [CALENDAR_NAME] nvarchar(200) NULL,
   [MISFIRE_INSTR] int NULL,
+  [MISFIRE_ORIG_FIRE_TIME] bigint NULL,
+  [EXECUTION_GROUP] nvarchar(200) NULL,
   [JOB_DATA] varbinary(max) NULL
 );
 GO
@@ -378,4 +388,23 @@ CREATE INDEX [IDX_QRTZ_T_NFT_ST_MISFIRE_GRP]  ON [dbo].[QRTZ_TRIGGERS](SCHED_NAM
 CREATE INDEX [IDX_QRTZ_FT_INST_JOB_REQ_RCVRY] ON [dbo].[QRTZ_FIRED_TRIGGERS](SCHED_NAME, INSTANCE_NAME, REQUESTS_RECOVERY);
 CREATE INDEX [IDX_QRTZ_FT_G_J]                ON [dbo].[QRTZ_FIRED_TRIGGERS](SCHED_NAME, JOB_GROUP, JOB_NAME);
 CREATE INDEX [IDX_QRTZ_FT_G_T]                ON [dbo].[QRTZ_FIRED_TRIGGERS](SCHED_NAME, TRIGGER_GROUP, TRIGGER_NAME);
+GO
+
+IF COL_LENGTH('QRTZ_TRIGGERS','MISFIRE_ORIG_FIRE_TIME') IS NULL
+BEGIN
+  ALTER TABLE [dbo].[QRTZ_TRIGGERS] ADD [MISFIRE_ORIG_FIRE_TIME] bigint NULL;
+END
+GO
+
+
+IF COL_LENGTH('QRTZ_TRIGGERS','EXECUTION_GROUP') IS NULL
+BEGIN
+  ALTER TABLE [dbo].[QRTZ_TRIGGERS] ADD [EXECUTION_GROUP] nvarchar(200) NULL;
+END
+GO
+
+IF COL_LENGTH('QRTZ_FIRED_TRIGGERS','EXECUTION_GROUP') IS NULL
+BEGIN
+  ALTER TABLE [dbo].[QRTZ_FIRED_TRIGGERS] ADD [EXECUTION_GROUP] nvarchar(200) NULL;
+END
 GO

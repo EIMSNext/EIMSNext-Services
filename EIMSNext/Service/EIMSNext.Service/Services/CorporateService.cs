@@ -33,7 +33,7 @@ namespace EIMSNext.Service
             {
                 ClientName = "service_" + entity.Code,
                 ClientSecrets = { },
-                AllowedGrantTypes = IdentityServer4.Models.GrantTypes.ClientCredentials.Select(x => new ClientGrantType { GrantType = x }).ToList(),
+                AllowedGrantTypes = [new ClientGrantType { GrantType = "client_credentials" }],
                 AllowedScopes = { new ClientScope { Scope = "api.readwrite" } },
                 AccessTokenLifetime = 28800,
                 IdentityTokenLifetime = 28800,

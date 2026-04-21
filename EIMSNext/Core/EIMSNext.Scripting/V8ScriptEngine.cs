@@ -5,13 +5,13 @@ using System.Text.Json;
 
 using Microsoft.ClearScript;
 using Microsoft.ClearScript.V8;
-
-using NLog;
+using Serilog;
 
 namespace EIMSNext.Scripting
 {
     public class V8ScriptEngine : IScriptEngine
     {
+        private static readonly ILogger Logger = Log.ForContext<V8ScriptEngine>();
 
         #region 配置参数
         private ScriptEngineOption _option;
@@ -156,7 +156,7 @@ namespace EIMSNext.Scripting
             catch (Exception ex)
             {
                 result.Error = ex.Message;
-                LogManager.GetCurrentClassLogger().Error(ex, $"JS执行错误: {script}, {JsonSerializer.Serialize(parameters)}");
+                Logger.Error(ex, "JS execution failed. Script={Script}, Parameters={Parameters}", script, parameters);
                 if (!TestEngine(engine)) // Test V8Engine
                     engine.IsBroken = true;
             }

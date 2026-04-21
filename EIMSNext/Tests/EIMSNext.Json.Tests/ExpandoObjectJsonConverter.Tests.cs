@@ -23,7 +23,7 @@ namespace EIMSNext.Json.Tests
             var json = "{\"name\":\"Alice\",\"age\":30,\"active\":true,\"tags\":[\"a\",\"b\"],\"meta\":{\"id\":1}}";
             var options = CreateOptions();
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
-            var dict = (IDictionary<string, object>)expando;
+            var dict = (IDictionary<string, object>)expando!;
 
             Assert.AreEqual("Alice", dict["name"] as string);
             Assert.AreEqual(30L, dict["age"]);
@@ -33,7 +33,7 @@ namespace EIMSNext.Json.Tests
             CollectionAssert.AreEqual(new List<object> { "a", "b" }, tags);
 
             var meta = dict["meta"] as ExpandoObject;
-            var metaDict = (IDictionary<string, object>)meta;
+            var metaDict = (IDictionary<string, object>)meta!;
             Assert.AreEqual(1L, metaDict["id"]);
         }
 
@@ -43,11 +43,11 @@ namespace EIMSNext.Json.Tests
             var json = "{\"items\":[{\"id\":1},{\"id\":2}]}";
             var options = CreateOptions();
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
-            var dict = (IDictionary<string, object>)expando;
+            var dict = (IDictionary<string, object>)expando!;
             var items = dict["items"] as IList<object>;
             Assert.AreEqual(2, items.Count);
             var first = items[0] as ExpandoObject;
-            var firstDict = (IDictionary<string, object>)first;
+            var firstDict = (IDictionary<string, object>)first!;
             Assert.AreEqual(1L, firstDict["id"]);
         }
 
@@ -57,7 +57,7 @@ namespace EIMSNext.Json.Tests
             var json = "{\"CamelCaseKey\": \"value\"}";
             var options = CreateOptions();
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
-            var dict = (IDictionary<string, object>)expando;
+            var dict = (IDictionary<string, object>)expando!;
             Assert.IsTrue(dict.ContainsKey("CamelCaseKey"));
         }
 
@@ -67,11 +67,11 @@ namespace EIMSNext.Json.Tests
             var json = "{\"a\":null,\"b\":[{\"c\":null},5]}";
             var options = CreateOptions();
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
-            var dict = (IDictionary<string, object>)expando;
+            var dict = (IDictionary<string, object>)expando!;
             Assert.IsNull(dict["a"]);
             var b = dict["b"] as IList<object>;
             var first = b[0] as ExpandoObject;
-            var firstDict = (IDictionary<string, object>)first;
+            var firstDict = (IDictionary<string, object>)first!;
             Assert.IsNull(firstDict["c"]);
             Assert.AreEqual(5L, b[1]);
         }
@@ -82,7 +82,7 @@ namespace EIMSNext.Json.Tests
             var json = "{\"m\": [\"text\", 123, false, null, {\"inner\": 7}], \"n\": {\"a\": [1, 2, 3]}}";
             var options = CreateOptions();
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
-            var dict = (IDictionary<string, object>)expando;
+            var dict = (IDictionary<string, object>)expando!;
             var m = dict["m"] as List<object>;
             Assert.IsNotNull(m);
             Assert.AreEqual("text", m[0] as string);
@@ -90,11 +90,11 @@ namespace EIMSNext.Json.Tests
             Assert.AreEqual(false, m[2]);
             Assert.IsNull(m[3]);
             var inner = m[4] as ExpandoObject;
-            var innerDict = (IDictionary<string, object>)inner;
+            var innerDict = (IDictionary<string, object>)inner!;
             Assert.AreEqual(7L, innerDict["inner"]);
 
             var n = dict["n"] as ExpandoObject;
-            var nDict = (IDictionary<string, object>)n;
+            var nDict = (IDictionary<string, object>)n!;
             var a = nDict["a"] as List<object>;
             CollectionAssert.AreEqual(new List<object> { 1L, 2L, 3L }, a);
         }

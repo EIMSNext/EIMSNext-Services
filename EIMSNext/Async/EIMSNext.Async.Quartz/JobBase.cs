@@ -23,7 +23,7 @@ namespace EIMSNext.Async.Quartz
             }
             catch (Exception ex)
             {
-                Logger.LogError(ex, $"{nameof(T)} Execute Fail.");
+                Logger.LogError(ex, "Job execution failed. JobType={JobType}", typeof(T).Name);
                 return Task.FromException(ex);
             }
         }
