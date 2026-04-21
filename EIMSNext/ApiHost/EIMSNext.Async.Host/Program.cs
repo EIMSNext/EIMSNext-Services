@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Async.Host.Extensions;
@@ -6,9 +5,9 @@ using EIMSNext.Async.Quartz;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
-using Microsoft.AspNetCore.Http;
 using Quartz;
 using Serilog;
+using System.Diagnostics;
 
 Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
