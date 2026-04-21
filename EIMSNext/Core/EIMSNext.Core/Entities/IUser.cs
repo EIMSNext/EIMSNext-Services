@@ -54,6 +54,10 @@ namespace EIMSNext.Core.Entities
         /// <summary>
         /// 飞书
         /// </summary>
-        Feishu = 3
+        Feishu = 3,
+        /// <summary>
+        /// 私有
+        /// </summary>
+        Private = 999
     }
 }

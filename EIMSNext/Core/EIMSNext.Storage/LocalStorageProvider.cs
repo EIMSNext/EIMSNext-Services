@@ -15,12 +15,28 @@ namespace EIMSNext.Storage
             if (string.IsNullOrEmpty(Setting.LocalPath) || string.IsNullOrEmpty(objKey))
                 return false;
 
+            using var stream = new MemoryStream(content, writable: false);
+            return Upload(stream, objKey);
+
+        }
+
+        public override bool Upload(Stream content, string objKey)
+        {
+            if (string.IsNullOrEmpty(Setting.LocalPath) || string.IsNullOrEmpty(objKey))
+                return false;
+
             var fullPath = Path.Combine(Setting.LocalPath, objKey.TrimStart('/'));
             var dirInfo = new FileInfo(fullPath);
             if (!dirInfo.Directory!.Exists)
                 Directory.CreateDirectory(dirInfo.Directory.FullName);
 
-            File.WriteAllBytes(fullPath, content);
+            if (content.CanSeek)
+            {
+                content.Position = 0;
+            }
+
+            using var fileStream = new FileStream(fullPath, FileMode.Create, FileAccess.Write, FileShare.None);
+            content.CopyTo(fileStream);
 
             return true;
         }
@@ -40,7 +56,7 @@ namespace EIMSNext.Storage
                 }
                 catch (Exception ex)
                 {
-                    Logger.LogError(ex, $"从LocalStorageProvider读取资源失败:{objKey}");
+                    Logger.LogError(ex, "从LocalStorageProvider读取资源失败。ObjectKey={ObjectKey}", objKey);
                 }
             }
 

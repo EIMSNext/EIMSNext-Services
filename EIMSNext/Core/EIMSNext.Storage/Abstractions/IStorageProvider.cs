@@ -4,6 +4,7 @@
     {
         StorageConfiguration Setting { get; }
         bool Upload(byte[] content, string objKey);
+        bool Upload(Stream content, string objKey);
         Stream? Download(string objKey);
         bool Exists(string objKey);
         void Delete(List<string> objKeys);

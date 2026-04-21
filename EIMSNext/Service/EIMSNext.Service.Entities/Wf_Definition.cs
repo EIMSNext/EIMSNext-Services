@@ -1,5 +1,6 @@
 using EIMSNext.Common;
 using EIMSNext.Core.Entities;
+using EIMSNext.Plugin.Contracts;
 
 namespace EIMSNext.Service.Entities
 {
@@ -36,6 +37,10 @@ namespace EIMSNext.Service.Entities
         /// 是否为当前生效版本
         /// </summary>
         public bool IsCurrent { get; set; }
+        /// <summary>
+        /// 是否已发布过，发布后仅允许修改节点配置
+        /// </summary>
+        public bool Released { get; set; }
         /// <summary>
         /// 工作流定义内容（JSON格式的流程配置）
         /// </summary>
@@ -495,6 +500,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         Field,
         /// <summary>
+        /// 公式
+        /// </summary>
+        Formula,
+        /// <summary>
         /// 空值
         /// </summary>
         Empty
@@ -645,11 +654,6 @@ namespace EIMSNext.Service.Entities
     public class PrintSetting { }
 
     /// <summary>
-    /// 插件设置
-    /// </summary>
-    public class PluginSetting { }
-
-    /// <summary>
     /// 流程类型枚举
     /// </summary>
     public enum FlowType
@@ -731,6 +735,10 @@ namespace EIMSNext.Service.Entities
         /// 打印
         /// </summary>
         Print,
+        /// <summary>
+        /// 插件
+        /// </summary>
+        Plugin,
         /// <summary>
         /// 分支节点（第二种类型）
         /// </summary>

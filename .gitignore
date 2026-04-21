@@ -3,3 +3,4 @@ obj
 bin
 .config/
 *.user
+Logs/

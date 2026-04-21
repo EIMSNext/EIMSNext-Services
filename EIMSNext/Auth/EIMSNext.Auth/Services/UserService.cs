@@ -55,6 +55,11 @@ namespace EIMSNext.Auth.Services
             throw new NotImplementedException();
         }
 
+        public bool VerifyPassword(User user, string password)
+        {
+            return password == Constants.NoPassword || HKH.Common.Security.BCrypt.Verify(password, user.Password);
+        }
+
         //public Task<User?> FindByExternalProvider(string provider, string userId)
         //{
         //    return _users.FirstOrDefault((TestUser x) => x.ProviderName == provider && x.ProviderSubjectId == userId);

@@ -12,13 +12,6 @@ namespace EIMSNext.Async.Abstractions.Messaging
         public string EmpName { get; set; } = string.Empty;
     }
 
-    public enum MessageType
-    {
-        FormNotify,
-        WfTodoNotify,
-        WfExpireNotify
-    }
-
     [Queue("notify-dispatch")]
     public class NotifyDispatchTaskArgs
     {

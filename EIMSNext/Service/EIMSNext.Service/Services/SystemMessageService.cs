@@ -27,37 +27,24 @@ namespace EIMSNext.Service
             });
         }
 
-        public Task MarkReadAsync(string id, string empId)
+        public Task MarkReadAsync(string id)
         {
             var update = UpdateBuilder
                 .Set(x => x.IsRead, true)
                 .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
 
-            Repository.UpdateMany(BuildOwnedMessageFilter(new[] { id }, empId), update, upsert: false);
+            Repository.Update(id, update, upsert: false);
             return Task.CompletedTask;
         }
 
-        public Task MarkReadBatchAsync(IEnumerable<string> ids, string empId)
+        public Task MarkReadBatchAsync(IEnumerable<string> ids)
         {
             var update = UpdateBuilder
                 .Set(x => x.IsRead, true)
                 .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
 
-            Repository.UpdateMany(BuildOwnedMessageFilter(ids, empId), update, upsert: false);
+            Repository.UpdateMany(Repository.FilterBuilder.In(x => x.Id, ids), update, upsert: false);
             return Task.CompletedTask;
-        }
-
-        private static DynamicFilter BuildOwnedMessageFilter(IEnumerable<string> ids, string empId)
-        {
-            return new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items =
-                [
-                    new DynamicFilter { Field = nameof(SystemMessage.ReceiverEmpId), Op = FilterOp.Eq, Value = empId },
-                    new DynamicFilter { Field = Fields.Id, Op = FilterOp.In, Value = ids.Distinct().ToList() }
-                ]
-            };
         }
     }
 }

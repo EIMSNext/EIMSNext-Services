@@ -1,23 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
     <Version>1.1.0.0</Version>
+    <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
   </PropertyGroup>
-
   <ItemGroup>
-    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="9.0.9" />
+    <PackageReference Include="HKH.CSV" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" />
+    <PackageReference Include="NPOI" />
+    <PackageReference Include="SkiaSharp" />
+    <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
-
   <ItemGroup>
     <ProjectReference Include="..\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Storage\EIMSNext.Storage.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
   </ItemGroup>
-
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>EIMSNext.Async.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

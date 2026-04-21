@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Serialization;
+using MongoDB.Driver;
 using EIMSNext.Json.Serialization;
 
 namespace EIMSNext.Core.Tests
@@ -29,6 +30,8 @@ namespace EIMSNext.Core.Tests
 
             _dbContext = DbContext.Create();
             _scope = new MongoTransactionScope(_dbContext);
+            _dbContext.Database.GetCollection<FormData>(nameof(FormData)).DeleteMany(FilterDefinition<FormData>.Empty);
+            _dbContext.Database.GetCollection<EntityData>(nameof(EntityData)).DeleteMany(FilterDefinition<EntityData>.Empty);
         }
 
         [TestCleanup]

@@ -1,12 +1,11 @@
 using System.Text.Json.Nodes;
 using EIMSNext.Print.Extensions;
-using NLog;
 
 namespace EIMSNext.Print.Abstractions
 {
     public abstract class BasePrintGenerator<T> : IPrintGenerator where T : IPrintGenerator
     {
-        protected ILogger Loggger = LogManager.GetCurrentClassLogger();
+        protected Serilog.ILogger Logger => Serilog.Log.ForContext(GetType());
         protected bool IsPreview { get; set; } = false;
 
         public PrintResult Preview(PrintTemplate template, PrintOption option)
@@ -22,7 +21,7 @@ namespace EIMSNext.Print.Abstractions
             return new PrintResult { Content = content, FileName = GetFileName(datas.FirstOrDefault(), option) };
         }
 
-        protected abstract byte[] Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas);
+        protected abstract Stream Generate(PrintTemplate template, PrintOption option, List<JsonObject> datas);
 
         protected virtual string GetFileName(object? data, PrintOption option)
         {

@@ -1,26 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
-
-	<PropertyGroup>
-		<TargetFramework>net8.0</TargetFramework>
-		<ImplicitUsings>enable</ImplicitUsings>
-		<Nullable>enable</Nullable>
-		<Authors>EIMSNext Team</Authors>
-		<Version>1.1.0.0</Version>
-	</PropertyGroup>
-
-	<ItemGroup>
-		<PackageReference Include="Asp.Versioning.OData.ApiExplorer" Version="8.2.0" />
-		<PackageReference Include="Autofac" Version="8.1.0" />
-		<PackageReference Include="Microsoft.AspNetCore.OData" Version="9.4.0" />
-		<PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.4" />
-		<PackageReference Include="Swashbuckle.AspNetCore.Annotations" Version="9.0.4" />
-	</ItemGroup>
-
-	<ItemGroup>
-		<ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
-		<ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
-		<ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
-		<ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
-	</ItemGroup>
-
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Asp.Versioning.OData.ApiExplorer" />
+    <PackageReference Include="Autofac" />
+    <PackageReference Include="Microsoft.AspNetCore.OData" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+  </ItemGroup>
 </Project>

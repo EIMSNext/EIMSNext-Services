@@ -253,7 +253,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             catch (Exception ex)    //写日志失败不影响整个审批流程
             {
-                Logger.LogError(ex, $"写入审批流程执行日志失败：{JsonSerializer.Serialize(execLog)}");
+                Logger.LogError(ex, "写入审批流程执行日志失败。ExecLog={ExecLog}", execLog);
             }
         }
 

@@ -1,4 +1,5 @@
-﻿using HKH.Common;
+﻿using System.Text.Json;
+using HKH.Common;
 
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Hosting;
@@ -58,7 +59,7 @@ namespace EIMSNext.ApiCore
                     httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
                 }
                 var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(ex) : "抱歉，出错了";
-                await httpContext.Response.WriteAsync(errorMsg);
+                await httpContext.Response.WriteAsync(new { message = errorMsg }.SerializeToJson());
             }
         }
 

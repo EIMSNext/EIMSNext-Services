@@ -2,7 +2,7 @@ using System.Text;
 
 using Asp.Versioning.ApiExplorer;
 
-using Microsoft.OpenApi.Models;
+using Microsoft.OpenApi;
 
 namespace EIMSNext.ApiHost.Extensions
 {

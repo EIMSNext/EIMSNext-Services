@@ -131,6 +131,24 @@ namespace EIMSNext.Scripting.Tests
             var wfResult = pool.Evaluate("MAP(data.subform2,'inputvalue')", data);
             Assert.AreEqual("[\"222\",\"222\"]", wfResult.Value);
         }
+
+        [TestMethod]
+        public void TestColumnAndSum()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption() { MinPoolSize = 1 });
+            var data = BuildWfSubData();
+            var wfResult = pool.Evaluate("MAP(data.subform2,'numbervalue')", data);
+            Assert.AreEqual("[100,200]", wfResult.Value);
+        }
+
+        [TestMethod]
+        public void TestSubFieldFormula()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption() { MinPoolSize = 1 });
+            var data = BuildWfSubData();
+            var wfResult = pool.Evaluate("CONCAT(data.subform2[0].inputvalue,'-',data.inputvalue)", data);
+            Assert.AreEqual("222-111", wfResult.Value);
+        }
         [TestMethod]
         public void TestArray()
         {
