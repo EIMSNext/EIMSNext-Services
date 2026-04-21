@@ -25,11 +25,6 @@ try
 
     builder.UseSerilog((ctx, cfg) =>
         cfg.ReadFrom.Configuration(ctx.Configuration)
-            .Enrich.FromLogContext()
-            .Enrich.WithProperty("Application", "EIMSNext.Async.Host")
-            .WriteTo.Console()
-           .WriteTo.File(Path.Combine(logDirectory, "quartz-.log"), rollingInterval: RollingInterval.Day, retainedFileCountLimit: 31,
-               outputTemplate: "[{Timestamp:yyyy-MM-dd HH:mm:ss.fff zzz}] [{Level:u3}] {Message:lj}{NewLine}{Exception}")
     );
 
     builder.ConfigureServices((hostContext, services) =>
