@@ -7,19 +7,21 @@ using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
 using Quartz;
 using Serilog;
-using System.Diagnostics;
 
 Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
 
 var appBasePath = AppContext.BaseDirectory;
-var isService = !(Debugger.IsAttached || args.Contains("--console"));
 var logDirectory = Path.Combine(appBasePath, "Logs");
 Directory.CreateDirectory(logDirectory);
 
 try
 {
     var builder = Host.CreateDefaultBuilder(args)
-        .UseContentRoot(appBasePath);
+        .UseContentRoot(appBasePath)
+        .UseWindowsService(cfg =>
+        {
+            cfg.ServiceName = "EIMSNext Async Service";
+        });
 
     builder.UseAutofac<AutofacRegisterModule>();
 
@@ -58,14 +60,6 @@ try
         {
             q.WaitForJobsToComplete = true;
         });
-
-        if (isService)
-        {
-            builder.UseWindowsService(cfg =>
-            {
-                cfg.ServiceName = "EIMSNext Async Service";
-            });
-        }
     });
 
     var host = builder.Build();
