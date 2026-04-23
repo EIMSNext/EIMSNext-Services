@@ -11,18 +11,7 @@ namespace EIMSNext.Print.Tests
         public void RenderImages_ShouldAddImageFrame_WhenResourceIsValid()
         {
             var options = new Pdf.PdfRenderOptions();
-            var workbook = new Pdf.UniverWorkbook
-            {
-                Resources =
-                [
-                    new Pdf.UniverResource
-                    {
-                        Name = "logo",
-                        Type = "image/png",
-                        Data = TinyPngBase64
-                    }
-                ]
-            };
+            var workbook = new Pdf.UniverWorkbook();
 
             var worksheet = new Pdf.UniverWorksheet
             {
@@ -30,13 +19,24 @@ namespace EIMSNext.Print.Tests
                 [
                     new Pdf.UniverImageData
                     {
-                        ResourceId = "logo",
-                        Position = new Pdf.UniverImagePosition
+                        Source = $"data:image/png;base64,{TinyPngBase64}",
+                        ImageSourceType = "BASE64",
+                        SheetTransform = new Pdf.UniverSheetTransform
                         {
-                            Left = 10,
-                            Top = 20,
-                            Width = 30,
-                            Height = 40
+                            From = new Pdf.UniverGridAnchor
+                            {
+                                Column = 0,
+                                ColumnOffset = 10,
+                                Row = 0,
+                                RowOffset = 20,
+                            },
+                            To = new Pdf.UniverGridAnchor
+                            {
+                                Column = 0,
+                                ColumnOffset = 40,
+                                Row = 0,
+                                RowOffset = 60,
+                            }
                         }
                     }
                 ]
@@ -63,18 +63,7 @@ namespace EIMSNext.Print.Tests
         public void RenderImages_ShouldIgnoreInvalidImageData()
         {
             var options = new Pdf.PdfRenderOptions();
-            var workbook = new Pdf.UniverWorkbook
-            {
-                Resources =
-                [
-                    new Pdf.UniverResource
-                    {
-                        Name = "broken",
-                        Type = "image/png",
-                        Data = "not-base64"
-                    }
-                ]
-            };
+            var workbook = new Pdf.UniverWorkbook();
 
             var worksheet = new Pdf.UniverWorksheet
             {
@@ -82,8 +71,17 @@ namespace EIMSNext.Print.Tests
                 [
                     new Pdf.UniverImageData
                     {
-                        ResourceId = "broken",
-                        Position = new Pdf.UniverImagePosition { Width = 10, Height = 10 }
+                        Source = "data:image/png;base64,not-base64",
+                        ImageSourceType = "BASE64",
+                        SheetTransform = new Pdf.UniverSheetTransform
+                        {
+                            From = new Pdf.UniverGridAnchor(),
+                            To = new Pdf.UniverGridAnchor
+                            {
+                                ColumnOffset = 10,
+                                RowOffset = 10,
+                            }
+                        }
                     }
                 ]
             };

@@ -1,4 +1,6 @@
+using System.Text.Json;
 using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
 
 namespace EIMSNext.Print.Pdf
 {
@@ -17,25 +19,21 @@ namespace EIMSNext.Print.Pdf
 
         public void RenderImages(Section section, UniverWorkbook workbook, UniverWorksheet worksheet)
         {
-            if (worksheet.Images == null || worksheet.Images.Count == 0 || workbook.Resources == null || workbook.Resources.Count == 0)
+            if (worksheet.Images == null || worksheet.Images.Count == 0)
             {
                 return;
             }
-
-            var resources = workbook.Resources
-                .Where(resource => !string.IsNullOrWhiteSpace(resource.Name) || !string.IsNullOrWhiteSpace(resource.Data))
-                .ToDictionary(GetResourceKey, resource => resource, StringComparer.OrdinalIgnoreCase);
 
             var renderPlan = _layoutCalculator.CreatePlan(worksheet, section.PageSetup);
 
             foreach (var image in worksheet.Images)
             {
-                if (string.IsNullOrWhiteSpace(image.ResourceId))
+                if (!TryResolveImagePath(image, _temporaryFileSession, out var imagePath))
                 {
                     continue;
                 }
 
-                if (!TryResolveImagePath(image.ResourceId, resources, _temporaryFileSession, out var imagePath))
+                if (!TryResolveImageBounds(image, worksheet, section.PageSetup, renderPlan, out var leftCm, out var topCm, out var widthCm, out var heightCm))
                 {
                     continue;
                 }
@@ -43,10 +41,6 @@ namespace EIMSNext.Print.Pdf
                 try
                 {
                     var textFrame = section.AddTextFrame();
-                    var leftCm = section.PageSetup.LeftMargin.Centimeter + _layoutCalculator.MapHorizontalPixelsToCm(worksheet, image.Position.Left, renderPlan.ScaleFactor);
-                    var topCm = section.PageSetup.TopMargin.Centimeter + _layoutCalculator.MapVerticalPixelsToCm(worksheet, image.Position.Top);
-                    var widthCm = _layoutCalculator.MapHorizontalPixelsToCm(worksheet, image.Position.Width, renderPlan.ScaleFactor);
-                    var heightCm = _layoutCalculator.MapVerticalPixelsToCm(worksheet, image.Position.Height);
 
                     textFrame.Left = Unit.FromCentimeter(leftCm);
                     textFrame.Top = Unit.FromCentimeter(topCm);
@@ -65,51 +59,197 @@ namespace EIMSNext.Print.Pdf
             }
         }
 
-        private static string GetResourceKey(UniverResource resource)
+        public bool TryRenderCellImage(Cell cell, UniverWorkbook workbook, UniverWorksheet worksheet, UniverCell univerCell, int rowIndex, int columnIndex, double scaleFactor)
         {
-            if (!string.IsNullOrWhiteSpace(resource.Name))
-            {
-                return resource.Name;
-            }
-
-            return resource.Data.GetHashCode().ToString();
-        }
-
-        private static bool TryResolveImagePath(string resourceId, IReadOnlyDictionary<string, UniverResource> resources, PdfTemporaryFileSession temporaryFileSession, out string imagePath)
-        {
-            imagePath = string.Empty;
-            if (!resources.TryGetValue(resourceId, out var resource))
-            {
-                resource = resources.Values.FirstOrDefault(x => string.Equals(x.Name, resourceId, StringComparison.OrdinalIgnoreCase));
-                if (resource == null)
-                {
-                    return false;
-                }
-            }
-
-            if (!IsImageResource(resource))
+            var cellImage = univerCell.Image ?? univerCell.InlineImage ?? ResolveCellImageFromValue(univerCell.Value);
+            if (cellImage == null)
             {
                 return false;
             }
 
-            if (!TryDecodeResourceData(resource.Data, out var imageBytes))
+            if (!TryResolveCellImagePath(cellImage, _temporaryFileSession, out var imagePath))
             {
                 return false;
             }
 
-            var extension = ResolveImageExtension(resource);
-            imagePath = temporaryFileSession.CreateFile(extension, imageBytes);
+            var paragraph = cell.AddParagraph();
+            paragraph.Format.Alignment = cell.Format.Alignment;
+
+            var image = paragraph.AddImage(imagePath);
+            image.LockAspectRatio = false;
+
+            var widthCm = ResolveCellImageWidthCm(worksheet, columnIndex, cellImage, scaleFactor);
+            var heightCm = ResolveCellImageHeightCm(worksheet, rowIndex, cellImage);
+
+            image.Width = Unit.FromCentimeter(widthCm);
+            image.Height = Unit.FromCentimeter(heightCm);
             return true;
         }
 
-        private static bool IsImageResource(UniverResource resource)
+        private static bool TryResolveImagePath(UniverImageData image, PdfTemporaryFileSession temporaryFileSession, out string imagePath)
         {
-            if (string.IsNullOrWhiteSpace(resource.Type))
+            imagePath = string.Empty;
+
+            if (TryDecodeSource(image.Source, out var inlineBytes))
             {
+                imagePath = temporaryFileSession.CreateFile(ResolveImageExtension(image.Source, image.ImageSourceType), inlineBytes);
                 return true;
             }
 
-            return resource.Type.Contains("image", StringComparison.OrdinalIgnoreCase);
+            return false;
+        }
+
+        private static bool TryResolveCellImagePath(UniverCellImage image, PdfTemporaryFileSession temporaryFileSession, out string imagePath)
+        {
+            imagePath = string.Empty;
+
+            if (TryDecodeSource(image.Source, out var inlineBytes))
+            {
+                imagePath = temporaryFileSession.CreateFile(ResolveImageExtension(image.Source, image.ImageSourceType ?? image.Type), inlineBytes);
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryResolveImageBounds(UniverImageData image, UniverWorksheet worksheet, PageSetup pageSetup, PdfSheetRenderPlan renderPlan, out double leftCm, out double topCm, out double widthCm, out double heightCm)
+        {
+            leftCm = 0;
+            topCm = 0;
+            widthCm = 0;
+            heightCm = 0;
+
+            var transform = image.AxisAlignSheetTransform ?? image.SheetTransform;
+            if (transform?.From != null)
+            {
+                leftCm = pageSetup.LeftMargin.Centimeter + GetColumnOffsetCm(worksheet, transform.From.Column, transform.From.ColumnOffset, renderPlan.ScaleFactor);
+                topCm = pageSetup.TopMargin.Centimeter + GetRowOffsetCm(worksheet, transform.From.Row, transform.From.RowOffset);
+
+                if (transform.To != null)
+                {
+                    var rightCm = pageSetup.LeftMargin.Centimeter + GetColumnOffsetCm(worksheet, transform.To.Column, transform.To.ColumnOffset, renderPlan.ScaleFactor);
+                    var bottomCm = pageSetup.TopMargin.Centimeter + GetRowOffsetCm(worksheet, transform.To.Row, transform.To.RowOffset);
+                    widthCm = Math.Max(rightCm - leftCm, 0);
+                    heightCm = Math.Max(bottomCm - topCm, 0);
+                }
+            }
+            else
+            {
+                return false;
+            }
+
+            if (widthCm <= 0 && image.Width.HasValue)
+            {
+                widthCm = _layoutCalculator.MapHorizontalPixelsToCm(worksheet, image.Width.Value, renderPlan.ScaleFactor);
+            }
+
+            if (heightCm <= 0 && image.Height.HasValue)
+            {
+                heightCm = _layoutCalculator.MapVerticalPixelsToCm(worksheet, image.Height.Value);
+            }
+
+            return widthCm > 0 || heightCm > 0;
+        }
+
+        private double GetColumnOffsetCm(UniverWorksheet worksheet, int column, double columnOffset, double scaleFactor)
+        {
+            var pixels = 0d;
+            for (var index = 0; index < column; index++)
+            {
+                pixels += GetColumnPixels(worksheet, index);
+            }
+
+            pixels += Math.Max(columnOffset, 0);
+            return _layoutCalculator.MapHorizontalPixelsToCm(worksheet, pixels, scaleFactor);
+        }
+
+        private double GetRowOffsetCm(UniverWorksheet worksheet, int row, double rowOffset)
+        {
+            var pixels = 0d;
+            for (var index = 0; index < row; index++)
+            {
+                pixels += GetRowPixels(worksheet, index);
+            }
+
+            pixels += Math.Max(rowOffset, 0);
+            return _layoutCalculator.MapVerticalPixelsToCm(worksheet, pixels);
+        }
+
+        private static double GetColumnPixels(UniverWorksheet worksheet, int columnIndex)
+        {
+            if (worksheet.ColumnWidth?.TryGetValue(columnIndex, out var width) == true && width > 0)
+            {
+                return width;
+            }
+
+            if (worksheet.ColumnData?.TryGetValue(columnIndex.ToString(), out var columnData) == true)
+            {
+                if (columnData.InnerWidth.HasValue && columnData.InnerWidth.Value > 0)
+                {
+                    return columnData.InnerWidth.Value;
+                }
+
+                if (columnData.Width.HasValue && columnData.Width.Value > 0)
+                {
+                    return columnData.Width.Value;
+                }
+            }
+
+            return worksheet.DefaultColumnWidth;
+        }
+
+        private static double GetRowPixels(UniverWorksheet worksheet, int rowIndex)
+        {
+            if (worksheet.RowHeight?.TryGetValue(rowIndex, out var height) == true && height > 0)
+            {
+                return height;
+            }
+
+            if (worksheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true)
+            {
+                if (rowData.ActualHeight.HasValue && rowData.ActualHeight.Value > 0)
+                {
+                    return rowData.ActualHeight.Value;
+                }
+
+                if (rowData.Height.HasValue && rowData.Height.Value > 0)
+                {
+                    return rowData.Height.Value;
+                }
+            }
+
+            return worksheet.DefaultRowHeight;
+        }
+
+        private static double ResolveCellImageWidthCm(UniverWorksheet worksheet, int columnIndex, UniverCellImage image, double scaleFactor)
+        {
+            if (image.Width.HasValue && image.Width.Value > 0)
+            {
+                return Math.Max(PdfConvertUtil.PixelToCm(image.Width.Value, PdfRenderDefaults.DefaultColumnWidthCm) * scaleFactor, 0.2);
+            }
+
+            return Math.Max(PdfConvertUtil.PixelToCm(GetColumnPixels(worksheet, columnIndex), PdfRenderDefaults.DefaultColumnWidthCm) * scaleFactor * 0.92, 0.2);
+        }
+
+        private static double ResolveCellImageHeightCm(UniverWorksheet worksheet, int rowIndex, UniverCellImage image)
+        {
+            if (image.Height.HasValue && image.Height.Value > 0)
+            {
+                return Math.Max(PdfConvertUtil.PixelToCm(image.Height.Value, PdfRenderDefaults.DefaultRowHeightCm), 0.2);
+            }
+
+            return Math.Max(PdfConvertUtil.PixelToCm(GetRowPixels(worksheet, rowIndex), PdfRenderDefaults.DefaultRowHeightCm) * 0.85, 0.2);
+        }
+
+        private static bool TryDecodeSource(string? source, out byte[] imageBytes)
+        {
+            imageBytes = Array.Empty<byte>();
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return false;
+            }
+
+            return TryDecodeResourceData(source, out imageBytes);
         }
 
         private static bool TryDecodeResourceData(string data, out byte[] imageBytes)
@@ -138,19 +278,77 @@ namespace EIMSNext.Print.Pdf
             }
         }
 
-        private static string ResolveImageExtension(UniverResource resource)
+        private static UniverCellImage? ResolveCellImageFromValue(object? value)
         {
-            if (resource.Type.Contains("png", StringComparison.OrdinalIgnoreCase)) return "png";
-            if (resource.Type.Contains("jpeg", StringComparison.OrdinalIgnoreCase) || resource.Type.Contains("jpg", StringComparison.OrdinalIgnoreCase)) return "jpg";
-            if (resource.Type.Contains("bmp", StringComparison.OrdinalIgnoreCase)) return "bmp";
-            if (resource.Type.Contains("gif", StringComparison.OrdinalIgnoreCase)) return "gif";
-            if (!string.IsNullOrWhiteSpace(resource.Name))
+            if (value is not JsonElement element)
             {
-                var extension = Path.GetExtension(resource.Name);
-                if (!string.IsNullOrWhiteSpace(extension))
+                return null;
+            }
+
+            if (element.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (TryDeserializeCellImage(element, out var cellImage))
+            {
+                return cellImage;
+            }
+
+            foreach (var property in element.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.Object)
                 {
-                    return extension.TrimStart('.');
+                    continue;
                 }
+
+                if (TryDeserializeCellImage(property.Value, out cellImage))
+                {
+                    return cellImage;
+                }
+            }
+
+            return null;
+        }
+
+        private static bool TryDeserializeCellImage(JsonElement element, out UniverCellImage? cellImage)
+        {
+            cellImage = null;
+            if (!element.TryGetProperty("source", out _))
+            {
+                return false;
+            }
+
+            try
+            {
+                cellImage = JsonSerializer.Deserialize<UniverCellImage>(element.GetRawText(), new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                });
+                return cellImage != null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string ResolveImageExtension(string? source, string? imageType)
+        {
+            if (!string.IsNullOrWhiteSpace(imageType))
+            {
+                if (imageType.Contains("png", StringComparison.OrdinalIgnoreCase)) return "png";
+                if (imageType.Contains("jpeg", StringComparison.OrdinalIgnoreCase) || imageType.Contains("jpg", StringComparison.OrdinalIgnoreCase)) return "jpg";
+                if (imageType.Contains("bmp", StringComparison.OrdinalIgnoreCase)) return "bmp";
+                if (imageType.Contains("gif", StringComparison.OrdinalIgnoreCase)) return "gif";
+            }
+
+            if (!string.IsNullOrWhiteSpace(source) && source.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (source.Contains("image/png", StringComparison.OrdinalIgnoreCase)) return "png";
+                if (source.Contains("image/jpeg", StringComparison.OrdinalIgnoreCase) || source.Contains("image/jpg", StringComparison.OrdinalIgnoreCase)) return "jpg";
+                if (source.Contains("image/bmp", StringComparison.OrdinalIgnoreCase)) return "bmp";
+                if (source.Contains("image/gif", StringComparison.OrdinalIgnoreCase)) return "gif";
             }
 
             return "png";

@@ -56,5 +56,85 @@ namespace EIMSNext.Print.Tests
             using var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
             result.Content.CopyTo(fileStream);
         }
+
+        [TestMethod]
+        public void PrintTest_WithWorksheetPageSetup_ShouldGeneratePdf()
+        {
+            var template = new PrintTemplate
+            {
+                Content = """
+                {
+                  "id": "Sheet1",
+                  "name": "Sheet1",
+                  "sheetOrder": ["Sheet1"],
+                  "styles": {
+                    "title-style": {
+                      "fs": 14,
+                      "bl": 1,
+                      "ht": 2,
+                      "vt": 2
+                    }
+                  },
+                  "sheets": {
+                    "Sheet1": {
+                      "id": "Sheet1",
+                      "name": "Sheet1",
+                      "defaultRowHeight": 24,
+                      "defaultColumnWidth": 96,
+                      "pageSetup": {
+                        "paperSize": "A5",
+                        "pageSize": "A5",
+                        "pageFormat": "A5",
+                        "topMargin": 28.3465,
+                        "rightMargin": 42.5197,
+                        "bottomMargin": 56.6929,
+                        "leftMargin": 42.5197
+                      },
+                      "cellData": {
+                        "0": {
+                          "0": {
+                            "v": "打印页面设置测试",
+                            "s": "title-style"
+                          }
+                        },
+                        "2": {
+                          "0": {
+                            "v": "${Name}",
+                            "custom": {
+                              "dataType": "field",
+                              "id": "Name"
+                            }
+                          }
+                        }
+                      },
+                      "rowData": {},
+                      "columnData": {},
+                      "rowHeight": {},
+                      "columnWidth": {},
+                      "mergeData": []
+                    }
+                  }
+                }
+                """
+            };
+
+            var option = new PrintOption();
+            var outputDirectory = Path.Combine(Path.GetTempPath(), "eimsnext-print-tests");
+            Directory.CreateDirectory(outputDirectory);
+
+            var datas = new List<object>
+            {
+                JsonNode.Parse("""{ "Name": "页设置打印" }""")!
+            };
+
+            using var result = new CustomPrintService().Print(template, option, datas);
+
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Content.Length > 0);
+
+            var fileName = Path.Combine(outputDirectory, result.FileName);
+            using var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+            result.Content.CopyTo(fileStream);
+        }
     }
 }

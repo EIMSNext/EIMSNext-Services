@@ -1,4 +1,5 @@
-﻿using System.Text.Json.Serialization;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace EIMSNext.Print.Pdf
 {
@@ -80,6 +81,8 @@ namespace EIMSNext.Print.Pdf
         [JsonPropertyName("l")] public UniverHyperlink? Hyperlink { get; set; }
         [JsonPropertyName("tr")] public UniverTextRotation? TextRotation { get; set; }
         [JsonPropertyName("custom")] public PdfPrintMeta? PrintMeta { get; set; }
+        [JsonPropertyName("image")] public UniverCellImage? Image { get; set; }
+        [JsonPropertyName("img")] public UniverCellImage? InlineImage { get; set; }
     }
 
     public class UniverWorksheet
@@ -204,17 +207,43 @@ namespace EIMSNext.Print.Pdf
 
     public class UniverImageData
     {
-        public string ImageId { get; set; } = string.Empty;
-        public UniverImagePosition Position { get; set; } = new();
-        public string ResourceId { get; set; } = string.Empty;
+        [JsonPropertyName("imageId")] public string ImageId { get; set; } = string.Empty;
+        [JsonPropertyName("drawingId")] public string? DrawingId { get; set; }
+        [JsonPropertyName("source")] public string? Source { get; set; }
+        [JsonPropertyName("imageSourceType")] public string? ImageSourceType { get; set; }
+        [JsonPropertyName("sheetTransform")] public UniverSheetTransform? SheetTransform { get; set; }
+        [JsonPropertyName("axisAlignSheetTransform")] public UniverSheetTransform? AxisAlignSheetTransform { get; set; }
+        [JsonPropertyName("width")] public double? Width { get; set; }
+        [JsonPropertyName("height")] public double? Height { get; set; }
+        [JsonPropertyName("column")] public int? Column { get; set; }
+        [JsonPropertyName("columnOffset")] public double? ColumnOffset { get; set; }
+        [JsonPropertyName("row")] public int? Row { get; set; }
+        [JsonPropertyName("rowOffset")] public double? RowOffset { get; set; }
     }
 
-    public class UniverImagePosition
+    public class UniverCellImage
     {
-        public double Top { get; set; }
-        public double Left { get; set; }
-        public double Width { get; set; }
-        public double Height { get; set; }
+        [JsonPropertyName("source")] public string? Source { get; set; }
+        [JsonPropertyName("imageSourceType")] public string? ImageSourceType { get; set; }
+        [JsonPropertyName("name")] public string? Name { get; set; }
+        [JsonPropertyName("type")] public string? Type { get; set; }
+        [JsonPropertyName("width")] public double? Width { get; set; }
+        [JsonPropertyName("height")] public double? Height { get; set; }
+        [JsonExtensionData] public Dictionary<string, JsonElement>? ExtraProperties { get; set; }
+    }
+
+    public class UniverSheetTransform
+    {
+        [JsonPropertyName("from")] public UniverGridAnchor? From { get; set; }
+        [JsonPropertyName("to")] public UniverGridAnchor? To { get; set; }
+    }
+
+    public class UniverGridAnchor
+    {
+        [JsonPropertyName("column")] public int Column { get; set; }
+        [JsonPropertyName("columnOffset")] public double ColumnOffset { get; set; }
+        [JsonPropertyName("row")] public int Row { get; set; }
+        [JsonPropertyName("rowOffset")] public double RowOffset { get; set; }
     }
 
     public class UniverResource
@@ -245,7 +274,6 @@ namespace EIMSNext.Print.Pdf
         public string Name { get; set; } = string.Empty;
         public Dictionary<string, UniverWorksheet> Sheets { get; set; } = new();
         public object? Snapshot { get; set; }
-        public List<UniverResource>? Resources { get; set; }
         public Dictionary<string, UniverStyle>? Styles { get; set; }
         
         [JsonIgnore]
