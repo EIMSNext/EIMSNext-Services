@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
 
@@ -19,14 +20,15 @@ namespace EIMSNext.Print.Pdf
 
         public void RenderImages(Section section, UniverWorkbook workbook, UniverWorksheet worksheet)
         {
-            if (worksheet.Images == null || worksheet.Images.Count == 0)
+            var images = ResolveWorksheetImages(workbook, worksheet);
+            if (images.Count == 0)
             {
                 return;
             }
 
             var renderPlan = _layoutCalculator.CreatePlan(worksheet, section.PageSetup);
 
-            foreach (var image in worksheet.Images)
+            foreach (var image in images)
             {
                 if (!TryResolveImagePath(image, _temporaryFileSession, out var imagePath))
                 {
@@ -149,6 +151,130 @@ namespace EIMSNext.Print.Pdf
             }
 
             return widthCm > 0 || heightCm > 0;
+        }
+
+        private static List<UniverImageData> ResolveWorksheetImages(UniverWorkbook workbook, UniverWorksheet worksheet)
+        {
+            var images = new List<UniverImageData>();
+            var imageKeys = new HashSet<string>(StringComparer.Ordinal);
+
+            void addImage(UniverImageData image)
+            {
+                var key = image.DrawingId ?? image.ImageId ?? image.Source;
+                if (string.IsNullOrWhiteSpace(key) || imageKeys.Add(key))
+                {
+                    images.Add(image);
+                }
+            }
+
+            if (worksheet.Images != null)
+            {
+                foreach (var image in worksheet.Images)
+                {
+                    if (image != null)
+                    {
+                        addImage(image);
+                    }
+                }
+            }
+
+            if (workbook.Resources == null)
+            {
+                return images;
+            }
+
+            foreach (var resource in workbook.Resources)
+            {
+                if (!string.Equals(resource.Name, "SHEET_DRAWING_PLUGIN", StringComparison.OrdinalIgnoreCase) || string.IsNullOrWhiteSpace(resource.Data))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var resourceNode = JsonNode.Parse(resource.Data);
+                    if (resourceNode == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var image in EnumerateDrawingImages(resourceNode))
+                    {
+                        addImage(image);
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return images;
+        }
+
+        private static IEnumerable<UniverImageData> EnumerateDrawingImages(JsonNode node)
+        {
+            if (node is JsonObject jsonObject)
+            {
+                if (LooksLikeDrawingImage(jsonObject) && TryDeserializeImage(jsonObject, out var image))
+                {
+                    yield return image;
+                }
+
+                foreach (var property in jsonObject)
+                {
+                    var child = property.Value;
+                    if (child == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var imageData in EnumerateDrawingImages(child))
+                    {
+                        yield return imageData;
+                    }
+                }
+            }
+
+            if (node is JsonArray jsonArray)
+            {
+                foreach (var child in jsonArray)
+                {
+                    if (child == null)
+                    {
+                        continue;
+                    }
+
+                    foreach (var imageData in EnumerateDrawingImages(child))
+                    {
+                        yield return imageData;
+                    }
+                }
+            }
+        }
+
+        private static bool LooksLikeDrawingImage(JsonObject jsonObject)
+        {
+            return jsonObject.ContainsKey("source")
+                && (jsonObject.ContainsKey("sheetTransform") || jsonObject.ContainsKey("axisAlignSheetTransform"));
+        }
+
+        private static bool TryDeserializeImage(JsonObject jsonObject, out UniverImageData image)
+        {
+            image = null!;
+
+            try
+            {
+                image = JsonSerializer.Deserialize<UniverImageData>(jsonObject.ToJsonString(), new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true,
+                })!;
+
+                return image != null;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private double GetColumnOffsetCm(UniverWorksheet worksheet, int column, double columnOffset, double scaleFactor)

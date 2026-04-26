@@ -1,4 +1,5 @@
 using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
 
 namespace EIMSNext.Print.Tests
 {
@@ -94,6 +95,92 @@ namespace EIMSNext.Print.Tests
 
             Assert.AreEqual(0, section.Elements.Count);
             Assert.AreEqual(0, temporaryFileSession.FilePaths.Count);
+        }
+
+        [TestMethod]
+        public void RenderImages_ShouldReadFloatingImageFromDrawingResource()
+        {
+            var options = new Pdf.PdfRenderOptions();
+            var workbook = new Pdf.UniverWorkbook
+            {
+                Resources =
+                [
+                    new Pdf.UniverResource
+                    {
+                        Name = "SHEET_DRAWING_PLUGIN",
+                        Data = $$"""
+                        {
+                          "Sheet1": {
+                            "drawingData": {
+                              "drawings": {
+                                "drawing-1": {
+                                  "drawingId": "drawing-1",
+                                  "imageId": "image-1",
+                                  "source": "data:image/png;base64,{{TinyPngBase64}}",
+                                  "imageSourceType": "BASE64",
+                                  "width": 30,
+                                  "height": 40,
+                                  "sheetTransform": {
+                                    "from": { "row": 0, "rowOffset": 0, "column": 0, "columnOffset": 0 },
+                                    "to": { "row": 1, "rowOffset": 0, "column": 1, "columnOffset": 0 }
+                                  },
+                                  "axisAlignSheetTransform": {
+                                    "from": { "row": 0, "rowOffset": 0, "column": 0, "columnOffset": 0 },
+                                    "to": { "row": 1, "rowOffset": 0, "column": 1, "columnOffset": 0 }
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                        """
+                    }
+                ]
+            };
+
+            var worksheet = new Pdf.UniverWorksheet
+            {
+                Id = "Sheet1",
+                Name = "Sheet1"
+            };
+
+            using var temporaryFileSession = new Pdf.PdfTemporaryFileSession(options.TemporaryDirectory);
+            var renderer = new Pdf.PdfImageRenderer(options, temporaryFileSession);
+            var section = new Document().AddSection();
+
+            renderer.RenderImages(section, workbook, worksheet);
+
+            Assert.AreEqual(1, section.Elements.Count);
+            Assert.AreEqual(1, temporaryFileSession.FilePaths.Count);
+        }
+
+        [TestMethod]
+        public void TryRenderCellImage_ShouldRenderInlineImgPayload()
+        {
+            var options = new Pdf.PdfRenderOptions();
+            var workbook = new Pdf.UniverWorkbook();
+            var worksheet = new Pdf.UniverWorksheet();
+            var renderer = new Pdf.PdfImageRenderer(options, new Pdf.PdfTemporaryFileSession(options.TemporaryDirectory));
+            var table = new Table();
+            table.AddColumn();
+            var row = table.AddRow();
+            var cell = row.Cells[0];
+
+            var univerCell = new Pdf.UniverCell
+            {
+                InlineImage = new Pdf.UniverCellImage
+                {
+                    Source = $"data:image/png;base64,{TinyPngBase64}",
+                    ImageSourceType = "BASE64",
+                    Width = 24,
+                    Height = 24,
+                }
+            };
+
+            var rendered = renderer.TryRenderCellImage(cell, workbook, worksheet, univerCell, 0, 0, 1.0);
+
+            Assert.IsTrue(rendered);
+            Assert.AreEqual(1, cell.Elements.Count);
         }
 
         [TestMethod]

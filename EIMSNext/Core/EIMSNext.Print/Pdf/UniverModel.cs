@@ -99,19 +99,12 @@ namespace EIMSNext.Print.Pdf
         public Dictionary<string, UniverRowData>? RowData { get; set; } = new(); // 行数据信息
         public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息
         [JsonPropertyName("pageSetup")] public UniverPageSetup? PageSetup { get; set; }
-        [JsonPropertyName("printSetup")] public UniverPageSetup? PrintSetup { get; set; }
     }
 
     public class UniverPageSetup
     {
         [JsonPropertyName("orientation")] public string? Orientation { get; set; }
-        [JsonPropertyName("pageFormat")] public string? PageFormat { get; set; }
-        [JsonPropertyName("pageSize")] public string? PageSize { get; set; }
         [JsonPropertyName("paperSize")] public string? PaperSize { get; set; }
-        [JsonPropertyName("marginTop")] public double? MarginTop { get; set; }
-        [JsonPropertyName("marginBottom")] public double? MarginBottom { get; set; }
-        [JsonPropertyName("marginLeft")] public double? MarginLeft { get; set; }
-        [JsonPropertyName("marginRight")] public double? MarginRight { get; set; }
         [JsonPropertyName("topMargin")] public double? TopMargin { get; set; }
         [JsonPropertyName("bottomMargin")] public double? BottomMargin { get; set; }
         [JsonPropertyName("leftMargin")] public double? LeftMargin { get; set; }
@@ -275,6 +268,7 @@ namespace EIMSNext.Print.Pdf
         public Dictionary<string, UniverWorksheet> Sheets { get; set; } = new();
         public object? Snapshot { get; set; }
         public Dictionary<string, UniverStyle>? Styles { get; set; }
+        [JsonPropertyName("resources")] public List<UniverResource>? Resources { get; set; } = new();
         
         [JsonIgnore]
         public UniverWorksheet? ActiveSheet => Sheets?.Values.FirstOrDefault();
