@@ -18,6 +18,7 @@
   <ItemGroup>
     <ProjectReference Include="..\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Storage\EIMSNext.Storage.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />

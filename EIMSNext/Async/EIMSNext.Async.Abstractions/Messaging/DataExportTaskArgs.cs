@@ -1,7 +1,7 @@
 namespace EIMSNext.Async.Abstractions.Messaging
 {
-    [Queue("export-log")]
-    public class ExportLogTaskArgs
+    [Queue("data-export")]
+    public class DataExportTaskArgs
     {
         public string ExportLogId { get; set; } = string.Empty;
 

@@ -74,4 +74,18 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string Detail { get; set; } = string.Empty;
     }
+
+    [Queue("webhook")]
+    public class WebhookTaskArgs
+    {
+        public string CorpId { get; set; } = string.Empty;
+
+        public string AppId { get; set; } = string.Empty;
+
+        public string FormId { get; set; } = string.Empty;
+
+        public WebHookTrigger Trigger { get; set; }
+
+        public string PayloadJson { get; set; } = string.Empty;
+    }
 }

@@ -4,7 +4,6 @@ using System.Text.Json.Nodes;
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.Http;
 using CloudNative.CloudEvents.SystemTextJson;
-using EIMSNext.Common;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 using Microsoft.Extensions.Logging;
@@ -15,10 +14,8 @@ namespace EIMSNext.CloudEvent
     /// TODO：此类可能最终改为注入类，并放到异步程序中
     /// </summary>
     /// <param name="Logger"></param>
-    /// <param name="Appsetting"></param>
     /// <param name="WebPushLogRepo"></param>
-    /// <param name="WebHookRepo"></param>
-    public class EventHub(ILogger<EventHub> Logger, AppSetting Appsetting, IRepository<Webhook> WebHookRepo, IRepository<WebPushLog> WebPushLogRepo) : IEventHub
+    public class EventHub(ILogger<EventHub> Logger, IRepository<WebPushLog> WebPushLogRepo) : IEventHub
     {
         private static string domain = "eimsnext.com";
 

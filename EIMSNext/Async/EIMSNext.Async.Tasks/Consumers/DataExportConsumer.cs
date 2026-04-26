@@ -12,14 +12,14 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
-    public class ExportLogConsumer : TaskConsumerBase<ExportLogTaskArgs, ExportLogConsumer>
+    public class DataExportConsumer : TaskConsumerBase<DataExportTaskArgs, DataExportConsumer>
     {
-        public ExportLogConsumer(IServiceScopeFactory scopeFactory)
+        public DataExportConsumer(IServiceScopeFactory scopeFactory)
             : base(scopeFactory)
         {
         }
 
-        protected override async Task HandleAsync(ExportLogTaskArgs args, CancellationToken ct, IResolver resolver)
+        protected override async Task HandleAsync(DataExportTaskArgs args, CancellationToken ct, IResolver resolver)
         {
             var exportLogService = resolver.Resolve<IExportLogService>();
             var exportLog = exportLogService.Get(args.ExportLogId);
@@ -142,6 +142,5 @@ namespace EIMSNext.Async.Tasks.Consumers
                 _ => "导出",
             };
         }
-
     }
 }
