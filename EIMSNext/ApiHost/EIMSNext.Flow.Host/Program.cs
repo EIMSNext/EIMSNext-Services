@@ -1,21 +1,19 @@
 using Asp.Versioning;
-
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
-using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.MongoDb;
-
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
-
 using WorkflowCore.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -60,6 +58,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
+builder.Services.AddRabbitMqMessaging(builder.Configuration);
 
 var app = builder.Build();
 

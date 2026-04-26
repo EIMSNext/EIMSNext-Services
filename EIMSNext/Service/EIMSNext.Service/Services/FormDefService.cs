@@ -45,7 +45,7 @@ namespace EIMSNext.Service
             var appRepo = Resolver.GetRepository<App>();
             var app = appRepo.Get(entity.AppId, session)!;
 
-            var menu = app.AppMenus.FirstOrDefault(x => x.MenuId == entity.Id);
+            var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
             if (menu != null)
             {
                 menu.Title = entity.Name;
@@ -67,7 +67,7 @@ namespace EIMSNext.Service
 
                 updated.ForEach(e =>
                 {
-                    var menu = app.AppMenus.FirstOrDefault(x => x.MenuId == e.Id);
+                    var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
                 appRepo.Replace(app, session);
@@ -91,10 +91,18 @@ namespace EIMSNext.Service
                 var app = appRepo.Get(appId, session);
                 if (app == null) continue;
 
-                // 移除所有被删除 FormDef 对应的菜单
-                var removedCount = app.AppMenus.RemoveAll(m => deletedForms.Any(f => f.Id == m.MenuId));
+                var removedCount = 0;
+                foreach (var form in deletedForms.Where(x => x.AppId == appId))
+                {
+                    if (AppMenuHelper.RemoveMenu(app.AppMenus, form.Id))
+                    {
+                        removedCount++;
+                    }
+                }
+
                 if (removedCount > 0)
                 {
+                    AppMenuHelper.Normalize(app.AppMenus);
                     appRepo.Replace(app, session);
                 }
             }

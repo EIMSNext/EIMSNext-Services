@@ -25,6 +25,11 @@ namespace EIMSNext.Print.Pdf
         {
             return pixel <= 0 || pixel is null ? defaultValuePt : Math.Round(pixel.Value / 1.333, 2);
         }
+
+        public static double MmToPoint(double millimeter)
+        {
+            return Math.Round(millimeter * 72 / 25.4, 4);
+        }
         #endregion
 
         #region 颜色转换

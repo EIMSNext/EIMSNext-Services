@@ -113,16 +113,16 @@ app.UseODataQueryRequest();
 //app.UseODataBatching();
 //app.UseHttpsRedirection();
 
-app.UseStaticFiles(new StaticFileOptions()
-{
-    OnPrepareResponse = (e) =>
-    {
-        e.Context.Response.Headers.AccessControlAllowOrigin = e.Context.Request.Headers.Origin;
-        e.Context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-        e.Context.Response.Headers.AccessControlAllowHeaders = e.Context.Request.Headers.AccessControlRequestHeaders;
-        e.Context.Response.Headers.AccessControlAllowCredentials = "true";
-    }
-});
+//app.UseStaticFiles(new StaticFileOptions()
+//{
+//    OnPrepareResponse = (e) =>
+//    {
+//        e.Context.Response.Headers.AccessControlAllowOrigin = e.Context.Request.Headers.Origin;
+//        e.Context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
+//        e.Context.Response.Headers.AccessControlAllowHeaders = e.Context.Request.Headers.AccessControlRequestHeaders;
+//        e.Context.Response.Headers.AccessControlAllowCredentials = "true";
+//    }
+//});
 
 app.UseRouting();
 app.UseAuthentication();

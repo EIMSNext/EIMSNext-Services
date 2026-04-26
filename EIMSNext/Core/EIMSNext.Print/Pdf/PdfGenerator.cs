@@ -78,19 +78,19 @@ namespace EIMSNext.Print.Pdf
             var defaultPageSetup = section.Document?.DefaultPageSetup ?? section.PageSetup;
             section.PageSetup = defaultPageSetup.Clone();
 
-            var templatePageSetup = worksheet.PageSetup ?? worksheet.PrintSetup;
+            var templatePageSetup = worksheet.PageSetup;
 
             section.PageSetup.PageFormat = ResolvePageFormat(templatePageSetup, renderOptions);
             section.PageSetup.Orientation = ResolveOrientation(templatePageSetup, renderOptions);
-            section.PageSetup.TopMargin = ResolveMargin(templatePageSetup?.TopMargin ?? templatePageSetup?.MarginTop, renderOptions.PageTopMargin);
-            section.PageSetup.BottomMargin = ResolveMargin(templatePageSetup?.BottomMargin ?? templatePageSetup?.MarginBottom, renderOptions.PageBottomMargin);
-            section.PageSetup.LeftMargin = ResolveMargin(templatePageSetup?.LeftMargin ?? templatePageSetup?.MarginLeft, renderOptions.PageLeftMargin);
-            section.PageSetup.RightMargin = ResolveMargin(templatePageSetup?.RightMargin ?? templatePageSetup?.MarginRight, renderOptions.PageRightMargin);
+            section.PageSetup.TopMargin = ResolveMargin(templatePageSetup?.TopMargin, renderOptions.PageTopMargin);
+            section.PageSetup.BottomMargin = ResolveMargin(templatePageSetup?.BottomMargin, renderOptions.PageBottomMargin);
+            section.PageSetup.LeftMargin = ResolveMargin(templatePageSetup?.LeftMargin, renderOptions.PageLeftMargin);
+            section.PageSetup.RightMargin = ResolveMargin(templatePageSetup?.RightMargin, renderOptions.PageRightMargin);
         }
 
         private static PageFormat ResolvePageFormat(UniverPageSetup? pageSetup, PdfRenderOptions renderOptions)
         {
-            var pageFormat = pageSetup?.PageFormat ?? pageSetup?.PageSize ?? pageSetup?.PaperSize;
+            var pageFormat = pageSetup?.PaperSize;
             if (string.IsNullOrWhiteSpace(pageFormat))
             {
                 return renderOptions.PageFormat;

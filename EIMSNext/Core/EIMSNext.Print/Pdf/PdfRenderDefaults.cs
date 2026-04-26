@@ -25,10 +25,10 @@ namespace EIMSNext.Print.Pdf
 
         public const PageFormat DefaultPageFormat = PageFormat.A4;
         public const Orientation DefaultOrientation = Orientation.Portrait;
-        public static readonly Unit DefaultPageTopMargin = Unit.FromCentimeter(1.0);
-        public static readonly Unit DefaultPageBottomMargin = Unit.FromCentimeter(1.0);
-        public static readonly Unit DefaultPageLeftMargin = Unit.FromCentimeter(1.0);
-        public static readonly Unit DefaultPageRightMargin = Unit.FromCentimeter(1.0);
+        public static readonly Unit DefaultPageTopMargin = Unit.FromMillimeter(15);
+        public static readonly Unit DefaultPageBottomMargin = Unit.FromMillimeter(15);
+        public static readonly Unit DefaultPageLeftMargin = Unit.FromMillimeter(15);
+        public static readonly Unit DefaultPageRightMargin = Unit.FromMillimeter(15);
 
         public static readonly IReadOnlyDictionary<string, string> FontAliases =
             new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)

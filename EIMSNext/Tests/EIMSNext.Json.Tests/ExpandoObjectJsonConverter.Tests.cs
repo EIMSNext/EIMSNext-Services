@@ -13,6 +13,7 @@ namespace EIMSNext.Json.Tests
         private JsonSerializerOptions CreateOptions()
         {
             var options = new JsonSerializerOptions();
+            options.Converters.Add(new ObjectJsonConverter());
             options.Converters.Add(new ExpandoObjectJsonConverter());
             return options;
         }
@@ -97,6 +98,30 @@ namespace EIMSNext.Json.Tests
             var nDict = (IDictionary<string, object>)n!;
             var a = nDict["a"] as List<object>;
             CollectionAssert.AreEqual(new List<object> { 1L, 2L, 3L }, a);
+        }
+
+        [TestMethod]
+        public void Deserialize_WithObjectConverter_PreservesStringsAndObjects()
+        {
+            var json = "{\"data\":{\"text\":\"中文\",\"meta\":{\"a\":1111},\"tags\":[{\"id\":\"1\",\"label\":\"测试\",\"type\":2}]}}";
+            var options = CreateOptions();
+            var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
+            var dict = (IDictionary<string, object>)expando!;
+            var data = (ExpandoObject)dict["data"];
+            var dataDict = (IDictionary<string, object>)data;
+
+            Assert.IsInstanceOfType(dataDict["text"], typeof(string));
+            Assert.AreEqual("中文", dataDict["text"]);
+
+            var meta = dataDict["meta"] as ExpandoObject;
+            Assert.IsNotNull(meta);
+            var metaDict = (IDictionary<string, object>)meta;
+            Assert.AreEqual(1111L, metaDict["a"]);
+
+            var tags = dataDict["tags"] as IList<object>;
+            Assert.IsNotNull(tags);
+            Assert.AreEqual(1, tags.Count);
+            Assert.IsInstanceOfType(tags[0], typeof(ExpandoObject));
         }
     }
 }
