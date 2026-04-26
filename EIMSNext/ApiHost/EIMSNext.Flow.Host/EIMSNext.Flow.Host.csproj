@@ -18,6 +18,7 @@
     <PackageReference Include="Swashbuckle.AspNetCore.Annotations" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
     <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Core\EIMSNext.Flow.Core.csproj" />

@@ -30,7 +30,7 @@ namespace EIMSNext.Flow.Core.Nodes
             if (updateSetting.UpdateMode == UpdateMode.Node)
             {
                 //TODO: 是否需要复制副本?
-                toUpdates = dataContext.NodeDatas.FirstOrDefault(x => x.Key == updateSetting.NodeId).Value.ActionDatas.ToList();
+                toUpdates = dataContext.NodeDatas.FirstOrDefault(x => x.Key == updateSetting.NodeId).Value?.ActionDatas.ToList();
             }
             else if (updateSetting.UpdateMode == UpdateMode.Form)
             {

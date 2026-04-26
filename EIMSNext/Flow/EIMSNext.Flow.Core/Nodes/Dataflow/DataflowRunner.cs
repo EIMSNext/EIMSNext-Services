@@ -58,7 +58,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var dataflow = _resolver.Resolve<IRepository<Wf_Definition>>().Find(x => x.CorpId == paramter.Data.CorpId && x.FlowType == FlowType.Dataflow
                && x.EventSource == paramter.EventSource && paramter.Data.FormId.Equals(x.SourceId) && x.EventSetting != null && x.EventSetting.EventType.HasFlag(paramter.EventType)).FirstOrDefault();
 
-            if (dataflow != null && (paramter.Cascade == CascadeMode.All || paramter.EventIds!.Contains($",{dataflow.Id},")))
+            if (dataflow != null && (paramter.Cascade == CascadeMode.NotSet || paramter.Cascade == CascadeMode.All || (!string.IsNullOrEmpty(paramter.EventIds) && paramter.EventIds.Contains($",{dataflow.Id},"))))
             {
                 if (!IsMeet(dataflow, paramter.Data))
                     return execResult;
