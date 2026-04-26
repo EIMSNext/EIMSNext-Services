@@ -12,6 +12,7 @@ namespace EIMSNext.Print.Pdf
         private readonly PdfRenderOptions _options;
         private readonly PdfStyleResolver _styleResolver;
         private readonly PdfSheetLayoutCalculator _layoutCalculator;
+        private readonly PdfImageRenderer _imageRenderer;
 
         // 类级变量
         private UniverWorksheet? _worksheet;
@@ -30,6 +31,7 @@ namespace EIMSNext.Print.Pdf
             _isPreview = isPreview;
             _styleResolver = new PdfStyleResolver(workbook, options);
             _layoutCalculator = new PdfSheetLayoutCalculator(options);
+            _imageRenderer = new PdfImageRenderer(options, new PdfTemporaryFileSession(options.TemporaryDirectory));
         }
 
         public void Generate(UniverWorksheet worksheet, Table table, JsonObject data, PageSetup pageSetup)
@@ -261,7 +263,11 @@ namespace EIMSNext.Print.Pdf
                         var cellValue = subDataArray != null && subDataArray.Count > 0
                             ? GetCellValue(templateCell, _data!, new[] { i })
                             : string.Empty;
-                        AddCellParagraph(cell, templateCell, cellValue, keepEmptyParagraph: true, leftIndentCm: 0.1, rowIndex: rowIndex, columnIndex: columnIndex);
+
+                        if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, templateCell, rowIndex, columnIndex, 1.0))
+                        {
+                            AddCellParagraph(cell, templateCell, cellValue, keepEmptyParagraph: true, leftIndentCm: 0.1, rowIndex: rowIndex, columnIndex: columnIndex);
+                        }
                     }
                 }
             }
@@ -300,7 +306,11 @@ namespace EIMSNext.Print.Pdf
                     _styleResolver.ApplyCellStyle(cell, univerCell);
                     ApplyMergedBoundaryStyles(cell, rowIndex, columnIndex);
                     var cellValue = GetCellValue(univerCell, _data!, Array.Empty<int>());
-                    AddCellParagraph(cell, univerCell, cellValue, keepEmptyParagraph: false, leftIndentCm: 0, rowIndex: rowIndex, columnIndex: columnIndex);
+
+                    if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, univerCell, rowIndex, columnIndex, 1.0))
+                    {
+                        AddCellParagraph(cell, univerCell, cellValue, keepEmptyParagraph: false, leftIndentCm: 0, rowIndex: rowIndex, columnIndex: columnIndex);
+                    }
                 }
             }
 

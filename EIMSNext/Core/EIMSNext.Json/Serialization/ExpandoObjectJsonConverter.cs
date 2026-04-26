@@ -12,7 +12,7 @@ namespace EIMSNext.Json.Serialization
             Type typeToConvert,
             JsonSerializerOptions options)
         {
-            var dict = JsonSerializer.Deserialize<Dictionary<string, object>>(ref reader, options);
+            var dict = JsonSerializer.Deserialize<Dictionary<string, object?>>(ref reader, options);
             var expando = new ExpandoObject();
             if (dict != null)
             {
@@ -21,43 +21,27 @@ namespace EIMSNext.Json.Serialization
             return expando;
         }
 
-        private ExpandoObject ConvertExpendo(IDictionary<string, object> dict)
+        private ExpandoObject ConvertExpendo(IDictionary<string, object?> dict)
         {
             var expando = new ExpandoObject();
             var target = (IDictionary<string, object?>)expando;
             foreach (var kvp in dict)
             {
-                if (kvp.Value is JsonElement)
-                {
-                    target.Add(kvp.Key, ConvertJsonValue((JsonElement)kvp.Value));
-                }
-                else if (kvp.Value is IEnumerable)
-                    target.Add(kvp.Key, ConvertExpendoList((IEnumerable)kvp.Value));
-                else if (kvp.Value is IDictionary<string, object>)
-                    target.Add(kvp.Key, ConvertExpendo((IDictionary<string, object>)kvp.Value));
-                else
-                    target.Add(kvp.Key, kvp.Value);
+                target.Add(kvp.Key, ConvertObjectValue(kvp.Value));
             }
             return expando;
         }
+
         private IList<object?> ConvertExpendoList(IEnumerable objList)
         {
             var list = new List<object?>();
             foreach (var x in objList)
             {
-                if (x is JsonElement)
-                {
-                    list.Add(ConvertJsonValue((JsonElement)x));
-                }
-                else if (x is IEnumerable)
-                    list.Add(ConvertExpendoList((IEnumerable)x));
-                else if (x is IDictionary<string, object>)
-                    list.Add(ConvertExpendo((IDictionary<string, object>)x));
-                else
-                    list.Add(x);
+                list.Add(ConvertObjectValue(x));
             }
             return list;
         }
+
         private IList<object?> ConvertJsonArray(JsonElement objList)
         {
             var list = new List<object?>();
@@ -76,6 +60,66 @@ namespace EIMSNext.Json.Serialization
                 target.Add(kvp.Name, ConvertJsonValue(kvp.Value));
             }
             return expando;
+        }
+
+        private object? ConvertObjectValue(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value is JsonElement element)
+            {
+                return ConvertJsonValue(element);
+            }
+
+            if (value is string)
+            {
+                return value;
+            }
+
+            if (value is int intValue)
+            {
+                return (long)intValue;
+            }
+
+            if (value is uint uintValue)
+            {
+                return (long)uintValue;
+            }
+
+            if (value is short shortValue)
+            {
+                return (long)shortValue;
+            }
+
+            if (value is ushort ushortValue)
+            {
+                return (long)ushortValue;
+            }
+
+            if (value is byte byteValue)
+            {
+                return (long)byteValue;
+            }
+
+            if (value is sbyte sbyteValue)
+            {
+                return (long)sbyteValue;
+            }
+
+            if (value is IDictionary<string, object?> dict)
+            {
+                return ConvertExpendo(dict);
+            }
+
+            if (value is IEnumerable list)
+            {
+                return ConvertExpendoList(list);
+            }
+
+            return value;
         }
 
         private object? ConvertJsonValue(JsonElement element)
@@ -102,7 +146,7 @@ namespace EIMSNext.Json.Serialization
             ExpandoObject value,
             JsonSerializerOptions options)
         {
-            JsonSerializer.Serialize(writer, value as IDictionary<string, object>, options);
+            JsonSerializer.Serialize(writer, value as IDictionary<string, object?>, options);
         }
     }
 }

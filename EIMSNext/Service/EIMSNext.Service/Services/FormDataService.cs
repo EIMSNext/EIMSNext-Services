@@ -1,25 +1,18 @@
 using System.Dynamic;
 using System.Text.Json;
-using System.Text.Json.Nodes;
-using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.ApiClient.Flow;
+using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Cache;
 using EIMSNext.CloudEvent;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
-using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
-
+using EIMSNext.Service.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
-
 using MongoDB.Driver;
-using StackExchange.Redis;
-
-using FlowCascadeMode = EIMSNext.ApiClient.Flow.CascadeMode;
 
 namespace EIMSNext.Service
 {
@@ -78,6 +71,7 @@ namespace EIMSNext.Service
 
         protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
+
             var eventHub = Resolver.Resolve<IEventHub>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var entity = entities.First();
@@ -150,7 +144,7 @@ namespace EIMSNext.Service
                     if (cascade != EIMSNext.Service.Entities.CascadeMode.Never)
                     {
                         //非流程单据直接提交
-                        var dfResp = await _flowClient.RunDataflow(new DfRunRequest { DataId = entity.Id, Trigger = DfTrigger.Submit }, Context.AccessToken);
+                        var dfResp = await _flowClient.RunDataflow(new DfRunRequest { DataId = entity.Id, EventSource = ApiClient.Flow.EventSourceType.Form, EventType = ApiClient.Flow.EventType.Submit }, Context.AccessToken);
                         if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
                         {
                             throw new UnLogException(dfResp.Error);

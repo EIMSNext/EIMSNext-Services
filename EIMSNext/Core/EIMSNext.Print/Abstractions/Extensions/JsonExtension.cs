@@ -49,6 +49,10 @@ namespace EIMSNext.Print.Extensions
                 {
                     resultDict[lowerKey] = ConvertKeysToLowerCase(childExpando);
                 }
+                else if (value is string)
+                {
+                    resultDict[lowerKey] = value;
+                }
                 else if (value is IEnumerable list)
                 {
                     var newList = new List<object>();

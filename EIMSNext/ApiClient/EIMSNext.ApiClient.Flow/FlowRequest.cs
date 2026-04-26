@@ -43,11 +43,30 @@
     public class DfRunRequest
     {
         public string DataId { get; set; } = string.Empty;
-        public DfTrigger Trigger { get; set; }
+        public EventSourceType EventSource { get; set; }
+        public EventType EventType { get; set; }
         public CascadeMode DfCascade { get; set; }
         public string? EventIds { get; set; }
     }
-    public enum DfTrigger
+    /// <summary>
+    /// 事件来源类型枚举
+    /// </summary>
+    public enum EventSourceType
+    {
+        /// <summary>
+        /// 无
+        /// </summary>
+        None,
+        /// <summary>
+        /// 表单
+        /// </summary>
+        Form,
+        /// <summary>
+        /// 按钮
+        /// </summary>
+        Buttton
+    }
+    public enum EventType
     {
         None = 0,
         Submit = 1,
