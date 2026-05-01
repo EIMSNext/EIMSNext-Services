@@ -13,7 +13,6 @@ namespace EIMSNext.Print.Pdf
         public const double DefaultRowHeightCm = 0.69;
         public const bool DefaultWrapText = false;
         public const bool IgnoreUnsupportedStyle = true;
-        public static readonly string TemporaryDirectory = Path.Combine(Path.GetTempPath(), "eimsnext-print", "temp");
 
         public static readonly Color DefaultFontColor = Color.FromRgb(0, 0, 0);
         public static readonly Color DefaultBorderColor = Color.FromRgb(0, 0, 0);

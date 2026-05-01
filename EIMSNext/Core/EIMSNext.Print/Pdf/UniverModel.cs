@@ -83,6 +83,7 @@ namespace EIMSNext.Print.Pdf
         [JsonPropertyName("custom")] public PdfPrintMeta? PrintMeta { get; set; }
         [JsonPropertyName("image")] public UniverCellImage? Image { get; set; }
         [JsonPropertyName("img")] public UniverCellImage? InlineImage { get; set; }
+        [JsonPropertyName("p")] public JsonElement ParagraphContent { get; set; }
     }
 
     public class UniverWorksheet
@@ -217,6 +218,7 @@ namespace EIMSNext.Print.Pdf
     public class UniverCellImage
     {
         [JsonPropertyName("source")] public string? Source { get; set; }
+        [JsonPropertyName("imageId")] public string? ImageId { get; set; }
         [JsonPropertyName("imageSourceType")] public string? ImageSourceType { get; set; }
         [JsonPropertyName("name")] public string? Name { get; set; }
         [JsonPropertyName("type")] public string? Type { get; set; }

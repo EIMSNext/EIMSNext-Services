@@ -31,8 +31,7 @@ namespace EIMSNext.Print.Pdf
             var section = document.AddSection();
             ApplyPageSetup(section, worksheet, renderOptions);
 
-            using var temporaryFileSession = new PdfTemporaryFileSession(renderOptions.TemporaryDirectory);
-            RenderTables(document, workbook, worksheet, datas, option, renderOptions, temporaryFileSession);
+            RenderTables(document, workbook, worksheet, datas, option, renderOptions);
 
             var ms = new MemoryStream();
             var renderer = new PdfDocumentRenderer()
@@ -46,18 +45,17 @@ namespace EIMSNext.Print.Pdf
             return ms;
         }
 
-        private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option, PdfRenderOptions renderOptions, PdfTemporaryFileSession temporaryFileSession)
+        private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option, PdfRenderOptions renderOptions)
         {
             if (datas == null || datas.Count == 0) return;
 
-            var imageRenderer = new PdfImageRenderer(renderOptions, temporaryFileSession);
+            var imageRenderer = new PdfImageRenderer(renderOptions);
 
             for (int i = 0; i < datas.Count; i++)
             {
                 if (i > 0)
                 {
                     document.AddSection();
-                    ApplyPageSetup(document.LastSection, worksheet, renderOptions);
                 }
 
                 var table = document.LastSection.AddTable();
@@ -77,7 +75,6 @@ namespace EIMSNext.Print.Pdf
         {
             var defaultPageSetup = section.Document?.DefaultPageSetup ?? section.PageSetup;
             section.PageSetup = defaultPageSetup.Clone();
-
             var templatePageSetup = worksheet.PageSetup;
 
             section.PageSetup.PageFormat = ResolvePageFormat(templatePageSetup, renderOptions);
