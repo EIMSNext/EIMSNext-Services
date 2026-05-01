@@ -99,18 +99,17 @@ namespace EIMSNext.Print.Pdf
         public List<UniverImageData>? Images { get; set; } = new();
         public Dictionary<string, UniverRowData>? RowData { get; set; } = new(); // 行数据信息
         public Dictionary<string, UniverColumnData>? ColumnData { get; set; } = new(); // 列数据信息
-        [JsonPropertyName("pageSetup")] public UniverPageSetup? PageSetup { get; set; }
+        public UniverPageSetup? PageSetup { get; set; }
     }
 
     public class UniverPageSetup
     {
-        [JsonPropertyName("orientation")] public string? Orientation { get; set; }
-        [JsonPropertyName("paperSize")] public string? PaperSize { get; set; }
-        [JsonPropertyName("topMargin")] public double? TopMargin { get; set; }
-        [JsonPropertyName("bottomMargin")] public double? BottomMargin { get; set; }
-        [JsonPropertyName("leftMargin")] public double? LeftMargin { get; set; }
-        [JsonPropertyName("rightMargin")] public double? RightMargin { get; set; }
-        [JsonPropertyName("landscape")] public bool? Landscape { get; set; }
+        public string? Orientation { get; set; }
+        public string? PaperSize { get; set; }
+        public double? TopMargin { get; set; }
+        public double? BottomMargin { get; set; }
+        public double? LeftMargin { get; set; }
+        public double? RightMargin { get; set; }
     }
 
     public class UniverStyle
@@ -148,10 +147,10 @@ namespace EIMSNext.Print.Pdf
     {
         [JsonPropertyName("s")]
         public object Style { get; set; } = "none"; // 支持数字和字符串两种格式
-        
+
         [JsonPropertyName("cl")]
         public UniverColor Color { get; set; } = new();
-        
+
         [JsonIgnore]
         public string StyleName
         {
@@ -172,7 +171,7 @@ namespace EIMSNext.Print.Pdf
                 };
             }
         }
-        
+
         [JsonIgnore]
         public double WidthValue
         {
@@ -271,7 +270,7 @@ namespace EIMSNext.Print.Pdf
         public object? Snapshot { get; set; }
         public Dictionary<string, UniverStyle>? Styles { get; set; }
         [JsonPropertyName("resources")] public List<UniverResource>? Resources { get; set; } = new();
-        
+
         [JsonIgnore]
         public UniverWorksheet? ActiveSheet => Sheets?.Values.FirstOrDefault();
     }

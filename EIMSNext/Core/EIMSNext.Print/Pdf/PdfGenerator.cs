@@ -105,14 +105,9 @@ namespace EIMSNext.Print.Pdf
 
         private static Orientation ResolveOrientation(UniverPageSetup? pageSetup, PdfRenderOptions renderOptions)
         {
-            if (pageSetup?.Landscape == true)
+            if (string.IsNullOrWhiteSpace(pageSetup?.Orientation))
             {
-                return Orientation.Landscape;
-            }
-
-            if (pageSetup?.Landscape == false && string.IsNullOrWhiteSpace(pageSetup.Orientation))
-            {
-                return Orientation.Portrait;
+                return renderOptions.Orientation;
             }
 
             return pageSetup?.Orientation?.Trim().ToLowerInvariant() switch
