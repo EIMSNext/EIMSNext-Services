@@ -50,6 +50,8 @@ namespace EIMSNext.Print.Pdf
             if (datas == null || datas.Count == 0) return;
 
             var imageRenderer = new PdfImageRenderer(renderOptions);
+            var hasTabularContent = HasTabularContent(worksheet);
+            var hasImages = worksheet.Images != null && worksheet.Images.Count > 0;
 
             for (int i = 0; i < datas.Count; i++)
             {
@@ -58,10 +60,17 @@ namespace EIMSNext.Print.Pdf
                     document.AddSection();
                 }
 
-                var table = document.LastSection.AddTable();
+                if (hasTabularContent)
+                {
+                    var table = document.LastSection.AddTable();
+                    var tableGenerator = new PdfTableGenerator(workbook, renderOptions, IsPreview);
+                    tableGenerator.Generate(worksheet, table, datas[i], document.LastSection.PageSetup);
+                }
+                else if (!hasImages)
+                {
+                    document.LastSection.AddParagraph(string.Empty);
+                }
 
-                var tableGenerator = new PdfTableGenerator(workbook, renderOptions, IsPreview);
-                tableGenerator.Generate(worksheet, table, datas[i], document.LastSection.PageSetup);
                 imageRenderer.RenderImages(document.LastSection, workbook, worksheet);
 
                 if (i < datas.Count - 1)
@@ -69,6 +78,22 @@ namespace EIMSNext.Print.Pdf
                     document.LastSection.AddPageBreak();
                 }
             }
+        }
+
+        private static bool HasTabularContent(UniverWorksheet worksheet)
+        {
+            if (worksheet.CellData != null)
+            {
+                foreach (var row in worksheet.CellData.Values)
+                {
+                    if (row != null && row.Count > 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return worksheet.MergeData != null && worksheet.MergeData.Count > 0;
         }
 
         private static void ApplyPageSetup(Section section, UniverWorksheet worksheet, PdfRenderOptions renderOptions)

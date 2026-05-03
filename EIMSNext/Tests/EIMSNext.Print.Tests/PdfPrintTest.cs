@@ -58,6 +58,26 @@ namespace EIMSNext.Print.Tests
         }
 
         [TestMethod]
+        public void PrintEmptyTest()
+        {
+            var template = new PrintTemplate();
+            var option = new PrintOption();
+            var outputDirectory = Path.Combine("d:\\temp", "eimsnext-print-tests");
+            Directory.CreateDirectory(outputDirectory);
+
+            template.Content = "{\"id\":\"Sheet1\",\"sheetOrder\":[\"Sheet1\"],\"name\":\"Sheet1\",\"appVersion\":\"0.21.0\",\"locale\":\"zhCN\",\"styles\":{},\"sheets\":{\"Sheet1\":{\"id\":\"Sheet1\",\"name\":\"Sheet1\",\"rowCount\":100,\"columnCount\":26,\"cellData\":{},\"rowData\":{},\"columnData\":{},\"rowHeight\":{},\"columnWidth\":{},\"mergeData\":[],\"pageSetup\":{\"paperSize\":\"A4\",\"orientation\":\"portrait\",\"topMargin\":42.5197,\"rightMargin\":42.5197,\"bottomMargin\":42.5197,\"leftMargin\":42.5197},\"tabColor\":\"\",\"hidden\":0,\"zoomRatio\":1,\"freeze\":{\"xSplit\":0,\"ySplit\":0,\"startRow\":-1,\"startColumn\":-1},\"scrollTop\":0,\"scrollLeft\":0,\"defaultColumnWidth\":88,\"defaultRowHeight\":24,\"showGridlines\":1,\"rowHeader\":{\"width\":46,\"hidden\":0},\"columnHeader\":{\"height\":20,\"hidden\":0},\"rightToLeft\":0}},\"resources\":[{\"name\":\"SHEET_RANGE_PROTECTION_PLUGIN\",\"data\":\"\"},{\"name\":\"SHEET_AuthzIoMockService_PLUGIN\",\"data\":\"{}\"},{\"name\":\"SHEET_WORKSHEET_PROTECTION_PLUGIN\",\"data\":\"{}\"},{\"name\":\"SHEET_WORKSHEET_PROTECTION_POINT_PLUGIN\",\"data\":\"{}\"},{\"name\":\"SHEET_DRAWING_PLUGIN\",\"data\":\"{}\"},{\"name\":\"SHEET_DEFINED_NAME_PLUGIN\",\"data\":\"\"},{\"name\":\"SHEET_RANGE_THEME_MODEL_PLUGIN\",\"data\":\"{}\"}]}";
+            Pdf.PdfGenerator pdfGenerator = new Pdf.PdfGenerator();
+            using var result = pdfGenerator.Preview(template, option);
+
+            Assert.IsNotNull(result);
+            Assert.IsTrue(result.Content.Length > 0);
+
+            var fileName = Path.Combine(outputDirectory, result.FileName);
+            using var fileStream = new FileStream(fileName, FileMode.Create, FileAccess.Write, FileShare.None);
+            result.Content.CopyTo(fileStream);
+        }
+
+        [TestMethod]
         public void PrintTest_WithWorksheetPageSetup_ShouldGeneratePdf()
         {
             var template = new PrintTemplate
