@@ -26,6 +26,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var webhookRepo = resolver.GetRepository<Webhook>();
+            var webhookAliasRepo = resolver.GetRepository<WebhookAlias>();
             var triggerValue = (long)args.Trigger;
             var webhooks = webhookRepo.Queryable
                 .Where(x => x.CorpId == args.CorpId
@@ -40,10 +41,54 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var payload = JsonNode.Parse(args.PayloadJson) ?? new JsonObject();
+            var aliasConfig = webhookAliasRepo.Queryable
+                .FirstOrDefault(x => x.CorpId == args.CorpId
+                    && x.AppId == args.AppId
+                    && x.FormId == args.FormId);
             var eventHub = resolver.Resolve<IEventHub>();
             foreach (var webhook in webhooks)
             {
-                await eventHub.SendAsync(webhook, args.Trigger, payload);
+                var webhookPayload = payload.DeepClone();
+                ApplyAliases(webhookPayload, aliasConfig?.FieldAlias ?? []);
+                await eventHub.SendAsync(webhook, args.Trigger, webhookPayload);
+            }
+        }
+
+        private static void ApplyAliases(JsonNode payload, List<FieldAliasItem> aliases)
+        {
+            if (aliases.Count == 0 || payload is not JsonObject root)
+            {
+                return;
+            }
+
+            if (root["data"] is JsonObject dataNode)
+            {
+                ApplyAliasItems(dataNode, aliases);
+            }
+        }
+
+        private static void ApplyAliasItems(JsonObject target, List<FieldAliasItem> aliases)
+        {
+            foreach (var item in aliases)
+            {
+                if (string.IsNullOrWhiteSpace(item.Field) || !target.TryGetPropertyValue(item.Field, out var value))
+                {
+                    continue;
+                }
+
+                if (value is JsonArray array && item.Children?.Count > 0)
+                {
+                    foreach (var row in array.OfType<JsonObject>())
+                    {
+                        ApplyAliasItems(row, item.Children);
+                    }
+                }
+
+                if (!string.IsNullOrWhiteSpace(item.Alias) && item.Alias != item.Field)
+                {
+                    target.Remove(item.Field);
+                    target[item.Alias] = value;
+                }
             }
         }
     }
