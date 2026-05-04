@@ -79,10 +79,7 @@ namespace EIMSNext.Service
                 entity.EventSetting = content.EventSetting;
             }
 
-            var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag)
-                .Select(x => x.Version)
-                .DefaultIfEmpty(0)
-                .Max();
+            var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag).Select(x => x.Version).OrderByDescending(x => x).FirstOrDefault();
 
             entity.Version = maxVersion + 1;
             entity.IsCurrent = false;
@@ -96,8 +93,8 @@ namespace EIMSNext.Service
             var exist = Get(entity.Id) ?? throw new InvalidOperationException("流程版本不存在");
 
             entity.Version = exist.Version;
-            entity.IsCurrent = exist.IsCurrent;
-            entity.Released = exist.Released;
+            if (!exist.Released) //release 不允许往回改
+                entity.Released = exist.Released;
 
             var content = metadataParser.Parse(entity);
             entity.Metadata = content.Metadata;

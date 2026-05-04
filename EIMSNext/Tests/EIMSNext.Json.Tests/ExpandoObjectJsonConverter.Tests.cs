@@ -108,14 +108,14 @@ namespace EIMSNext.Json.Tests
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
             var dict = (IDictionary<string, object>)expando!;
             var data = (ExpandoObject)dict["data"];
-            var dataDict = (IDictionary<string, object>)data;
+            var dataDict = (IDictionary<string, object?>)data;
 
             Assert.IsInstanceOfType(dataDict["text"], typeof(string));
             Assert.AreEqual("中文", dataDict["text"]);
 
             var meta = dataDict["meta"] as ExpandoObject;
             Assert.IsNotNull(meta);
-            var metaDict = (IDictionary<string, object>)meta;
+            var metaDict = (IDictionary<string, object?>)meta;
             Assert.AreEqual(1111L, metaDict["a"]);
 
             var tags = dataDict["tags"] as IList<object>;

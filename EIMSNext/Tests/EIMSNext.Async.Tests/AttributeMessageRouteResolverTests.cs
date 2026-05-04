@@ -17,6 +17,14 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
+        public void ResolveQueueName_ReturnsWebhookQueueName()
+        {
+            var queueName = _resolver.ResolveQueueName(typeof(WebhookTaskArgs));
+
+            Assert.AreEqual("webhook", queueName);
+        }
+
+        [TestMethod]
         public void ResolveQueueName_ThrowsWhenAttributeMissing()
         {
             Assert.ThrowsExactly<InvalidOperationException>(() => _resolver.ResolveQueueName(typeof(NoQueueMessage)));

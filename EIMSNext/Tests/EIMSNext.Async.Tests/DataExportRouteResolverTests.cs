@@ -4,15 +4,15 @@ using EIMSNext.Async.RabbitMQ.Messaging;
 namespace EIMSNext.Async.Tests
 {
     [TestClass]
-    public class ExportLogRouteResolverTests
+    public class DataExportRouteResolverTests
     {
         [TestMethod]
-        public void ResolveQueueName_ReturnsExportLogQueueName()
+        public void ResolveQueueName_ReturnsDataExportQueueName()
         {
             var resolver = new AttributeMessageRouteResolver();
-            var queueName = resolver.ResolveQueueName(typeof(ExportLogTaskArgs));
+            var queueName = resolver.ResolveQueueName(typeof(DataExportTaskArgs));
 
-            Assert.AreEqual("export-log", queueName);
+            Assert.AreEqual("data-export", queueName);
         }
     }
 }

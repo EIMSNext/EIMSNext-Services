@@ -56,13 +56,13 @@ namespace EIMSNext.Print.Pdf
                 scaleFactor);
         }
 
-        public double MapVerticalPixelsToCm(UniverWorksheet worksheet, double pixels)
+        public double MapVerticalPixelsToCm(UniverWorksheet worksheet, double pixels, double scaleFactor = 1.0)
         {
             return MapPixelsToCm(
                 pixels,
                 index => GetRowHeightPixels(worksheet, index),
                 index => IsHiddenRow(worksheet, index),
-                1.0);
+                scaleFactor);
         }
 
         private static (int MaxRow, int MaxCol) CalculateEffectiveRange(UniverWorksheet sheet)
@@ -170,14 +170,14 @@ namespace EIMSNext.Print.Pdf
 
             if (sheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true)
             {
-                if (rowData.ActualHeight.HasValue && rowData.ActualHeight.Value > 0)
-                {
-                    return rowData.ActualHeight.Value;
-                }
-
                 if (rowData.Height.HasValue && rowData.Height.Value > 0)
                 {
                     return rowData.Height.Value;
+                }
+
+                if (rowData.ActualHeight.HasValue && rowData.ActualHeight.Value > 0)
+                {
+                    return rowData.ActualHeight.Value;
                 }
             }
 
@@ -220,7 +220,7 @@ namespace EIMSNext.Print.Pdf
                     mappedCm += PdfConvertUtil.PixelToCm(consumed, 0) * scaleFactor;
                 }
 
-                remaining -= rawSize;
+                remaining -= consumed;
                 index++;
             }
 

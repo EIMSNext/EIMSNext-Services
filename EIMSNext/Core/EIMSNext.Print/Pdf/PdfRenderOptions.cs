@@ -19,7 +19,6 @@ namespace EIMSNext.Print.Pdf
         public double DefaultRowHeightCm { get; init; } = PdfRenderDefaults.DefaultRowHeightCm;
         public bool DefaultWrapText { get; init; } = PdfRenderDefaults.DefaultWrapText;
         public bool IgnoreUnsupportedStyle { get; init; } = PdfRenderDefaults.IgnoreUnsupportedStyle;
-        public string TemporaryDirectory { get; init; } = PdfRenderDefaults.TemporaryDirectory;
 
         public PageFormat PageFormat { get; init; } = PdfRenderDefaults.DefaultPageFormat;
         public Orientation Orientation { get; init; } = PdfRenderDefaults.DefaultOrientation;

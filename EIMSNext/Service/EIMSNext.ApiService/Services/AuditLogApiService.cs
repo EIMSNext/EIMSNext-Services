@@ -75,7 +75,7 @@ namespace EIMSNext.ApiService
 			};
 
 			await exportLogService.AddAsync(exportLog);
-			await Resolver.Resolve<IMessagePublisher>().PublishAsync(new ExportLogTaskArgs
+			await Resolver.Resolve<IMessagePublisher>().PublishAsync(new DataExportTaskArgs
 			{
 				ExportLogId = exportLog.Id,
 				CorpId = exportLog.CorpId ?? string.Empty,

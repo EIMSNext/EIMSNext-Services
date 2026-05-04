@@ -12,7 +12,8 @@ namespace EIMSNext.Async.Tasks
             services.AddHostedService<NotifyDispatchConsumer>();
             services.AddHostedService<SystemMessageConsumer>();
             services.AddHostedService<EmailConsumer>();
-            services.AddHostedService<ExportLogConsumer>();
+            services.AddHostedService<DataExportConsumer>();
+            services.AddHostedService<WebhookConsumer>();
 
             return services;
         }
