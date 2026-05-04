@@ -1,5 +1,6 @@
 using System.Text.Json.Nodes;
 using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Tables;
 
 namespace EIMSNext.Print.Tests
 {
@@ -157,6 +158,75 @@ namespace EIMSNext.Print.Tests
             Assert.AreEqual(3, table.Rows.Count);
             Assert.IsTrue(table.Rows[0].HeadingFormat);
             Assert.AreEqual(1, table.Rows[0].KeepWith);
+        }
+
+        [TestMethod]
+        public void Generate_ShouldRenderParagraphDrawingImageInsideCell()
+        {
+            const string tinyPngBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aV7wAAAAASUVORK5CYII=";
+
+            var workbook = new Pdf.UniverWorkbook
+            {
+                Styles = new Dictionary<string, Pdf.UniverStyle>(),
+                Sheets = new Dictionary<string, Pdf.UniverWorksheet>
+                {
+                    ["sheet1"] = new Pdf.UniverWorksheet
+                    {
+                        DefaultColumnWidth = 88,
+                        DefaultRowHeight = 24,
+                        ColumnData = new Dictionary<string, Pdf.UniverColumnData>
+                        {
+                            ["0"] = new() { Width = 143 }
+                        },
+                        RowData = new Dictionary<string, Pdf.UniverRowData>
+                        {
+                            ["8"] = new() { Height = 45 }
+                        },
+                        CellData = new Dictionary<string, Dictionary<string, Pdf.UniverCell>>
+                        {
+                            ["8"] = new()
+                            {
+                                ["0"] = System.Text.Json.JsonSerializer.Deserialize<Pdf.UniverCell>(
+                                    $$"""
+                                    {
+                                      "p": {
+                                        "drawings": {
+                                          "drawing-1": {
+                                            "drawingId": "drawing-1",
+                                            "imageSourceType": "BASE64",
+                                            "source": "data:image/png;base64,{{tinyPngBase64}}",
+                                            "transform": {
+                                              "width": 97,
+                                              "height": 24
+                                            }
+                                          }
+                                        }
+                                      }
+                                    }
+                                    """,
+                                    new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true })!
+                            }
+                        }
+                    }
+                }
+            };
+
+            var worksheet = workbook.Sheets["sheet1"];
+            var document = new Document();
+            var section = document.AddSection();
+            var table = section.AddTable();
+            var generator = new Pdf.PdfTableGenerator(workbook, new Pdf.PdfRenderOptions(), true);
+            var data = new JsonObject();
+
+            generator.Generate(worksheet, table, data, section.PageSetup);
+
+            Assert.AreEqual(9, table.Rows.Count);
+            Assert.AreEqual(1, table.Rows[8].Cells[0].Elements.Count);
+            Assert.IsInstanceOfType<Paragraph>(table.Rows[8].Cells[0].Elements[0]);
+
+            var paragraph = (Paragraph)table.Rows[8].Cells[0].Elements[0];
+            Assert.AreEqual(1, paragraph.Elements.Count);
+            Assert.IsInstanceOfType<MigraDoc.DocumentObjectModel.Shapes.Image>(paragraph.Elements[0]);
         }
     }
 }

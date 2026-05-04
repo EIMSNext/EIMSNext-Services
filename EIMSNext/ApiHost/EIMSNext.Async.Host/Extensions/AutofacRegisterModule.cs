@@ -1,6 +1,7 @@
 using Autofac;
 
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.CloudEvent;
 using EIMSNext.Common;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service;
@@ -20,6 +21,7 @@ namespace EIMSNext.Async.Host.Extensions
             builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
 
             builder.RegisterType<EIMSDbContext>().AsImplementedInterfaces().SingleInstance();
+            builder.RegisterType<EventHub>().AsImplementedInterfaces().SingleInstance();
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterAssemblyTypes(typeof(CorporateService).Assembly)
                 .AsSelf()

@@ -31,8 +31,7 @@ namespace EIMSNext.Print.Pdf
             var section = document.AddSection();
             ApplyPageSetup(section, worksheet, renderOptions);
 
-            using var temporaryFileSession = new PdfTemporaryFileSession(renderOptions.TemporaryDirectory);
-            RenderTables(document, workbook, worksheet, datas, option, renderOptions, temporaryFileSession);
+            RenderTables(document, workbook, worksheet, datas, option, renderOptions);
 
             var ms = new MemoryStream();
             var renderer = new PdfDocumentRenderer()
@@ -46,24 +45,32 @@ namespace EIMSNext.Print.Pdf
             return ms;
         }
 
-        private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option, PdfRenderOptions renderOptions, PdfTemporaryFileSession temporaryFileSession)
+        private void RenderTables(Document document, UniverWorkbook workbook, UniverWorksheet worksheet, List<JsonObject> datas, PrintOption option, PdfRenderOptions renderOptions)
         {
             if (datas == null || datas.Count == 0) return;
 
-            var imageRenderer = new PdfImageRenderer(renderOptions, temporaryFileSession);
+            var imageRenderer = new PdfImageRenderer(renderOptions);
+            var hasTabularContent = HasTabularContent(worksheet);
+            var hasImages = worksheet.Images != null && worksheet.Images.Count > 0;
 
             for (int i = 0; i < datas.Count; i++)
             {
                 if (i > 0)
                 {
                     document.AddSection();
-                    ApplyPageSetup(document.LastSection, worksheet, renderOptions);
                 }
 
-                var table = document.LastSection.AddTable();
+                if (hasTabularContent)
+                {
+                    var table = document.LastSection.AddTable();
+                    var tableGenerator = new PdfTableGenerator(workbook, renderOptions, IsPreview);
+                    tableGenerator.Generate(worksheet, table, datas[i], document.LastSection.PageSetup);
+                }
+                else if (!hasImages)
+                {
+                    document.LastSection.AddParagraph(string.Empty);
+                }
 
-                var tableGenerator = new PdfTableGenerator(workbook, renderOptions, IsPreview);
-                tableGenerator.Generate(worksheet, table, datas[i], document.LastSection.PageSetup);
                 imageRenderer.RenderImages(document.LastSection, workbook, worksheet);
 
                 if (i < datas.Count - 1)
@@ -73,11 +80,26 @@ namespace EIMSNext.Print.Pdf
             }
         }
 
+        private static bool HasTabularContent(UniverWorksheet worksheet)
+        {
+            if (worksheet.CellData != null)
+            {
+                foreach (var row in worksheet.CellData.Values)
+                {
+                    if (row != null && row.Count > 0)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return worksheet.MergeData != null && worksheet.MergeData.Count > 0;
+        }
+
         private static void ApplyPageSetup(Section section, UniverWorksheet worksheet, PdfRenderOptions renderOptions)
         {
             var defaultPageSetup = section.Document?.DefaultPageSetup ?? section.PageSetup;
             section.PageSetup = defaultPageSetup.Clone();
-
             var templatePageSetup = worksheet.PageSetup;
 
             section.PageSetup.PageFormat = ResolvePageFormat(templatePageSetup, renderOptions);
@@ -108,14 +130,9 @@ namespace EIMSNext.Print.Pdf
 
         private static Orientation ResolveOrientation(UniverPageSetup? pageSetup, PdfRenderOptions renderOptions)
         {
-            if (pageSetup?.Landscape == true)
+            if (string.IsNullOrWhiteSpace(pageSetup?.Orientation))
             {
-                return Orientation.Landscape;
-            }
-
-            if (pageSetup?.Landscape == false && string.IsNullOrWhiteSpace(pageSetup.Orientation))
-            {
-                return Orientation.Portrait;
+                return renderOptions.Orientation;
             }
 
             return pageSetup?.Orientation?.Trim().ToLowerInvariant() switch
