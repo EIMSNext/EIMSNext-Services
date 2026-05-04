@@ -2,7 +2,6 @@ using Autofac;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
-using EIMSNext.CloudEvent;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Persistence;
 
@@ -33,8 +32,6 @@ namespace EIMSNext.Service.Host.Extensions
             //builder.RegisterType<TianyanchaClient>().AsSelf().SingleInstance();
             //builder.RegisterType<TencentCloudClient>().AsSelf().SingleInstance();
 
-            //TODO:注入测试，将来移到异步项目
-            builder.RegisterType<EventHub>().AsImplementedInterfaces().SingleInstance();
         }
     }
 }

@@ -26,21 +26,27 @@ namespace EIMSNext.Service.Host.Controllers
             if (string.IsNullOrEmpty(request.Content))
                 return ApiResult.Fail(400, "模板为空").ToActionResult();
 
-
-            using var printResult = new Print.CustomPrintService().Preview(new PrintTemplate { Content = request.Content, PrintType = (PrintType)(int)request.PrintType }, new PrintOption());
-
-            if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
+            try
             {
-                var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
-                var storage = Resolver.Resolve<IStorageProvider>();
-                if (!storage.Upload(printResult.Content, savePath))
-                    return ApiResult.Fail(500, "上传打印文件失败").ToActionResult();
+                using var printResult = new Print.CustomPrintService().Preview(new PrintTemplate { Content = request.Content, PrintType = (PrintType)(int)request.PrintType }, new PrintOption());
 
-                return ApiResult.Success(new { downloadUrl = $"{storage.Setting.BaseUrl.TrimEnd('/')}/{savePath.TrimStart('/', '\\').Replace("\\", "/")}", fileName = printResult.FileName }).ToActionResult();
+                if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
+                {
+                    var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
+                    var storage = Resolver.Resolve<IStorageProvider>();
+                    if (!storage.Upload(printResult.Content, savePath))
+                        return ApiResult.Fail(500, "上传打印文件失败").ToActionResult();
 
+                    return ApiResult.Success(new { downloadUrl = $"{storage.Setting.BaseUrl.TrimEnd('/')}/{savePath.TrimStart('/', '\\').Replace("\\", "/")}", fileName = printResult.FileName }).ToActionResult();
+
+                }
+                else
+                    return ApiResult.Fail(500, "打印文件失败").ToActionResult();
             }
-            else
-                return ApiResult.Fail(500, "打印文件失败").ToActionResult();
+            catch (Exception ex)
+            {
+                return ApiResult.Fail(500, $"打印预览失败: {ex.Message}").ToActionResult();
+            }
         }
 
         [HttpPost("Print")]

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using MigraDoc.DocumentObjectModel;
+using MigraDoc.DocumentObjectModel.Shapes;
 using MigraDoc.DocumentObjectModel.Tables;
 
 namespace EIMSNext.Print.Pdf
@@ -9,13 +10,11 @@ namespace EIMSNext.Print.Pdf
     {
         private readonly PdfRenderOptions _options;
         private readonly PdfSheetLayoutCalculator _layoutCalculator;
-        private readonly PdfTemporaryFileSession _temporaryFileSession;
 
-        public PdfImageRenderer(PdfRenderOptions options, PdfTemporaryFileSession temporaryFileSession)
+        public PdfImageRenderer(PdfRenderOptions options)
         {
             _options = options;
             _layoutCalculator = new PdfSheetLayoutCalculator(options);
-            _temporaryFileSession = temporaryFileSession;
         }
 
         public void RenderImages(Section section, UniverWorkbook workbook, UniverWorksheet worksheet)
@@ -30,7 +29,7 @@ namespace EIMSNext.Print.Pdf
 
             foreach (var image in images)
             {
-                if (!TryResolveImagePath(image, _temporaryFileSession, out var imagePath))
+                if (!TryResolveImagePath(image, out var imagePath))
                 {
                     continue;
                 }
@@ -44,11 +43,14 @@ namespace EIMSNext.Print.Pdf
                 {
                     var textFrame = section.AddTextFrame();
 
+                    textFrame.RelativeHorizontal = RelativeHorizontal.Page;
+                    textFrame.RelativeVertical = RelativeVertical.Page;
                     textFrame.Left = Unit.FromCentimeter(leftCm);
                     textFrame.Top = Unit.FromCentimeter(topCm);
                     textFrame.Width = Unit.FromCentimeter(widthCm > 0 ? widthCm : _options.DefaultColumnWidthCm);
                     textFrame.Height = Unit.FromCentimeter(heightCm > 0 ? heightCm : _options.DefaultRowHeightCm);
                     textFrame.LineFormat.Visible = false;
+                    textFrame.WrapFormat.Style = WrapStyle.Through;
 
                     var imageShape = textFrame.AddImage(imagePath);
                     imageShape.LockAspectRatio = false;
@@ -63,13 +65,16 @@ namespace EIMSNext.Print.Pdf
 
         public bool TryRenderCellImage(Cell cell, UniverWorkbook workbook, UniverWorksheet worksheet, UniverCell univerCell, int rowIndex, int columnIndex, double scaleFactor)
         {
-            var cellImage = univerCell.Image ?? univerCell.InlineImage ?? ResolveCellImageFromValue(univerCell.Value);
+            var cellImage = univerCell.Image
+                ?? univerCell.InlineImage
+                ?? ResolveCellImageFromParagraph(univerCell)
+                ?? ResolveCellImageFromValue(univerCell.Value);
             if (cellImage == null)
             {
                 return false;
             }
 
-            if (!TryResolveCellImagePath(cellImage, _temporaryFileSession, out var imagePath))
+            if (!TryResolveCellImagePath(workbook, cellImage, out var imagePath))
             {
                 return false;
             }
@@ -88,30 +93,66 @@ namespace EIMSNext.Print.Pdf
             return true;
         }
 
-        private static bool TryResolveImagePath(UniverImageData image, PdfTemporaryFileSession temporaryFileSession, out string imagePath)
+        private static bool TryResolveImagePath(UniverImageData image, out string imagePath)
         {
             imagePath = string.Empty;
 
-            if (TryDecodeSource(image.Source, out var inlineBytes))
-            {
-                imagePath = temporaryFileSession.CreateFile(ResolveImageExtension(image.Source, image.ImageSourceType), inlineBytes);
-                return true;
-            }
-
-            return false;
+            return TryConvertToMigraDocImageSource(image.Source, out imagePath);
         }
 
-        private static bool TryResolveCellImagePath(UniverCellImage image, PdfTemporaryFileSession temporaryFileSession, out string imagePath)
+        private static UniverCellImage? ResolveCellImageFromParagraph(UniverCell cell)
+        {
+            if (cell.ParagraphContent.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            if (!cell.ParagraphContent.TryGetProperty("drawings", out var drawings) || drawings.ValueKind != JsonValueKind.Object)
+            {
+                return null;
+            }
+
+            foreach (var property in drawings.EnumerateObject())
+            {
+                if (property.Value.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var drawing = property.Value;
+                if (!drawing.TryGetProperty("source", out var sourceElement) || sourceElement.ValueKind != JsonValueKind.String)
+                {
+                    continue;
+                }
+
+                var cellImage = new UniverCellImage
+                {
+                    Source = sourceElement.GetString(),
+                    ImageSourceType = TryGetStringProperty(drawing, "imageSourceType"),
+                    ImageId = TryGetStringProperty(drawing, "imageId"),
+                    Width = TryGetDoubleProperty(drawing, "width"),
+                    Height = TryGetDoubleProperty(drawing, "height"),
+                };
+
+                if ((!cellImage.Width.HasValue || !cellImage.Height.HasValue) && drawing.TryGetProperty("transform", out var transformElement))
+                {
+                    cellImage.Width ??= TryGetDoubleProperty(transformElement, "width");
+                    cellImage.Height ??= TryGetDoubleProperty(transformElement, "height");
+                }
+
+                return cellImage;
+            }
+
+            return null;
+        }
+
+        private static bool TryResolveCellImagePath(UniverWorkbook workbook, UniverCellImage image, out string imagePath)
         {
             imagePath = string.Empty;
 
-            if (TryDecodeSource(image.Source, out var inlineBytes))
-            {
-                imagePath = temporaryFileSession.CreateFile(ResolveImageExtension(image.Source, image.ImageSourceType ?? image.Type), inlineBytes);
-                return true;
-            }
+            var source = ResolveCellImageSource(workbook, image);
 
-            return false;
+            return TryConvertToMigraDocImageSource(source, out imagePath);
         }
 
         private bool TryResolveImageBounds(UniverImageData image, UniverWorksheet worksheet, PageSetup pageSetup, PdfSheetRenderPlan renderPlan, out double leftCm, out double topCm, out double widthCm, out double heightCm)
@@ -211,6 +252,42 @@ namespace EIMSNext.Print.Pdf
             return images;
         }
 
+        private static string? ResolveCellImageSource(UniverWorkbook workbook, UniverCellImage image)
+        {
+            if (LooksLikeInlineImagePayload(image.Source))
+            {
+                return image.Source;
+            }
+
+            if (!string.IsNullOrWhiteSpace(image.ImageId)
+                && TryResolveImageSourceById(workbook, image.ImageId, out var sourceByImageId))
+            {
+                return sourceByImageId;
+            }
+
+            if (!string.IsNullOrWhiteSpace(image.Source)
+                && TryResolveImageSourceById(workbook, image.Source, out var sourceBySourceKey))
+            {
+                return sourceBySourceKey;
+            }
+
+            if (image.ExtraProperties != null)
+            {
+                if (TryGetString(image.ExtraProperties, "imageId", out var extraImageId)
+                    && TryResolveImageSourceById(workbook, extraImageId, out var sourceByExtraImageId))
+                {
+                    return sourceByExtraImageId;
+                }
+
+                if (TryGetString(image.ExtraProperties, "src", out var extraSource) && LooksLikeInlineImagePayload(extraSource))
+                {
+                    return extraSource;
+                }
+            }
+
+            return image.Source;
+        }
+
         private static IEnumerable<UniverImageData> EnumerateDrawingImages(JsonNode node)
         {
             if (node is JsonObject jsonObject)
@@ -277,6 +354,119 @@ namespace EIMSNext.Print.Pdf
             }
         }
 
+        private static bool TryResolveImageSourceById(UniverWorkbook workbook, string imageId, out string source)
+        {
+            source = string.Empty;
+            if (string.IsNullOrWhiteSpace(imageId) || workbook.Resources == null)
+            {
+                return false;
+            }
+
+            foreach (var resource in workbook.Resources)
+            {
+                if (string.IsNullOrWhiteSpace(resource.Data))
+                {
+                    continue;
+                }
+
+                try
+                {
+                    var resourceNode = JsonNode.Parse(resource.Data);
+                    if (resourceNode != null && TryFindImageSource(resourceNode, imageId, out source))
+                    {
+                        return true;
+                    }
+                }
+                catch
+                {
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryFindImageSource(JsonNode node, string imageId, out string source)
+        {
+            source = string.Empty;
+
+            if (node is JsonObject jsonObject)
+            {
+                if (TryGetImageIdAndSource(jsonObject, out var currentImageId, out var currentSource)
+                    && string.Equals(currentImageId, imageId, StringComparison.Ordinal)
+                    && !string.IsNullOrWhiteSpace(currentSource))
+                {
+                    source = currentSource;
+                    return true;
+                }
+
+                foreach (var property in jsonObject)
+                {
+                    if (property.Value != null && TryFindImageSource(property.Value, imageId, out source))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            if (node is JsonArray jsonArray)
+            {
+                foreach (var child in jsonArray)
+                {
+                    if (child != null && TryFindImageSource(child, imageId, out source))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static bool TryGetImageIdAndSource(JsonObject jsonObject, out string imageId, out string source)
+        {
+            imageId = string.Empty;
+            source = string.Empty;
+
+            if (!TryGetString(jsonObject, "imageId", out imageId))
+            {
+                return false;
+            }
+
+            TryGetString(jsonObject, "source", out source);
+            return true;
+        }
+
+        private static bool TryGetString(IReadOnlyDictionary<string, JsonElement> properties, string propertyName, out string value)
+        {
+            value = string.Empty;
+            if (!properties.TryGetValue(propertyName, out var element) || element.ValueKind != JsonValueKind.String)
+            {
+                return false;
+            }
+
+            value = element.GetString() ?? string.Empty;
+            return !string.IsNullOrWhiteSpace(value);
+        }
+
+        private static bool TryGetString(JsonObject jsonObject, string propertyName, out string value)
+        {
+            value = string.Empty;
+            if (!jsonObject.TryGetPropertyValue(propertyName, out var node) || node == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                value = node.GetValue<string>() ?? string.Empty;
+                return !string.IsNullOrWhiteSpace(value);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         private double GetColumnOffsetCm(UniverWorksheet worksheet, int column, double columnOffset, double scaleFactor)
         {
             var pixels = 0d;
@@ -333,14 +523,14 @@ namespace EIMSNext.Print.Pdf
 
             if (worksheet.RowData?.TryGetValue(rowIndex.ToString(), out var rowData) == true)
             {
-                if (rowData.ActualHeight.HasValue && rowData.ActualHeight.Value > 0)
-                {
-                    return rowData.ActualHeight.Value;
-                }
-
                 if (rowData.Height.HasValue && rowData.Height.Value > 0)
                 {
                     return rowData.Height.Value;
+                }
+
+                if (rowData.ActualHeight.HasValue && rowData.ActualHeight.Value > 0)
+                {
+                    return rowData.ActualHeight.Value;
                 }
             }
 
@@ -367,7 +557,7 @@ namespace EIMSNext.Print.Pdf
             return Math.Max(PdfConvertUtil.PixelToCm(GetRowPixels(worksheet, rowIndex), PdfRenderDefaults.DefaultRowHeightCm) * 0.85, 0.2);
         }
 
-        private static bool TryDecodeSource(string? source, out byte[] imageBytes)
+        private static bool TryDecodeImageBytes(string? source, out byte[] imageBytes)
         {
             imageBytes = Array.Empty<byte>();
             if (string.IsNullOrWhiteSpace(source))
@@ -375,15 +565,33 @@ namespace EIMSNext.Print.Pdf
                 return false;
             }
 
-            return TryDecodeResourceData(source, out imageBytes);
-        }
-
-        private static bool TryDecodeResourceData(string data, out byte[] imageBytes)
-        {
-            imageBytes = Array.Empty<byte>();
-            if (string.IsNullOrWhiteSpace(data))
+            var payload = ExtractBase64Payload(source);
+            if (string.IsNullOrWhiteSpace(payload))
             {
                 return false;
+            }
+
+            try
+            {
+                imageBytes = Convert.FromBase64String(payload);
+                if (imageBytes.Length == 0)
+                {
+                    return false;
+                }
+
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static string? ExtractBase64Payload(string data)
+        {
+            if (string.IsNullOrWhiteSpace(data))
+            {
+                return null;
             }
 
             var payload = data.Trim();
@@ -393,15 +601,36 @@ namespace EIMSNext.Print.Pdf
                 payload = payload[(commaIndex + 1)..];
             }
 
-            try
+            if (payload.StartsWith("base64:", StringComparison.OrdinalIgnoreCase))
             {
-                imageBytes = Convert.FromBase64String(payload);
-                return imageBytes.Length > 0;
+                payload = payload["base64:".Length..];
             }
-            catch
+
+            return payload;
+        }
+
+        private static bool TryConvertToMigraDocImageSource(string? source, out string imageSource)
+        {
+            imageSource = string.Empty;
+            if (!TryDecodeImageBytes(source, out var imageBytes))
             {
                 return false;
             }
+
+            imageSource = $"base64:{Convert.ToBase64String(imageBytes)}";
+            return true;
+        }
+
+        private static bool LooksLikeInlineImagePayload(string? source)
+        {
+            if (string.IsNullOrWhiteSpace(source))
+            {
+                return false;
+            }
+
+            var payload = source.Trim();
+            return payload.StartsWith("data:image/", StringComparison.OrdinalIgnoreCase)
+                || payload.StartsWith("base64:", StringComparison.OrdinalIgnoreCase);
         }
 
         private static UniverCellImage? ResolveCellImageFromValue(object? value)
@@ -440,7 +669,7 @@ namespace EIMSNext.Print.Pdf
         private static bool TryDeserializeCellImage(JsonElement element, out UniverCellImage? cellImage)
         {
             cellImage = null;
-            if (!element.TryGetProperty("source", out _))
+            if (!element.TryGetProperty("source", out _) && !element.TryGetProperty("imageId", out _))
             {
                 return false;
             }
@@ -459,25 +688,30 @@ namespace EIMSNext.Print.Pdf
             }
         }
 
-        private static string ResolveImageExtension(string? source, string? imageType)
+        private static string? TryGetStringProperty(JsonElement element, string propertyName)
         {
-            if (!string.IsNullOrWhiteSpace(imageType))
+            if (!element.TryGetProperty(propertyName, out var property) || property.ValueKind != JsonValueKind.String)
             {
-                if (imageType.Contains("png", StringComparison.OrdinalIgnoreCase)) return "png";
-                if (imageType.Contains("jpeg", StringComparison.OrdinalIgnoreCase) || imageType.Contains("jpg", StringComparison.OrdinalIgnoreCase)) return "jpg";
-                if (imageType.Contains("bmp", StringComparison.OrdinalIgnoreCase)) return "bmp";
-                if (imageType.Contains("gif", StringComparison.OrdinalIgnoreCase)) return "gif";
+                return null;
             }
 
-            if (!string.IsNullOrWhiteSpace(source) && source.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
-            {
-                if (source.Contains("image/png", StringComparison.OrdinalIgnoreCase)) return "png";
-                if (source.Contains("image/jpeg", StringComparison.OrdinalIgnoreCase) || source.Contains("image/jpg", StringComparison.OrdinalIgnoreCase)) return "jpg";
-                if (source.Contains("image/bmp", StringComparison.OrdinalIgnoreCase)) return "bmp";
-                if (source.Contains("image/gif", StringComparison.OrdinalIgnoreCase)) return "gif";
-            }
-
-            return "png";
+            return property.GetString();
         }
+
+        private static double? TryGetDoubleProperty(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var property))
+            {
+                return null;
+            }
+
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetDouble(out var numberValue))
+            {
+                return numberValue;
+            }
+
+            return null;
+        }
+
     }
 }

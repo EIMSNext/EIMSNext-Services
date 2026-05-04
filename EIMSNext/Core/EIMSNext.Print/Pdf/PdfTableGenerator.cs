@@ -11,7 +11,6 @@ namespace EIMSNext.Print.Pdf
         private readonly bool _isPreview;
         private readonly PdfRenderOptions _options;
         private readonly PdfStyleResolver _styleResolver;
-        private readonly PdfSheetLayoutCalculator _layoutCalculator;
         private readonly PdfImageRenderer _imageRenderer;
 
         // 类级变量
@@ -19,6 +18,7 @@ namespace EIMSNext.Print.Pdf
         private Table? _table;
         private JsonObject? _data;
         private int _maxCol;
+        private double _scaleFactor = 1.0;
         private Dictionary<(int Row, int Column), (int RowSpan, int ColumnSpan)> _mergeStarts = new();
         private HashSet<(int Row, int Column)> _mergeOccupied = new();
         private Row? _lastGeneratedNormalRow;
@@ -30,8 +30,7 @@ namespace EIMSNext.Print.Pdf
             _options = options;
             _isPreview = isPreview;
             _styleResolver = new PdfStyleResolver(workbook, options);
-            _layoutCalculator = new PdfSheetLayoutCalculator(options);
-            _imageRenderer = new PdfImageRenderer(options, new PdfTemporaryFileSession(options.TemporaryDirectory));
+            _imageRenderer = new PdfImageRenderer(options);
         }
 
         public void Generate(UniverWorksheet worksheet, Table table, JsonObject data, PageSetup pageSetup)
@@ -68,11 +67,11 @@ namespace EIMSNext.Print.Pdf
             }
 
             var availableWidth = GetAvailableWidthCm(pageSetup);
-            var scaleFactor = totalWidth > availableWidth ? availableWidth / totalWidth : 1.0;
+            _scaleFactor = totalWidth > availableWidth ? availableWidth / totalWidth : 1.0;
 
             for (int columnIndex = 0; columnIndex < maxCol; columnIndex++)
             {
-                var columnWidth = GetColumnWidth(_worksheet, columnIndex) * scaleFactor;
+                var columnWidth = GetColumnWidth(_worksheet, columnIndex) * _scaleFactor;
                 _table.AddColumn(Unit.FromCentimeter(columnWidth));
             }
 
@@ -264,7 +263,7 @@ namespace EIMSNext.Print.Pdf
                             ? GetCellValue(templateCell, _data!, new[] { i })
                             : string.Empty;
 
-                        if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, templateCell, rowIndex, columnIndex, 1.0))
+                        if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, templateCell, rowIndex, columnIndex, _scaleFactor))
                         {
                             AddCellParagraph(cell, templateCell, cellValue, keepEmptyParagraph: true, leftIndentCm: 0.1, rowIndex: rowIndex, columnIndex: columnIndex);
                         }
@@ -307,7 +306,7 @@ namespace EIMSNext.Print.Pdf
                     ApplyMergedBoundaryStyles(cell, rowIndex, columnIndex);
                     var cellValue = GetCellValue(univerCell, _data!, Array.Empty<int>());
 
-                    if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, univerCell, rowIndex, columnIndex, 1.0))
+                    if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, univerCell, rowIndex, columnIndex, _scaleFactor))
                     {
                         AddCellParagraph(cell, univerCell, cellValue, keepEmptyParagraph: false, leftIndentCm: 0, rowIndex: rowIndex, columnIndex: columnIndex);
                     }

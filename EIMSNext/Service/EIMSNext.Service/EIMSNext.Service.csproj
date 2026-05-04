@@ -9,8 +9,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
     <ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
