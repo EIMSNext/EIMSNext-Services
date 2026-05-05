@@ -1,4 +1,5 @@
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core;
@@ -14,6 +15,7 @@ namespace EIMSNext.Flow.Service
     public class DfDataProcessor : IDfDataProcessor
     {
         protected IResolver Resolver { get; private set; }
+        protected IServiceContext ServiceContext { get; private set; }
         protected IRepository<Wf_Definition> WfDefinitionRepository { get; private set; }
         protected IFormDataService FormDataService { get; private set; }
         protected IWorkflowHost WorkflowHost { get; private set; }
@@ -22,6 +24,7 @@ namespace EIMSNext.Flow.Service
         public DfDataProcessor(IResolver resolver)
         {
             this.Resolver = resolver;
+            this.ServiceContext = resolver.GetServiceContext();
             this.WfDefinitionRepository = resolver.GetRepository<Wf_Definition>();
             this.FormDataService = resolver.Resolve<IFormDataService>();
             this.WorkflowHost = resolver.Resolve<IWorkflowHost>();
@@ -32,6 +35,8 @@ namespace EIMSNext.Flow.Service
         {
             List<FormData> inserted = new List<FormData>();
             var dataContext = (DfDataContext)inst.Data;
+
+            InitServiceContext(dataContext);
 
             using (var scope = WfDefinitionRepository.NewTransactionScope())
             {
@@ -77,7 +82,7 @@ namespace EIMSNext.Flow.Service
                     var formDef = dataContext.FormDefs[x.FormId];
                     if (formDef.UsingWorkflow)
                     {
-                        var data = new WfDataContext(x.CorpId ?? "", dataContext.UserId, x.AppId, x.FormId, x.Id, x.CreateBy, dataContext.DfCascade, dataContext.EventIds);
+                        var data = new WfDataContext(x.CorpId ?? "", dataContext.UserId, dataContext.AccessToken, x.AppId, x.FormId, x.Id, x.CreateBy, dataContext.DfCascade, dataContext.EventIds);
                         WorkflowHost.StartWorkflow(x.FormId, data.ToExpando());
                     }
                 }
@@ -86,6 +91,14 @@ namespace EIMSNext.Flow.Service
                     Logger.LogError(ex, "Dataflow自动提交表单失败。FormDataId={FormDataId}", x.Id);
                 }
             });
+        }
+
+        private void InitServiceContext(DfDataContext dataContext)
+        {
+            ServiceContext.CorpId = dataContext.CorpId;
+            ServiceContext.UserId = dataContext.UserId;
+            ServiceContext.AccessToken = dataContext.AccessToken;
+            ServiceContext.Operator = dataContext.WfStarter ?? Operator.Empty;
         }
     }
 }

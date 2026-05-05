@@ -43,7 +43,7 @@ namespace EIMSNext.Service
         protected override async Task AfterUpdate(FilterDefinition<DashboardDef> filter, UpdateDefinition<DashboardDef> update, bool upsert, IClientSessionHandle? session)
         {
             await base.AfterUpdate(filter, update, upsert, session);
-            var updated = Context.SessionStore.GetAll<DashboardDef>(Cache.DataVersion.New);
+            var updated = Context.ScopeCache.GetAll<DashboardDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
                 updated = await Collection.Find(filter).ToListAsync();

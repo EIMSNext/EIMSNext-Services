@@ -342,7 +342,7 @@ namespace EIMSNext.Service.Host.Controllers
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
 
-            ServiceContext.SessionStore.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
+            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
 
             //保存原始实体的重要字段
             var originalCorpId = entity.CorpId;
@@ -395,7 +395,7 @@ namespace EIMSNext.Service.Host.Controllers
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
 
-            ServiceContext.SessionStore.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
+            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
 
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 

@@ -8,10 +8,11 @@ namespace EIMSNext.Flow.Core
     public class WfDataContext
     {
         private WfDataContext() { }
-        public WfDataContext(string corpId, string userId, string appId, string formId, string dataId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public WfDataContext(string corpId, string userId, string accessToken, string appId, string formId, string dataId, Operator? starter, CascadeMode cascade, string? eventIds)
         {
             CorpId = corpId;
             UserId = userId;
+            AccessToken = accessToken;
             AppId = appId;
             FormId = formId;
             DataId = dataId;
@@ -25,6 +26,7 @@ namespace EIMSNext.Flow.Core
             var ctx = new WfDataContext();
             ctx.CorpId = expando.GetValue(WfConsts.CorpId, string.Empty);
             ctx.UserId = expando.GetValue(WfConsts.UserId, string.Empty);
+            ctx.AccessToken = expando.GetValue(WfConsts.AccessToken, string.Empty);
             ctx.AppId = expando.GetValue(WfConsts.AppId, string.Empty);
             ctx.FormId = expando.GetValue(WfConsts.FormId, string.Empty);
             ctx.DataId = expando.GetValue(WfConsts.DataId, string.Empty);
@@ -47,6 +49,7 @@ namespace EIMSNext.Flow.Core
 
         public string CorpId { get; private set; } = string.Empty;
         public string UserId { get; private set; } = string.Empty;
+        public string AccessToken { get; private set; } = string.Empty;
         public string AppId { get; private set; } = string.Empty;
         public string FormId { get; private set; } = string.Empty;
         public string DataId { get; private set; } = string.Empty;
@@ -62,6 +65,7 @@ namespace EIMSNext.Flow.Core
             var data = new ExpandoObject();
             data.AddOrUpdate(WfConsts.CorpId, CorpId);
             data.AddOrUpdate(WfConsts.UserId, UserId);
+            data.AddOrUpdate(WfConsts.AccessToken, AccessToken);
             data.AddOrUpdate(WfConsts.AppId, AppId);
             data.AddOrUpdate(WfConsts.FormId, FormId);
             data.AddOrUpdate(WfConsts.DataId, DataId);

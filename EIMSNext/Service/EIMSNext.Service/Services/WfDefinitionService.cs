@@ -93,7 +93,7 @@ namespace EIMSNext.Service
             var exist = Get(entity.Id) ?? throw new InvalidOperationException("流程版本不存在");
 
             entity.Version = exist.Version;
-            if (!exist.Released) //release 不允许往回改
+            if (exist.Released) //release 不允许往回改
                 entity.Released = exist.Released;
 
             var content = metadataParser.Parse(entity);
