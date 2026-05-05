@@ -33,9 +33,13 @@ namespace EIMSNext.Core.Services
                 entity.CreateTime = DateTime.UtcNow.ToTimeStampMs();
                 entity.UpdateTime = entity.CreateTime;
 
-                if (ICorpOwnedType.IsAssignableFrom(typeof(T)))
+                if (!string.IsNullOrEmpty(Context.CorpId) && ICorpOwnedType.IsAssignableFrom(typeof(T)))
                 {
-                    (entity as ICorpOwned)!.CorpId = Context.CorpId;
+                    var ownedEntity = (entity as ICorpOwned)!;
+                    if (string.IsNullOrEmpty(ownedEntity.CorpId))
+                    {
+                        ownedEntity.CorpId = Context.CorpId;
+                    }
                 }
             }
 
