@@ -1,14 +1,12 @@
 using EIMSNext.ApiCore;
 using EIMSNext.Auth.Extensions;
+using EIMSNext.Auth.Host;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Services;
-using EIMSNext.Auth.Host;
 using EIMSNext.Core;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -22,7 +20,6 @@ builder.Host.UseSerilog((ctx, cfg) =>
 // Add services to the container.
 
 builder.Services.AddControllers();
-builder.Services.AddMemoryCache();
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();

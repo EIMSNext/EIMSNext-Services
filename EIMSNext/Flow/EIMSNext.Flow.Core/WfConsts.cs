@@ -12,6 +12,7 @@ namespace EIMSNext.Flow.Core
         public const string AppId = "app_id";
         public const string FormId = "form_id";
         public const string DataId = "data_id";
+        public const string AccessToken = "access_token";
         public const string WfStarter = "wf_starter";
         public const string UserId = "user_id";
         public const string EmpId = "emp_id";

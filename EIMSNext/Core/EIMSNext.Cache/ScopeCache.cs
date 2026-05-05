@@ -1,6 +1,6 @@
-﻿namespace EIMSNext.Cache
+namespace EIMSNext.Cache
 {
-    public class SessionStore : ISessionStore
+    public class ScopeCache : IScopeCache
     {
         protected Dictionary<Type, Dictionary<string, object>> _store = new Dictionary<Type, Dictionary<string, object>>();
 
@@ -20,6 +20,7 @@
                 }
             }
         }
+
         public T? Get<T>(string key, DataVersion version = DataVersion.Temp, Func<string, T?>? getter = null) where T : class
         {
             if (!_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))
@@ -33,16 +34,14 @@
             {
                 return val as T;
             }
-            else
+
+            if (getter != null)
             {
-                if (getter != null)
+                T? value = getter(key);
+                if (value != null)
                 {
-                    T? value = getter(key);
-                    if (value != null)
-                    {
-                        dic.Add(dataKey, value);
-                        return value;
-                    }
+                    dic[dataKey] = value;
+                    return value;
                 }
             }
 
@@ -70,15 +69,9 @@
             }
 
             var dataKey = $"{key}_{version}";
-            if (dic.TryGetValue(dataKey, out object? val))
-            {
-                dic[dataKey] = val;
-            }
-            else
-            {
-                dic.Add(dataKey, value);
-            }
+            dic[dataKey] = value;
         }
+
         public bool Contains<T>(string key, DataVersion version = DataVersion.Temp) where T : class
         {
             if (_store.TryGetValue(typeof(T), out Dictionary<string, object>? dic))

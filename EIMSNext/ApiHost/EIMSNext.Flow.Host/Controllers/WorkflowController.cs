@@ -68,7 +68,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), CascadeMode.All, null);
+                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), CascadeMode.All, null);
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;

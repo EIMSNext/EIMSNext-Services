@@ -88,7 +88,7 @@ namespace EIMSNext.Service
         protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
         {
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
-            var old = SessionStore.Get<FormData>(entity.Id, DataVersion.Old);
+            var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
             var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
             var oriValue = new ExpandoObject();
             changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));

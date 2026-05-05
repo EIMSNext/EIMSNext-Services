@@ -21,11 +21,11 @@ namespace EIMSNext.Service.Contracts
             AccessToken = "";
             CorpId = "";
             UserId = "";
-            SessionStore = resolver.Resolve<ISessionStore>();
+            ScopeCache = resolver.Resolve<IScopeCache>();
         }
 
         private IResolver Resolver { get; set; }
-        public ISessionStore SessionStore { get; private set; }
+        public IScopeCache ScopeCache { get; private set; }
         public Operator? Operator { get; set; }
 
         public IUser? User

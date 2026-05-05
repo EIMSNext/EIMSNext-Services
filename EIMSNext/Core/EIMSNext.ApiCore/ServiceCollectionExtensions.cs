@@ -1,9 +1,4 @@
-﻿using System.Text;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-
-using EIMSNext.Cache;
+﻿using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
 using EIMSNext.Json.Serialization;
@@ -20,7 +15,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
-using ISessionStore = EIMSNext.Cache.ISessionStore;
+using System.Text;
+using System.Text.Encodings.Web;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using IScopeCache = EIMSNext.Cache.IScopeCache;
 
 namespace EIMSNext.ApiCore
 {
@@ -93,6 +92,7 @@ namespace EIMSNext.ApiCore
         }
         public static void AddCustomCache(this IServiceCollection services, IConfiguration configuration)
         {
+            services.AddMemoryCache();
             services.AddStackExchangeRedisCache(options =>
             {
                 //Redis实例名
@@ -108,8 +108,9 @@ namespace EIMSNext.ApiCore
                 options.ConfigurationOptions.EndPoints.Add(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
             });
 
-            services.AddSingleton<ICacheClient, DistributedCacheClient>();
-            services.AddScoped<ISessionStore, SessionStore>();
+            //services.AddSingleton<ICacheClient, DistributedCacheClient>();
+            services.AddSingleton<ICacheClient, FakeCacheClient>();
+            services.AddScoped<IScopeCache, ScopeCache>();
         }
 
         public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)

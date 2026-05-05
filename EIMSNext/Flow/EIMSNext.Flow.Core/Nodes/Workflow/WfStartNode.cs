@@ -28,7 +28,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 AddApprovalLog(context.Workflow, new Wf_Todo(), dataContext, Metadata!, approveData, scope.SessionHandle);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(new DfRunParamter(dataContext.UserId ?? "", formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
+                await RunDataflow(new DfRunParamter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
 
                 scope.CommitTransaction();
             }

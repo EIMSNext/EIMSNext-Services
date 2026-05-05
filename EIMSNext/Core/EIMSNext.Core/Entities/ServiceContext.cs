@@ -12,7 +12,7 @@ namespace EIMSNext.Core.Entities
         public IEmployee? Employee { get; set; }
         public string? ClientIp { get; set; }
         public DataAction Action { get; set; }
-        ISessionStore SessionStore { get; }
+        IScopeCache ScopeCache { get; }
     }
 
     public sealed class Operator
