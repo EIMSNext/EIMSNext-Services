@@ -1,6 +1,6 @@
-﻿namespace EIMSNext.Cache
+namespace EIMSNext.Cache
 {
-    public interface ISessionStore
+    public interface IScopeCache
     {
         IEnumerable<T> GetAll<T>(DataVersion version = DataVersion.Temp) where T : class;
         T? Get<T>(string key, DataVersion version = DataVersion.Temp, Func<string, T?>? getter = null) where T : class;
@@ -8,6 +8,7 @@
         void Remove<T>(string key, DataVersion version = DataVersion.Temp) where T : class;
         bool Contains<T>(string key, DataVersion version = DataVersion.Temp) where T : class;
     }
+
     public enum DataVersion
     {
         Temp,

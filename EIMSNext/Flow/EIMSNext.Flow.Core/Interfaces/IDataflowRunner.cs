@@ -13,9 +13,10 @@ namespace EIMSNext.Flow.Core.Interfaces
 
     public class DfRunParamter
     {
-        public DfRunParamter(string userId, FormData data, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public DfRunParamter(string userId, string accessToken, FormData data, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, CascadeMode cascade, string? eventIds)
         {
             UserId = userId;
+            AccessToken = accessToken;
             Data = data;
             EventSource = eventSource;
             EventType = eventType;
@@ -26,6 +27,7 @@ namespace EIMSNext.Flow.Core.Interfaces
         }
 
         public string UserId { get; private set; }
+        public string AccessToken { get; private set; }
         public FormData Data { get; private set; }
         public EventSourceType EventSource { get; private set; }
         public EventType EventType { get; private set; }

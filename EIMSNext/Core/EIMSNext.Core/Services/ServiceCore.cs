@@ -35,7 +35,7 @@ namespace EIMSNext.Core.Services
             CacheClient = resolver.GetCacheClient();
             Logger = resolver.GetLogger<T>();
             Context = resolver.GetServiceContext();
-            SessionStore = resolver.Resolve<ISessionStore>();
+            ScopeCache = resolver.Resolve<IScopeCache>();
         }
 
         #region Properties
@@ -46,7 +46,7 @@ namespace EIMSNext.Core.Services
         protected ICacheClient CacheClient { get; private set; }
         protected ILogger<T> Logger { get; private set; }
         protected IServiceContext Context { get; private set; }
-        protected ISessionStore SessionStore { get; private set; }
+        protected IScopeCache ScopeCache { get; private set; }
         protected virtual bool LogicDelete => true;
         protected virtual bool LogAudit => true;
 
@@ -182,7 +182,7 @@ namespace EIMSNext.Core.Services
         }
         protected virtual S? GetFromStore<S>(string key, DataVersion version = DataVersion.Temp) where S : class, IMongoEntity
         {
-            return SessionStore.Get<S>(key, version, id => Resolver.GetRepository<S>().Get(id));
+            return ScopeCache.Get<S>(key, version, id => Resolver.GetRepository<S>().Get(id));
         }
 
         #region Methods
@@ -237,7 +237,7 @@ namespace EIMSNext.Core.Services
             FillSystemField(entity, true);
             BeforeReplace(entity, session).Wait();
             var result = Repository.Replace(entity, session);
-            var old = SessionStore.Get<T>(entity.Id, DataVersion.Old);
+            var old = ScopeCache.Get<T>(entity.Id, DataVersion.Old);
             CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             AfterReplace(entity, session).Wait();
             return result;
@@ -381,7 +381,7 @@ namespace EIMSNext.Core.Services
             FillSystemField(entity, true);
             await BeforeReplace(entity, session);
             var result = await Repository.ReplaceAsync(entity, session);
-            var old = SessionStore.Get<T>(entity.Id, DataVersion.Old);
+            var old = ScopeCache.Get<T>(entity.Id, DataVersion.Old);
             CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             await AfterReplace(entity, session);
             return result;

@@ -288,7 +288,7 @@ namespace EIMSNext.Service.Host.OData
             T? entity = await ApiService.GetAsync(key);
             if (entity == null) return NotFound();
 
-            ServiceContext.SessionStore.Set<T>(entity.Id, entity.DeepClone());
+            ServiceContext.ScopeCache.Set<T>(entity.Id, entity.DeepClone());
 
             R model = entity.CastTo<T, R>();
 

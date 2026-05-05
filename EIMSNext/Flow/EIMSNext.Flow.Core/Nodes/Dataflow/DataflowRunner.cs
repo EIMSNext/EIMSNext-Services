@@ -67,6 +67,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 {
                     CorpId = paramter.Data.CorpId ?? "",
                     UserId = paramter.UserId,
+                    AccessToken = paramter.AccessToken,
                     AppId = paramter.Data.AppId,
                     FormId = paramter.Data.FormId,
                     DataId = paramter.Data.Id,
