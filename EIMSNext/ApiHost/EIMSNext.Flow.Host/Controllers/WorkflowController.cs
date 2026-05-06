@@ -172,13 +172,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 }
             }
 
-            var formData = _formDataservice.Get(request.DataId);
-            if (formData == null)
-            {
-                return NotFound("数据不存在");
-            }
-
-            var formDef = Resolver.GetRepository<FormDef>().Get(formData.FormId);
+            var formDef = Resolver.GetRepository<FormDef>().Get(todo.FormId);
             var result = await _workflowActionService.WithdrawAsync(
                 new WorkflowActionDataContext
                 {
@@ -188,8 +182,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 },
                 wfInst,
                 todo,
-                formData,
-                formDef,
+                formDef?.Name ?? string.Empty,
                 request.Comment);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();

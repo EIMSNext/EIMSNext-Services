@@ -26,7 +26,7 @@ namespace EIMSNext.Flow.Core
             _definitionService = resolver.Resolve<IWfDefinitionService>();
         }
 
-        public async Task<WorkflowActionResult> WithdrawAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, FormData formData, FormDef? formDef, string comment)
+        public async Task<WorkflowActionResult> WithdrawAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string formName, string comment)
         {
             var definition = GetWorkflowDefinition(workflowInstance);
             var todoRepo = _resolver.GetRepository<Wf_Todo>();
@@ -57,10 +57,10 @@ namespace EIMSNext.Flow.Core
                 approvalLogRepo.Insert(new Wf_ApprovalLog
                 {
                     CorpId = context.CorpId,
-                    AppId = formData.AppId,
-                    FormId = formData.FormId,
-                    DataId = formData.Id,
-                    FormName = formDef?.Name ?? string.Empty,
+                    AppId = todo.AppId,
+                    FormId = todo.FormId,
+                    DataId = todo.DataId,
+                    FormName = formName,
                     WfVersion = workflowInstance.Version,
                     NodeId = todo?.ApproveNodeId ?? string.Empty,
                     NodeName = todo?.ApproveNodeName ?? "发起节点",

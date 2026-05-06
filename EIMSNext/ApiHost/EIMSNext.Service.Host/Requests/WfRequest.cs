@@ -37,17 +37,20 @@ namespace EIMSNext.Service.Host.Requests
 
     public class WfWithdrawRequest
     {
+        public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public string Comment { get; set; } = string.Empty;
     }
 
     public class WfUrgeRequest
     {
+        public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
     }
 
     public class WfActionStatusRequest
     {
+        public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
     }
 }

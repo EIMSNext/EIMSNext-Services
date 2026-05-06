@@ -2,6 +2,7 @@ using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiService;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Requests;
@@ -120,6 +121,7 @@ namespace EIMSNext.Service.Host.Controllers
             var flowClient = Resolver.Resolve<FlowApiClient>();
             var resp = await flowClient.Withdraw(new WithdrawRequest
             {
+                WfInstanceId = request.WfInstanceId,
                 DataId = data.Id,
                 Comment = request.Comment,
             }, IdentityContext.AccessToken);
@@ -146,6 +148,7 @@ namespace EIMSNext.Service.Host.Controllers
             var flowClient = Resolver.Resolve<FlowApiClient>();
             var resp = await flowClient.Urge(new UrgeRequest
             {
+                WfInstanceId = request.WfInstanceId,
                 DataId = data.Id,
             }, IdentityContext.AccessToken);
 
@@ -167,11 +170,12 @@ namespace EIMSNext.Service.Host.Controllers
             var flowClient = Resolver.Resolve<FlowApiClient>();
             var resp = await flowClient.ActionStatus(new ActionStatusRequest
             {
+                WfInstanceId = request.WfInstanceId,
                 DataId = data.Id,
             }, IdentityContext.AccessToken);
 
             if (resp != null && string.IsNullOrEmpty(resp.Error))
-                return Ok(resp.Value);
+                return Ok(resp);
 
             return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
         }

@@ -64,7 +64,6 @@
         public bool CanWithdraw { get; set; }
         public bool CanUrge { get; set; }
         public string? Error { get; set; }
-        public object? Value => new { canWithdraw = CanWithdraw, canUrge = CanUrge };
     }
     public class DfRunRequest
     {
