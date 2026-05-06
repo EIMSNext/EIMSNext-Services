@@ -5,6 +5,9 @@
         Task<WfResponse?> Load(LoadDefRequest req, string accessToken);
         Task<WfResponse?> Start(StartRequest req, string accessToken);
         Task<WfResponse?> Approve(ApproveRequest req, string accessToken);
+        Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken);
+        Task<WfResponse?> Urge(UrgeRequest req, string accessToken);
+        Task<WfActionStatusResponse?> ActionStatus(ActionStatusRequest req, string accessToken);
         Task<WfResponse?> Status(StatusRequest req, string accessToken);
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
         Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken);
@@ -35,10 +38,33 @@
         public string Comment { get; set; } = string.Empty;
         public string Signature { get; set; } = string.Empty;
     }
+    public class WithdrawRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
     public class StatusRequest
     {
         public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
+    }
+    public class UrgeRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+    }
+    public class ActionStatusRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+    }
+    public class WfActionStatusResponse
+    {
+        public bool CanWithdraw { get; set; }
+        public bool CanUrge { get; set; }
+        public string? Error { get; set; }
+        public object? Value => new { canWithdraw = CanWithdraw, canUrge = CanUrge };
     }
     public class DfRunRequest
     {
@@ -83,7 +109,10 @@
         Reject,
         Return,
         AddSignPre,
-        AddSignAfter
+        AddSignAfter,
+        AutoApprove,
+        CopyTo,
+        Withdraw
     }
     public enum CascadeMode
     {

@@ -17,17 +17,24 @@ namespace EIMSNext.Component
             var meta = def.Metadata;
             meta.Id = def.ExternalId;
             meta.Version = def.Version;
-            meta.Steps = ParseSteps(def.CorpId!, eventSetting, def.FlowType, def.Content);
+            var flowData = def.Content.DeserializeFromJson<FlowData>()!;
+            meta.WorkflowSetting = new WorkflowSetting
+            {
+                Description = flowData.WorkflowMeta?.Description,
+                AllowUrge = flowData.WorkflowMeta?.AllowUrge ?? false,
+                NotifyChannels = flowData.WorkflowMeta?.NotifyChannels ?? NotifyChannel.None,
+                AutoProcessRule = flowData.WorkflowMeta?.AutoProcessRule ?? WorkflowAutoProcessRule.Disabled,
+                WithdrawRule = flowData.WorkflowMeta?.WithdrawRule ?? WorkflowWithdrawRule.Disabled,
+            };
+            meta.Steps = ParseSteps(def.CorpId!, eventSetting, def.FlowType, flowData);
 
             return (meta, eventSetting);
         }
 
-        private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, string content)
+        private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, FlowData flowData)
         {
             var steps = new List<WfStep>() { };
             var otherformIds = new List<string>();
-
-            var flowData = content.DeserializeFromJson<FlowData>()!;
 
             ParseFlowNode(corpId, steps, flowType, flowData.StartNode, flowData.EndNode.Id, otherformIds);
             flowData.Nodes.ForEach(node => { ParseFlowNode(corpId, steps, flowType, node, flowData.EndNode.Id, otherformIds); });
@@ -485,8 +492,17 @@ namespace EIMSNext.Component
             public FlowNodeData StartNode { get; set; } = new FlowNodeData();
             public List<FlowNodeData> Nodes { get; set; } = new List<FlowNodeData>();
             public FlowNodeData EndNode { get; set; } = new FlowNodeData();
+            public WorkflowMeta? WorkflowMeta { get; set; }
             public CascadeMode DfCascade { get; set; }
             public List<string>? EventIds { get; set; }
+        }
+        private class WorkflowMeta
+        {
+            public string? Description { get; set; }
+            public bool? AllowUrge { get; set; }
+            public NotifyChannel NotifyChannels { get; set; }
+            public WorkflowAutoProcessRule? AutoProcessRule { get; set; }
+            public WorkflowWithdrawRule? WithdrawRule { get; set; }
         }
         private class FlowNodeData
         {

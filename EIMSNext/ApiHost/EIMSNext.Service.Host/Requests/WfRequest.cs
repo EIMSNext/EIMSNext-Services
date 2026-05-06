@@ -34,4 +34,20 @@ namespace EIMSNext.Service.Host.Requests
         /// </summary>
         public string Signature { get; set; } = string.Empty;
     }
+
+    public class WfWithdrawRequest
+    {
+        public string DataId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    public class WfUrgeRequest
+    {
+        public string DataId { get; set; } = string.Empty;
+    }
+
+    public class WfActionStatusRequest
+    {
+        public string DataId { get; set; } = string.Empty;
+    }
 }

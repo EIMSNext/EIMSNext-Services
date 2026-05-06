@@ -1,8 +1,11 @@
 using Asp.Versioning;
 
+using System.Dynamic;
+
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Entities;
@@ -31,6 +34,7 @@ namespace EIMSNext.Flow.Host.Controllers
         private readonly IFormDataService _formDataservice;
         private readonly IWfExecLogService _execlogservice;
         private readonly IWfTodoService _todoservice;
+        private readonly IWorkflowActionService _workflowActionService;
         private readonly IMongoPersistenceProvider _store;
 
         public WorkflowController(IResolver resolver) : base(resolver)
@@ -42,6 +46,7 @@ namespace EIMSNext.Flow.Host.Controllers
             _formDataservice = resolver.Resolve<IFormDataService>();
             _execlogservice = resolver.Resolve<IWfExecLogService>();
             _todoservice = resolver.Resolve<IWfTodoService>();
+            _workflowActionService = resolver.Resolve<IWorkflowActionService>();
             _store = (IMongoPersistenceProvider)_wfHost.PersistenceStore;
         }
 
@@ -73,8 +78,19 @@ namespace EIMSNext.Flow.Host.Controllers
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
 
-                var wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando(), request.DataId);
-                var errMsg = WaitForComplete(wfinstId);
+                var existingInstance = ResolveReusableWorkflowInstance(request.DataId);
+                string wfinstId;
+                string errMsg;
+                if (existingInstance != null)
+                {
+                    wfinstId = existingInstance.Id;
+                    errMsg = await RestartWorkflowInstanceAsync(existingInstance, data);
+                }
+                else
+                {
+                    wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando(), request.DataId);
+                    errMsg = WaitForComplete(wfinstId);
+                }
 
                 if (!string.IsNullOrEmpty(errMsg))
                     return ApiResult.Fail(-1, errMsg, new { id = wfinstId }).ToActionResult();
@@ -95,11 +111,16 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var workerId = IdentityContext.CurrentEmployee.Id;
-            var todo = _todoservice.Find(x => x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId && x.EmployeeId == workerId).FirstOrDefault();
+            var todo = _todoservice.Find(x => x.DataId == request.DataId && x.EmployeeId == workerId)
+                .ToList()
+                .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
             if (todo == null)
             {
                 return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
             }
+
+            request.WfNodeId = todo.ApproveNodeId;
+            request.WfInstanceId = string.IsNullOrEmpty(request.WfInstanceId) ? todo.WfInstanceId : request.WfInstanceId;
 
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
@@ -113,6 +134,130 @@ namespace EIMSNext.Flow.Host.Controllers
                 return ApiResult.Fail(-1, errMsg, new { id = request.WfInstanceId }).ToActionResult();
 
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
+        }
+
+        [HttpPost, Route("Withdraw")]
+        public async Task<IActionResult> WithdrawAsync(WithdrawRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("发起人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可撤回");
+            }
+
+            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            {
+                return BadRequest("仅流程发起人可撤回");
+            }
+
+            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            var withdrawRule = definition?.Metadata?.WorkflowSetting?.WithdrawRule ?? WorkflowWithdrawRule.Disabled;
+            if (withdrawRule == WorkflowWithdrawRule.Disabled)
+            {
+                return BadRequest("当前流程不允许撤回");
+            }
+
+            if (withdrawRule == WorkflowWithdrawRule.StarterOnly)
+            {
+                var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
+                if (!string.IsNullOrWhiteSpace(firstApproveNodeId) && todo?.ApproveNodeId != firstApproveNodeId)
+                {
+                    return BadRequest("当前节点不允许撤回");
+                }
+            }
+
+            var formData = _formDataservice.Get(request.DataId);
+            if (formData == null)
+            {
+                return NotFound("数据不存在");
+            }
+
+            var formDef = Resolver.GetRepository<FormDef>().Get(formData.FormId);
+            var result = await _workflowActionService.WithdrawAsync(
+                new WorkflowActionDataContext
+                {
+                    CorpId = IdentityContext.CurrentCorpId,
+                    CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                    CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+                },
+                wfInst,
+                todo,
+                formData,
+                formDef,
+                request.Comment);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
+        [HttpPost, Route("Urge")]
+        public async Task<IActionResult> UrgeAsync(UrgeRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("发起人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可催办");
+            }
+
+            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            {
+                return BadRequest("仅流程发起人可催办");
+            }
+
+            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            if (definition?.Metadata?.WorkflowSetting?.AllowUrge != true)
+            {
+                return BadRequest("当前流程不允许催办");
+            }
+
+            var result = await _workflowActionService.UrgeAsync(
+                new WorkflowActionDataContext
+                {
+                    CorpId = IdentityContext.CurrentCorpId,
+                    CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                    CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+                },
+                wfInst,
+                todo,
+                request.DataId);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
+        [HttpGet, Route("ActionStatus")]
+        public IActionResult GetActionStatus([FromQuery] ActionStatusRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("发起人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return Ok(new WorkflowActionStatusResponse());
+            }
+
+            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            var status = _workflowActionService.GetActionStatus(IdentityContext.CurrentEmployee.Id, todo, definition);
+
+            return Ok(new WorkflowActionStatusResponse
+            {
+                CanUrge = status.CanUrge,
+                CanWithdraw = status.CanWithdraw
+            });
         }
 
         [HttpPost, Route("Terminate")]
@@ -175,6 +320,51 @@ namespace EIMSNext.Flow.Host.Controllers
 
             return execLog.ErrMsg;
         }
+
+        private WorkflowInstance? ResolveWorkflowInstance(string? wfInstanceId, string dataId)
+        {
+            if (!string.IsNullOrEmpty(wfInstanceId))
+            {
+                return _store.GetWorkflowInstances().FirstOrDefault(x => x.Id == wfInstanceId && x.Status == WorkflowStatus.Runnable);
+            }
+
+            return _store.GetWorkflowInstances().FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
+        }
+
+        private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)
+        {
+            return _store.GetWorkflowInstances()
+                .Where(x => x.Reference == dataId && x.Status == WorkflowStatus.Suspended)
+                .OrderByDescending(x => x.CreateTime)
+                .FirstOrDefault();
+        }
+
+        private async Task<string> RestartWorkflowInstanceAsync(WorkflowInstance wfInst, WfDataContext data)
+        {
+            var existingData = WfDataContext.FromExpando((ExpandoObject)wfInst.Data);
+            var restartData = new WfDataContext(
+                data.CorpId,
+                data.UserId,
+                data.AccessToken,
+                data.AppId,
+                data.FormId,
+                data.DataId,
+                data.WfStarter,
+                data.DfCascade,
+                data.EventIds)
+            {
+                Round = existingData.Round
+            };
+
+            wfInst.Data = restartData.ToExpando();
+            wfInst.Status = WorkflowStatus.Runnable;
+            wfInst.NextExecution = 0;
+            wfInst.CompleteTime = null;
+
+            await _store.PersistWorkflow(wfInst);
+            return WaitForComplete(wfInst.Id);
+        }
+
 
         [HttpPost, Route("Definition/Delete")]
         public IActionResult DeleteDef(DeleteRequest request)
@@ -285,6 +475,31 @@ namespace EIMSNext.Flow.Host.Controllers
         public ApproveAction Action { get; set; }
         public string Comment { get; set; } = string.Empty;
         public string Signature { get; set; } = string.Empty;
+    }
+
+    public class WithdrawRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    public class UrgeRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+    }
+
+    public class ActionStatusRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+    }
+
+    public class WorkflowActionStatusResponse
+    {
+        public bool CanWithdraw { get; set; }
+        public bool CanUrge { get; set; }
     }
 
     public class TerminateRequest

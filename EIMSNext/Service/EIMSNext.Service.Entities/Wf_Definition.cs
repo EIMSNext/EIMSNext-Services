@@ -99,6 +99,33 @@ namespace EIMSNext.Service.Entities
         /// 工作流步骤列表
         /// </summary>
         public List<WfStep> Steps { get; set; } = new List<WfStep>();
+        /// <summary>
+        /// 流程级配置
+        /// </summary>
+        public WorkflowSetting WorkflowSetting { get; set; } = new WorkflowSetting();
+    }
+
+    public class WorkflowSetting
+    {
+        public string? Description { get; set; }
+        public bool AllowUrge { get; set; }
+        public NotifyChannel NotifyChannels { get; set; } = NotifyChannel.None;
+        public WorkflowAutoProcessRule AutoProcessRule { get; set; } = WorkflowAutoProcessRule.Disabled;
+        public WorkflowWithdrawRule WithdrawRule { get; set; } = WorkflowWithdrawRule.Disabled;
+    }
+
+    public enum WorkflowAutoProcessRule
+    {
+        Disabled = 0,
+        FirstNodeOnly = 1,
+        ContinuousApproval = 2,
+    }
+
+    public enum WorkflowWithdrawRule
+    {
+        Disabled = 0,
+        StarterOnly = 1,
+        AllNodes = 2,
     }
 
     /// <summary>
@@ -988,6 +1015,10 @@ namespace EIMSNext.Service.Entities
         /// 抄送
         /// </summary>
         CopyTo = 7,
+        /// <summary>
+        /// 撤回
+        /// </summary>
+        Withdraw = 8,
 
     }
 }

@@ -31,6 +31,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 MessageType.FormNotify => HandleFormNotifyAsync(args, ct, resolver),
                 MessageType.WfTodoNotify => HandleWfTodoNotifyAsync(args, ct, resolver),
                 MessageType.WfExpireNotify => HandleWfExpireNotifyAsync(args, ct, resolver),
+                MessageType.WfUrgeNotify => HandleWfUrgeNotifyAsync(args, ct, resolver),
                 _ => Task.CompletedTask
             };
         }
@@ -106,6 +107,11 @@ namespace EIMSNext.Async.Tasks.Consumers
             var channels = step?.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
             if (channels == NotifyChannel.None)
             {
+                var definition = GetWorkflowDefinition(resolver, sample.WfInstanceId);
+                channels = definition?.Metadata?.WorkflowSetting?.NotifyChannels ?? NotifyChannel.None;
+            }
+            if (channels == NotifyChannel.None)
+            {
                 return;
             }
 
@@ -179,6 +185,44 @@ namespace EIMSNext.Async.Tasks.Consumers
             await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct);
         }
 
+        private static async Task HandleWfUrgeNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
+        {
+            if (string.IsNullOrWhiteSpace(args.WfInstanceId))
+            {
+                return;
+            }
+
+            var todoRepo = resolver.GetRepository<Wf_Todo>();
+            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId).ToList();
+            if (todos.Count == 0)
+            {
+                return;
+            }
+
+            var sample = todos[0];
+            var definition = GetWorkflowDefinition(resolver, sample.WfInstanceId);
+            var channels = definition?.Metadata?.WorkflowSetting?.NotifyChannels ?? NotifyChannel.System;
+            if (channels == NotifyChannel.None)
+            {
+                channels = NotifyChannel.System;
+            }
+
+            var receivers = await ResolveTodoReceiversAsync(resolver, todos.Select(x => x.EmployeeId));
+            if (receivers.Count == 0)
+            {
+                return;
+            }
+
+            var title = $"流程发起人催办：{sample.ApproveNodeName}";
+            var detail = BuildTodoDetail(sample);
+            var url = $"/workflow/todo/{sample.DataId}";
+            var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:urge";
+            var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
+            var publisher = resolver.Resolve<IMessagePublisher>();
+
+            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+        }
+
         private static async Task PublishToChannelsAsync(IMessagePublisher publisher, string corpId, string notifyId, string title, string detail, string url, long expireTime, MessageCategory category, NotifyChannel channels, List<NotifyReceiver> receivers, MessageType messageType, CancellationToken ct)
         {
             if (channels.HasFlag(NotifyChannel.System))
@@ -234,6 +278,13 @@ namespace EIMSNext.Async.Tasks.Consumers
 
         private static WfStep? GetWorkflowStep(IResolver resolver, string wfInstanceId, string approveNodeId)
         {
+            var definition = GetWorkflowDefinition(resolver, wfInstanceId);
+
+            return definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == approveNodeId);
+        }
+
+        private static Wf_Definition? GetWorkflowDefinition(IResolver resolver, string wfInstanceId)
+        {
             var raw = resolver.Resolve<IMongoDbContex>().Database.GetCollection<BsonDocument>("Wf_WorkflowInstance")
                 .Find(Builders<BsonDocument>.Filter.Eq("Id", wfInstanceId))
                 .FirstOrDefault();
@@ -251,11 +302,9 @@ namespace EIMSNext.Async.Tasks.Consumers
             var workflowDefinitionId = workflowDefinitionIdValue.AsString;
             var version = versionValue.ToInt32();
 
-            var definition = resolver.GetRepository<Wf_Definition>()
+            return resolver.GetRepository<Wf_Definition>()
                 .Find(x => x.ExternalId == workflowDefinitionId && x.Version == version)
                 .FirstOrDefault();
-
-            return definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == approveNodeId);
         }
 
         private static string BuildTodoDetail(Wf_Todo todo)

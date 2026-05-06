@@ -107,5 +107,73 @@ namespace EIMSNext.Service.Host.Controllers
                 return Error(-1, "审批流程失败：数据不存在");
             }
         }
+
+        [HttpPost("Withdraw")]
+        public async Task<IActionResult> Withdraw(WfWithdrawRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "撤回流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.Withdraw(new WithdrawRequest
+            {
+                DataId = data.Id,
+                Comment = request.Comment,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                data.FlowStatus = FlowStatus.Draft;
+                await ApiService.ReplaceAsync(data, DataAction.Save);
+                return Ok(resp);
+            }
+
+            return Error(-1, $"撤回流程失败：{resp?.Error}");
+        }
+
+        [HttpPost("Urge")]
+        public async Task<IActionResult> Urge(WfUrgeRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "催办流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.Urge(new UrgeRequest
+            {
+                DataId = data.Id,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+                return Ok(resp);
+
+            return Error(-1, $"催办流程失败：{resp?.Error}");
+        }
+
+        [HttpGet("ActionStatus")]
+        public async Task<IActionResult> ActionStatus([FromQuery] WfActionStatusRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "获取流程操作状态失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.ActionStatus(new ActionStatusRequest
+            {
+                DataId = data.Id,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+                return Ok(resp.Value);
+
+            return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
+        }
     }
 }

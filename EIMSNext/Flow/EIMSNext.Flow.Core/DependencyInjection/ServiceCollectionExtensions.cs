@@ -23,6 +23,7 @@ namespace EIMSNext.Flow.Core
 
             services.AddSingleton<IExpressionEvaluator, ExpressionEvaluator>();
 
+            services.AddTransient<IWorkflowActionService, WorkflowActionService>();
             services.AddTransient<IDataflowRunner, DataflowRunner>();
 
             services.AddTransient<WfStartNode>();

@@ -143,6 +143,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         WfExpireNotify,
         /// <summary>
+        /// 待办催办提醒
+        /// </summary>
+        WfUrgeNotify,
+        /// <summary>
         /// 导出提醒
         /// </summary>
         ExportNotify
