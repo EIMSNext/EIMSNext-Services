@@ -109,6 +109,101 @@ namespace EIMSNext.Service.Host.Controllers
             }
         }
 
+        [HttpPost("Submit")]
+        public async Task<IActionResult> Submit(WfApproveRequest request)
+        {
+            request.Action = EIMSNext.ApiClient.Flow.ApproveAction.Approve;
+            return await Approve(request);
+        }
+
+        [HttpPost("Reject")]
+        public async Task<IActionResult> Reject(WfApproveRequest request)
+        {
+            request.Action = EIMSNext.ApiClient.Flow.ApproveAction.Reject;
+            return await Approve(request);
+        }
+
+        [HttpPost("Return")]
+        public async Task<IActionResult> Return(WfReturnRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "回退流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.Return(new ReturnRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+                WfNodeId = request.WfNodeId,
+                TargetNodeId = request.TargetNodeId,
+                Comment = request.Comment,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                return Ok(resp);
+            }
+
+            return Error(-1, $"回退流程失败：{resp?.Error}");
+        }
+
+        [HttpPost("AddSign")]
+        public async Task<IActionResult> AddSign(WfAddSignRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "加签流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.AddSign(new AddSignRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+                WfNodeId = request.WfNodeId,
+                TargetEmployeeId = request.TargetEmployeeId,
+                Comment = request.Comment,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                return Ok(resp);
+            }
+
+            return Error(-1, $"加签流程失败：{resp?.Error}");
+        }
+
+        [HttpPost("Transfer")]
+        public async Task<IActionResult> Transfer(WfTransferRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "转交流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.Transfer(new TransferRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+                WfNodeId = request.WfNodeId,
+                TargetEmployeeId = request.TargetEmployeeId,
+                Comment = request.Comment,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                return Ok(resp);
+            }
+
+            return Error(-1, $"转交流程失败：{resp?.Error}");
+        }
+
         [HttpPost("Withdraw")]
         public async Task<IActionResult> Withdraw(WfWithdrawRequest request)
         {
@@ -178,6 +273,25 @@ namespace EIMSNext.Service.Host.Controllers
                 return Ok(resp);
 
             return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
+        }
+
+        [HttpGet("ReturnTargets")]
+        public async Task<IActionResult> ReturnTargets([FromQuery] WfActionStatusRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "获取回退节点失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.ReturnTargets(new ActionStatusRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+            }, IdentityContext.AccessToken);
+
+            return Ok(resp ?? []);
         }
     }
 }

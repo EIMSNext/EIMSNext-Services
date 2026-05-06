@@ -1,6 +1,7 @@
 using Asp.Versioning;
 
 using System.Dynamic;
+using System.Linq;
 
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
@@ -136,6 +137,110 @@ namespace EIMSNext.Flow.Host.Controllers
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
         }
 
+        [HttpPost, Route("Submit")]
+        public Task<IActionResult> SubmitAsync(ApproveRequest request)
+        {
+            request.Action = ApproveAction.Approve;
+            return ApproveAsync(request);
+        }
+
+        [HttpPost, Route("Reject")]
+        public Task<IActionResult> RejectAsync(ApproveRequest request)
+        {
+            request.Action = ApproveAction.Reject;
+            return ApproveAsync(request);
+        }
+
+        [HttpPost, Route("Transfer")]
+        public async Task<IActionResult> TransferAsync(TransferRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可转交");
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
+            if (todo == null)
+            {
+                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
+            }
+
+            var result = await _workflowActionService.TransferAsync(new WorkflowActionDataContext
+            {
+                CorpId = IdentityContext.CurrentCorpId,
+                CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
+        [HttpPost, Route("AddSign")]
+        public async Task<IActionResult> AddSignAsync(AddSignRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可加签");
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
+            if (todo == null)
+            {
+                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
+            }
+
+            var result = await _workflowActionService.AddSignAsync(new WorkflowActionDataContext
+            {
+                CorpId = IdentityContext.CurrentCorpId,
+                CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
+        [HttpPost, Route("Return")]
+        public async Task<IActionResult> ReturnAsync(ReturnRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可回退");
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
+            if (todo == null)
+            {
+                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
+            }
+
+            var result = await _workflowActionService.ReturnAsync(new WorkflowActionDataContext
+            {
+                CorpId = IdentityContext.CurrentCorpId,
+                CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+            }, wfInst, todo, request.TargetNodeId, request.Comment);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
         [HttpPost, Route("Withdraw")]
         public async Task<IActionResult> WithdrawAsync(WithdrawRequest request)
         {
@@ -253,6 +358,41 @@ namespace EIMSNext.Flow.Host.Controllers
             });
         }
 
+        [HttpGet, Route("ReturnTargets")]
+        public async Task<IActionResult> ReturnTargetsAsync([FromQuery] ActionStatusRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return Ok(new List<ReturnTargetNode>());
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, string.Empty);
+            if (todo == null)
+            {
+                return Ok(new List<ReturnTargetNode>());
+            }
+
+            var targets = await _workflowActionService.GetReturnTargetsAsync(new WorkflowActionDataContext
+            {
+                CorpId = IdentityContext.CurrentCorpId,
+                CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+            }, wfInst, todo);
+
+            return Ok(targets.Select(x => new ReturnTargetNode
+            {
+                NodeId = x.NodeId,
+                NodeName = x.NodeName,
+                Round = x.Round,
+            }).ToList());
+        }
+
         [HttpPost, Route("Terminate")]
         public async Task<IActionResult> TerminateAsync(TerminateRequest request)
         {
@@ -322,6 +462,19 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return _store.GetWorkflowInstances().FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
+        }
+
+        private Wf_Todo? ResolveCurrentTodo(string dataId, string? wfNodeId)
+        {
+            var workerId = IdentityContext.CurrentEmployee?.Id;
+            if (string.IsNullOrWhiteSpace(workerId))
+            {
+                return null;
+            }
+
+            return _todoservice.Find(x => x.DataId == dataId && x.EmployeeId == workerId)
+                .ToList()
+                .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }
 
         private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)
@@ -468,6 +621,35 @@ namespace EIMSNext.Flow.Host.Controllers
         public ApproveAction Action { get; set; }
         public string Comment { get; set; } = string.Empty;
         public string Signature { get; set; } = string.Empty;
+        public string TargetNodeId { get; set; } = string.Empty;
+        public string TargetEmployeeId { get; set; } = string.Empty;
+    }
+
+    public class ReturnRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string TargetNodeId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    public class AddSignRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string TargetEmployeeId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    public class TransferRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string TargetEmployeeId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
     }
 
     public class WithdrawRequest
@@ -493,6 +675,13 @@ namespace EIMSNext.Flow.Host.Controllers
     {
         public bool CanWithdraw { get; set; }
         public bool CanUrge { get; set; }
+    }
+
+    public class ReturnTargetNode
+    {
+        public string NodeId { get; set; } = string.Empty;
+        public string NodeName { get; set; } = string.Empty;
+        public int Round { get; set; }
     }
 
     public class TerminateRequest

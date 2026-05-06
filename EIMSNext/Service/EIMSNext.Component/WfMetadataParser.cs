@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using EIMSNext.Plugin.Contracts;
@@ -115,6 +116,13 @@ namespace EIMSNext.Component
                         Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
                         EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
                         CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
+                        NodeActions = flowNode.Metadata.ApproveMeta?.NodeActions?.Select(x => new NodeActionConfig
+                        {
+                            ActionType = Enum.TryParse<NodeActionType>(x.ActionType.ToString(), true, out var actionType) ? actionType : NodeActionType.Submit,
+                            Enabled = x.Enabled ?? false,
+                            Text = x.Text,
+                            Candidates = x.Candidates?.ToList()
+                        }).ToList(),
                         NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
                         ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
                         {
@@ -546,8 +554,17 @@ namespace EIMSNext.Component
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
+            public List<NodeActionMeta>? NodeActions { get; set; }
             public NotifyChannel NotifyChannels { get; set; }
             public ExpireMeta? ExpireSetting { get; set; }
+        }
+
+        private class NodeActionMeta
+        {
+            public string ActionType { get; set; } = string.Empty;
+            public bool? Enabled { get; set; }
+            public string? Text { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
 
         private class ExpireMeta

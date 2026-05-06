@@ -235,6 +235,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public List<ApprovalCandidate>? CopytoCandidates { get; set; }
         /// <summary>
+        /// 节点操作配置
+        /// </summary>
+        public List<NodeActionConfig>? NodeActions { get; set; }
+        /// <summary>
         /// 待办创建通知通道
         /// </summary>
         public NotifyChannel NotifyChannels { get; set; } = NotifyChannel.None;
@@ -295,6 +299,24 @@ namespace EIMSNext.Service.Entities
         /// 转交目标候选人
         /// </summary>
         public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    public class NodeActionConfig
+    {
+        public NodeActionType ActionType { get; set; }
+        public bool Enabled { get; set; }
+        public string? Text { get; set; }
+        public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    public enum NodeActionType
+    {
+        Submit = 1,
+        Return = 2,
+        Reject = 3,
+        Draft = 4,
+        AddSign = 5,
+        Transfer = 6,
     }
 
     /// <summary>
@@ -1019,6 +1041,11 @@ namespace EIMSNext.Service.Entities
         /// 撤回
         /// </summary>
         Withdraw = 8,
+
+        /// <summary>
+        /// 转交
+        /// </summary>
+        Transfer = 9,
 
     }
 }

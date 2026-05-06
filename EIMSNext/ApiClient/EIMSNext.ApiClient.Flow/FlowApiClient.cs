@@ -27,6 +27,31 @@ namespace EIMSNext.ApiClient.Flow
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Approve", req, accessToken));
         }
 
+        public async Task<WfResponse?> Submit(ApproveRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Submit", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Reject(ApproveRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Reject", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Return(ReturnRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Return", req, accessToken));
+        }
+
+        public async Task<WfResponse?> AddSign(AddSignRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/AddSign", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Transfer(TransferRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Transfer", req, accessToken));
+        }
+
         public async Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Withdraw", req, accessToken));
@@ -49,6 +74,15 @@ namespace EIMSNext.ApiClient.Flow
             }
 
             return new WfActionStatusResponse { Error = response.ErrorMessage };
+        }
+
+        public async Task<List<ReturnTargetNode>?> ReturnTargets(ActionStatusRequest req, string accessToken)
+        {
+            var query = string.IsNullOrEmpty(req.WfInstanceId)
+                ? $"dataId={req.DataId}"
+                : $"dataId={req.DataId}&wfInstanceId={req.WfInstanceId}";
+            var response = await GetAsync<List<ReturnTargetNode>>("Workflow/ReturnTargets/?" + query, accessToken);
+            return response.IsSuccessful ? response.Data! : [];
         }
 
         public  async Task<WfResponse?> Status(StatusRequest req, string accessToken)
