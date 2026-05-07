@@ -1,14 +1,19 @@
 using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
+using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
+using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.Authorization;
+using EIMSNext.Service.Host.Models;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using EIMSNext.Common.Extensions;
 
 namespace EIMSNext.Service.Host.Controllers
 {
@@ -19,6 +24,65 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiVersion(1.0)]
     public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
+        [HttpGet("ManageTodos")]
+        [IdentityType(IdentityType.CorpAdmin)]
+        public IActionResult ManageTodos([FromQuery] FlowManageQueryRequest request)
+        {
+            var pageNum = request.PageNum <= 0 ? 1 : request.PageNum;
+            var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
+            var keyword = request.Keyword?.Trim() ?? string.Empty;
+
+            var todoService = Resolver.GetService<Wf_Todo>();
+            var employeeService = Resolver.GetService<Employee>();
+            var departmentService = Resolver.GetService<Department>();
+            var formDefRepo = Resolver.GetRepository<FormDef>();
+
+            var query = todoService.Query(x => x.CorpId == IdentityContext.CurrentCorpId);
+            if (!string.IsNullOrWhiteSpace(keyword))
+            {
+                query = query.Where(x => x.DataId.Contains(keyword));
+            }
+
+            var total = query.LongCount();
+            var todos = query
+                .OrderByDescending(x => x.ApproveNodeStartTime)
+                .ToList();
+            var pagedTodos = todos.Skip((pageNum - 1) * pageSize).Take(pageSize).ToList();
+
+            var employeeIds = pagedTodos.Select(x => x.EmployeeId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var employeeMap = employeeService.Query(x => employeeIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x);
+
+            var deptIds = employeeMap.Values.Select(x => x.DepartmentId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var deptMap = departmentService.Query(x => deptIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x.Name);
+
+            var items = pagedTodos.Select(todo =>
+            {
+                employeeMap.TryGetValue(todo.EmployeeId, out var employee);
+                var departmentName = !string.IsNullOrWhiteSpace(employee?.DepartmentId) && deptMap.TryGetValue(employee.DepartmentId, out var deptName)
+                    ? deptName
+                    : string.Empty;
+
+                return new FlowManageTodoItem
+                {
+                    WfInstanceId = todo.WfInstanceId,
+                    DataId = todo.DataId,
+                    FormName = formDefRepo.Get(todo.FormId)?.Name ?? string.Empty,
+                    Starter = todo.Starter,
+                    CurrentApproverName = employee?.EmpName ?? string.Empty,
+                    DepartmentName = departmentName,
+                    ApproveNodeId = todo.ApproveNodeId,
+                    ApproveNodeName = todo.ApproveNodeName,
+                    ApproveNodeStartTime = todo.ApproveNodeStartTime,
+                };
+            }).ToList();
+
+            return ApiResult.Success(new FlowManageTodoQueryResult
+            {
+                Items = items,
+                Total = total,
+            }).ToActionResult();
+        }
+
         /// <summary>
         /// 
         /// </summary>
@@ -275,8 +339,8 @@ namespace EIMSNext.Service.Host.Controllers
             return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
         }
 
-        [HttpGet("ReturnTargets")]
-        public async Task<IActionResult> ReturnTargets([FromQuery] WfActionStatusRequest request)
+        [HttpGet("ReturnNodes")]
+        public async Task<IActionResult> ReturnNodes([FromQuery] WfActionStatusRequest request)
         {
             var data = ApiService.Get(request.DataId);
             if (data == null)
@@ -285,13 +349,62 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             var flowClient = Resolver.Resolve<FlowApiClient>();
-            var resp = await flowClient.ReturnTargets(new ActionStatusRequest
+            var resp = await flowClient.ReturnNodes(new ActionStatusRequest
             {
                 WfInstanceId = request.WfInstanceId,
                 DataId = data.Id,
             }, IdentityContext.AccessToken);
 
             return Ok(resp ?? []);
+        }
+
+        [HttpPost("Terminate")]
+        [IdentityType(IdentityType.CorpAdmin)]
+        public async Task<IActionResult> Terminate(WfTerminateRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            if (data == null)
+            {
+                return Error(-1, "废弃流程失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.Terminate(new TerminateRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = request.DataId,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                data.FlowStatus = FlowStatus.Discarded;
+                await ApiService.ReplaceAsync(data, DataAction.Save);
+                return Ok(resp);
+            }
+
+            return Error(-1, $"废弃流程失败：{resp?.Error}");
+        }
+
+        [HttpPost("ChangeApprover")]
+        [IdentityType(IdentityType.CorpAdmin)]
+        public async Task<IActionResult> ChangeApprover(WfChangeApproverRequest request)
+        {
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var resp = await flowClient.ChangeApprover(new ChangeApproverRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = request.DataId,
+                WfNodeId = request.WfNodeId,
+                TargetEmployeeId = request.TargetEmployeeId,
+                Comment = request.Comment,
+            }, IdentityContext.AccessToken);
+
+            if (resp != null && string.IsNullOrEmpty(resp.Error))
+            {
+                return Ok(resp);
+            }
+
+            return Error(-1, $"变更审批人失败：{resp?.Error}");
         }
     }
 }

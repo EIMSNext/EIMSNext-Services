@@ -13,9 +13,10 @@
         Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken);
         Task<WfResponse?> Urge(UrgeRequest req, string accessToken);
         Task<WfActionStatusResponse?> ActionStatus(ActionStatusRequest req, string accessToken);
-        Task<List<ReturnTargetNode>?> ReturnTargets(ActionStatusRequest req, string accessToken);
+        Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken);
         Task<WfResponse?> Status(StatusRequest req, string accessToken);
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
+        Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken);
         Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken);
 
         Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken);
@@ -177,6 +178,15 @@
         public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public string WorkerId { get; set; } = string.Empty;
+    }
+
+    public class ChangeApproverRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string TargetEmployeeId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
     }
 
     public class DeleteRequest()

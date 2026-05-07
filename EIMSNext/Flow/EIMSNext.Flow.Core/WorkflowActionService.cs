@@ -135,7 +135,40 @@ namespace EIMSNext.Flow.Core
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
         }
 
-        public async Task<List<ReturnTargetNodeResult>> GetReturnTargetsAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo)
+        public async Task<WorkflowActionResult> ChangeApproverAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string targetEmployeeId, string comment)
+        {
+            if (string.IsNullOrWhiteSpace(targetEmployeeId))
+            {
+                throw new InvalidOperationException("审批人不能为空");
+            }
+
+            if (targetEmployeeId == todo.EmployeeId)
+            {
+                throw new InvalidOperationException("当前节点审批人未发生变化");
+            }
+
+            var employee = await _employeeRepo.GetAsync(targetEmployeeId);
+            if (employee == null || employee.CorpId != context.CorpId)
+            {
+                throw new InvalidOperationException("目标审批人不存在");
+            }
+
+            using var scope = _todoRepo.NewTransactionScope();
+            _todoRepo.Update(todo.Id,
+                Builders<Wf_Todo>.Update
+                    .Set(x => x.EmployeeId, targetEmployeeId)
+                    .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs())
+                    .Set(x => x.UpdateBy, context.CurrentEmployee),
+                session: scope.SessionHandle);
+
+            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, todo, WfNodeType.Approve, todo.ApproveNodeId, todo.ApproveNodeName, ApproveAction.Transfer, comment, dataContext.Round), scope.SessionHandle);
+            scope.CommitTransaction();
+
+            return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
+        }
+
+        public async Task<List<ReturnTargetNodeResult>> GetReturnNodesAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo)
         {
             var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
             await EnsureStartApprovalLogAsync(workflowInstance, dataContext);

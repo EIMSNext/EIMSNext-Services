@@ -18,6 +18,11 @@ namespace EIMSNext.ApiClient.Flow
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Terminate", req, accessToken));
         }
 
+        public async Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/ChangeApprover", req, accessToken));
+        }
+
         public async Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Definition/Delete", req, accessToken));
@@ -76,12 +81,12 @@ namespace EIMSNext.ApiClient.Flow
             return new WfActionStatusResponse { Error = response.ErrorMessage };
         }
 
-        public async Task<List<ReturnTargetNode>?> ReturnTargets(ActionStatusRequest req, string accessToken)
+        public async Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken)
         {
             var query = string.IsNullOrEmpty(req.WfInstanceId)
                 ? $"dataId={req.DataId}"
                 : $"dataId={req.DataId}&wfInstanceId={req.WfInstanceId}";
-            var response = await GetAsync<List<ReturnTargetNode>>("Workflow/ReturnTargets/?" + query, accessToken);
+            var response = await GetAsync<List<ReturnTargetNode>>("Workflow/ReturnNodes/?" + query, accessToken);
             return response.IsSuccessful ? response.Data! : [];
         }
 

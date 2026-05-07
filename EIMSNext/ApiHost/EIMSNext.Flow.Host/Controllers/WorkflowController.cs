@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using ChangeApproverRequest = EIMSNext.ApiClient.Flow.ChangeApproverRequest;
 
 using System.Dynamic;
 using System.Linq;
@@ -358,8 +359,8 @@ namespace EIMSNext.Flow.Host.Controllers
             });
         }
 
-        [HttpGet, Route("ReturnTargets")]
-        public async Task<IActionResult> ReturnTargetsAsync([FromQuery] ActionStatusRequest request)
+        [HttpGet, Route("ReturnNodes")]
+        public async Task<IActionResult> ReturnNodesAsync([FromQuery] ActionStatusRequest request)
         {
             if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
             {
@@ -378,7 +379,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 return Ok(new List<ReturnTargetNode>());
             }
 
-            var targets = await _workflowActionService.GetReturnTargetsAsync(new WorkflowActionDataContext
+            var targets = await _workflowActionService.GetReturnNodesAsync(new WorkflowActionDataContext
             {
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
@@ -421,6 +422,43 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
+        }
+
+        [HttpPost, Route("ChangeApprover")]
+        public async Task<IActionResult> ChangeApproverAsync(ChangeApproverRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId) || string.IsNullOrEmpty(request.TargetEmployeeId))
+            {
+                return BadRequest("审批人、数据Id和目标审批人不能为空");
+            }
+
+            if (IdentityContext.IdentityType != ApiService.IdentityType.CorpAdmin)
+            {
+                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有变更审批人权限");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可变更审批人");
+            }
+
+            var todo = _todoservice.Find(x => x.DataId == request.DataId)
+                .ToList()
+                .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
+            if (todo == null)
+            {
+                return BadRequest("当前节点待办不存在");
+            }
+
+            var result = await _workflowActionService.ChangeApproverAsync(new WorkflowActionDataContext
+            {
+                CorpId = IdentityContext.CurrentCorpId,
+                CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
+                CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
+            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
 
         [HttpGet, Route("Status")]
