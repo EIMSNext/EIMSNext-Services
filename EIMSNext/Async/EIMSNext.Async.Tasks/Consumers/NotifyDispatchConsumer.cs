@@ -2,6 +2,7 @@ using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
+using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
@@ -48,6 +49,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             var publisher = resolver.Resolve<IMessagePublisher>();
             var detailBuilder = resolver.Resolve<IFormNotifyDetailBuilder>();
             var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
+            var templateResolver = resolver.Resolve<DataTitleResolver>();
 
             var formDef = formDefRepo.Get(args.NewData.FormId);
             if (formDef == null)
@@ -79,7 +81,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                     ? detailBuilder.BuildForAdd(args.NewData, formDef)
                     : detailBuilder.BuildForChange(args.OldData, args.NewData, formDef);
 
-                var title = notify.NotifyText ?? string.Empty;
+                var title = templateResolver.Resolve(notify.NotifyText, args.NewData, formDef);
                 var url = $"/data/{args.DataId}";
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;

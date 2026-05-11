@@ -43,6 +43,49 @@ namespace EIMSNext.Service.Entities
         /// 是否流程表单
         /// </summary>
         public bool UsingWorkflow { get; set; }
+
+        /// <summary>
+        /// 表单设置
+        /// </summary>
+        public FormSettings FormSettings { get; set; } = new FormSettings();
+    }
+
+    /// <summary>
+    /// 表单设置。
+    /// </summary>
+    public class FormSettings
+    {
+        /// <summary>
+        /// 高级功能设置。
+        /// </summary>
+        public DataAdvancedSettings Advanced { get; set; } = new DataAdvancedSettings();
+    }
+
+    /// <summary>
+    /// 表单高级功能设置。
+    /// </summary>
+    public class DataAdvancedSettings
+    {
+        /// <summary>
+        /// 数据标题设置。
+        /// </summary>
+        public DataTitleSettings DataTitle { get; set; } = new DataTitleSettings();
+    }
+
+    /// <summary>
+    /// 数据标题设置。
+    /// </summary>
+    public class DataTitleSettings
+    {
+        /// <summary>
+        /// 标题模式，支持 default/custom。
+        /// </summary>
+        public string Mode { get; set; } = "default";
+
+        /// <summary>
+        /// 自定义标题模板内容。
+        /// </summary>
+        public string Content { get; set; } = string.Empty;
     }
 
     /// <summary>
