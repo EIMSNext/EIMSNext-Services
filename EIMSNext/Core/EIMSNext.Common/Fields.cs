@@ -4,6 +4,7 @@
     {
         public const string BsonId = "_id";
         public const string Id = "id";
+        public const string DataTitle = "dataTitle";
         public const string CreateBy = "createBy";
         public const string CreateTime = "createTime";
         public const string UpdateBy = "updateBy";
@@ -16,7 +17,7 @@
         public const string FormId = "formId";
         public const string FlowStatus = "flowStatus";
 
-        public static readonly string[] SystemFields = { Id, BsonId, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
+        public static readonly string[] SystemFields = { Id, BsonId, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
         public static bool IsSystemField(string fieldName)
         {
             return SystemFields.Contains(fieldName, StringComparer.OrdinalIgnoreCase);
