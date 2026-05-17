@@ -18,6 +18,11 @@ namespace EIMSNext.ApiClient.Flow
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Terminate", req, accessToken));
         }
 
+        public async Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/ChangeApprover", req, accessToken));
+        }
+
         public async Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Definition/Delete", req, accessToken));
@@ -25,6 +30,64 @@ namespace EIMSNext.ApiClient.Flow
         public async Task<WfResponse?> Approve(ApproveRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Approve", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Submit(ApproveRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Submit", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Reject(ApproveRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Reject", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Return(ReturnRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Return", req, accessToken));
+        }
+
+        public async Task<WfResponse?> AddSign(AddSignRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/AddSign", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Transfer(TransferRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Transfer", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Withdraw", req, accessToken));
+        }
+
+        public async Task<WfResponse?> Urge(UrgeRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/Urge", req, accessToken));
+        }
+
+        public async Task<WfActionStatusResponse?> ActionStatus(ActionStatusRequest req, string accessToken)
+        {
+            var query = string.IsNullOrEmpty(req.WfInstanceId)
+                ? $"dataId={req.DataId}"
+                : $"dataId={req.DataId}&wfInstanceId={req.WfInstanceId}";
+            var response = await GetAsync<WfActionStatusResponse>($"Workflow/ActionStatus/?{query}", accessToken);
+            if (response.IsSuccessful)
+            {
+                return response.Data!;
+            }
+
+            return new WfActionStatusResponse { Error = response.ErrorMessage };
+        }
+
+        public async Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken)
+        {
+            var query = string.IsNullOrEmpty(req.WfInstanceId)
+                ? $"dataId={req.DataId}"
+                : $"dataId={req.DataId}&wfInstanceId={req.WfInstanceId}";
+            var response = await GetAsync<List<ReturnTargetNode>>("Workflow/ReturnNodes/?" + query, accessToken);
+            return response.IsSuccessful ? response.Data! : [];
         }
 
         public  async Task<WfResponse?> Status(StatusRequest req, string accessToken)

@@ -399,7 +399,8 @@ namespace EIMSNext.Print.Pdf
             paragraph.Format.LeftIndent = Unit.FromCentimeter(Math.Max(leftIndentCm, 0.06));
             paragraph.Format.Alignment = cell.Format.Alignment;
             paragraph.Format.Font.Name = PdfTextFontHelper.ResolveParagraphFontName(cellValue, cell.Format.Font.Name, cell.Format.Font.Bold);
-            paragraph.Format.Font.Size = cell.Format.Font.Size;
+            if (cell.Format.Font.Size > 0)
+                paragraph.Format.Font.Size = cell.Format.Font.Size;
             paragraph.Format.Font.Bold = cell.Format.Font.Bold;
             paragraph.Format.Font.Italic = cell.Format.Font.Italic;
             paragraph.Format.Font.Color = cell.Format.Font.Color;

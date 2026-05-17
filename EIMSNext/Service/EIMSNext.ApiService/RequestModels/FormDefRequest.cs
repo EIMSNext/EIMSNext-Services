@@ -31,5 +31,10 @@ namespace EIMSNext.ApiService.RequestModels
         /// 是否流程表单
         /// </summary>
         public bool UsingWorkflow { get; set; }
+
+        /// <summary>
+        /// 表单设置
+        /// </summary>
+        public FormSettings FormSettings { get; set; } = new FormSettings();
     }
 }
