@@ -12,6 +12,7 @@ using MongoDB.Driver;
 using System.Dynamic;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using WorkflowCore.Primitives;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -64,7 +65,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
                 Result = approveData.Action,
                 WfVersion = wfInst.Version,
-                Round = 1
+                Round = dataContext.Round
             };
 
             ApprovalLogRepository.Insert(log, session);
@@ -85,12 +86,12 @@ namespace EIMSNext.Flow.Core.Nodes
                  Approver = new Operator(emp.Id, emp.Code, emp.EmpName),
                  NodeId = wfStep.Id,
                  NodeName = wfStep.Name,
-                 NodeType = wfStep.NodeType,
-                 ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
-                 Result = ApproveAction.CopyTo,
-                 WfVersion = wfInst.Version,
-                 Round = 1
-             }));
+                  NodeType = wfStep.NodeType,
+                  ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
+                  Result = ApproveAction.CopyTo,
+                  WfVersion = wfInst.Version,
+                  Round = dataContext.Round
+              }));
 
             if (logs.Any())
             {
@@ -232,6 +233,39 @@ namespace EIMSNext.Flow.Core.Nodes
         public UpdateResult UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
         {
             return FormDataRepository.Update(dataId, Builders<FormData>.Update.Set(x => x.FlowStatus, flowStatus), session: session);
+        }
+
+        protected Wf_Definition? GetWorkflowDefinition(WorkflowInstance wfInst)
+        {
+            var defRepo = Resolver.GetRepository<Wf_Definition>();
+            return defRepo.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+        }
+
+        protected bool ShouldAutoApprove(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep)
+        {
+            var definition = GetWorkflowDefinition(wfInst);
+            var rule = definition?.Metadata?.WorkflowSetting?.AutoProcessRule ?? WorkflowAutoProcessRule.Disabled;
+            if (rule == WorkflowAutoProcessRule.Disabled)
+            {
+                return false;
+            }
+
+            if (rule == WorkflowAutoProcessRule.FirstNodeOnly)
+            {
+                var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
+                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId != wfStep.Id;
+            }
+
+            if (rule == WorkflowAutoProcessRule.ContinuousApproval)
+            {
+                var lastApproval = ApprovalLogRepository
+                    .Find(x => x.DataId == dataContext.DataId)
+                    .SortByDescending(x => x.ApprovalTime)
+                    .FirstOrDefault();
+                return lastApproval?.Approver?.Id == dataContext.WfStarter?.Id;
+            }
+
+            return false;
         }
 
         protected void CreateExecLog(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, string errMsg = "")

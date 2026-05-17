@@ -29,7 +29,6 @@ namespace EIMSNext.Service.Host.Controllers.OData
         protected override IQueryable<WfTodoViewModel> Expand(IQueryable<WfTodoViewModel> query, ODataQueryOptions<WfTodoViewModel> options)
         {
             var formDefs = Resolver.GetService<FormDef>().All();
-            var formDataDefs = Resolver.GetService<FormData>().All();
             query = query.Join(formDefs, x => x.FormId, y => y.Id,
                    //ObjectConvert.ProjExp<WfTodoViewModel, FormDef, string>(x => x.FormName, y => y.Name)               
                    (x, y) =>
@@ -49,11 +48,11 @@ namespace EIMSNext.Service.Host.Controllers.OData
                           CreateTime = x.CreateTime,
                           UpdateBy = x.UpdateBy,
                           UpdateTime = x.UpdateTime,
-                          FormName = y.Name,
-                          Starter = x.Starter,
-                          DataBrief = x.DataBrief,
-                          ApproveNodeStartTime = x.ApproveNodeStartTime,
-                      }
+                           FormName = y.Name,
+                           Starter = x.Starter,
+                           DataBrief = x.DataBrief,
+                           ApproveNodeStartTime = x.ApproveNodeStartTime,
+                        }
 
                    );
 

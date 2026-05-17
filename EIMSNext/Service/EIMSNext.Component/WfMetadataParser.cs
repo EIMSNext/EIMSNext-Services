@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Linq;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using EIMSNext.Plugin.Contracts;
@@ -17,17 +18,24 @@ namespace EIMSNext.Component
             var meta = def.Metadata;
             meta.Id = def.ExternalId;
             meta.Version = def.Version;
-            meta.Steps = ParseSteps(def.CorpId!, eventSetting, def.FlowType, def.Content);
+            var flowData = def.Content.DeserializeFromJson<FlowData>()!;
+            meta.WorkflowSetting = new WorkflowSetting
+            {
+                Description = flowData.WorkflowMeta?.Description,
+                AllowUrge = flowData.WorkflowMeta?.AllowUrge ?? false,
+                NotifyChannels = flowData.WorkflowMeta?.NotifyChannels ?? NotifyChannel.None,
+                AutoProcessRule = flowData.WorkflowMeta?.AutoProcessRule ?? WorkflowAutoProcessRule.Disabled,
+                WithdrawRule = flowData.WorkflowMeta?.WithdrawRule ?? WorkflowWithdrawRule.Disabled,
+            };
+            meta.Steps = ParseSteps(def.CorpId!, eventSetting, def.FlowType, flowData);
 
             return (meta, eventSetting);
         }
 
-        private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, string content)
+        private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, FlowData flowData)
         {
             var steps = new List<WfStep>() { };
             var otherformIds = new List<string>();
-
-            var flowData = content.DeserializeFromJson<FlowData>()!;
 
             ParseFlowNode(corpId, steps, flowType, flowData.StartNode, flowData.EndNode.Id, otherformIds);
             flowData.Nodes.ForEach(node => { ParseFlowNode(corpId, steps, flowType, node, flowData.EndNode.Id, otherformIds); });
@@ -108,6 +116,13 @@ namespace EIMSNext.Component
                         Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
                         EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
                         CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
+                        NodeActions = flowNode.Metadata.ApproveMeta?.NodeActions?.Select(x => new NodeActionConfig
+                        {
+                            ActionType = Enum.TryParse<NodeActionType>(x.ActionType.ToString(), true, out var actionType) ? actionType : NodeActionType.Submit,
+                            Enabled = x.Enabled ?? false,
+                            Text = x.Text,
+                            Candidates = x.Candidates?.ToList()
+                        }).ToList(),
                         NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
                         ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
                         {
@@ -485,8 +500,17 @@ namespace EIMSNext.Component
             public FlowNodeData StartNode { get; set; } = new FlowNodeData();
             public List<FlowNodeData> Nodes { get; set; } = new List<FlowNodeData>();
             public FlowNodeData EndNode { get; set; } = new FlowNodeData();
+            public WorkflowMeta? WorkflowMeta { get; set; }
             public CascadeMode DfCascade { get; set; }
             public List<string>? EventIds { get; set; }
+        }
+        private class WorkflowMeta
+        {
+            public string? Description { get; set; }
+            public bool? AllowUrge { get; set; }
+            public NotifyChannel NotifyChannels { get; set; }
+            public WorkflowAutoProcessRule? AutoProcessRule { get; set; }
+            public WorkflowWithdrawRule? WithdrawRule { get; set; }
         }
         private class FlowNodeData
         {
@@ -530,8 +554,17 @@ namespace EIMSNext.Component
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
+            public List<NodeActionMeta>? NodeActions { get; set; }
             public NotifyChannel NotifyChannels { get; set; }
             public ExpireMeta? ExpireSetting { get; set; }
+        }
+
+        private class NodeActionMeta
+        {
+            public string ActionType { get; set; } = string.Empty;
+            public bool? Enabled { get; set; }
+            public string? Text { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
 
         private class ExpireMeta

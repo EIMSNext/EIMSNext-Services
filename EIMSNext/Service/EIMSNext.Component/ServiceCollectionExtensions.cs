@@ -12,6 +12,7 @@ namespace EIMSNext.Component
             services.AddSingleton<FormFormulaEvaluator>();
             services.AddSingleton<WfMetadataParser>();
             services.AddSingleton<FormLayoutParser>();
+            services.AddSingleton<DataTitleResolver>();
         }
     }
 }
