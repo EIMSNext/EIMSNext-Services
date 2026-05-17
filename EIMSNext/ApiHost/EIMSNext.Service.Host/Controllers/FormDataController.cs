@@ -11,6 +11,7 @@ using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
@@ -31,6 +32,9 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiVersion(1.0)]
     public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
+        private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
+        private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
+
         /// <summary>
         /// 动态查询总数
         /// </summary>
@@ -54,7 +58,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             //TODO: fill field type
             var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+            return Ok(new { value = result.Cast(ToFormDataViewModel) });
         }
 
         /// <summary>
@@ -86,7 +90,7 @@ namespace EIMSNext.Service.Host.Controllers
                 };
             }
             var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result.Cast(x => FormDataViewModel.FromFormData(x)) });
+            return Ok(new { value = result.Cast(ToFormDataViewModel) });
         }
 
         [Permission(Operation = Operation.Read)]
@@ -296,7 +300,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return NotFound();
             }
 
-            return Ok(FormDataViewModel.FromFormData(result));
+            return Ok(ToFormDataViewModel(result));
         }
 
         /// <summary>
@@ -321,7 +325,7 @@ namespace EIMSNext.Service.Host.Controllers
             //    return BadRequest(fail?.Message);
 
             await ApiService.AddAsync(entity, model.Action);
-            return Ok(FormDataViewModel.FromFormData(entity));
+            return Ok(ToFormDataViewModel(entity));
         }
 
         /// <summary>
@@ -365,7 +369,14 @@ namespace EIMSNext.Service.Host.Controllers
             //    return BadRequest(fail?.Message);
 
             await ApiService.ReplaceAsync(entity, model.Action);
-            return Ok(FormDataViewModel.FromFormData(entity));
+            return Ok(ToFormDataViewModel(entity));
+        }
+
+        private FormDataViewModel ToFormDataViewModel(FormData formData)
+        {
+            var formDef = _formDefService.Get(formData.FormId);
+            var dataTitle = formDef == null ? null : _dataTitleResolver.ResolveDataTitle(formData, formDef);
+            return FormDataViewModel.FromFormData(formData, dataTitle);
         }
 
         /// <summary>

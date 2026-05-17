@@ -9,89 +9,42 @@ namespace EIMSNext.Component
 {
     public class FormLayoutParser
     {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="layout"></param>
-        /// <returns></returns>
         public IList<FieldDef> Parse(string layout)
         {
-            var fieldList = new List<FieldDef>();
             var fieldArr = layout.DeserializeFromJson<JsonArray>();
-
-            fieldList.AddRange(ParseChildren(fieldArr));
+            var fieldList = ParseChildren(fieldArr);
+            PopulateDepends(fieldList);
 
             return fieldList;
         }
+
         private IList<FieldDef> ParseChildren(JsonArray? fieldArr)
         {
             var fieldList = new List<FieldDef>();
-
-            if (fieldArr == null || fieldArr.Count == 0) return fieldList;
-
             if (fieldArr == null || fieldArr.Count == 0)
+            {
                 return fieldList;
+            }
 
             foreach (JsonNode? node in fieldArr)
             {
-                if (node == null || node.GetValueKind() != JsonValueKind.Object) continue;
-                var field = node.AsObject();
+                if (node == null || node.GetValueKind() != JsonValueKind.Object)
+                {
+                    continue;
+                }
 
+                var field = node.AsObject();
                 if (field.ContainsKey("type") && FieldType.IsInputField(field["type"]!.GetValue<string>()))
                 {
-                    //因为FieldType定义中不包括 Layout的类型，所以此处都是表单控件和子表单控件
-                    var fieldDef = ParseField(field)!;
-                    var fType = field["type"]!.GetValue<string>();
-
-
-                    if (field.ContainsKey("props"))
+                    var fieldDef = ParseField(field);
+                    if (fieldDef != null)
                     {
-                        var props = field["props"]!.AsObject();
-
-                        switch (fType)
-                        {
-                            case FieldType.TableForm:
-                                {
-                                    //解析Columns
-                                    if (props.ContainsKey("columns"))
-                                    {
-                                        fieldDef.Columns = new List<FieldDef>();
-                                        var columns = props["columns"]!.AsArray();
-                                        foreach (var column in columns)
-                                        {
-                                            var subDef = ParseField(column?["rule"]?.AsArray()?.FirstOrDefault()?.AsObject());
-                                            if (subDef != null)
-                                                fieldDef.Columns.Add(subDef);
-                                        }
-                                    }
-                                }
-                                break;
-                            case FieldType.TimeStamp:
-                                {
-                                    fieldDef.Props.Format = props["format"]?.GetValue<string>();
-                                }
-                                break;
-                        }
+                        fieldList.Add(fieldDef);
                     }
-
-                    if (field.ContainsKey("options"))
-                    {
-                        var options = field["options"]?.AsArray();
-                        if (options != null)
-                        {
-                            fieldDef.Props.Options = options.SerializeToJson().DeserializeFromJson<List<ValueOption>>();
-                        }
-                    }
-
-                    fieldList.Add(fieldDef);
                 }
-                else
+                else if (field.ContainsKey("children"))
                 {
-                    //Layout控件
-                    if (field.ContainsKey("children"))
-                    {
-                        fieldList.AddRange(ParseChildren(field["children"]!.AsArray()));
-                    }
+                    fieldList.AddRange(ParseChildren(field["children"]!.AsArray()));
                 }
             }
 
@@ -100,51 +53,180 @@ namespace EIMSNext.Component
 
         private FieldDef? ParseField(JsonObject? field)
         {
-            if (field == null) return null;
+            if (field == null)
+            {
+                return null;
+            }
 
-            var fieldDef = new FieldDef();
-            fieldDef.Type = field["type"]!.GetValue<string>();
-            fieldDef.Field = field["field"]!.GetValue<string>();
-            fieldDef.Title = field["title"]!.GetValue<string>();
-            fieldDef.Hidden = field["hidden"]?.GetValue<bool>() ?? false;
+            var fieldDef = new FieldDef
+            {
+                Type = field["type"]!.GetValue<string>(),
+                Field = field["field"]!.GetValue<string>(),
+                Title = field["title"]!.GetValue<string>(),
+                Hidden = field["hidden"]?.GetValue<bool>() ?? false,
+            };
+
+            var fieldType = fieldDef.Type;
+            if (field.ContainsKey("props"))
+            {
+                var props = field["props"]!.AsObject();
+                switch (fieldType)
+                {
+                    case FieldType.TableForm:
+                        if (props.ContainsKey("columns"))
+                        {
+                            fieldDef.Columns = new List<FieldDef>();
+                            var columns = props["columns"]!.AsArray();
+                            foreach (var column in columns)
+                            {
+                                var subDef = ParseField(column?["rule"]?.AsArray()?.FirstOrDefault()?.AsObject());
+                                if (subDef != null)
+                                {
+                                    fieldDef.Columns.Add(subDef);
+                                }
+                            }
+                        }
+                        break;
+                    case FieldType.TimeStamp:
+                        fieldDef.Props.Format = props["format"]?.GetValue<string>();
+                        break;
+                }
+            }
+
+            if (field.ContainsKey("options"))
+            {
+                var options = field["options"]?.AsArray();
+                if (options != null)
+                {
+                    fieldDef.Props.Options = options.SerializeToJson().DeserializeFromJson<List<ValueOption>>();
+                }
+            }
 
             var computed = field["computed"]?.AsObject();
             if (computed != null)
             {
                 var valueNode = computed["value"];
                 string? formula = null;
-                
                 if (valueNode != null)
                 {
-                    if (valueNode is JsonValue jsonValue)
-                    {
-                        formula = jsonValue.GetValue<string>();
-                    }
-                    else
-                    {
-                        // 如果value是一个对象，将其序列化为JSON字符串
-                        formula = valueNode.SerializeToJson();
-                    }
+                    formula = valueNode is JsonValue jsonValue
+                        ? jsonValue.GetValue<string>()
+                        : valueNode.SerializeToJson();
                 }
-                
-                fieldDef.Props.ValueProp = new ValueProp() { Formula = formula };
-                if (!string.IsNullOrEmpty(fieldDef.Props.ValueProp.Formula))
-                {
-                    fieldDef.Props.ValueProp.Depends = ParseDepends(fieldDef.Props.ValueProp.Formula);
-                }
+
+                fieldDef.Props.ValueProp = new ValueProp { Formula = formula };
             }
+
             return fieldDef;
         }
 
-        private string? ParseDepends(string? formula)
+        private void PopulateDepends(IList<FieldDef> fields)
         {
-            if (string.IsNullOrEmpty(formula)) return null;
+            var fieldMap = BuildFieldMap(fields);
+            foreach (var field in fields)
+            {
+                PopulateDepends(field, fieldMap);
+            }
+        }
 
-            //字段为自定义的nanoid, 格式j+15位随机数
-            string pattern = @"\bj[a-z0-9]{15}\b";
-            IEnumerable<string> depends = Regex.Matches(formula, pattern).Select(m => m.Value);
+        private void PopulateDepends(FieldDef field, IReadOnlyDictionary<string, string> fieldMap)
+        {
+            if (!string.IsNullOrWhiteSpace(field.Props.ValueProp?.Formula))
+            {
+                field.Props.ValueProp.Depends = ParseDepends(field.Props.ValueProp.Formula, fieldMap);
+            }
 
-            return depends.Any() ? string.Join(',', depends.Distinct()) : null;
+            if (field.Columns == null || field.Columns.Count == 0)
+            {
+                return;
+            }
+
+            foreach (var column in field.Columns)
+            {
+                PopulateDepends(column, fieldMap);
+            }
+        }
+
+        private Dictionary<string, string> BuildFieldMap(IList<FieldDef> fields)
+        {
+            var fieldMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var field in fields)
+            {
+                if (!string.IsNullOrWhiteSpace(field.Field))
+                {
+                    fieldMap.TryAdd(field.Field, field.Field);
+                }
+
+                if (field.Columns == null || field.Columns.Count == 0)
+                {
+                    continue;
+                }
+
+                foreach (var column in field.Columns)
+                {
+                    if (string.IsNullOrWhiteSpace(column.Field))
+                    {
+                        continue;
+                    }
+
+                    fieldMap.TryAdd(column.Field, column.Field);
+                    fieldMap.TryAdd($"{field.Field}.{column.Field}", $"{field.Field}>{column.Field}");
+                }
+            }
+
+            return fieldMap;
+        }
+
+        private string? ParseDepends(string? formula, IReadOnlyDictionary<string, string> fieldMap)
+        {
+            if (string.IsNullOrWhiteSpace(formula) || fieldMap.Count == 0)
+            {
+                return null;
+            }
+
+            var depends = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var workingFormula = formula;
+
+            foreach (Match match in Regex.Matches(formula, "['\"]([^'\"]+)['\"]"))
+            {
+                var token = match.Groups[1].Value;
+                if (fieldMap.TryGetValue(token, out var mappedField))
+                {
+                    depends.Add(mappedField);
+                    workingFormula = ReplaceRangeWithWhitespace(workingFormula, match.Index, match.Length);
+                }
+            }
+
+            foreach (var entry in fieldMap.OrderByDescending(x => x.Key.Length))
+            {
+                var escaped = Regex.Escape(entry.Key);
+                var regex = new Regex($@"(?<![a-zA-Z0-9_]){escaped}(?![a-zA-Z0-9_])");
+                var match = regex.Match(workingFormula);
+                if (match.Success)
+                {
+                    depends.Add(entry.Value);
+                    workingFormula = ReplaceRangeWithWhitespace(workingFormula, match.Index, match.Length);
+                }
+            }
+
+            return depends.Count > 0 ? string.Join(',', depends) : null;
+        }
+
+        private static string ReplaceRangeWithWhitespace(string value, int index, int length)
+        {
+            if (index < 0 || length <= 0 || index >= value.Length)
+            {
+                return value;
+            }
+
+            var chars = value.ToCharArray();
+            var max = Math.Min(index + length, chars.Length);
+            for (var i = index; i < max; i++)
+            {
+                chars[i] = ' ';
+            }
+
+            return new string(chars);
         }
     }
 }

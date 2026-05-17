@@ -99,6 +99,83 @@ namespace EIMSNext.Service.Entities
         /// 工作流步骤列表
         /// </summary>
         public List<WfStep> Steps { get; set; } = new List<WfStep>();
+        /// <summary>
+        /// 流程级配置
+        /// </summary>
+        public WorkflowSetting WorkflowSetting { get; set; } = new WorkflowSetting();
+    }
+
+    /// <summary>
+    /// 流程级通用配置。
+    /// </summary>
+    public class WorkflowSetting
+    {
+        /// <summary>
+        /// 流程描述。
+        /// </summary>
+        public string? Description { get; set; }
+
+        /// <summary>
+        /// 是否允许催办。
+        /// </summary>
+        public bool AllowUrge { get; set; }
+
+        /// <summary>
+        /// 默认通知通道。
+        /// </summary>
+        public NotifyChannel NotifyChannels { get; set; } = NotifyChannel.None;
+
+        /// <summary>
+        /// 自动处理规则。
+        /// </summary>
+        public WorkflowAutoProcessRule AutoProcessRule { get; set; } = WorkflowAutoProcessRule.Disabled;
+
+        /// <summary>
+        /// 撤回规则。
+        /// </summary>
+        public WorkflowWithdrawRule WithdrawRule { get; set; } = WorkflowWithdrawRule.Disabled;
+    }
+
+    /// <summary>
+    /// 流程自动处理规则。
+    /// </summary>
+    public enum WorkflowAutoProcessRule
+    {
+        /// <summary>
+        /// 禁用。
+        /// </summary>
+        Disabled = 0,
+
+        /// <summary>
+        /// 仅首节点自动处理。
+        /// </summary>
+        FirstNodeOnly = 1,
+
+        /// <summary>
+        /// 连续审批时自动处理。
+        /// </summary>
+        ContinuousApproval = 2,
+    }
+
+    /// <summary>
+    /// 流程撤回规则。
+    /// </summary>
+    public enum WorkflowWithdrawRule
+    {
+        /// <summary>
+        /// 禁用。
+        /// </summary>
+        Disabled = 0,
+
+        /// <summary>
+        /// 仅发起人可撤回。
+        /// </summary>
+        StarterOnly = 1,
+
+        /// <summary>
+        /// 所有节点均可撤回。
+        /// </summary>
+        AllNodes = 2,
     }
 
     /// <summary>
@@ -208,6 +285,10 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public List<ApprovalCandidate>? CopytoCandidates { get; set; }
         /// <summary>
+        /// 节点操作配置
+        /// </summary>
+        public List<NodeActionConfig>? NodeActions { get; set; }
+        /// <summary>
         /// 待办创建通知通道
         /// </summary>
         public NotifyChannel NotifyChannels { get; set; } = NotifyChannel.None;
@@ -268,6 +349,68 @@ namespace EIMSNext.Service.Entities
         /// 转交目标候选人
         /// </summary>
         public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 节点操作配置。
+    /// </summary>
+    public class NodeActionConfig
+    {
+        /// <summary>
+        /// 操作类型。
+        /// </summary>
+        public NodeActionType ActionType { get; set; }
+
+        /// <summary>
+        /// 是否启用。
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>
+        /// 按钮文本。
+        /// </summary>
+        public string? Text { get; set; }
+
+        /// <summary>
+        /// 操作候选人。
+        /// </summary>
+        public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 节点操作类型。
+    /// </summary>
+    public enum NodeActionType
+    {
+        /// <summary>
+        /// 提交。
+        /// </summary>
+        Submit = 1,
+
+        /// <summary>
+        /// 退回。
+        /// </summary>
+        Return = 2,
+
+        /// <summary>
+        /// 驳回。
+        /// </summary>
+        Reject = 3,
+
+        /// <summary>
+        /// 存草稿。
+        /// </summary>
+        Draft = 4,
+
+        /// <summary>
+        /// 加签。
+        /// </summary>
+        AddSign = 5,
+
+        /// <summary>
+        /// 转交。
+        /// </summary>
+        Transfer = 6,
     }
 
     /// <summary>
@@ -988,6 +1131,15 @@ namespace EIMSNext.Service.Entities
         /// 抄送
         /// </summary>
         CopyTo = 7,
+        /// <summary>
+        /// 撤回
+        /// </summary>
+        Withdraw = 8,
+
+        /// <summary>
+        /// 转交
+        /// </summary>
+        Transfer = 9,
 
     }
 }

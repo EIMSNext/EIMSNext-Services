@@ -148,9 +148,37 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             else
             {
+                if (ShouldAutoApprove(context.Workflow, dataContext, meta))
+                {
+                    var autoApproveData = new WfApproveData(
+                        dataContext.CorpId!,
+                        dataContext.UserId ?? string.Empty,
+                        dataContext.WfStarter?.Id ?? string.Empty,
+                        dataContext.WfStarter?.Value ?? string.Empty,
+                        dataContext.WfStarter?.Label ?? "系统",
+                        ApproveAction.AutoApprove,
+                        "系统自动同意",
+                        string.Empty,
+                        Guid.NewGuid().ToString());
+
+                    using (var scope = TodoRepository.NewTransactionScope())
+                    {
+                        AddApprovalLog(context.Workflow, new Wf_Todo { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, autoApproveData, scope.SessionHandle);
+                        scope.CommitTransaction();
+                    }
+
+                    CreateExecLog(context.Workflow, dataContext, meta, autoApproveData);
+                    return ExecutionResult.Next();
+                }
+
                 //写入待办记录
                 var todos = await CreateTodos(context.Workflow, dataContext, meta, null);
+                var def = GetWorkflowDefinition(context.Workflow);
                 var notifyChannels = meta.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
+                if (notifyChannels == NotifyChannel.None)
+                {
+                    notifyChannels = def?.Metadata?.WorkflowSetting?.NotifyChannels ?? NotifyChannel.None;
+                }
                 if (todos.Count > 0 && notifyChannels != NotifyChannel.None)
                 {
                     await Resolver.Resolve<IMessagePublisher>().PublishAsync(new NotifyDispatchTaskArgs
