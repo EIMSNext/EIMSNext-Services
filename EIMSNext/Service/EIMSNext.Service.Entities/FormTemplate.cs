@@ -25,9 +25,25 @@ namespace EIMSNext.Service.Entities
         /// 关联的应用模板ID
         /// </summary>
         public string AppTemplateId { get; set; } = string.Empty;
+
         /// <summary>
-        /// 关联的应用模板名称
+        /// 表单内容
         /// </summary>
-        public string AppTemplateName { get; set; } = string.Empty;
+        public FormContent Content { get; set; } = new FormContent();
+
+        /// <summary>
+        /// 是否台账
+        /// </summary>
+        public bool IsLedger { get; set; }
+
+        /// <summary>
+        /// 是否流程表单
+        /// </summary>
+        public bool UsingWorkflow { get; set; }
+
+        /// <summary>
+        /// 表单设置
+        /// </summary>
+        public FormSettings FormSettings { get; set; } = new FormSettings();
     }
 }

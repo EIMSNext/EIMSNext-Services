@@ -19,5 +19,10 @@ namespace EIMSNext.Service.Entities
         /// 模板图标
         /// </summary>
         public string Icon { get; set; } = "";
+
+        /// <summary>
+        /// 模板菜单树(JSON)
+        /// </summary>
+        public string Menus { get; set; } = "[]";
     }
 }

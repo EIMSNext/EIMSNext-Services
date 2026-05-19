@@ -3,27 +3,22 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 自定义仪表盘
+    /// 仪表盘模板
     /// </summary>
-    public class DashboardDef : CorpEntityBase
+    public class DashboardTemplate : EntityBase
     {
         /// <summary>
-        /// 模板Id, 对于从模板安装的仪表盘
+        /// 所属应用模板 ID。
         /// </summary>
-        public string? TemplateId { get; set; }
+        public string AppTemplateId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 应用ID
-        /// </summary>
-        public string AppId { get; set; } = string.Empty;
-
-        /// <summary>
-        /// 仪表盘名称
+        /// 仪表盘名称。
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// 布局
+        /// 仪表盘布局 JSON。
         /// </summary>
         public string Layout { get; set; } = string.Empty;
     }

@@ -3,7 +3,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-    public interface IAppService : IService<App>
+    public interface IAppDefService : IService<AppDef>
     {
     }
 }

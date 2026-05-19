@@ -13,7 +13,7 @@ namespace EIMSNext.Service
         protected override async Task AfterAdd(IEnumerable<DashboardDef> entities, IClientSessionHandle? session)
         {
             await base.AfterAdd(entities, session);
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
             var app = appRepo.Get(entities.First().AppId, session)!;
             var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
@@ -29,7 +29,7 @@ namespace EIMSNext.Service
         protected override async Task AfterReplace(DashboardDef entity, IClientSessionHandle? session)
         {
             await base.AfterReplace(entity, session);
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
             var app = appRepo.Get(entity.AppId, session)!;
 
             var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
@@ -51,7 +51,7 @@ namespace EIMSNext.Service
 
             if (updated.Any())
             {
-                var appRepo = Resolver.GetRepository<App>();
+                var appRepo = Resolver.GetRepository<AppDef>();
                 var app = appRepo.Get(updated.First().AppId, session)!;
 
                 updated.ForEach(e =>
@@ -72,7 +72,7 @@ namespace EIMSNext.Service
                 return;
             }
 
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();
             foreach (var appId in appIds)
             {

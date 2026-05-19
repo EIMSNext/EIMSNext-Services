@@ -5,7 +5,7 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
-	public class AppApiService(IResolver resolver) : ApiServiceBase<App, AppViewModel, IAppService>(resolver)
-	{
-	}
+    public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, AppDefViewModel, IAppDefService>(resolver)
+    {
+    }
 }

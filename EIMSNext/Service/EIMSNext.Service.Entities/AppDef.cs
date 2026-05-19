@@ -3,9 +3,9 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 应用
+    /// 应用定义
     /// </summary>
-    public class App : CorpEntityBase
+    public class AppDef : CorpEntityBase
     {
         /// <summary>
         /// 模板Id, 对于从模板安装的应用
