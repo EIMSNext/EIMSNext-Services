@@ -3,12 +3,12 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 打印模板
+    /// 打印定义
     /// </summary>
-    public class PrintTemplate : CorpEntityBase
+    public class PrintDef : CorpEntityBase
     {
         /// <summary>
-        /// 模板Id, 对于从模板安装的打印模板
+        /// 模板Id, 对于从模板安装的打印定义
         /// </summary>
         public string? TemplateId { get; set; }
 
@@ -21,7 +21,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string FormId { get; set; } = "";
         /// <summary>
-        /// 打印模板名称。
+        /// 打印定义名称。
         /// </summary>
         public string Name { get; set; } = "";
 
@@ -31,18 +31,18 @@ namespace EIMSNext.Service.Entities
         public string Content { get; set; } = "";
 
         /// <summary>
-        /// 打印模板类型
+        /// 打印定义类型
         /// </summary>
-        public PrintTemplateType PrintType { get; set; }
+        public PrintDefType PrintType { get; set; }
     }
 
     /// <summary>
-    /// 打印模板类型。
+    /// 打印定义类型。
     /// </summary>
-    public enum PrintTemplateType
+    public enum PrintDefType
     {
         /// <summary>
-        /// PDF 打印模板。
+        /// PDF 打印定义。
         /// </summary>
         Pdf
     }

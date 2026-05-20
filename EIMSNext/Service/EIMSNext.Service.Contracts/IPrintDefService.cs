@@ -3,7 +3,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-    public interface IPrintTemplateService : IService<PrintTemplate>
+    public interface IPrintDefService : IService<PrintDef>
     {
-    } 
+    }
 }

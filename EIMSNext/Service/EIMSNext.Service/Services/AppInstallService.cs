@@ -20,13 +20,13 @@ namespace EIMSNext.Service
             var dashboardTemplateRepo = _resolver.GetRepository<DashboardTemplate>();
             var dashboardItemTemplateRepo = _resolver.GetRepository<DashboardItemTemplate>();
             var wfTemplateRepo = _resolver.GetRepository<WfDefinitionTemplate>();
-            var printTemplateTemplateRepo = _resolver.GetRepository<PrintTemplateTemplate>();
+            var printTemplateTemplateRepo = _resolver.GetRepository<PrintDefTemplate>();
             var appDefRepo = _resolver.GetRepository<AppDef>();
             var formDefRepo = _resolver.GetRepository<FormDef>();
             var dashboardDefRepo = _resolver.GetRepository<DashboardDef>();
             var dashboardItemDefRepo = _resolver.GetRepository<DashboardItemDef>();
             var wfDefRepo = _resolver.GetRepository<Wf_Definition>();
-            var printTemplateRepo = _resolver.GetRepository<PrintTemplate>();
+            var printTemplateRepo = _resolver.GetRepository<PrintDef>();
 
             var profile = profileRepo.Get(appProfileId) ?? throw new InvalidOperationException("应用档案不存在");
             var appTemplate = appTemplateRepo.Get(profile.TemplateId) ?? throw new InvalidOperationException("应用模板不存在");
@@ -36,7 +36,7 @@ namespace EIMSNext.Service
             var dashboardIds = dashboardTemplates.Select(x => x.Id).ToList();
             List<DashboardItemTemplate> dashboardItemTemplates = dashboardItemTemplateRepo.Queryable.Where(x => dashboardIds.Contains(x.DashboardTemplateId)).ToList();
             List<WfDefinitionTemplate> wfTemplates = wfTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
-            List<PrintTemplateTemplate> printTemplateTemplates = printTemplateTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
+            List<PrintDefTemplate> printTemplateTemplates = printTemplateTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
 
             var newAppId = appDefRepo.NewId();
             var appDef = new AppDef
@@ -131,7 +131,7 @@ namespace EIMSNext.Service
 
             foreach (var printTemplateTemplate in printTemplateTemplates)
             {
-                var printTemplate = new PrintTemplate
+                var printTemplate = new PrintDef
                 {
                     Id = printMap[printTemplateTemplate.Id],
                     AppId = newAppId,

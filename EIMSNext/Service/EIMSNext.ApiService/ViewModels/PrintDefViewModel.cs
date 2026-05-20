@@ -2,8 +2,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.ViewModels
 {
-    public class PrintTemplateViewModel : PrintTemplate
+    public class PrintDefViewModel : PrintDef
     {
     }
 }
-

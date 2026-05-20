@@ -30,13 +30,13 @@ namespace EIMSNext.Service.Tests
             var dashboardRepo = repos.Add(new InMemoryRepository<DashboardDef>());
             var dashboardItemRepo = repos.Add(new InMemoryRepository<DashboardItemDef>());
             var workflowRepo = repos.Add(new InMemoryRepository<Wf_Definition>());
-            var printRepo = repos.Add(new InMemoryRepository<PrintTemplate>());
+            var printRepo = repos.Add(new InMemoryRepository<PrintDef>());
             var appTemplateRepo = repos.Add(new InMemoryRepository<AppTemplate>());
             var formTemplateRepo = repos.Add(new InMemoryRepository<FormTemplate>());
             var dashboardTemplateRepo = repos.Add(new InMemoryRepository<DashboardTemplate>());
             var dashboardItemTemplateRepo = repos.Add(new InMemoryRepository<DashboardItemTemplate>());
             var workflowTemplateRepo = repos.Add(new InMemoryRepository<WfDefinitionTemplate>());
-            var printTemplateTemplateRepo = repos.Add(new InMemoryRepository<PrintTemplateTemplate>());
+            var printTemplateTemplateRepo = repos.Add(new InMemoryRepository<PrintDefTemplate>());
             var profileRepo = repos.Add(new InMemoryRepository<AppProfile>());
 
             const string sourceAppId = "app-source";
@@ -90,20 +90,20 @@ namespace EIMSNext.Service.Tests
                 AppId = sourceAppId,
                 Name = "Source Workflow",
                 ExternalId = sourceFormId,
-                Content = $"{{\"formId\":\"{sourceFormId}\",\"dashboardId\":\"{sourceDashboardId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printTemplateId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}",
+                Content = $"{{\"formId\":\"{sourceFormId}\",\"dashboardId\":\"{sourceDashboardId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}",
                 Metadata = new WfMetadata(),
                 SourceId = sourceFormId,
                 IsCurrent = true
             });
 
-            await printRepo.InsertAsync(new PrintTemplate
+            await printRepo.InsertAsync(new PrintDef
             {
                 Id = sourcePrintId,
                 AppId = sourceAppId,
                 FormId = sourceFormId,
                 Name = "Source Print",
-                Content = $"{{\"formId\":\"{sourceFormId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printTemplateId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}",
-                PrintType = PrintTemplateType.Pdf
+                Content = $"{{\"formId\":\"{sourceFormId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}",
+                PrintType = PrintDefType.Pdf
             });
 
             await dashboardItemRepo.InsertAsync(new DashboardItemDef
@@ -114,7 +114,7 @@ namespace EIMSNext.Service.Tests
                 LayoutId = sourceLayoutId,
                 ItemType = "chart",
                 Name = "Source Item",
-                Details = $"{{\"formId\":\"{sourceFormId}\",\"dashboardId\":\"{sourceDashboardId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printTemplateId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}"
+                Details = $"{{\"formId\":\"{sourceFormId}\",\"dashboardId\":\"{sourceDashboardId}\",\"workflowId\":\"{sourceWorkflowId}\",\"printId\":\"{sourcePrintId}\",\"appId\":\"{sourceAppId}\"}}"
             });
 
             var resolver = new TestResolver(repos.Services);

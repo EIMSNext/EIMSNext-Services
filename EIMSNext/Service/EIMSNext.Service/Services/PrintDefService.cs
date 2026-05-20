@@ -5,7 +5,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.Service
 {
-	public class PrintTemplateService(IResolver resolver) : EntityServiceBase<PrintTemplate>(resolver), IPrintTemplateService
+	public class PrintDefService(IResolver resolver) : EntityServiceBase<PrintDef>(resolver), IPrintDefService
 	{
 	}
 }

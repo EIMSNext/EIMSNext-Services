@@ -20,13 +20,13 @@ namespace EIMSNext.Service
             var dashboardDefRepo = _resolver.GetRepository<DashboardDef>();
             var dashboardItemDefRepo = _resolver.GetRepository<DashboardItemDef>();
             var wfDefRepo = _resolver.GetRepository<Wf_Definition>();
-            var printDefRepo = _resolver.GetRepository<PrintTemplate>();
+            var printDefRepo = _resolver.GetRepository<PrintDef>();
             var appTemplateRepo = _resolver.GetRepository<AppTemplate>();
             var formTemplateRepo = _resolver.GetRepository<FormTemplate>();
             var dashboardTemplateRepo = _resolver.GetRepository<DashboardTemplate>();
             var dashboardItemTemplateRepo = _resolver.GetRepository<DashboardItemTemplate>();
             var wfTemplateRepo = _resolver.GetRepository<WfDefinitionTemplate>();
-            var printTemplateRepo = _resolver.GetRepository<PrintTemplateTemplate>();
+            var printTemplateRepo = _resolver.GetRepository<PrintDefTemplate>();
             var appProfileRepo = _resolver.GetRepository<AppProfile>();
 
             var appDef = appDefRepo.Get(appDefId) ?? throw new InvalidOperationException("应用定义不存在");
@@ -124,7 +124,7 @@ namespace EIMSNext.Service
 
             foreach (var printDef in printDefs)
             {
-                await UpsertAsync(printTemplateRepo, new PrintTemplateTemplate
+                await UpsertAsync(printTemplateRepo, new PrintDefTemplate
                 {
                     Id = printMap[printDef.Id],
                     AppTemplateId = appTemplateId,
@@ -197,7 +197,7 @@ namespace EIMSNext.Service
                     wf.TemplateId = templateId;
                     await repo.ReplaceAsync(entity);
                     break;
-                case PrintTemplate print:
+                case PrintDef print:
                     print.TemplateId = templateId;
                     await repo.ReplaceAsync(entity);
                     break;

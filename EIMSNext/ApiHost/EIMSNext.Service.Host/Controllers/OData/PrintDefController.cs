@@ -14,7 +14,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class PrintTemplateController(IResolver resolver) : ODataController<PrintTemplateApiService, PrintTemplate, PrintTemplateViewModel, PrintTemplateRequest>(resolver)
+	public class PrintDefController(IResolver resolver) : ODataController<PrintDefApiService, PrintDef, PrintDefViewModel, PrintDefRequest>(resolver)
 	{
 		
 	}

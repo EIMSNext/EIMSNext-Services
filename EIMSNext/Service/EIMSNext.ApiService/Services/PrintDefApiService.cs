@@ -6,7 +6,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
 {
-	public class PrintTemplateApiService(IResolver resolver) : ApiServiceBase<PrintTemplate, PrintTemplateViewModel, IPrintTemplateService>(resolver)
+	public class PrintDefApiService(IResolver resolver) : ApiServiceBase<PrintDef, PrintDefViewModel, IPrintDefService>(resolver)
 	{
 	}
 }

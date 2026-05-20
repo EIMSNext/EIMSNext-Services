@@ -3,9 +3,9 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 打印模板模板
+    /// 打印定义模板
     /// </summary>
-    public class PrintTemplateTemplate : EntityBase
+    public class PrintDefTemplate : EntityBase
     {
         /// <summary>
         /// 所属应用模板 ID。
@@ -18,18 +18,18 @@ namespace EIMSNext.Service.Entities
         public string FormTemplateId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 打印模板名称。
+        /// 打印定义名称。
         /// </summary>
         public string Name { get; set; } = string.Empty;
 
         /// <summary>
-        /// 打印模板内容。
+        /// 打印定义内容。
         /// </summary>
         public string Content { get; set; } = string.Empty;
 
         /// <summary>
-        /// 打印模板类型。
+        /// 打印定义类型。
         /// </summary>
-        public PrintTemplateType PrintType { get; set; }
+        public PrintDefType PrintType { get; set; }
     }
 }

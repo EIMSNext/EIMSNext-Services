@@ -3,9 +3,9 @@ using EIMSNext.Service.Entities;
 namespace EIMSNext.ApiService.RequestModels
 {
     /// <summary>
-    /// 打印模板请求
+    /// 打印定义请求
     /// </summary>
-    public class PrintTemplateRequest : RequestBase
+    public class PrintDefRequest : RequestBase
     {
         /// <summary>
         /// 应用ID
@@ -16,7 +16,7 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public string FormId { get; set; } = "";
         /// <summary>
-        /// 模板名称
+        /// 名称
         /// </summary>
         public string Name { get; set; } = "";
 
@@ -26,8 +26,8 @@ namespace EIMSNext.ApiService.RequestModels
         public string Content { get; set; } = "";
 
         /// <summary>
-        /// 打印模板类型
+        /// 打印定义类型
         /// </summary>
-        public PrintTemplateType PrintType { get; set; }
+        public PrintDefType PrintType { get; set; }
     }
 }

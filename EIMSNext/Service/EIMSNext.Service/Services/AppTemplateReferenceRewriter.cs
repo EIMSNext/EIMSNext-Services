@@ -162,7 +162,7 @@ namespace EIMSNext.Service
                             {
                                 obj[property.Key] = newWorkflowId;
                             }
-                            else if ((property.Key.Equals("printTemplateId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("templateId", StringComparison.OrdinalIgnoreCase))
+                            else if (property.Key.Equals("printId", StringComparison.OrdinalIgnoreCase)
                                 && printMap != null
                                 && printMap.TryGetValue(text, out var newPrintId))
                             {

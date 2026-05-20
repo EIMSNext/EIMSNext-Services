@@ -52,10 +52,10 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("Print")]
         public IActionResult Print(PrintRequest request)
         {
-            if (string.IsNullOrEmpty(request.TemplateId) || request.DataIds == null || request.DataIds.Count == 0)
+            if (string.IsNullOrEmpty(request.PrintId) || request.DataIds == null || request.DataIds.Count == 0)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
 
-            var template = Resolver.Resolve<PrintTemplateApiService>().Get(request.TemplateId);
+            var template = Resolver.Resolve<PrintDefApiService>().Get(request.PrintId);
             if (template == null)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
 
