@@ -6,7 +6,9 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Host.Requests;
 using EIMSNext.Service.Entities;
@@ -20,9 +22,10 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param> 
     [ApiVersion(1.0)]
-    public class SystemController(IResolver resolver, IPluginRuntimeManager pluginRuntimeManager) : MefControllerBase(resolver)
+    public class SystemController(IResolver resolver, IPluginRuntimeManager pluginRuntimeManager, IRepository<PluginInstall> pluginInstallRepository) : MefControllerBase(resolver)
     {
         private IPluginRuntimeManager PluginRuntimeManager { get; } = pluginRuntimeManager;
+        private IRepository<PluginInstall> PluginInstallRepository { get; } = pluginInstallRepository;
 
         /// <summary>
         /// 获取当前用户信息
@@ -126,6 +129,66 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var result = await PluginRuntimeManager.ReloadAsync(cancellationToken);
             return ApiResult.Success(result).ToActionResult();
+        }
+
+        [HttpGet("PluginInstalls")]
+        public IActionResult GetPluginInstalls()
+        {
+            var corpId = IdentityContext.CurrentCorpId;
+            var items = PluginInstallRepository.Queryable
+                .Where(x => x.CorpId == corpId && !x.DeleteFlag)
+                .OrderByDescending(x => x.InstalledAt)
+                .ToList();
+
+            return ApiResult.Success(items).ToActionResult();
+        }
+
+        [HttpPost("PluginInstalls/{id}/Enable")]
+        public async Task<IActionResult> EnablePluginInstall(string id)
+        {
+            var entity = PluginInstallRepository.Queryable.FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+
+            entity.Enabled = true;
+            entity.LastEnabledAt = DateTime.UtcNow.ToTimeStampMs();
+            entity.Status = PluginInstallStatus.Installed;
+            await PluginInstallRepository.ReplaceAsync(entity);
+            return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpPost("PluginInstalls/{id}/Disable")]
+        public async Task<IActionResult> DisablePluginInstall(string id)
+        {
+            var entity = PluginInstallRepository.Queryable.FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+
+            entity.Enabled = false;
+            entity.LastDisabledAt = DateTime.UtcNow.ToTimeStampMs();
+            await PluginInstallRepository.ReplaceAsync(entity);
+            return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpDelete("PluginInstalls/{id}")]
+        public async Task<IActionResult> DeletePluginInstall(string id)
+        {
+            var entity = PluginInstallRepository.Queryable.FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+
+            entity.DeleteFlag = true;
+            entity.Enabled = false;
+            entity.Status = PluginInstallStatus.Uninstalled;
+            entity.UninstalledAt = DateTime.UtcNow.ToTimeStampMs();
+            await PluginInstallRepository.ReplaceAsync(entity);
+            return ApiResult.Success(entity.Id).ToActionResult();
         }
     }
 }

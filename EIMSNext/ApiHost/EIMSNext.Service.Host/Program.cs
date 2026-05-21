@@ -6,6 +6,7 @@ using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
+using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
@@ -136,6 +137,7 @@ async void EnsureSeedData(IResolver resolver)
 {
     resolver.GetServiceContext().Operator = new Operator("", "", "");
     var corpService = resolver.GetService<Corporate>();
+    var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
     if (!corpService!.All().Any())
     {
         await corpService.AddAsync(
@@ -143,7 +145,60 @@ async void EnsureSeedData(IResolver resolver)
               {
                   Code = "2008080800008",
                   Name = "EIMS Team",
-                  Description = "EIMS Team",
-              });
+                   Description = "EIMS Team",
+               });
+    }
+
+    if (!pluginProfileRepo.Queryable.Any(x => x.PluginId == "sampleplugin" && !x.DeleteFlag))
+    {
+        var profile = new PluginProfile
+        {
+            Id = pluginProfileRepo.NewId(),
+            PluginId = "sampleplugin",
+            Version = "1.0",
+            Name = "示例插件",
+            Summary = "演示插件市场、插件详情和函数清单展示。",
+            Description = "示例收款单插件，可用于验证插件市场接入、安装管理和函数展示。",
+            Category = "表单增强",
+            Scenario = "信息查询",
+            DeveloperName = "EIMSNext Team",
+            IsOfficial = true,
+            IsRecommended = true,
+            Status = "Published",
+            SortIndex = 1000,
+            InstallCount = 0,
+            PublishedAt = DateTime.UtcNow,
+            HelpDocUrl = string.Empty,
+            TemplateUrl = string.Empty,
+            PricingPlans =
+            [
+                new PluginPricingPlan
+                {
+                    Id = "free",
+                    Name = "免费试用",
+                    Price = 0,
+                    DurationDays = 30,
+                    Unit = "天",
+                    IsTrial = true
+                }
+            ],
+            Functions =
+            [
+                new PluginFunctionSnapshot
+                {
+                    Id = "CreateReceipt",
+                    Name = "收款单新版",
+                    Description = "演示插件字段配置与映射",
+                    InputFields =
+                    [
+                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = FieldType.Input, Required = true },
+                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = FieldType.Number, Required = true },
+                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = FieldType.TimeStamp },
+                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = FieldType.TextArea }
+                    ]
+                }
+            ]
+        };
+        await pluginProfileRepo.InsertAsync(profile);
     }
 }
