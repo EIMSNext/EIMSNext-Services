@@ -27,6 +27,8 @@ namespace EIMSNext.Service
             var dashboardItemDefRepo = _resolver.GetRepository<DashboardItemDef>();
             var wfDefRepo = _resolver.GetRepository<Wf_Definition>();
             var printTemplateRepo = _resolver.GetRepository<PrintDef>();
+            var authGroupTemplateRepo = _resolver.GetRepository<AuthGroupTemplate>();
+            var authGroupRepo = _resolver.GetRepository<AuthGroup>();
 
             var profile = profileRepo.Get(appProfileId) ?? throw new InvalidOperationException("应用档案不存在");
             var appTemplate = appTemplateRepo.Get(profile.TemplateId) ?? throw new InvalidOperationException("应用模板不存在");
@@ -37,6 +39,7 @@ namespace EIMSNext.Service
             List<DashboardItemTemplate> dashboardItemTemplates = dashboardItemTemplateRepo.Queryable.Where(x => dashboardIds.Contains(x.DashboardTemplateId)).ToList();
             List<WfDefinitionTemplate> wfTemplates = wfTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
             List<PrintDefTemplate> printTemplateTemplates = printTemplateTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
+            List<AuthGroupTemplate> authGroupTemplates = authGroupTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
 
             var newAppId = appDefRepo.NewId();
             var appDef = new AppDef
@@ -58,6 +61,7 @@ namespace EIMSNext.Service
             var dashboardItemMap = dashboardItemTemplates.ToDictionary(x => x.Id, _ => dashboardItemDefRepo.NewId());
             var wfMap = wfTemplates.ToDictionary(x => x.Id, _ => wfDefRepo.NewId());
             var printMap = printTemplateTemplates.ToDictionary(x => x.Id, _ => printTemplateRepo.NewId());
+            var authGroupMap = authGroupTemplates.ToDictionary(x => x.Id, _ => authGroupRepo.NewId());
 
             foreach (var formTemplate in formTemplates)
             {
@@ -142,6 +146,25 @@ namespace EIMSNext.Service
                     PrintType = printTemplateTemplate.PrintType
                 };
                 await printTemplateRepo.InsertAsync(printTemplate);
+            }
+
+            foreach (var authGroupTemplate in authGroupTemplates)
+            {
+                var authGroup = new AuthGroup
+                {
+                    Id = authGroupMap[authGroupTemplate.Id],
+                    AppId = newAppId,
+                    TemplateId = authGroupTemplate.Id,
+                    FormId = formMap.TryGetValue(authGroupTemplate.FormTemplateId, out var formDefId) ? formDefId : authGroupTemplate.FormTemplateId,
+                    Name = authGroupTemplate.Name,
+                    Desc = authGroupTemplate.Desc,
+                    Type = authGroupTemplate.Type,
+                    DataPerms = authGroupTemplate.DataPerms,
+                    DataFilter = authGroupTemplate.DataFilter,
+                    FieldPerms = authGroupTemplate.FieldPerms,
+                    Disabled = authGroupTemplate.Disabled,
+                };
+                await authGroupRepo.InsertAsync(authGroup);
             }
 
             appDef.AppMenus = BuildInstalledMenus(appTemplate, formMap, dashboardMap);

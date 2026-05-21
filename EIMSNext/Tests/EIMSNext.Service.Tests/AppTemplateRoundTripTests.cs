@@ -38,6 +38,8 @@ namespace EIMSNext.Service.Tests
             var workflowTemplateRepo = repos.Add(new InMemoryRepository<WfDefinitionTemplate>());
             var printTemplateTemplateRepo = repos.Add(new InMemoryRepository<PrintDefTemplate>());
             var profileRepo = repos.Add(new InMemoryRepository<AppProfile>());
+            var authGroupRepo = repos.Add(new InMemoryRepository<AuthGroup>());
+            var authGroupTemplateRepo = repos.Add(new InMemoryRepository<AuthGroupTemplate>());
 
             const string sourceAppId = "app-source";
             const string sourceFormId = "form-source";

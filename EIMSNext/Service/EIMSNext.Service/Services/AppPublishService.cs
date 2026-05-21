@@ -21,6 +21,8 @@ namespace EIMSNext.Service
             var dashboardItemDefRepo = _resolver.GetRepository<DashboardItemDef>();
             var wfDefRepo = _resolver.GetRepository<Wf_Definition>();
             var printDefRepo = _resolver.GetRepository<PrintDef>();
+            var authGroupRepo = _resolver.GetRepository<AuthGroup>();
+            var authGroupTemplateRepo = _resolver.GetRepository<AuthGroupTemplate>();
             var appTemplateRepo = _resolver.GetRepository<AppTemplate>();
             var formTemplateRepo = _resolver.GetRepository<FormTemplate>();
             var dashboardTemplateRepo = _resolver.GetRepository<DashboardTemplate>();
@@ -36,6 +38,7 @@ namespace EIMSNext.Service
             var dashboardItemDefs = dashboardItemDefRepo.Queryable.Where(x => x.AppId == appDefId && dashboardIds.Contains(x.DashboardId) && !x.DeleteFlag).ToList();
             var wfDefs = wfDefRepo.Queryable.Where(x => x.AppId == appDefId && !x.DeleteFlag && x.IsCurrent).ToList();
             var printDefs = printDefRepo.Queryable.Where(x => x.AppId == appDefId && !x.DeleteFlag).ToList();
+            var authGroups = authGroupRepo.Queryable.Where(x => x.AppId == appDefId && !x.DeleteFlag).ToList();
 
             var appTemplateId = EnsureTemplateId(appTemplateRepo, appDef.TemplateId);
             var formMap = formDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(formTemplateRepo, x.TemplateId));
@@ -43,6 +46,7 @@ namespace EIMSNext.Service
             var dashboardItemMap = dashboardItemDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(dashboardItemTemplateRepo, x.TemplateId));
             var wfMap = wfDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(wfTemplateRepo, x.TemplateId));
             var printMap = printDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(printTemplateRepo, x.TemplateId));
+            var authGroupMap = authGroups.ToDictionary(x => x.Id, x => EnsureTemplateId(authGroupTemplateRepo, x.TemplateId));
             var dashboardLayoutMap = CreateLayoutTemplateMap(dashboardDefs);
 
             await UpsertAsync(appTemplateRepo, new AppTemplate
@@ -137,6 +141,25 @@ namespace EIMSNext.Service
                 await SetTemplateIdAsync(printDefRepo, printDef, printMap[printDef.Id]);
             }
 
+            foreach (var authGroup in authGroups)
+            {
+                await UpsertAsync(authGroupTemplateRepo, new AuthGroupTemplate
+                {
+                    Id = authGroupMap[authGroup.Id],
+                    AppTemplateId = appTemplateId,
+                    FormTemplateId = formMap.TryGetValue(authGroup.FormId, out var formTemplateId) ? formTemplateId : authGroup.FormId,
+                    Name = authGroup.Name,
+                    Desc = authGroup.Desc,
+                    Type = authGroup.Type,
+                    DataPerms = authGroup.DataPerms,
+                    DataFilter = authGroup.DataFilter,
+                    FieldPerms = authGroup.FieldPerms,
+                    Disabled = authGroup.Disabled,
+                });
+
+                await SetTemplateIdAsync(authGroupRepo, authGroup, authGroupMap[authGroup.Id]);
+            }
+
             await SetTemplateIdAsync(appDefRepo, appDef, appTemplateId);
 
             var profile = appProfileRepo.Queryable.FirstOrDefault(x => x.TemplateId == appTemplateId && !x.DeleteFlag) ?? new AppProfile { Id = appProfileRepo.NewId(), TemplateId = appTemplateId };
@@ -199,6 +222,10 @@ namespace EIMSNext.Service
                     break;
                 case PrintDef print:
                     print.TemplateId = templateId;
+                    await repo.ReplaceAsync(entity);
+                    break;
+                case AuthGroup auth:
+                    auth.TemplateId = templateId;
                     await repo.ReplaceAsync(entity);
                     break;
             }
