@@ -2,11 +2,6 @@ using System.Security.Cryptography.X509Certificates;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Persistence;
 using EIMSNext.Auth.Services;
-using EIMSNext.Auth.Services.Providers;
-using EIMSNext.DingTalk.Clients;
-using EIMSNext.Feishu.Clients;
-using EIMSNext.WeChat.Clients;
-using EIMSNext.WxWork.Clients;
 using EIMSNext.MongoDb;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -26,20 +21,10 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             services.AddScoped<ISingleSignOnService, SingleSignOnService>();
-            services.AddScoped<IIntegrationAuthService, IntegrationAuthService>();
             services.AddScoped<IAuditLoginService, AuditLoginService>();
-            services.AddScoped<WeChatOpenClient>();
-            services.AddScoped<WxWorkClient>();
-            services.AddScoped<DingTalkClient>();
-            services.AddScoped<FeishuClient>();
-            services.AddScoped<IIntegrationProvider, WeChatIntegrationProvider>();
-            services.AddScoped<IIntegrationProvider, WxWorkIntegrationProvider>();
-            services.AddScoped<IIntegrationProvider, DingTalkIntegrationProvider>();
-            services.AddScoped<IIntegrationProvider, FeishuIntegrationProvider>();
             services.AddScoped<ITokenGrantHandler, PasswordTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, VerificationCodeTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
-            services.AddScoped<ITokenGrantHandler, IntegrationTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
             var certificatePath = Path.Combine(contentRootPath, configuration.GetSection("Certificates:CerPath").Value!);
@@ -58,7 +43,6 @@ namespace EIMSNext.Auth.Extensions
                     options.AllowPasswordFlow();
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SingleSignOn);
-                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Integration);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();

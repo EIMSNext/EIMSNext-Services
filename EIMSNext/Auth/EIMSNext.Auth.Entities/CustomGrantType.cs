@@ -10,6 +10,5 @@ namespace EIMSNext.Auth.Entities
     {
         public const string VerificationCode = "verification_code";
         public const string SingleSignOn = "sso_credentials";
-        public const string Integration = "integration";
     }
 }

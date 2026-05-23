@@ -15,8 +15,7 @@ namespace EIMSNext.Auth.Host
                     [
                         new Auth.Entities.ClientGrantType { GrantType = "password" },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.VerificationCode },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Integration }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn }
                     ],
                     AllowedScopes =
                     [
@@ -40,39 +39,5 @@ namespace EIMSNext.Auth.Host
             };
         }
 
-        public static IEnumerable<Auth.Entities.IntegrationLoginSetting> GetIntegrationLoginSettings()
-        {
-            return
-            [
-                new Auth.Entities.IntegrationLoginSetting
-                {
-                    Id = Auth.Entities.IntegrationLoginType.WeChat,
-                    Type = Auth.Entities.IntegrationLoginType.WeChat,
-                    DisplayName = "微信",
-                    Enabled = false
-                },
-                new Auth.Entities.IntegrationLoginSetting
-                {
-                    Id = Auth.Entities.IntegrationLoginType.WxWork,
-                    Type = Auth.Entities.IntegrationLoginType.WxWork,
-                    DisplayName = "企业微信",
-                    Enabled = false
-                },
-                new Auth.Entities.IntegrationLoginSetting
-                {
-                    Id = Auth.Entities.IntegrationLoginType.DingTalk,
-                    Type = Auth.Entities.IntegrationLoginType.DingTalk,
-                    DisplayName = "钉钉",
-                    Enabled = false
-                },
-                new Auth.Entities.IntegrationLoginSetting
-                {
-                    Id = Auth.Entities.IntegrationLoginType.Feishu,
-                    Type = Auth.Entities.IntegrationLoginType.Feishu,
-                    DisplayName = "飞书",
-                    Enabled = false
-                }
-            ];
-        }
     }
 }
