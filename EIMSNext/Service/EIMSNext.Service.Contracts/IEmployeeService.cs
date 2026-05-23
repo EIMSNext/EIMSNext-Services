@@ -9,5 +9,7 @@ namespace EIMSNext.Service.Contracts
     {
         Task<UpdateResult> AddToRoleAsync(Role role, IEnumerable<string> empIds);
         Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds);
+        Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved, string corpId);
+        Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted);
     }
 }

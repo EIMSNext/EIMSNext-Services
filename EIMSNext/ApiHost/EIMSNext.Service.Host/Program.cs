@@ -191,10 +191,10 @@ async void EnsureSeedData(IResolver resolver)
                     Description = "演示插件字段配置与映射",
                     InputFields =
                     [
-                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = FieldType.Input, Required = true },
-                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = FieldType.Number, Required = true },
-                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = FieldType.TimeStamp },
-                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = FieldType.TextArea }
+                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = "Input", Required = true },
+                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = "Number", Required = true },
+                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = "TimeStamp" },
+                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = "TextArea" }
                     ]
                 }
             ]

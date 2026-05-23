@@ -7,7 +7,6 @@ using Microsoft.Extensions.Caching.Memory;
 namespace EIMSNext.Auth.Services
 {
     public class AccountSecurityService(
-        IUserService userService,
         IAuthDbContext dbContext,
         IMemoryCache memoryCache) : IAccountSecurityService
     {
@@ -77,7 +76,7 @@ namespace EIMSNext.Auth.Services
             switch (request.Type)
             {
                 case VerifyIdentityType.Password:
-                    if (string.IsNullOrWhiteSpace(request.Password) || !userService.VerifyPassword(user, request.Password))
+                    if (string.IsNullOrWhiteSpace(request.Password) || !VerifyPassword(user, request.Password))
                     {
                         throw new InvalidOperationException("密码验证失败");
                     }
@@ -233,7 +232,7 @@ namespace EIMSNext.Auth.Services
 
         private User GetCurrentUser(string userId)
         {
-            return userService.FindById(userId) ?? throw new InvalidOperationException("当前用户不存在");
+            return dbContext.Users.FirstOrDefault(x => x.Id == userId) ?? throw new InvalidOperationException("当前用户不存在");
         }
 
         private User ConsumeVerifyTicket(string userId, string verifyToken)
@@ -259,11 +258,18 @@ namespace EIMSNext.Auth.Services
 
         private void EnsureTargetAvailable(string type, string target, string currentUserId)
         {
-            User? duplicated = type == PinCodeTargetType.Phone ? userService.FindByPhone(target) : userService.FindByEmail(target);
+            User? duplicated = type == PinCodeTargetType.Phone
+                ? dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == target)
+                : dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Email == target);
             if (duplicated != null && duplicated.Id != currentUserId)
             {
                 throw new InvalidOperationException(type == PinCodeTargetType.Phone ? "手机号已存在" : "邮箱已存在");
             }
+        }
+
+        private static bool VerifyPassword(User user, string password)
+        {
+            return password == Constants.NoPassword || HKH.Common.Security.BCrypt.Verify(password, user.Password);
         }
 
         private static bool IsUsage(string usage)

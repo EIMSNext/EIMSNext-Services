@@ -3,6 +3,7 @@ using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiService;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
@@ -10,8 +11,10 @@ using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Host.Requests;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 
@@ -94,6 +97,26 @@ namespace EIMSNext.Service.Host.Controllers
             user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
             await Resolver.GetApiService<User, User>().ReplaceAsync(user);
             return ApiResult.Success(req.CorpId).ToActionResult();
+        }
+
+        [HttpPost("JoinCorp")]
+        [Permission(Operation = Operation.Write)]
+        [IdentityType(IdentityType.NoCorp)]
+        public async Task<IActionResult> JoinCorp([FromBody] ApplyJoinCorporateRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CorpId))
+            {
+                return BadRequest("请选择要加入的企业");
+            }
+
+            var user = IdentityContext.CurrentUser as User;
+            if (user == null)
+            {
+                return BadRequest("未登录用户");
+            }
+
+            await Resolver.Resolve<ICorpOnboardingService>().ApplyJoinCorporateAsync(request.CorpId, user);
+            return ApiResult.Success().ToActionResult();
         }
 
         /// <summary>

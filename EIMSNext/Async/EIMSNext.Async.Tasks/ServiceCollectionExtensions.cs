@@ -1,7 +1,6 @@
 using EIMSNext.Async.Tasks.Consumers;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace EIMSNext.Async.Tasks
 {

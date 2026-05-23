@@ -10,6 +10,7 @@ namespace EIMSNext.Auth.Interfaces
         User? FindByEmail(string email);
         User? FindByPhone(string phone);
         User? FindByEmpNo(string corpId, string empNo);
+        Client? FindEnabledClient(string clientId);
         bool VerifyPassword(User user, string password);
     }
 }

@@ -12,22 +12,44 @@ namespace EIMSNext.ApiService
 {
     public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, EmployeeViewModel, IEmployeeService>(resolver)
     {
+        public Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved)
+        {
+            return CoreService.ReviewJoinCorporateAsync(employeeIds, approved, IdentityContext.CurrentCorpId);
+        }
+
+        public Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted)
+        {
+            return CoreService.AcceptInviteAsync(userId, phone, email, accepted);
+        }
+
         protected override async Task AddAsyncCore(Employee entity)
         {
             var platform = GetCurrentCorpPlatform();
             if (platform == PlatformType.Private)
             {
+                entity.Status = EmployeeStatus.Active;
+                entity.UserBound = true;
                 await BindPrivateUserAsync(entity, null, createWhenMissing: true);
             }
-            else if (!entity.Approved && !string.IsNullOrEmpty(entity.Invite)
-                && (!string.IsNullOrEmpty(entity.WorkPhone) || !string.IsNullOrEmpty(entity.WorkEmail)))
+            else if (!string.IsNullOrWhiteSpace(entity.Invite)
+                && (!string.IsNullOrWhiteSpace(entity.WorkPhone) || !string.IsNullOrWhiteSpace(entity.WorkEmail)))
             {
-                var user = CreateUser(entity, platform);
-                Resolver.GetService<User>().Add(user);
-                ApplyBoundUser(entity, user);
+                entity.Status = EmployeeStatus.Active;
+                entity.UserBound = false;
+            }
+            else
+            {
+                entity.Status = EmployeeStatus.Active;
+                entity.UserBound = true;
             }
 
             await base.AddAsyncCore(entity);
+
+            if (platform != PlatformType.Private && !string.IsNullOrWhiteSpace(entity.Invite)
+                && (!string.IsNullOrWhiteSpace(entity.WorkPhone) || !string.IsNullOrWhiteSpace(entity.WorkEmail)))
+            {
+                await CreateAdminInviteRequestAsync(entity);
+            }
         }
 
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Employee entity)
@@ -56,7 +78,7 @@ namespace EIMSNext.ApiService
 
             foreach (var employee in employees)
             {
-                employee.Status = 1;
+                employee.Status = EmployeeStatus.Inactive;
                 employee.DeleteFlag = true;
 
                 if (isPrivate && !string.IsNullOrEmpty(employee.UserId))
@@ -151,9 +173,37 @@ namespace EIMSNext.ApiService
 
         private static void ApplyBoundUser(Employee entity, User user)
         {
-            entity.Approved = true;
+            entity.UserBound = true;
+            entity.Status = EmployeeStatus.Active;
             entity.UserId = user.Id;
             entity.UserName = user.Name;
+        }
+
+        private async Task CreateAdminInviteRequestAsync(Employee entity)
+        {
+            var requestRepo = Resolver.GetRepository<CorpOnboardingRequest>();
+            var corporate = Resolver.GetService<Corporate>().Get(IdentityContext.CurrentCorpId);
+            var exists = requestRepo.Queryable.Any(x => x.EmployeeId == entity.Id);
+            if (exists)
+            {
+                return;
+            }
+
+            var request = new CorpOnboardingRequest
+            {
+                UserId = string.Empty,
+                UserName = string.Empty,
+                TargetCorpId = IdentityContext.CurrentCorpId,
+                TargetCorpName = corporate?.Name ?? string.Empty,
+                ApplicantName = entity.EmpName,
+                Phone = entity.WorkPhone,
+                Email = entity.WorkEmail,
+                EmployeeId = entity.Id,
+                SourceType = CorpOnboardingSourceType.AdminInvite,
+            };
+
+            requestRepo.EnsureId(request);
+            await requestRepo.InsertAsync(request);
         }
 
         private PlatformType GetCurrentCorpPlatform()

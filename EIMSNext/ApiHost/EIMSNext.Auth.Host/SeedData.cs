@@ -39,5 +39,40 @@ namespace EIMSNext.Auth.Host
                 new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" }
             };
         }
+
+        public static IEnumerable<Auth.Entities.IntegrationLoginSetting> GetIntegrationLoginSettings()
+        {
+            return
+            [
+                new Auth.Entities.IntegrationLoginSetting
+                {
+                    Id = Auth.Entities.IntegrationLoginType.WeChat,
+                    Type = Auth.Entities.IntegrationLoginType.WeChat,
+                    DisplayName = "微信",
+                    Enabled = false
+                },
+                new Auth.Entities.IntegrationLoginSetting
+                {
+                    Id = Auth.Entities.IntegrationLoginType.WxWork,
+                    Type = Auth.Entities.IntegrationLoginType.WxWork,
+                    DisplayName = "企业微信",
+                    Enabled = false
+                },
+                new Auth.Entities.IntegrationLoginSetting
+                {
+                    Id = Auth.Entities.IntegrationLoginType.DingTalk,
+                    Type = Auth.Entities.IntegrationLoginType.DingTalk,
+                    DisplayName = "钉钉",
+                    Enabled = false
+                },
+                new Auth.Entities.IntegrationLoginSetting
+                {
+                    Id = Auth.Entities.IntegrationLoginType.Feishu,
+                    Type = Auth.Entities.IntegrationLoginType.Feishu,
+                    DisplayName = "飞书",
+                    Enabled = false
+                }
+            ];
+        }
     }
 }

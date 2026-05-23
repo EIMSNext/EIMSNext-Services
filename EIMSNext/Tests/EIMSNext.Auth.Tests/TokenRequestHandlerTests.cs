@@ -1,5 +1,6 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Services;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
@@ -42,7 +43,7 @@ namespace EIMSNext.Auth.Tests
             };
 
             var handler = new TokenRequestHandler(
-                new FakeAuthDbContext([client], [user]),
+                new FakeUserService(user, [client]),
                 CreateGrantHandlers(user));
 
             var request = new OpenIddictRequest
@@ -84,7 +85,7 @@ namespace EIMSNext.Auth.Tests
             };
 
             var handler = new TokenRequestHandler(
-                new FakeAuthDbContext([client], [user]),
+                new FakeUserService(user, [client]),
                 CreateGrantHandlers(user));
 
             var request = new OpenIddictRequest
@@ -118,24 +119,11 @@ namespace EIMSNext.Auth.Tests
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
                 new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
-                new IntegrationTokenGrantHandler()
+                new IntegrationTokenGrantHandler(new FakeIntegrationAuthService(), auditLoginService, contextAccessor)
             ];
         }
 
-        private sealed class FakeAuthDbContext(List<Client> clients, List<User> users) : IAuthDbContext
-        {
-            public IQueryable<Client> Clients => clients.AsQueryable();
-            public IQueryable<User> Users => users.AsQueryable();
-            public IQueryable<AuditLogin> AuditLogins => throw new NotSupportedException();
-
-            public Task AddClient(Client entity) => throw new NotSupportedException();
-            public Task AddUser(User entity) => throw new NotSupportedException();
-            public Task UpdateUser(User entity) => throw new NotSupportedException();
-            public Task AddAuditLogin(AuditLogin entity) => Task.CompletedTask;
-            public void Dispose() { }
-        }
-
-        private sealed class FakeUserService(User user) : IUserService
+        private sealed class FakeUserService(User user, List<Client>? clients = null) : IUserService
         {
             public User? Validate(string emailOrPhone, string password)
             {
@@ -149,6 +137,7 @@ namespace EIMSNext.Auth.Tests
             public User? FindByEmail(string email) => user.Email == email ? user : null;
             public User? FindByPhone(string phone) => user.Phone == phone ? user : null;
             public User? FindByEmpNo(string corpId, string empNo) => null;
+            public Client? FindEnabledClient(string clientId) => clients?.FirstOrDefault(x => x.Id == clientId && x.Enabled);
             public bool VerifyPassword(User inputUser, string password) => inputUser.Id == user.Id && password == Constants.NoPassword;
         }
 
@@ -165,6 +154,19 @@ namespace EIMSNext.Auth.Tests
         private sealed class FakeAuditLoginService : IAuditLoginService
         {
             public Task AddAuditLogin(AuditLogin entity) => Task.CompletedTask;
+        }
+
+        private sealed class FakeIntegrationAuthService : IIntegrationAuthService
+        {
+            public Task<IntegrationAuthorizationUrlResult> GetAuthorizationUrlAsync(string integrationType, string state, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(new IntegrationAuthorizationUrlResult());
+            }
+
+            public Task<User?> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult<User?>(null);
+            }
         }
     }
 }
