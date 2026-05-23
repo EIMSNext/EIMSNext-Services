@@ -937,6 +937,11 @@ namespace EIMSNext.Service.Entities
         /// 是否级联部门（包含下级部门）
         /// </summary>
         public bool CascadedDept { get; set; }
+
+        /// <summary>
+        /// 主管层级，支持多选。
+        /// </summary>
+        public List<int>? ManagerLevels { get; set; }
     }
 
     /// <summary>
