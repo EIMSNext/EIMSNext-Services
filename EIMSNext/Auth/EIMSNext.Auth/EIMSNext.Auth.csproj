@@ -13,5 +13,9 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
+    <ProjectReference Include="..\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj" />
+    <ProjectReference Include="..\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
+    <ProjectReference Include="..\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
+    <ProjectReference Include="..\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
   </ItemGroup>
 </Project>

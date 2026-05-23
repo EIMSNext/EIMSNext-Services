@@ -81,5 +81,12 @@ void EnsureSeedData(IAuthDbContext context)
         }
     }
 
+    if (!context.IntegrationLoginSettings.Any())
+    {
+        foreach (var setting in SeedData.GetIntegrationLoginSettings())
+        {
+            context.AddIntegrationLoginSetting(setting);
+        }
+    }
 }
 

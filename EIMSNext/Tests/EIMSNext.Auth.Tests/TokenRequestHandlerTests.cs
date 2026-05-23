@@ -118,7 +118,8 @@ namespace EIMSNext.Auth.Tests
             [
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
-                new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor)
+                new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
+                new IntegrationTokenGrantHandler(new FakeIntegrationAuthService(), auditLoginService, contextAccessor)
             ];
         }
 
@@ -153,6 +154,19 @@ namespace EIMSNext.Auth.Tests
         private sealed class FakeAuditLoginService : IAuditLoginService
         {
             public Task AddAuditLogin(AuditLogin entity) => Task.CompletedTask;
+        }
+
+        private sealed class FakeIntegrationAuthService : IIntegrationAuthService
+        {
+            public Task<IntegrationAuthorizationUrlResult> GetAuthorizationUrlAsync(string integrationType, string state, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult(new IntegrationAuthorizationUrlResult());
+            }
+
+            public Task<User?> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
+            {
+                return Task.FromResult<User?>(null);
+            }
         }
     }
 }

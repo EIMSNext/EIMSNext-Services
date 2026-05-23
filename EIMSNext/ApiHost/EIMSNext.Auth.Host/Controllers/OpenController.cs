@@ -1,4 +1,5 @@
 using System.Reflection;
+using EIMSNext.Auth.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Auth.Host.Controllers
@@ -9,6 +10,13 @@ namespace EIMSNext.Auth.Host.Controllers
     [ApiController]
     public class OpenController : ControllerBase
     {
+        private readonly IIntegrationAuthService _integrationAuthService;
+
+        public OpenController(IIntegrationAuthService integrationAuthService)
+        {
+            _integrationAuthService = integrationAuthService;
+        }
+
         [Route("api/ping"), HttpGet]
         public string Ping()
         {
@@ -19,6 +27,18 @@ namespace EIMSNext.Auth.Host.Controllers
         public string Version()
         {
             return Assembly.GetExecutingAssembly().GetName().Version!.ToString();
+        }
+
+        [Route("api/open/integration/authorize"), HttpGet]
+        public async Task<IActionResult> GetIntegrationAuthorizationUrl([FromQuery] string type, [FromQuery] string state, CancellationToken cancellationToken)
+        {
+            var result = await _integrationAuthService.GetAuthorizationUrlAsync(type, state, cancellationToken);
+            if (!result.Enabled || string.IsNullOrWhiteSpace(result.AuthorizationUrl))
+            {
+                return BadRequest(new { message = $"{type} 集成登录未启用或配置不完整" });
+            }
+
+            return Ok(result);
         }
     }
 }
