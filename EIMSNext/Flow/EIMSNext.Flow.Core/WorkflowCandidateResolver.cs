@@ -34,9 +34,9 @@ namespace EIMSNext.Flow.Core
         public async Task<List<string>> ResolveEmployeeIdsAsync(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
             var empIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            if (candidates?.Count <= 0)
+            if (candidates == null || candidates.Count <= 0)
             {
-                return [];
+                return new List<string>();
             }
 
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);

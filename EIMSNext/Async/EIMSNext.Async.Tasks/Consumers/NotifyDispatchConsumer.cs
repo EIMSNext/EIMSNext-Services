@@ -1,14 +1,10 @@
-using System.Dynamic;
-using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
-using EIMSNext.Core.Extensions;
-using EIMSNext.Core.Query;
 using EIMSNext.MongoDb;
-using EIMSNext.Scripting;
+using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -46,12 +42,24 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var notifyRepo = resolver.GetRepository<FormNotify>();
             var formDefRepo = resolver.GetRepository<FormDef>();
+            var formDataRepo = resolver.GetRepository<FormData>();
             var publisher = resolver.Resolve<IMessagePublisher>();
             var detailBuilder = resolver.Resolve<IFormNotifyDetailBuilder>();
             var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
             var templateResolver = resolver.Resolve<DataTitleResolver>();
 
-            var formDef = formDefRepo.Get(args.NewData.FormId);
+            var currentData = args.NewData;
+            if (args.FormTriggerMode == FormNotifyTriggerMode.TimeFieldScheduled && !string.IsNullOrWhiteSpace(args.DataId))
+            {
+                currentData = formDataRepo.Get(args.DataId);
+                if (currentData == null)
+                {
+                    return;
+                }
+                args.NewData = currentData;
+            }
+
+            var formDef = formDefRepo.Get(currentData.FormId);
             if (formDef == null)
             {
                 return;
@@ -59,34 +67,36 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var notifies = notifyRepo.Find(x =>
                 x.CorpId == args.CorpId &&
-                x.AppId == args.NewData.AppId &&
-                x.FormId == args.NewData.FormId &&
+                x.AppId == currentData.AppId &&
+                x.FormId == currentData.FormId &&
                 !x.Disabled &&
                 x.TriggerMode == args.FormTriggerMode.Value).ToList();
 
             foreach (var notify in notifies)
             {
-                if (!ShouldNotify(resolver, notify, args))
+                if (!FormNotifyRuntime.ShouldNotify(resolver, notify, args))
                 {
                     continue;
                 }
 
-                var receivers = await recipientResolver.ResolveAsync(args.NewData, formDef, notify.Notifiers, args.Operator?.Id);
+                var receivers = await recipientResolver.ResolveAsync(currentData, formDef, notify.Notifiers, args.Operator?.Id);
                 if (receivers.Count == 0)
                 {
                     continue;
                 }
 
                 var detail = args.FormTriggerMode == FormNotifyTriggerMode.DataAdded || args.OldData == null
-                    ? detailBuilder.BuildForAdd(args.NewData, formDef)
-                    : detailBuilder.BuildForChange(args.OldData, args.NewData, formDef);
+                    ? detailBuilder.BuildForAdd(currentData, formDef)
+                    : detailBuilder.BuildForChange(args.OldData, currentData, formDef);
 
-                var title = templateResolver.Resolve(notify.NotifyText, args.NewData, formDef);
-                var url = $"/data/{args.DataId}";
+                var title = templateResolver.Resolve(notify.NotifyText, currentData, formDef);
+                var url = args.FormTriggerMode == FormNotifyTriggerMode.CustomScheduled
+                    ? $"/app/{notify.AppId}/form/{notify.FormId}"
+                    : $"/app/{currentData.AppId}/form/{currentData.FormId}/data/{args.DataId}";
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;
 
-                await PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
             }
         }
 
@@ -130,7 +140,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
         }
 
         private static async Task HandleWfExpireNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -184,7 +194,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct);
         }
 
         private static async Task HandleWfUrgeNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -222,40 +232,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
-        }
-
-        private static async Task PublishToChannelsAsync(IMessagePublisher publisher, string corpId, string notifyId, string title, string detail, string url, long expireTime, MessageCategory category, NotifyChannel channels, List<NotifyReceiver> receivers, MessageType messageType, CancellationToken ct)
-        {
-            if (channels.HasFlag(NotifyChannel.System))
-            {
-                await publisher.PublishAsync(new SystemMessageTaskArgs
-                {
-                    CorpId = corpId,
-                    NotifyId = notifyId,
-                    Title = title,
-                    Detail = detail,
-                    Url = url,
-                    ExpireTime = expireTime,
-                    Category = category,
-                    Receivers = receivers,
-                    MessageType = messageType
-                }, ct);
-            }
-
-            if (channels.HasFlag(NotifyChannel.Email))
-            {
-                await publisher.PublishAsync(new EmailNotifyTaskArgs
-                {
-                    CorpId = corpId,
-                    NotifyId = notifyId,
-                    Title = title,
-                    Detail = detail,
-                    Url = url,
-                    Receivers = receivers,
-                    MessageType = messageType
-                }, ct);
-            }
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
         }
 
         private static async Task<List<NotifyReceiver>> ResolveTodoReceiversAsync(IResolver resolver, IEnumerable<string> empIds)
@@ -281,7 +258,6 @@ namespace EIMSNext.Async.Tasks.Consumers
         private static WfStep? GetWorkflowStep(IResolver resolver, string wfInstanceId, string approveNodeId)
         {
             var definition = GetWorkflowDefinition(resolver, wfInstanceId);
-
             return definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == approveNodeId);
         }
 
@@ -328,64 +304,6 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             return string.Join(Environment.NewLine, lines);
-        }
-
-        private static bool ShouldNotify(IResolver resolver, FormNotify notify, NotifyDispatchTaskArgs args)
-        {
-            if (args.NewData == null || !args.FormTriggerMode.HasValue)
-            {
-                return false;
-            }
-
-            if (args.FormTriggerMode == FormNotifyTriggerMode.DataChanged && args.OldData != null)
-            {
-                var changedFields = ExpandoComparer.Compare(args.OldData.Data, args.NewData.Data)
-                    .Select(x => x.FieldId)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                if (notify.ChangeFields?.Count > 0 && !notify.ChangeFields.Any(changedFields.Contains))
-                {
-                    return false;
-                }
-            }
-
-            if (notify.TriggerMode == FormNotifyTriggerMode.DataAdded || notify.TriggerMode == FormNotifyTriggerMode.DataChanged)
-            {
-                if (!string.IsNullOrEmpty(notify.DataExpressFilter))
-                {
-                    var pData = args.NewData.Data;
-                    pData.TryAdd("createBy", args.NewData.CreateBy);
-                    return resolver.Resolve<IScriptEngine>().Evaluate<bool>(notify.DataExpressFilter, new Dictionary<string, object>()
-                    {
-                        ["data"] = pData
-                    }).Value;
-                }
-
-                return true;
-            }
-
-            if (string.IsNullOrWhiteSpace(notify.DataDynamicFilter))
-            {
-                return true;
-            }
-
-            var filter = notify.DataDynamicFilter.DeserializeFromJson<DynamicFilter>();
-            if (filter == null)
-            {
-                return true;
-            }
-
-            var composed = new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items =
-                [
-                    new DynamicFilter { Field = nameof(FormData.Id), Op = FilterOp.Eq, Value = args.DataId },
-                    filter
-                ]
-            };
-
-            return resolver.GetRepository<FormData>().Count(composed) > 0;
         }
     }
 }

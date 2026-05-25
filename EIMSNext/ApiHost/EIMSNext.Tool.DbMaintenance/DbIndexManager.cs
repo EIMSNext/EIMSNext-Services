@@ -26,6 +26,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreatePluginStoreIndexes(background);
             CreateDefinitionIndexes(background);
             CreateFormDataIndexes(background);
+            CreateFormNotifyIndexes(background);
             CreateWebhookIndexes(background);
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
@@ -165,6 +166,59 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<FormData>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Ascending(x => x.AppId),
                 options,
                 "ix_formdata_corp_delete_app");
+        }
+
+        private void CreateFormNotifyIndexes(CreateIndexOptions options)
+        {
+            CreateCorpIdIndex<FormNotify>(options, "ix_formnotify_corpid");
+            CreateCorpIdIndex<FormNotifyDispatchLog>(options, "ix_formnotifydispatchlog_corpid");
+            CreateCorpIdIndex<FormNotifyScheduleItem>(options, "ix_formnotifyscheduleitem_corpid");
+
+            CreateIndex(GetCollection<FormNotify>(),
+                Builders<FormNotify>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.Disabled)
+                    .Ascending(x => x.TriggerMode)
+                    .Ascending(x => x.NextTriggerTime),
+                options,
+                "ix_formnotify_corp_disabled_trigger_next");
+
+            CreateIndex(GetCollection<FormNotify>(),
+                Builders<FormNotify>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.FormId)
+                    .Ascending(x => x.TriggerMode)
+                    .Ascending(x => x.Disabled),
+                options,
+                "ix_formnotify_corp_form_trigger_disabled");
+
+            CreateIndex(GetCollection<FormNotifyDispatchLog>(),
+                Builders<FormNotifyDispatchLog>.IndexKeys
+                    .Ascending(x => x.NotifyId)
+                    .Ascending(x => x.DataId)
+                    .Ascending(x => x.TriggerTime),
+                CreateUniqueOptions(options),
+                "ix_formnotifydispatchlog_notify_data_trigger_unique");
+
+            CreateIndex(GetCollection<FormNotifyDispatchLog>(),
+                Builders<FormNotifyDispatchLog>.IndexKeys.Ascending(x => x.CreateTime),
+                options,
+                "ix_formnotifydispatchlog_createtime");
+
+            CreateIndex(GetCollection<FormNotifyScheduleItem>(),
+                Builders<FormNotifyScheduleItem>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.TriggerTime)
+                    .Ascending(x => x.TriggerMode),
+                options,
+                "ix_formnotifyscheduleitem_corp_trigger_triggermode");
+
+            CreateIndex(GetCollection<FormNotifyScheduleItem>(),
+                Builders<FormNotifyScheduleItem>.IndexKeys
+                    .Ascending(x => x.NotifyId)
+                    .Ascending(x => x.DataId),
+                CreateUniqueOptions(options),
+                "ix_formnotifyscheduleitem_notify_data_unique");
         }
 
         private void CreateWebhookIndexes(CreateIndexOptions options)
