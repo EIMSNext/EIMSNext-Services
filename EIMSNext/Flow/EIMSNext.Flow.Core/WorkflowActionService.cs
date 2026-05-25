@@ -26,6 +26,7 @@ namespace EIMSNext.Flow.Core
         private readonly IRepository<FormDef> _formDefRepo;
         private readonly IRepository<FormData> _formDataRepo;
         private readonly IRepository<Employee> _employeeRepo;
+        private readonly IRepository<Department> _departmentRepo;
         private readonly IMongoCollection<WorkflowInstance> _workflowCollection;
         private readonly IMongoCollection<EventSubscription> _subscriptionCollection;
 
@@ -38,6 +39,7 @@ namespace EIMSNext.Flow.Core
             _formDefRepo = resolver.GetRepository<FormDef>();
             _formDataRepo = resolver.GetRepository<FormData>();
             _employeeRepo = resolver.GetRepository<Employee>();
+            _departmentRepo = resolver.GetRepository<Department>();
             var db = resolver.Resolve<IMongoDbContex>().Database;
             _workflowCollection = db.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
             _subscriptionCollection = db.GetCollection<EventSubscription>("Wf_Subscription");
@@ -287,48 +289,8 @@ namespace EIMSNext.Flow.Core
 
         private async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
-            var empIds = new List<string>();
-            if (candidates?.Count > 0)
-            {
-                var deptIds = new List<string>();
-                var roleIds = new List<string>();
-                foreach (var c in candidates)
-                {
-                    switch (c.CandidateType)
-                    {
-                        case CandidateType.Department:
-                            deptIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Role:
-                            roleIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Employee:
-                            empIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Dynamic:
-                            if (c.CandidateId == "starter" && dataContext.WfStarter != null)
-                            {
-                                empIds.Add(dataContext.WfStarter.Id);
-                            }
-                            break;
-                    }
-                }
-
-                if (deptIds.Any())
-                {
-                    await _employeeRepo.Find(x => deptIds.Contains(x.DepartmentId)).ForEachAsync(x => empIds.Add(x.Id));
-                }
-
-                if (roleIds.Any())
-                {
-                    await _employeeRepo.Find(new MongoFindOptions<Employee>
-                    {
-                        Filter = Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId))
-                    }).ForEachAsync(x => empIds.Add(x.Id));
-                }
-            }
-
-            return empIds.Distinct().Take(100);
+            var resolver = new WorkflowCandidateResolver(_employeeRepo, _departmentRepo, _formDefRepo, _formDataRepo);
+            return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 
         private async Task EnsureStartApprovalLogAsync(WorkflowInstance workflowInstance, WfDataContext dataContext)
