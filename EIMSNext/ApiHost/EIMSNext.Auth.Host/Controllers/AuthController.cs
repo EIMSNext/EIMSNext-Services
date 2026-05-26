@@ -26,9 +26,17 @@ namespace EIMSNext.Auth.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [Route("auth/sendRegCode"), HttpPost]
-        public IActionResult SendRegCode()
+        public async Task<IActionResult> SendRegCode([FromBody] SendRegCodeRequest request)
         {
-            return NoContent();
+            try
+            {
+                await _accountSecurityService.SendRegCodeAsync(request);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         /// <summary>
@@ -36,9 +44,17 @@ namespace EIMSNext.Auth.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [Route("auth/register"), HttpPost]
-        public IActionResult Register()
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
         {
-            return NoContent();
+            try
+            {
+                await _accountSecurityService.RegisterAsync(request);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [Authorize]

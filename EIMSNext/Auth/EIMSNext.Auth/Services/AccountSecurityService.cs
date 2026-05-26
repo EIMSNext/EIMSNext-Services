@@ -2,6 +2,7 @@ using System.Text.RegularExpressions;
 using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Core.Entities;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Auth.Services
@@ -14,15 +15,66 @@ namespace EIMSNext.Auth.Services
         private static readonly TimeSpan VerifyTokenTtl = TimeSpan.FromMinutes(10);
         private static readonly Regex PhoneRegex = new("^1[3-9]\\d{9}$", RegexOptions.Compiled);
         private static readonly Regex EmailRegex = new(@"^\w[-\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\.)+[A-Za-z]{2,14}$", RegexOptions.Compiled);
+        private static readonly Regex UppercaseRegex = new("[A-Z]", RegexOptions.Compiled);
+        private static readonly Regex LowercaseRegex = new("[a-z]", RegexOptions.Compiled);
+        private static readonly Regex DigitRegex = new("\\d", RegexOptions.Compiled);
+        private static readonly Regex SpecialCharRegex = new("[^A-Za-z0-9]", RegexOptions.Compiled);
+
+        public Task SendRegCodeAsync(SendRegCodeRequest request)
+        {
+            if (!IsTargetType(request.Type))
+            {
+                throw new InvalidOperationException("验证码类型无效");
+            }
+
+            ValidateTarget(request.Type, request.Target);
+            EnsureTargetAvailable(request.Type, request.Target, string.Empty);
+            return Task.CompletedTask;
+        }
+
+        public async Task RegisterAsync(RegisterRequest request)
+        {
+            if (!IsTargetType(request.Type))
+            {
+                throw new InvalidOperationException("注册类型无效");
+            }
+
+            if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException("验证码错误");
+            }
+
+            ValidatePasswordStrength(request.Password, "密码");
+
+            var user = new User
+            {
+                Password = HKH.Common.Security.BCrypt.HashPassword(request.Password),
+                Platform = PlatformType.Public,
+            };
+
+            if (request.Type == PinCodeTargetType.Phone)
+            {
+                var phone = request.Phone?.Trim() ?? string.Empty;
+                ValidateTarget(request.Type, phone);
+                EnsureTargetAvailable(request.Type, phone, string.Empty);
+                user.Phone = phone;
+                user.Name = phone;
+            }
+            else
+            {
+                var email = request.Email?.Trim() ?? string.Empty;
+                ValidateTarget(request.Type, email);
+                EnsureTargetAvailable(request.Type, email, string.Empty);
+                user.Email = email;
+                user.Name = GetEmailName(email);
+            }
+
+            await dbContext.AddUser(user);
+        }
 
         public Task SendPinCodeAsync(string userId, SendPinCodeRequest request)
         {
             var user = GetCurrentUser(userId);
-
-            if (string.IsNullOrWhiteSpace(request.Target))
-            {
-                throw new InvalidOperationException("手机号或邮箱不能为空");
-            }
 
             if (!IsTargetType(request.Type))
             {
@@ -36,6 +88,7 @@ namespace EIMSNext.Auth.Services
 
             if (request.Usage == PinCodeUsage.Verify)
             {
+                ValidateTarget(request.Type, request.Target);
                 if (request.Type == PinCodeTargetType.Phone)
                 {
                     if (string.IsNullOrWhiteSpace(user.Phone))
@@ -63,6 +116,7 @@ namespace EIMSNext.Auth.Services
             }
             else
             {
+                ValidateTarget(request.Type, request.Target);
                 EnsureTargetAvailable(request.Type, request.Target, user.Id);
             }
 
@@ -130,15 +184,12 @@ namespace EIMSNext.Auth.Services
                 throw new InvalidOperationException("新密码不能为空");
             }
 
-            if (request.NewPassword.Length < 6)
-            {
-                throw new InvalidOperationException("新密码至少6位");
-            }
-
             if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException("两次输入的新密码不一致");
             }
+
+            ValidatePasswordStrength(request.NewPassword, "新密码");
 
             user.Password = HKH.Common.Security.BCrypt.HashPassword(request.NewPassword);
             await dbContext.UpdateUser(user);
@@ -270,6 +321,54 @@ namespace EIMSNext.Auth.Services
         private static bool VerifyPassword(User user, string password)
         {
             return password == Constants.NoPassword || HKH.Common.Security.BCrypt.Verify(password, user.Password);
+        }
+
+        private static void ValidatePasswordStrength(string password, string fieldName)
+        {
+            if (password.Length < 8 || password.Length > 30)
+            {
+                throw new InvalidOperationException($"{fieldName}长度需为8-30位");
+            }
+
+            var categories = 0;
+            if (UppercaseRegex.IsMatch(password)) categories++;
+            if (LowercaseRegex.IsMatch(password)) categories++;
+            if (DigitRegex.IsMatch(password)) categories++;
+            if (SpecialCharRegex.IsMatch(password)) categories++;
+
+            if (categories < 3)
+            {
+                throw new InvalidOperationException($"{fieldName}需包含大写字母、小写字母、数字、特殊字符中的至少三种");
+            }
+        }
+
+        private static string GetEmailName(string email)
+        {
+            var atIndex = email.IndexOf('@');
+            return atIndex > 0 ? email[..atIndex] : email;
+        }
+
+        private static void ValidateTarget(string type, string target)
+        {
+            if (string.IsNullOrWhiteSpace(target))
+            {
+                throw new InvalidOperationException("手机号或邮箱不能为空");
+            }
+
+            if (type == PinCodeTargetType.Phone)
+            {
+                if (!PhoneRegex.IsMatch(target))
+                {
+                    throw new InvalidOperationException("手机号格式不正确");
+                }
+
+                return;
+            }
+
+            if (!EmailRegex.IsMatch(target))
+            {
+                throw new InvalidOperationException("邮箱格式不正确");
+            }
         }
 
         private static bool IsUsage(string usage)
