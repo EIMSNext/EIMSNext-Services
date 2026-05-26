@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using HKH.Common.Security;
@@ -8,52 +9,58 @@ namespace EIMSNext.Auth.Services
     public sealed class IntegrationAuthService : IIntegrationAuthService
     {
         private readonly IAuthDbContext _dbContext;
-        private readonly IReadOnlyDictionary<string, IIntegrationProvider> _providers;
+        private readonly IIntegrationProviderResolver _providerResolver;
 
-        public IntegrationAuthService(IAuthDbContext dbContext, IEnumerable<IIntegrationProvider> providers)
+        public IntegrationAuthService(IAuthDbContext dbContext, IIntegrationProviderResolver providerResolver)
         {
             _dbContext = dbContext;
-            _providers = providers.ToDictionary(x => x.Type, StringComparer.OrdinalIgnoreCase);
+            _providerResolver = providerResolver;
         }
 
-        public async Task<User?> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
+        public async Task<IntegrationValidationResult> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(integrationType) || string.IsNullOrWhiteSpace(password))
             {
-                return null;
+                return Failure();
             }
 
             var setting = FindEnabledIntegrationSetting(integrationType);
-            if (setting == null || !_providers.TryGetValue(setting.Type, out var provider))
+            if (setting == null || !_providerResolver.TryGetById(setting.Type, out var provider) || provider == null)
             {
-                return null;
+                return Failure();
             }
 
             var payload = IntegrationAuthPayload.Parse(password);
             if (string.IsNullOrWhiteSpace(payload.Code))
             {
-                return null;
+                return Failure(provider.Capability.UnboundFailureMessage);
             }
 
             var authResult = await provider.AuthenticateAsync(setting, payload, cancellationToken);
             var binding = FindBinding(setting.Type, authResult);
             if (binding == null)
             {
-                if (!string.Equals(setting.Type, IntegrationLoginType.WeChat, StringComparison.OrdinalIgnoreCase))
+                if (!provider.Capability.CanAutoProvisionUser)
                 {
-                    return null;
+                    return Failure(provider.Capability.UnboundFailureMessage);
                 }
 
-                return await CreateWeChatUserAsync(authResult);
+                return new IntegrationValidationResult
+                {
+                    User = await CreateUserAsync(authResult, provider.Capability)
+                };
             }
 
-            return FindActiveUser(binding.UserId);
+            var user = FindActiveUser(binding.UserId);
+            return user == null
+                ? Failure(provider.Capability.UnboundFailureMessage)
+                : new IntegrationValidationResult { User = user };
         }
 
         public Task<IntegrationAuthorizationUrlResult> GetAuthorizationUrlAsync(string integrationType, string state, CancellationToken cancellationToken = default)
         {
             var setting = FindEnabledIntegrationSetting(integrationType);
-            if (setting == null || !setting.Enabled || !_providers.TryGetValue(setting.Type, out var provider))
+            if (setting == null || !setting.Enabled || !_providerResolver.TryGetById(setting.Type, out var provider) || provider == null)
             {
                 return Task.FromResult(new IntegrationAuthorizationUrlResult
                 {
@@ -111,11 +118,11 @@ namespace EIMSNext.Auth.Services
             return null;
         }
 
-        private async Task<User> CreateWeChatUserAsync(IntegrationAuthResult authResult)
+        private async Task<User> CreateUserAsync(IntegrationAuthResult authResult, IntegrationProviderCapability capability)
         {
             var user = new User
             {
-                Name = string.IsNullOrWhiteSpace(authResult.DisplayName) ? "微信用户" : authResult.DisplayName,
+                Name = string.IsNullOrWhiteSpace(authResult.DisplayName) ? capability.DefaultUserName : authResult.DisplayName,
                 Platform = EIMSNext.Core.Entities.PlatformType.Public,
                 Password = BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Email = string.Empty,
@@ -128,7 +135,7 @@ namespace EIMSNext.Auth.Services
             var binding = new UserIntegrationBinding
             {
                 UserId = user.Id,
-                IntegrationType = IntegrationLoginType.WeChat,
+                IntegrationType = authResult.IntegrationType,
                 OpenId = authResult.OpenId,
                 UnionId = authResult.UnionId,
                 ExternalUserId = authResult.ExternalUserId,
@@ -141,6 +148,14 @@ namespace EIMSNext.Auth.Services
 
             await _dbContext.AddUserIntegrationBinding(binding);
             return user;
+        }
+
+        private static IntegrationValidationResult Failure(string message = "")
+        {
+            return new IntegrationValidationResult
+            {
+                FailureMessage = message
+            };
         }
     }
 }

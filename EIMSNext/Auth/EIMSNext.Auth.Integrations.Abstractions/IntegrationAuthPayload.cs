@@ -1,4 +1,4 @@
-namespace EIMSNext.Auth.Models
+namespace EIMSNext.Auth.Integrations.Abstractions
 {
     /// <summary>
     /// 第三方集成登录请求载荷。

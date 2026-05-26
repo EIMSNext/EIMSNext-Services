@@ -1,6 +1,6 @@
 using EIMSNext.Auth.Entities;
 
-namespace EIMSNext.Auth.Services.Providers
+namespace EIMSNext.Auth.Integrations.Abstractions
 {
     public abstract class IntegrationProviderBase
     {

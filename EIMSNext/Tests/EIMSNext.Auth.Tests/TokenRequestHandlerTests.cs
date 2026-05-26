@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Services;
@@ -163,9 +164,9 @@ namespace EIMSNext.Auth.Tests
                 return Task.FromResult(new IntegrationAuthorizationUrlResult());
             }
 
-            public Task<User?> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
+            public Task<IntegrationValidationResult> ValidateAsync(string? integrationType, string? password, CancellationToken cancellationToken = default)
             {
-                return Task.FromResult<User?>(null);
+                return Task.FromResult(new IntegrationValidationResult());
             }
         }
     }

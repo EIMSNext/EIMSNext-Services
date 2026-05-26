@@ -1,4 +1,4 @@
-namespace EIMSNext.Auth.Models
+namespace EIMSNext.Auth.Integrations.Abstractions
 {
     /// <summary>
     /// 第三方平台换取到的统一身份结果。

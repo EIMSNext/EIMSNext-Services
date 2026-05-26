@@ -1,4 +1,4 @@
-namespace EIMSNext.Auth.Entities
+namespace EIMSNext.Auth.Integrations.Abstractions
 {
     /// <summary>
     /// 第三方集成登录类型。

@@ -1,25 +1,28 @@
+using System.Composition;
 using EIMSNext.Auth.Entities;
-using EIMSNext.Auth.Interfaces;
-using EIMSNext.Auth.Models;
+using EIMSNext.Auth.Integrations.Abstractions;
+using EIMSNext.Core;
 using EIMSNext.WeChat.Clients;
 
-namespace EIMSNext.Auth.Services.Providers
+namespace EIMSNext.Auth.Integrations.WeChat
 {
-    public sealed class WeChatIntegrationProvider : IntegrationProviderBase, IIntegrationProvider
+    [Export(typeof(IIntegrationProvider))]
+    [ExportMetadata(MefMetadata.Id, IntegrationLoginType.WeChat)]
+    public sealed class WeChatIntegrationProvider(WeChatOpenClient client) : IntegrationProviderBase, IIntegrationProvider
     {
-        private readonly WeChatOpenClient _client;
-
-        public WeChatIntegrationProvider(WeChatOpenClient client)
-        {
-            _client = client;
-        }
-
         public string Type => IntegrationLoginType.WeChat;
+
+        public IntegrationProviderCapability Capability => new()
+        {
+            UnboundFailureMessage = "该微信账号还未绑定到用户",
+            CanAutoProvisionUser = true,
+            DefaultUserName = "微信用户"
+        };
 
         public async Task<IntegrationAuthResult> AuthenticateAsync(IntegrationLoginSetting setting, IntegrationAuthPayload payload, CancellationToken cancellationToken = default)
         {
-            var token = await _client.ExchangeCodeAsync(GetClientId(setting), GetClientSecret(setting), GetRequiredCode(payload.Code, "微信"), cancellationToken);
-            var userInfo = await _client.GetUserInfoAsync(token.AccessToken, token.OpenId, cancellationToken);
+            var token = await client.ExchangeCodeAsync(GetClientId(setting), GetClientSecret(setting), GetRequiredCode(payload.Code, "微信"), cancellationToken);
+            var userInfo = await client.GetUserInfoAsync(token.AccessToken, token.OpenId, cancellationToken);
 
             return new IntegrationAuthResult
             {

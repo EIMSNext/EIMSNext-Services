@@ -8,15 +8,12 @@
     <Version>1.1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="OpenIddict.Server.AspNetCore" />
+    <PackageReference Include="System.Composition.AttributedModel" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\EIMSNext.Auth.Integrations.Abstractions\EIMSNext.Auth.Integrations.Abstractions.csproj" />
-    <ProjectReference Include="..\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj" />
-    <ProjectReference Include="..\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
-    <ProjectReference Include="..\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
     <ProjectReference Include="..\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
   </ItemGroup>
 </Project>

@@ -1,4 +1,5 @@
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Auth.Extensions;
 using EIMSNext.Auth.Host;
 using EIMSNext.Auth.Interfaces;
@@ -23,6 +24,7 @@ builder.Services.AddControllers();
 builder.Services.AddAuthorization();
 builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
+builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddAuthServices(builder.Configuration, builder.Environment.ContentRootPath);
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();

@@ -1,3 +1,5 @@
+using EIMSNext.Auth.Integrations.Abstractions;
+
 namespace EIMSNext.Auth.Host
 {
     public class SeedData
@@ -46,29 +48,29 @@ namespace EIMSNext.Auth.Host
             [
                 new Auth.Entities.IntegrationLoginSetting
                 {
-                    Id = Auth.Entities.IntegrationLoginType.WeChat,
-                    Type = Auth.Entities.IntegrationLoginType.WeChat,
+                    Id = IntegrationLoginType.WeChat,
+                    Type = IntegrationLoginType.WeChat,
                     DisplayName = "微信",
                     Enabled = false
                 },
                 new Auth.Entities.IntegrationLoginSetting
                 {
-                    Id = Auth.Entities.IntegrationLoginType.WxWork,
-                    Type = Auth.Entities.IntegrationLoginType.WxWork,
+                    Id = IntegrationLoginType.WxWork,
+                    Type = IntegrationLoginType.WxWork,
                     DisplayName = "企业微信",
                     Enabled = false
                 },
                 new Auth.Entities.IntegrationLoginSetting
                 {
-                    Id = Auth.Entities.IntegrationLoginType.DingTalk,
-                    Type = Auth.Entities.IntegrationLoginType.DingTalk,
+                    Id = IntegrationLoginType.DingTalk,
+                    Type = IntegrationLoginType.DingTalk,
                     DisplayName = "钉钉",
                     Enabled = false
                 },
                 new Auth.Entities.IntegrationLoginSetting
                 {
-                    Id = Auth.Entities.IntegrationLoginType.Feishu,
-                    Type = Auth.Entities.IntegrationLoginType.Feishu,
+                    Id = IntegrationLoginType.Feishu,
+                    Type = IntegrationLoginType.Feishu,
                     DisplayName = "飞书",
                     Enabled = false
                 }

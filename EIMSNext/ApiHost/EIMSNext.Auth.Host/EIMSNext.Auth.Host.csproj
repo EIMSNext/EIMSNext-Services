@@ -19,6 +19,10 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth\EIMSNext.Auth.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.WeChat\EIMSNext.Auth.Integrations.WeChat.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.WxWork\EIMSNext.Auth.Integrations.WxWork.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.DingTalk\EIMSNext.Auth.Integrations.DingTalk.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.Feishu\EIMSNext.Auth.Integrations.Feishu.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
   </ItemGroup>
   <ItemGroup>

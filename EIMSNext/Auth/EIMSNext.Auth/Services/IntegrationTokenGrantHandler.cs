@@ -29,13 +29,15 @@ namespace EIMSNext.Auth.Services
             var integrationType = request.Username;
             try
             {
-                var user = await _integrationAuthService.ValidateAsync(integrationType, request.Password, cancellationToken);
-                if (user == null)
+                var result = await _integrationAuthService.ValidateAsync(integrationType, request.Password, cancellationToken);
+                if (!result.Succeeded)
                 {
-                    var reason = GetFailureReason(integrationType);
+                    var reason = string.IsNullOrWhiteSpace(result.FailureMessage) ? "第三方集成登录失败" : result.FailureMessage;
                     await _auditLoginService.AddAuditLogin(CreateFailureAudit(integrationType, reason, GrantType));
                     return TokenRequestResult.Failure(Errors.InvalidGrant, reason);
                 }
+
+                var user = result.User!;
 
                 var subject = user.Email;
                 if (string.IsNullOrWhiteSpace(subject))
@@ -58,18 +60,6 @@ namespace EIMSNext.Auth.Services
                 await _auditLoginService.AddAuditLogin(CreateFailureAudit(integrationType, ex.Message, GrantType));
                 return TokenRequestResult.Failure(Errors.InvalidGrant, ex.Message);
             }
-        }
-
-        private static string GetFailureReason(string? integrationType)
-        {
-            return integrationType?.ToLowerInvariant() switch
-            {
-                IntegrationLoginType.WeChat => "该微信账号还未绑定到用户",
-                IntegrationLoginType.WxWork => "该企业微信账号还未绑定到用户",
-                IntegrationLoginType.DingTalk => "该钉钉账号还未绑定到用户",
-                IntegrationLoginType.Feishu => "该飞书账号还未绑定到用户",
-                _ => "第三方集成登录失败"
-            };
         }
     }
 }
