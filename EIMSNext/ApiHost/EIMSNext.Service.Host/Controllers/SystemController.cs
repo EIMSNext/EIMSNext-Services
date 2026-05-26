@@ -61,7 +61,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             if (IdentityType.App_Admins.HasFlag(IdentityContext.IdentityType))  //此种类型不应该请求进来
             {
-                Ok(Array.Empty<object>());
+                return Ok(Array.Empty<object>());
             }
             else if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
             {
@@ -127,7 +127,8 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("UpdateSecret")]
         public async Task<IActionResult> UpdateClientSecret(UpdateSecretRequest req)
         {
-            if (string.IsNullOrEmpty(req.ClientId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.ClientId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.Secret)) return BadRequest();
 
             var clientService = Resolver.GetApiService<Auth.Entities.Client, Auth.Entities.Client>();
             var client = await clientService.GetAsync(req.ClientId);

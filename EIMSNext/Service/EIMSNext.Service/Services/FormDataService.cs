@@ -1,17 +1,19 @@
 using System.Dynamic;
-using System.Text.Json;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common;
 using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.Service
 {
@@ -75,6 +77,7 @@ namespace EIMSNext.Service
             await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Created);
 
             await EnqueueFormNotify(messagePublisher, entity, null, FormNotifyTriggerMode.DataAdded);
+            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
             await base.AfterAdd(entities, session);
         }
 
@@ -89,15 +92,19 @@ namespace EIMSNext.Service
         {
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
-            var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
             var oriValue = new ExpandoObject();
-            changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+            if (old != null)
+            {
+                var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
+                changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+            }
 
             var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
             formExp.TryAdd("oridata", oriValue);
             await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Updated, formExp);
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);
+            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
 
             await base.AfterReplace(entity, session);
         }
@@ -163,6 +170,76 @@ namespace EIMSNext.Service
                 Trigger = trigger,
                 PayloadJson = (payload ?? entity).SerializeToJson()
             });
+        }
+
+        private async Task RebuildTimeFieldNotifySchedulesAsync(FormData entity, IClientSessionHandle? session)
+        {
+            var notifyRepo = Resolver.GetRepository<FormNotify>();
+            var scheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
+            var formDef = GetFromStore<FormDef>(entity.FormId);
+            if (formDef == null)
+            {
+                return;
+            }
+
+            var notifies = notifyRepo.Find(x =>
+                x.CorpId == entity.CorpId &&
+                x.AppId == entity.AppId &&
+                x.FormId == entity.FormId &&
+                !x.Disabled &&
+                x.TriggerMode == FormNotifyTriggerMode.TimeFieldScheduled).ToList();
+
+            foreach (var notify in notifies)
+            {
+                await scheduleRepo.DeleteAsync(scheduleRepo.FilterBuilder.And(
+                    scheduleRepo.FilterBuilder.Eq(x => x.NotifyId, notify.Id),
+                    scheduleRepo.FilterBuilder.Eq(x => x.DataId, entity.Id)), session);
+
+                if (string.IsNullOrWhiteSpace(notify.TimeField))
+                {
+                    continue;
+                }
+
+                var dataMatches = FormNotifyRuntime.ShouldNotify(this.Resolver, notify, new NotifyDispatchTaskArgs
+                {
+                    CorpId = entity.CorpId ?? string.Empty,
+                    DataId = entity.Id,
+                    AppId = entity.AppId,
+                    FormId = entity.FormId,
+                    FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
+                    NewData = entity
+                });
+                if (!dataMatches)
+                {
+                    continue;
+                }
+
+                var anchorTime = FormNotifyRuntime.ExtractTimeFieldValue(entity, notify.TimeField);
+                if (!anchorTime.HasValue)
+                {
+                    continue;
+                }
+
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, anchorTime.Value);
+                if (!nextTriggerTime.HasValue)
+                {
+                    continue;
+                }
+
+                await scheduleRepo.InsertAsync(new FormNotifyScheduleItem
+                {
+                    NotifyId = notify.Id,
+                    DataId = entity.Id,
+                    AppId = entity.AppId,
+                    FormId = entity.FormId,
+                    CorpId = entity.CorpId,
+                    TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
+                    ScheduleVersion = notify.ScheduleVersion,
+                    TriggerTime = nextTriggerTime.Value,
+                    AnchorTime = anchorTime.Value,
+                    TimeField = notify.TimeField
+                }, session);
+            }
         }
     }
 }

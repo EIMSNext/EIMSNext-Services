@@ -17,6 +17,46 @@ namespace EIMSNext.Service.Entities
         public string FormId { get; set; } = "";
 
         /// <summary>
+        /// 用于字段提醒的日期时间字段
+        /// </summary>
+        public string? TimeField { get; set; }
+
+        /// <summary>
+        /// 开始提醒时间
+        /// </summary>
+        public long? StartTime { get; set; }
+
+        /// <summary>
+        /// 结束提醒时间
+        /// </summary>
+        public long? EndTime { get; set; }
+
+        /// <summary>
+        /// 重复类型
+        /// </summary>
+        public FormNotifyRepeatType? RepeatType { get; set; }
+
+        /// <summary>
+        /// 重复配置(JSON)
+        /// </summary>
+        public string? RepeatConfig { get; set; }
+
+        /// <summary>
+        /// 下次触发时间
+        /// </summary>
+        public long? NextTriggerTime { get; set; }
+
+        /// <summary>
+        /// 上次触发时间
+        /// </summary>
+        public long? LastTriggerTime { get; set; }
+
+        /// <summary>
+        /// 调度版本号
+        /// </summary>
+        public long ScheduleVersion { get; set; }
+
+        /// <summary>
         /// 提醒类型
         /// </summary>
         public FormNotifyTriggerMode TriggerMode { get; set; }
@@ -76,6 +116,41 @@ namespace EIMSNext.Service.Entities
         /// 表单内时间字段
         /// </summary>
         TimeFieldScheduled
+    }
+
+    /// <summary>
+    /// 重复类型
+    /// </summary>
+    public enum FormNotifyRepeatType
+    {
+        /// <summary>
+        /// 只提醒一次
+        /// </summary>
+        Once,
+        /// <summary>
+        /// 每天提醒一次
+        /// </summary>
+        Daily,
+        /// <summary>
+        /// 每周提醒一次
+        /// </summary>
+        Weekly,
+        /// <summary>
+        /// 每两周提醒一次
+        /// </summary>
+        BiWeekly,
+        /// <summary>
+        /// 每月提醒一次
+        /// </summary>
+        Monthly,
+        /// <summary>
+        /// 每年提醒一次
+        /// </summary>
+        Yearly,
+        /// <summary>
+        /// 自定义重复
+        /// </summary>
+        Custom
     }
 
     /// <summary>

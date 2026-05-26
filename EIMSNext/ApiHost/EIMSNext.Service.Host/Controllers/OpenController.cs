@@ -195,14 +195,14 @@ namespace EIMSNext.Service.Host.Controllers
                 {
                     x.Id,
                     x.Name,
-                    x.Description,
+                    Description = x.Description ?? string.Empty,
                     inputFields = x.InputFields.ToList()
                 })
                 : runtime?.Functions.Select(x => new
                 {
                     x.Id,
                     x.Name,
-                    x.Description,
+                    Description = x.Description ?? string.Empty,
                     inputFields = x.InputFields.ToList()
                 }).ToList();
 

@@ -22,6 +22,26 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public FormNotifyTriggerMode TriggerMode { get; set; }
         /// <summary>
+        /// 用于字段提醒的日期时间字段
+        /// </summary>
+        public string? TimeField { get; set; }
+        /// <summary>
+        /// 开始提醒时间
+        /// </summary>
+        public long? StartTime { get; set; }
+        /// <summary>
+        /// 结束提醒时间
+        /// </summary>
+        public long? EndTime { get; set; }
+        /// <summary>
+        /// 重复类型
+        /// </summary>
+        public FormNotifyRepeatType? RepeatType { get; set; }
+        /// <summary>
+        /// 重复配置(JSON)
+        /// </summary>
+        public string? RepeatConfig { get; set; }
+        /// <summary>
         /// 数据变更后提醒时，触发提醒的字段
         /// </summary>
         public List<string>? ChangeFields { get; set; }
