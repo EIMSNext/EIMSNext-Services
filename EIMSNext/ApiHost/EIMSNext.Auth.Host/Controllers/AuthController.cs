@@ -25,8 +25,18 @@ namespace EIMSNext.Auth.Host.Controllers
         /// 集成登录方式获取Token
         /// </summary>
         /// <returns></returns>
-        [Route("auth/sendcode"), HttpPost]
-        public IActionResult SendCode()
+        [Route("auth/sendRegCode"), HttpPost]
+        public IActionResult SendRegCode()
+        {
+            return NoContent();
+        }
+
+        /// <summary>
+        /// 集成登录方式获取Token
+        /// </summary>
+        /// <returns></returns>
+        [Route("auth/register"), HttpPost]
+        public IActionResult Register()
         {
             return NoContent();
         }
