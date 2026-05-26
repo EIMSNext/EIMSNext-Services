@@ -7,7 +7,6 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
-using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;

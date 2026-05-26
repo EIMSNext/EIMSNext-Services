@@ -26,6 +26,12 @@ namespace EIMSNext.Auth.AccountSecurity
         public string Target { get; set; } = "";
     }
 
+    public class SendRegCodeRequest
+    {
+        public string Type { get; set; } = "";
+        public string Target { get; set; } = "";
+    }
+
     public class VerifyIdentityRequest
     {
         public string Type { get; set; } = "";
@@ -44,6 +50,15 @@ namespace EIMSNext.Auth.AccountSecurity
         public string VerifyToken { get; set; } = "";
         public string NewPassword { get; set; } = "";
         public string ConfirmPassword { get; set; } = "";
+    }
+
+    public class RegisterRequest
+    {
+        public string Type { get; set; } = "";
+        public string? Phone { get; set; }
+        public string? Email { get; set; }
+        public string Code { get; set; } = "";
+        public string Password { get; set; } = "";
     }
 
     public class ChangePhoneRequest

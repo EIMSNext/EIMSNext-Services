@@ -148,6 +148,27 @@ namespace EIMSNext.Service.Host.Controllers
             return ApiResult.Success(PluginRuntimeManager.GetPlugins()).ToActionResult();
         }
 
+        [HttpGet("EnabledPlugins")]
+        public IActionResult GetEnabledPlugins()
+        {
+            var corpId = IdentityContext.CurrentCorpId;
+            if (string.IsNullOrWhiteSpace(corpId))
+            {
+                return ApiResult.Success(Array.Empty<PluginRuntimeInfo>()).ToActionResult();
+            }
+
+            var enabledPluginIds = PluginInstallRepository.Queryable
+                .Where(x => x.CorpId == corpId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed && x.Enabled)
+                .Select(x => x.PluginId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var plugins = PluginRuntimeManager.GetPlugins()
+                .Where(x => enabledPluginIds.Contains(x.PluginId))
+                .ToList();
+
+            return ApiResult.Success(plugins).ToActionResult();
+        }
+
         [HttpPost("ReloadPlugin")]
         public async Task<IActionResult> ReloadPlugin(CancellationToken cancellationToken)
         {

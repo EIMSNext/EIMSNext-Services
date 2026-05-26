@@ -186,15 +186,29 @@ async void EnsureSeedData(IResolver resolver)
             [
                 new PluginFunctionSnapshot
                 {
-                    Id = "CreateReceipt",
-                    Name = "收款单新版",
-                    Description = "演示插件字段配置与映射",
+                    Id = "EchoReceipt",
+                    Name = "收款单回显",
+                    Description = "演示插件字段映射、执行结果开放字段与下游节点联动",
                     InputFields =
                     [
                         new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = "Input", Required = true },
                         new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = "Number", Required = true },
                         new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = "TimeStamp" },
-                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = "TextArea" }
+                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = "TextArea" },
+                        new PluginFieldDesc { Key = "items", Name = "明细子表", FieldType = "TableForm" }
+                    ]
+                },
+                new PluginFunctionSnapshot
+                {
+                    Id = "EchoMixedData",
+                    Name = "通用字段回显",
+                    Description = "用于验证插件切换方法、字段重置和结果字段选择",
+                    InputFields =
+                    [
+                        new PluginFieldDesc { Key = "title", Name = "标题", FieldType = "Input", Required = true },
+                        new PluginFieldDesc { Key = "description", Name = "描述", FieldType = "TextArea" },
+                        new PluginFieldDesc { Key = "owner", Name = "负责人", FieldType = "Employee1" },
+                        new PluginFieldDesc { Key = "ownerDept", Name = "归属部门", FieldType = "Department1" }
                     ]
                 }
             ]

@@ -277,7 +277,8 @@ namespace EIMSNext.Component
                         PluginId = flowNode.Metadata.PluginMeta.PluginId,
                         PluginVersion = flowNode.Metadata.PluginMeta.PluginVersion,
                         FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
-                        FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings)
+                        FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings),
+                        ResultFields = ParsePluginResultFieldList(flowNode.Metadata.PluginMeta.ResultFields)
                     };
                     break;
             }
@@ -492,6 +493,24 @@ namespace EIMSNext.Component
                 return fieldSetting;
             }).ToList();
         }
+
+        private List<PluginResultFieldSetting> ParsePluginResultFieldList(PluginResultFieldList? fieldList)
+        {
+            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            {
+                return new List<PluginResultFieldSetting>();
+            }
+
+            return fieldList.Items
+                .Where(item => !string.IsNullOrWhiteSpace(item.FieldKey))
+                .Select(item => new PluginResultFieldSetting
+                {
+                    FieldKey = item.FieldKey,
+                    FieldName = string.IsNullOrWhiteSpace(item.FieldName) ? item.FieldKey : item.FieldName,
+                    FieldType = item.FieldType,
+                })
+                .ToList();
+        }
         #endregion
 
         #region Help Classes
@@ -692,6 +711,7 @@ namespace EIMSNext.Component
             public string? PluginVersion { get; set; }
             public string FunctionId { get; set; } = string.Empty;
             public PluginFieldList FieldSettings { get; set; } = new PluginFieldList();
+            public PluginResultFieldList ResultFields { get; set; } = new PluginResultFieldList();
         }
 
         private class PluginFieldList
@@ -704,6 +724,18 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string FieldType { get; set; } = string.Empty;
             public FormFieldValue? Value { get; set; }
+        }
+
+        private class PluginResultFieldList
+        {
+            public List<PluginResultFieldItem> Items { get; set; } = new List<PluginResultFieldItem>();
+        }
+
+        private class PluginResultFieldItem
+        {
+            public string FieldKey { get; set; } = string.Empty;
+            public string? FieldName { get; set; }
+            public string FieldType { get; set; } = string.Empty;
         }
 
 
