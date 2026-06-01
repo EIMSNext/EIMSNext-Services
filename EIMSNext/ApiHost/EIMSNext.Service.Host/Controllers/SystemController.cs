@@ -9,6 +9,7 @@ using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Contracts;
@@ -25,10 +26,11 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param> 
     [ApiVersion(1.0)]
-    public class SystemController(IResolver resolver, IPluginRuntimeManager pluginRuntimeManager, IRepository<PluginInstall> pluginInstallRepository) : MefControllerBase(resolver)
+    public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
-        private IPluginRuntimeManager PluginRuntimeManager { get; } = pluginRuntimeManager;
-        private IRepository<PluginInstall> PluginInstallRepository { get; } = pluginInstallRepository;
+        private IPluginRuntimeManager PluginRuntimeManager => Resolver.Resolve<IPluginRuntimeManager>();
+        private IRepository<PluginInstall> PluginInstallRepository => Resolver.GetRepository<PluginInstall>();
+        private IRepository<PluginProfile> PluginProfileRepository => Resolver.GetRepository<PluginProfile>();
 
         /// <summary>
         /// 获取当前用户信息
@@ -234,6 +236,199 @@ namespace EIMSNext.Service.Host.Controllers
             entity.UninstalledAt = DateTime.UtcNow.ToTimeStampMs();
             await PluginInstallRepository.ReplaceAsync(entity);
             return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpGet("pluginstore")]
+        public IActionResult GetPluginStore([FromQuery] PluginProfileQueryRequest request)
+        {
+            var query = PluginProfileRepository.Queryable.Where(x => !x.DeleteFlag && x.Status == "Published");
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+            {
+                query = query.Where(x => x.Name.Contains(request.Keyword) || x.Summary.Contains(request.Keyword) || x.Tags.Contains(request.Keyword));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Category))
+            {
+                query = query.Where(x => x.Category == request.Category);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Scenario))
+            {
+                query = query.Where(x => x.Scenario == request.Scenario);
+            }
+
+            if (request.Recommended == true)
+            {
+                query = query.Where(x => x.IsRecommended);
+            }
+
+            var corpId = IdentityContext.CurrentCorpId;
+            var installedPluginIds = string.IsNullOrWhiteSpace(corpId)
+                ? []
+                : PluginInstallRepository.Queryable
+                    .Where(x => x.CorpId == corpId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed)
+                    .Select(x => x.PluginId)
+                    .ToList();
+
+            var total = query.Count();
+            var items = query
+                .OrderByDescending(x => x.IsRecommended)
+                .ThenByDescending(x => x.SortIndex)
+                .Skip(request.Skip)
+                .Take(request.Take)
+                .ToList()
+                .Select(x => new
+                {
+                    x.Id,
+                    x.PluginId,
+                    x.Version,
+                    x.Name,
+                    x.Summary,
+                    x.Description,
+                    x.Icon,
+                    x.CoverImage,
+                    x.BannerImage,
+                    x.GalleryImages,
+                    x.Category,
+                    x.Scenario,
+                    x.Tags,
+                    x.DeveloperName,
+                    x.IsOfficial,
+                    x.IsHot,
+                    x.IsRecommended,
+                    x.InstallCount,
+                    x.SortIndex,
+                    x.Status,
+                    x.PublishedAt,
+                    x.HelpDocUrl,
+                    x.TemplateUrl,
+                    x.PricingPlans,
+                    installed = installedPluginIds.Contains(x.PluginId)
+                })
+                .ToList();
+
+            return ApiResult.Success(new { total, items }).ToActionResult();
+        }
+
+        [HttpGet("pluginstore/{id}")]
+        public IActionResult GetPluginStoreDetail(string id)
+        {
+            var profile = PluginProfileRepository.Get(id);
+            if (profile == null || profile.DeleteFlag)
+            {
+                return NotFound();
+            }
+
+            var corpId = IdentityContext.CurrentCorpId;
+            var install = string.IsNullOrWhiteSpace(corpId)
+                ? null
+                : PluginInstallRepository.Queryable.FirstOrDefault(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed);
+            var runtime = PluginRuntimeManager.GetPlugins().FirstOrDefault(x => x.PluginId == profile.PluginId);
+            var functions = profile.Functions.Count > 0
+                ? profile.Functions.Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    Description = x.Description ?? string.Empty,
+                    inputFields = x.InputFields.ToList()
+                })
+                : runtime?.Functions.Select(x => new
+                {
+                    x.Id,
+                    x.Name,
+                    Description = x.Description ?? string.Empty,
+                    inputFields = x.InputFields.ToList()
+                }).ToList();
+
+            return ApiResult.Success(new
+            {
+                profile.Id,
+                profile.PluginId,
+                profile.Version,
+                profile.Name,
+                profile.Summary,
+                profile.Description,
+                profile.Icon,
+                profile.CoverImage,
+                profile.BannerImage,
+                profile.GalleryImages,
+                profile.Category,
+                profile.Scenario,
+                profile.Tags,
+                profile.DeveloperName,
+                profile.IsOfficial,
+                profile.IsHot,
+                profile.IsRecommended,
+                profile.InstallCount,
+                profile.SortIndex,
+                profile.Status,
+                profile.PublishedAt,
+                profile.HelpDocUrl,
+                profile.TemplateUrl,
+                profile.PricingPlans,
+                functions,
+                installed = install != null,
+                installEnabled = install?.Enabled,
+            }).ToActionResult();
+        }
+
+        [HttpPost("pluginstore/{id}/install")]
+        public async Task<IActionResult> InstallPlugin(string id)
+        {
+            if (string.IsNullOrWhiteSpace(IdentityContext.CurrentUserID) || string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId))
+            {
+                return Unauthorized();
+            }
+
+            var profile = PluginProfileRepository.Get(id);
+            if (profile == null || profile.DeleteFlag)
+            {
+                return NotFound();
+            }
+
+            var corpId = IdentityContext.CurrentCorpId;
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var existing = PluginInstallRepository.Queryable.FirstOrDefault(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag);
+            if (existing == null)
+            {
+                existing = new PluginInstall
+                {
+                    Id = PluginInstallRepository.NewId(),
+                    CorpId = corpId,
+                    PluginProfileId = profile.Id,
+                    PluginId = profile.PluginId,
+                    Version = profile.Version,
+                    Name = profile.Name,
+                    Summary = profile.Summary,
+                    Icon = profile.Icon,
+                    Status = PluginInstallStatus.Installed,
+                    Enabled = true,
+                    InstalledAt = now,
+                    InstalledBy = IdentityContext.CurrentEmployee?.ToOperator() ?? new Operator(IdentityContext.CurrentUserID, IdentityContext.CurrentUser?.Name ?? string.Empty, IdentityContext.CurrentUser?.Name ?? string.Empty),
+                    Source = "pluginstore"
+                };
+                await PluginInstallRepository.InsertAsync(existing);
+            }
+            else
+            {
+                existing.PluginProfileId = profile.Id;
+                existing.Version = profile.Version;
+                existing.Name = profile.Name;
+                existing.Summary = profile.Summary;
+                existing.Icon = profile.Icon;
+                existing.Status = PluginInstallStatus.Installed;
+                existing.Enabled = true;
+                existing.DeleteFlag = false;
+                existing.UninstalledAt = null;
+                existing.LastEnabledAt = now;
+                await PluginInstallRepository.ReplaceAsync(existing);
+            }
+
+            profile.InstallCount += 1;
+            await PluginProfileRepository.ReplaceAsync(profile);
+
+            return ApiResult.Success(new { pluginInstallId = existing.Id }).ToActionResult();
         }
     }
 }
