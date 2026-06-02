@@ -126,11 +126,26 @@ namespace EIMSNext.Core.Query
                     case FilterOp.In:
                         subFilter = Builders<T>.Filter.In(field, filterValues);
                         break;
+                    case FilterOp.AllIn:
+                        subFilter = Builders<T>.Filter.And(filterValues.Select(x => Builders<T>.Filter.AnyEq(field, x)));
+                        break;
                     case FilterOp.Lt:
                         subFilter = Builders<T>.Filter.Lt(field, filterValues[0]);
                         break;
                     case FilterOp.Lte:
                         subFilter = Builders<T>.Filter.Lte(field, filterValues[0]);
+                        break;
+                    case FilterOp.Between:
+                        if (filterValues.Count >= 2)
+                        {
+                            subFilter = Builders<T>.Filter.And(
+                                Builders<T>.Filter.Gte(field, filterValues[0]),
+                                Builders<T>.Filter.Lte(field, filterValues[1]));
+                        }
+                        else if (filterValues.Count == 1)
+                        {
+                            subFilter = Builders<T>.Filter.Eq(field, filterValues[0]);
+                        }
                         break;
                     case FilterOp.Ne:
                         subFilter = Builders<T>.Filter.Ne(field, filterValues[0]);

@@ -5,6 +5,7 @@ using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
 using EIMSNext.MongoDb;
 
+using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Search;
 
@@ -62,6 +63,8 @@ namespace EIMSNext.Core.Repositories
         Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null);
         Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null);
         Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null);
+
+        Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null);
 
         IEnumerable<T> EnsureId(IEnumerable<T> entities);
         T EnsureId(T entity);

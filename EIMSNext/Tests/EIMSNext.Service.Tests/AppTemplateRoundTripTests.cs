@@ -12,6 +12,7 @@ using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
+using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Search;
 
@@ -345,6 +346,11 @@ namespace EIMSNext.Service.Tests
             }
 
             public string NewId() => $"{typeof(T).Name}-{++_nextId}";
+
+            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null)
+            {
+                return Task.FromResult(new List<BsonValue>());
+            }
         }
     }
 }
