@@ -25,10 +25,36 @@ namespace EIMSNext.Auth.Host.Controllers
         /// 集成登录方式获取Token
         /// </summary>
         /// <returns></returns>
-        [Route("auth/sendcode"), HttpPost]
-        public IActionResult SendCode()
+        [Route("auth/sendRegCode"), HttpPost]
+        public async Task<IActionResult> SendRegCode([FromBody] SendRegCodeRequest request)
         {
-            return NoContent();
+            try
+            {
+                await _accountSecurityService.SendRegCodeAsync(request);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
+        }
+
+        /// <summary>
+        /// 集成登录方式获取Token
+        /// </summary>
+        /// <returns></returns>
+        [Route("auth/register"), HttpPost]
+        public async Task<IActionResult> Register([FromBody] RegisterRequest request)
+        {
+            try
+            {
+                await _accountSecurityService.RegisterAsync(request);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         [Authorize]

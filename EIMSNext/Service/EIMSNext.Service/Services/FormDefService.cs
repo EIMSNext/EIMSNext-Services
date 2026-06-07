@@ -20,7 +20,7 @@ namespace EIMSNext.Service
         protected override async Task AfterAdd(IEnumerable<FormDef> entities, IClientSessionHandle? session)
         {
             await base.AfterAdd(entities, session);
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
             var app = appRepo.Get(entities.First().AppId, session)!;
             var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
@@ -42,7 +42,7 @@ namespace EIMSNext.Service
         protected override async Task AfterReplace(FormDef entity, IClientSessionHandle? session)
         {
             await base.AfterReplace(entity, session);
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
             var app = appRepo.Get(entity.AppId, session)!;
 
             var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
@@ -62,7 +62,7 @@ namespace EIMSNext.Service
             }
             if (updated.Any())
             {
-                var appRepo = Resolver.GetRepository<App>();
+                var appRepo = Resolver.GetRepository<AppDef>();
                 var app = appRepo.Get(updated.First().AppId, session)!;
 
                 updated.ForEach(e =>
@@ -82,7 +82,7 @@ namespace EIMSNext.Service
             if (deletedForms.Count == 0)
                 return;
 
-            var appRepo = Resolver.GetRepository<App>();
+            var appRepo = Resolver.GetRepository<AppDef>();
 
             // 按 AppId 分组，批量处理
             var appIds = deletedForms.Select(f => f.AppId).Distinct();

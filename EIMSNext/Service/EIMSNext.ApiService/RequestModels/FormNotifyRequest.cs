@@ -22,6 +22,46 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public FormNotifyTriggerMode TriggerMode { get; set; }
         /// <summary>
+        /// 用于字段提醒的日期时间字段
+        /// </summary>
+        public string? TimeField { get; set; }
+        /// <summary>
+        /// 字段日期不含分钟时补的固定时间(HH:mm)
+        /// </summary>
+        public string? FixedTime { get; set; }
+        /// <summary>
+        /// 时间偏移方向
+        /// </summary>
+        public TimerOffsetDirection Direction { get; set; } = TimerOffsetDirection.At;
+        /// <summary>
+        /// 时间偏移量
+        /// </summary>
+        public int? OffsetValue { get; set; }
+        /// <summary>
+        /// 时间偏移单位
+        /// </summary>
+        public TimerOffsetUnit? OffsetUnit { get; set; }
+        /// <summary>
+        /// 字段日期格式, 仅用于决定是否需要补时
+        /// </summary>
+        public string? FieldFormat { get; set; }
+        /// <summary>
+        /// 开始提醒时间
+        /// </summary>
+        public long? StartTime { get; set; }
+        /// <summary>
+        /// 结束提醒时间
+        /// </summary>
+        public long? EndTime { get; set; }
+        /// <summary>
+        /// 重复类型
+        /// </summary>
+        public TimerRepeatType? RepeatType { get; set; }
+        /// <summary>
+        /// 重复配置(JSON)
+        /// </summary>
+        public string? RepeatConfig { get; set; }
+        /// <summary>
         /// 数据变更后提醒时，触发提醒的字段
         /// </summary>
         public List<string>? ChangeFields { get; set; }

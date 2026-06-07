@@ -48,6 +48,10 @@ namespace EIMSNext.Service.Entities
         /// 是否禁用
         /// </summary>
         public bool Disabled { get; set; }
+        /// <summary>
+        /// 模板ID
+        /// </summary>
+        public string? TemplateId { get; set; }
     }
 
     /// <summary>

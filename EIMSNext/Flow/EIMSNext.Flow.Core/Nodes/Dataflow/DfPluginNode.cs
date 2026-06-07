@@ -3,6 +3,7 @@ using System.Text.Json;
 using System.Collections;
 
 using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -59,6 +60,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             else
             {
+                SavePluginNodeResult(dataContext, result.Result, setting);
                 CreateExecLog(context.Workflow, dataContext, Metadata!);
             }
 
@@ -159,6 +161,151 @@ namespace EIMSNext.Flow.Core.Nodes
             return parts.Length == 2
                 ? $"MAP(data.n_{field.NodeId}.{parts[0]},'{parts[1]}')"
                 : $"data.n_{field.NodeId}.{field.Field}";
+        }
+
+        private void SavePluginNodeResult(DfDataContext dataContext, object? pluginResult, Plugin.Contracts.PluginSetting setting)
+        {
+            var payload = new ExpandoObject();
+            payload.AddOrUpdate("result", ToScriptValue(pluginResult));
+
+            var resultMap = ToDictionary(pluginResult);
+            foreach (var field in setting.ResultFields)
+            {
+                resultMap.TryGetValue(field.FieldKey, out var value);
+                payload.AddOrUpdate(field.FieldKey, ToScriptValue(value));
+            }
+
+            var formData = new FormData
+            {
+                AppId = dataContext.AppId,
+                CorpId = dataContext.CorpId,
+                FormId = string.Empty,
+                Data = payload,
+                CreateBy = dataContext.WfStarter,
+                CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+            };
+
+            dataContext.NodeDatas[Metadata!.Id] = new DfNodeData
+            {
+                NodeId = Metadata.Id,
+                SingleResult = true,
+                NodeExecResult = pluginResult,
+                ActionDatas = new List<ActionFormData>
+                {
+                    new ActionFormData { State = DataState.Unchanged, FormData = formData }
+                }
+            };
+        }
+
+        private static IDictionary<string, object?> ToDictionary(object? value)
+        {
+            if (value == null)
+            {
+                return new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (value is IDictionary<string, object?> dictionary)
+            {
+                return new Dictionary<string, object?>(dictionary, StringComparer.OrdinalIgnoreCase);
+            }
+
+            if (value is IDictionary legacyDictionary)
+            {
+                var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (DictionaryEntry item in legacyDictionary)
+                {
+                    var key = item.Key?.ToString();
+                    if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        result[key] = item.Value;
+                    }
+                }
+
+                return result;
+            }
+
+            var json = JsonSerializer.Serialize(value);
+            return JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+                ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        private static object? ToScriptValue(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value is JsonElement jsonElement)
+            {
+                return ConvertJsonElement(jsonElement);
+            }
+
+            if (value is IDictionary<string, object?> dictionary)
+            {
+                var expando = new ExpandoObject();
+                foreach (var item in dictionary)
+                {
+                    expando.AddOrUpdate(item.Key, ToScriptValue(item.Value));
+                }
+
+                return expando;
+            }
+
+            if (value is IDictionary legacyDictionary)
+            {
+                var expando = new ExpandoObject();
+                foreach (DictionaryEntry item in legacyDictionary)
+                {
+                    var key = item.Key?.ToString();
+                    if (!string.IsNullOrWhiteSpace(key))
+                    {
+                        expando.AddOrUpdate(key, ToScriptValue(item.Value));
+                    }
+                }
+
+                return expando;
+            }
+
+            if (value is IEnumerable enumerable and not string)
+            {
+                var list = new List<object?>();
+                foreach (var item in enumerable)
+                {
+                    list.Add(ToScriptValue(item));
+                }
+
+                return list;
+            }
+
+            return value;
+        }
+
+        private static object? ConvertJsonElement(JsonElement element)
+        {
+            return element.ValueKind switch
+            {
+                JsonValueKind.Object => ConvertJsonObject(element),
+                JsonValueKind.Array => element.EnumerateArray().Select(ConvertJsonElement).ToList(),
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number when element.TryGetInt64(out var intValue) => intValue,
+                JsonValueKind.Number when element.TryGetDecimal(out var decimalValue) => decimalValue,
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Null => null,
+                _ => element.ToString(),
+            };
+        }
+
+        private static ExpandoObject ConvertJsonObject(JsonElement element)
+        {
+            var result = new ExpandoObject();
+            foreach (var property in element.EnumerateObject())
+            {
+                result.AddOrUpdate(property.Name, ConvertJsonElement(property.Value));
+            }
+
+            return result;
         }
     }
 }

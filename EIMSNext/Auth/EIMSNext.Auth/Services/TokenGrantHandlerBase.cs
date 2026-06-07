@@ -33,7 +33,7 @@ namespace EIMSNext.Auth.Services
             };
         }
 
-        protected AuditLogin CreateFailureAudit(string? loginId, string reason)
+        protected AuditLogin CreateFailureAudit(string? loginId, string reason, string grantType = "password")
         {
             return new AuditLogin
             {
@@ -41,7 +41,7 @@ namespace EIMSNext.Auth.Services
                 ClientId = Constants.ClientId_Web,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                GrantType = "password",
+                GrantType = grantType,
                 FailReason = reason
             };
         }

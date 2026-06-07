@@ -26,6 +26,7 @@ namespace EIMSNext.Flow.Core.Nodes
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             EmployeeRepository = resolver.GetRepository<Employee>();
+            DepartmentRepository = resolver.GetRepository<Department>();
             Logger = resolver.GetLogger<T>();
         }
 
@@ -35,6 +36,7 @@ namespace EIMSNext.Flow.Core.Nodes
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IRepository<Employee> EmployeeRepository { get; private set; }
+        protected IRepository<Department> DepartmentRepository { get; private set; }
         protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
 
         protected ILogger<T> Logger { get; private set; }
@@ -166,54 +168,8 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
-            var empIds = new List<string>();
-            if (candidates?.Count > 0)
-            {
-                var deptIds = new List<string>();
-                var roleIds = new List<string>();
-
-                var formData = GetFormData(dataContext.DataId);
-
-                candidates.ForEach(c =>
-                {
-                    switch (c.CandidateType)
-                    {
-                        case CandidateType.Department:
-                            deptIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Role:
-                            roleIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Employee:
-                            empIds.Add(c.CandidateId);
-                            break;
-                        case CandidateType.Dynamic:
-                            //TODO: 进一步计算
-                            if (c.CandidateId == "starter" && dataContext.WfStarter != null)
-                            {
-                                //TODO:此处应进一步的排除匿名，比如由数据流节点或其他系统任务发起的流程
-                                empIds.Add(dataContext.WfStarter.Id);
-                            }
-                            break;
-                    }
-                });
-
-                if (deptIds.Any())
-                {
-                    await EmployeeRepository.Find(x => deptIds.Contains(x.DepartmentId)).ForEachAsync(x => empIds.Add(x.Id));
-                }
-
-                if (roleIds.Any())
-                {
-                    await EmployeeRepository.Find(new MongoFindOptions<Employee>
-                    {
-                        Filter = Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId))
-                    }).ForEachAsync(x => empIds.Add(x.Id));
-                }
-            }
-
-            //只取前100人
-            return empIds.Take(100);
+            var resolver = new WorkflowCandidateResolver(EmployeeRepository, DepartmentRepository, FormDefRepository, FormDataRepository);
+            return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 
         public DeleteResult DeleteTodos(string corpId, string dataId, string nodeId, IClientSessionHandle? session)

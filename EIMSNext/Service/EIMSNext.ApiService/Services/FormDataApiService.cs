@@ -105,6 +105,46 @@ namespace EIMSNext.ApiService
             };
         }
 
+        public async Task<FormDataFilterOptionsResponse> GetFilterOptionsAsync(FormDataFilterOptionsRequest request)
+        {
+            var filter = BuildBaseFilter(request);
+            var field = DynamicField.FormatFieldForFilter($"data.{request.Field}", request.FieldType);
+            var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 200);
+
+            var query = new FilterOptionQuery
+            {
+                Filter = filter,
+                FieldPath = field,
+                Keyword = request.Keyword,
+                Limit = limit
+            };
+
+            var result = await CoreService.GetFieldOptionsAsync(query);
+            return new FormDataFilterOptionsResponse { Items = result.Items };
+        }
+
+        private DynamicFilter BuildBaseFilter(FormDataFilterOptionsRequest request)
+        {
+            var baseFilter = new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items =
+                [
+                    new DynamicFilter { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.FormId },
+                    new DynamicFilter { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId },
+                    new DynamicFilter { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }
+                ]
+            };
+
+            var userFilter = request.Filter;
+            if (userFilter != null && (userFilter.IsGroup || !string.IsNullOrEmpty(userFilter.Field)))
+            {
+                baseFilter.Items.Add(userFilter);
+            }
+
+            return baseFilter;
+        }
+
         private Task<long> CountExportAsync(FormDataExportRequest request)
         {
             return CountAsync(request.Filter ?? DynamicFilter.Empty);

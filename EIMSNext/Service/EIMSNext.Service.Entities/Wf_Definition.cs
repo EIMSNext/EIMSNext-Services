@@ -10,6 +10,11 @@ namespace EIMSNext.Service.Entities
     public class Wf_Definition : CorpEntityBase
     {
         /// <summary>
+        /// 模板Id, 对于从模板安装的流程定义
+        /// </summary>
+        public string? TemplateId { get; set; }
+
+        /// <summary>
         /// 应用ID
         /// </summary>
         public string AppId { get; set; } = string.Empty;
@@ -547,6 +552,21 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string? NodeAction { get; set; }
 
+        /// <summary>
+        /// 触发类型。
+        /// </summary>
+        public DataflowTriggerKind TriggerKind { get; set; } = DataflowTriggerKind.Form;
+
+        /// <summary>
+        /// 定时触发设置。
+        /// </summary>
+        public DataflowTimeTriggerSetting? TimeTrigger { get; set; }
+
+        /// <summary>
+        /// HTTP触发设置。
+        /// </summary>
+        public DataflowHttpTriggerSetting? HttpTrigger { get; set; }
+
     }
 
     /// <summary>
@@ -932,6 +952,11 @@ namespace EIMSNext.Service.Entities
         /// 是否级联部门（包含下级部门）
         /// </summary>
         public bool CascadedDept { get; set; }
+
+        /// <summary>
+        /// 主管层级，支持多选。
+        /// </summary>
+        public List<int>? ManagerLevels { get; set; }
     }
 
     /// <summary>
@@ -981,7 +1006,15 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 按钮
         /// </summary>
-        Buttton
+        Button,
+        /// <summary>
+        /// 定时触发。
+        /// </summary>
+        Schedule,
+        /// <summary>
+        /// HTTP触发。
+        /// </summary>
+        Http
     }
 
     /// <summary>

@@ -80,5 +80,6 @@ void EnsureSeedData(IAuthDbContext context)
             context.AddUser(user);
         }
     }
+
 }
 

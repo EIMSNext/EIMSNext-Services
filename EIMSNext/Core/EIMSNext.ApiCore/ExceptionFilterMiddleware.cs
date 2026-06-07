@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using EIMSNext.Common;
 using HKH.Common;
 
 using Microsoft.AspNetCore.Diagnostics;
@@ -53,14 +54,30 @@ namespace EIMSNext.ApiCore
 
             if (error != null)
             {
+                var errorInfo = GetErrorInfo(error);
                 if (!httpContext.Response.Headers.IsReadOnly)
                 {
                     httpContext.Response.ContentType = "application/json";
-                    httpContext.Response.StatusCode = StatusCodes.Status500InternalServerError;
+                    httpContext.Response.StatusCode = errorInfo.StatusCode;
                 }
-                var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(ex) : "抱歉，出错了";
-                await httpContext.Response.WriteAsync(new { message = errorMsg }.SerializeToJson());
+
+                await httpContext.Response.WriteAsync(JsonSerializer.Serialize(new
+                {
+                    statecode = errorInfo.StateCode,
+                    message = errorInfo.Message,
+                }));
             }
+        }
+
+        private (int StatusCode, string StateCode, string Message) GetErrorInfo(Exception error)
+        {
+            if (error is HttpException httpException)
+            {
+                return (httpException.StatusCode, httpException.StateCode, httpException.Message);
+            }
+
+            var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(error) : "抱歉，出错了";
+            return (StatusCodes.Status500InternalServerError, "internalservererror", errorMsg);
         }
 
         private string GetInnerExceptionMessage(Exception ex)

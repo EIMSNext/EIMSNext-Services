@@ -13,6 +13,11 @@ namespace EIMSNext.Service.Entities
     public class DashboardItemDef : CorpEntityBase
     {
         /// <summary>
+        /// 模板Id, 对于从模板安装的仪表盘项
+        /// </summary>
+        public string? TemplateId { get; set; }
+
+        /// <summary>
         /// 应用Id
         /// </summary>
         public string AppId { get; set; } = string.Empty;

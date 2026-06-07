@@ -8,14 +8,14 @@ namespace EIMSNext.Auth.Services
 {
     public class TokenRequestHandler : ITokenRequestHandler
     {
-        private readonly IAuthDbContext _context;
+        private readonly IUserService _userService;
         private readonly IReadOnlyDictionary<string, ITokenGrantHandler> _grantHandlers;
 
         public TokenRequestHandler(
-            IAuthDbContext context,
+            IUserService userService,
             IEnumerable<ITokenGrantHandler> grantHandlers)
         {
-            _context = context;
+            _userService = userService;
             _grantHandlers = grantHandlers.ToDictionary(x => x.GrantType, StringComparer.Ordinal);
         }
 
@@ -62,7 +62,7 @@ namespace EIMSNext.Auth.Services
                 return null;
             }
 
-            var client = _context.Clients.FirstOrDefault(x => x.Id == clientId && x.Enabled);
+            var client = _userService.FindEnabledClient(clientId);
             if (client == null)
             {
                 return null;

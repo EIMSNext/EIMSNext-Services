@@ -50,8 +50,10 @@ namespace EIMSNext.Core.Query
         public const string Gt = "gt";
         public const string Gte = "gte";
         public const string In = "in";
+        public const string AllIn = "allin";
         public const string Lt = "lt";
         public const string Lte = "lte";
+        public const string Between = "between";
         public const string Ne = "ne";
         public const string Nin = "nin";
         public const string StringIn = "stringin";

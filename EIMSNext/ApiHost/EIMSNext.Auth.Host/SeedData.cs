@@ -15,8 +15,7 @@ namespace EIMSNext.Auth.Host
                     [
                         new Auth.Entities.ClientGrantType { GrantType = "password" },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.VerificationCode },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Integration }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn }
                     ],
                     AllowedScopes =
                     [
@@ -39,5 +38,6 @@ namespace EIMSNext.Auth.Host
                 new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" }
             };
         }
+
     }
 }

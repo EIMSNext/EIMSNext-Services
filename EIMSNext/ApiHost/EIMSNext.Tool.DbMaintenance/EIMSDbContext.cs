@@ -13,5 +13,6 @@ namespace EIMSNext.Auth.DbMaintenance
 
         public IMongoCollection<Client> Clients => Database.GetCollection<Client>(nameof(Client));
         public IMongoCollection<User> Users => Database.GetCollection<User>(nameof(User));
+        public IMongoCollection<AuditLogin> AuditLogins => Database.GetCollection<AuditLogin>(nameof(AuditLogin));
     }
 }

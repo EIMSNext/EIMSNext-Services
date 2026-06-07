@@ -4,6 +4,8 @@ namespace EIMSNext.Auth.Interfaces
 {
     public interface IAccountSecurityService
     {
+        Task SendRegCodeAsync(SendRegCodeRequest request);
+        Task RegisterAsync(RegisterRequest request);
         Task SendPinCodeAsync(string userId, SendPinCodeRequest request);
         Task<VerifyIdentityResponse> VerifyIdentityAsync(string userId, VerifyIdentityRequest request);
         Task ChangePasswordAsync(string userId, ChangePasswordRequest request);

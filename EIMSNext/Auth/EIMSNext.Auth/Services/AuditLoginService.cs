@@ -6,18 +6,18 @@ namespace EIMSNext.Auth.Services
 {
     public class AuditLoginService : IAuditLoginService
     {
-        private readonly IAuthDbContext _context;
+        private readonly IAuthDbContext _dbContext;
         private readonly ILogger<AuditLoginService> _logger;
 
-        public AuditLoginService(IAuthDbContext context, ILogger<AuditLoginService> logger)
+        public AuditLoginService(IAuthDbContext dbContext, ILogger<AuditLoginService> logger)
         {
-            _context = context ?? throw new ArgumentNullException(nameof(context));
+            _dbContext = dbContext ?? throw new ArgumentNullException(nameof(dbContext));
             _logger = logger;
         }
 
         public Task AddAuditLogin(AuditLogin entity)
         {
-            return this._context.AddAuditLogin(entity);
+            return _dbContext.AddAuditLogin(entity);
         }
     }
 }

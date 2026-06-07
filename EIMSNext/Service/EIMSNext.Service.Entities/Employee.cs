@@ -32,7 +32,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string WorkEmail { get; set; } = "";
         /// <summary>
-        /// 在职状态， 0 在职， 1 离职
+        /// 员工状态，0 在职，1 离职，2 待审核。
         /// </summary>
         public int Status { get; set; }
         /// <summary>
@@ -56,9 +56,9 @@ namespace EIMSNext.Service.Entities
         public string? Invite { get; set; }
 
         /// <summary>
-        /// 是否已经绑定用户
+        /// 是否已完成用户绑定或账号确认。
         /// </summary>
-        public bool Approved { get; set; }
+        public bool UserBound { get; set; }
 
         /// <summary>
         /// 所属角色
@@ -97,5 +97,26 @@ namespace EIMSNext.Service.Entities
         /// 角色名称
         /// </summary>
         public string RoleName { get; set; } = "";
+    }
+
+    /// <summary>
+    /// 员工状态常量。
+    /// </summary>
+    public static class EmployeeStatus
+    {
+        /// <summary>
+        /// 在职。
+        /// </summary>
+        public const int Active = 0;
+
+        /// <summary>
+        /// 离职。
+        /// </summary>
+        public const int Inactive = 1;
+
+        /// <summary>
+        /// 待审核。
+        /// </summary>
+        public const int PendingReview = 2;
     }
 }

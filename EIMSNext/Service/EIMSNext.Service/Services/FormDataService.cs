@@ -1,17 +1,20 @@
 using System.Dynamic;
-using System.Text.Json;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common;
 using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
+using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.Service
 {
@@ -75,6 +78,7 @@ namespace EIMSNext.Service
             await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Created);
 
             await EnqueueFormNotify(messagePublisher, entity, null, FormNotifyTriggerMode.DataAdded);
+            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
             await base.AfterAdd(entities, session);
         }
 
@@ -89,15 +93,19 @@ namespace EIMSNext.Service
         {
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
-            var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
             var oriValue = new ExpandoObject();
-            changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+            if (old != null)
+            {
+                var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
+                changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+            }
 
             var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
             formExp.TryAdd("oridata", oriValue);
             await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Updated, formExp);
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);
+            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
 
             await base.AfterReplace(entity, session);
         }
@@ -137,6 +145,82 @@ namespace EIMSNext.Service
             }
         }
 
+        public async Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query)
+        {
+            var rawValues = await Repository.DistinctFieldValuesAsync(query.Filter, query.FieldPath);
+            var items = ProcessDistinctValues(rawValues, query.Keyword, query.Limit);
+            return new FilterOptionResult { Items = items };
+        }
+
+        private static List<FilterOptionItem> ProcessDistinctValues(List<BsonValue> values, string? keyword, int limit)
+        {
+            var items = new List<FilterOptionItem>();
+            foreach (var value in values)
+            {
+                if (value == null || value.IsBsonNull) continue;
+
+                foreach (var option in ExpandOptionValues(value))
+                {
+                    if (!string.IsNullOrWhiteSpace(keyword) && option.Label?.Contains(keyword, StringComparison.OrdinalIgnoreCase) != true)
+                        continue;
+
+                    if (items.Any(x => x.Id == option.Id))
+                        continue;
+
+                    items.Add(option);
+                    if (items.Count >= limit) break;
+                }
+
+                if (items.Count >= limit) break;
+            }
+
+            return items;
+        }
+
+        private static IEnumerable<FilterOptionItem> ExpandOptionValues(BsonValue value)
+        {
+            if (value.IsBsonArray)
+            {
+                foreach (var item in value.AsBsonArray)
+                {
+                    foreach (var option in ExpandOptionValues(item))
+                        yield return option;
+                }
+                yield break;
+            }
+
+            if (value.IsBsonDocument)
+            {
+                var doc = value.AsBsonDocument;
+                var id = doc.TryGetValue("id", out var idValue) ? idValue.ToString() : value.ToString();
+                var label = doc.TryGetValue("label", out var labelValue)
+                    ? labelValue.ToString()
+                    : doc.TryGetValue("name", out var nameValue)
+                        ? nameValue.ToString()
+                        : id;
+
+                yield return new FilterOptionItem
+                {
+                    Id = id,
+                    Label = label,
+                    Value = BsonTypeMapper.MapToDotNetValue(value)
+                };
+                yield break;
+            }
+
+            var scalar = BsonTypeMapper.MapToDotNetValue(value);
+            var text = scalar?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                yield return new FilterOptionItem
+                {
+                    Id = text,
+                    Label = text,
+                    Value = scalar
+                };
+            }
+        }
+
         private Task EnqueueFormNotify(IMessagePublisher messagePublisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
         {
             return messagePublisher.PublishAsync(new NotifyDispatchTaskArgs
@@ -163,6 +247,77 @@ namespace EIMSNext.Service
                 Trigger = trigger,
                 PayloadJson = (payload ?? entity).SerializeToJson()
             });
+        }
+
+        private async Task RebuildTimeFieldNotifySchedulesAsync(FormData entity, IClientSessionHandle? session)
+        {
+            var notifyRepo = Resolver.GetRepository<FormNotify>();
+            var scheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
+            var formDef = GetFromStore<FormDef>(entity.FormId);
+            if (formDef == null)
+            {
+                return;
+            }
+
+            var notifies = notifyRepo.Find(x =>
+                x.CorpId == entity.CorpId &&
+                x.AppId == entity.AppId &&
+                x.FormId == entity.FormId &&
+                !x.Disabled &&
+                x.TriggerMode == FormNotifyTriggerMode.TimeFieldScheduled).ToList();
+
+            foreach (var notify in notifies)
+            {
+                await scheduleRepo.DeleteAsync(scheduleRepo.FilterBuilder.And(
+                    scheduleRepo.FilterBuilder.Eq(x => x.NotifyId, notify.Id),
+                    scheduleRepo.FilterBuilder.Eq(x => x.DataId, entity.Id)), session);
+
+                if (string.IsNullOrWhiteSpace(notify.TimeField))
+                {
+                    continue;
+                }
+
+                var dataMatches = FormNotifyRuntime.ShouldNotify(this.Resolver, notify, new NotifyDispatchTaskArgs
+                {
+                    CorpId = entity.CorpId ?? string.Empty,
+                    DataId = entity.Id,
+                    AppId = entity.AppId,
+                    FormId = entity.FormId,
+                    FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
+                    NewData = entity
+                });
+                if (!dataMatches)
+                {
+                    continue;
+                }
+
+                var anchorTime = FormNotifyRuntime.ExtractTimeFieldValue(entity, notify.TimeField);
+                if (!anchorTime.HasValue)
+                {
+                    continue;
+                }
+
+                var adjustedAnchor = FormNotifyRuntime.ResolveAdjustedAnchor(notify, anchorTime.Value) ?? anchorTime.Value;
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, adjustedAnchor);
+                if (!nextTriggerTime.HasValue)
+                {
+                    continue;
+                }
+
+                await scheduleRepo.InsertAsync(new FormNotifyScheduleItem
+                {
+                    NotifyId = notify.Id,
+                    DataId = entity.Id,
+                    AppId = notify.AppId,
+                    FormId = notify.FormId,
+                    CorpId = notify.CorpId,
+                    TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
+                    ScheduleVersion = notify.ScheduleVersion,
+                    TriggerTime = nextTriggerTime.Value,
+                    AnchorTime = adjustedAnchor,
+                    TimeField = notify.TimeField
+                }, session);
+            }
         }
     }
 }

@@ -25,7 +25,6 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<ITokenGrantHandler, PasswordTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, VerificationCodeTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
-            services.AddScoped<ITokenGrantHandler, IntegrationTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
             var certificatePath = Path.Combine(contentRootPath, configuration.GetSection("Certificates:CerPath").Value!);
@@ -44,7 +43,6 @@ namespace EIMSNext.Auth.Extensions
                     options.AllowPasswordFlow();
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SingleSignOn);
-                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Integration);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();

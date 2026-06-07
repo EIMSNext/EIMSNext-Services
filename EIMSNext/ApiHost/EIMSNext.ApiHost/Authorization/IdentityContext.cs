@@ -97,6 +97,13 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
+                    if (string.IsNullOrWhiteSpace(CurrentCorpId))
+                    {
+                        CurrentCorpId = _user.Crops.FirstOrDefault(x => x.IsDefault)?.CorpId
+                            ?? _user.Crops.FirstOrDefault()?.CorpId
+                            ?? string.Empty;
+                    }
+
                     _employee = _resolver.GetRepository<Employee>().Queryable.FirstOrDefault(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id);
                 }
                 _retrieved = true;

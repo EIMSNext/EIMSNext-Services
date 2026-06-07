@@ -1,7 +1,6 @@
 using EIMSNext.Async.Tasks.Consumers;
 
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 
 namespace EIMSNext.Async.Tasks
 {
@@ -14,6 +13,7 @@ namespace EIMSNext.Async.Tasks
             services.AddHostedService<EmailConsumer>();
             services.AddHostedService<DataExportConsumer>();
             services.AddHostedService<WebhookConsumer>();
+            services.AddHostedService<DataflowRunConsumer>();
 
             return services;
         }

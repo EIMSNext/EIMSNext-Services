@@ -1,6 +1,4 @@
-using System.Text.Json;
 using Asp.Versioning;
-
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -15,13 +13,11 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
-
 using HKH.Mef2.Integration;
-
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
-
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.Service.Host.Controllers
 {
@@ -91,6 +87,19 @@ namespace EIMSNext.Service.Host.Controllers
             }
             var result = ApiService.Find(FilterResult(options)).ToList();
             return Ok(new { value = result.Cast(ToFormDataViewModel) });
+        }
+
+        [Permission(Operation = Operation.Read)]
+        [HttpPost("filter/options")]
+        public async Task<ActionResult> GetFilterOptions([FromBody] FormDataFilterOptionsRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.FormId) || string.IsNullOrWhiteSpace(request.Field))
+            {
+                return BadRequest();
+            }
+
+            var result = await ApiService.GetFilterOptionsAsync(request);
+            return Ok(result);
         }
 
         [Permission(Operation = Operation.Read)]
@@ -449,5 +458,6 @@ namespace EIMSNext.Service.Host.Controllers
             }
             return NoContent();
         }
+
     }
 }
