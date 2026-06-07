@@ -196,13 +196,14 @@ namespace EIMSNext.Service
             var items = new List<FormNotifyScheduleItem>();
             await formDataRepo.Find(new MongoFindOptions<FormData> { Filter = filter }).ForEachAsync(data =>
             {
-                var anchorTime = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
-                if (!anchorTime.HasValue)
+                var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
+                if (!rawAnchor.HasValue)
                 {
                     return;
                 }
 
-                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchorTime.Value);
+                var anchor = FormNotifyRuntime.ResolveAdjustedAnchor(entity, rawAnchor.Value) ?? rawAnchor.Value;
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchor);
                 if (!nextTriggerTime.HasValue)
                 {
                     return;
@@ -218,7 +219,7 @@ namespace EIMSNext.Service
                     TriggerMode = entity.TriggerMode,
                     ScheduleVersion = entity.ScheduleVersion,
                     TriggerTime = nextTriggerTime.Value,
-                    AnchorTime = anchorTime.Value,
+                    AnchorTime = anchor,
                     TimeField = entity.TimeField
                 });
             });

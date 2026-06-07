@@ -13,6 +13,7 @@ namespace EIMSNext.Async.Tasks
             services.AddHostedService<EmailConsumer>();
             services.AddHostedService<DataExportConsumer>();
             services.AddHostedService<WebhookConsumer>();
+            services.AddHostedService<DataflowRunConsumer>();
 
             return services;
         }

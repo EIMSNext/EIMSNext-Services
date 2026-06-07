@@ -297,7 +297,8 @@ namespace EIMSNext.Service
                     continue;
                 }
 
-                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, anchorTime.Value);
+                var adjustedAnchor = FormNotifyRuntime.ResolveAdjustedAnchor(notify, anchorTime.Value) ?? anchorTime.Value;
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, adjustedAnchor);
                 if (!nextTriggerTime.HasValue)
                 {
                     continue;
@@ -307,13 +308,13 @@ namespace EIMSNext.Service
                 {
                     NotifyId = notify.Id,
                     DataId = entity.Id,
-                    AppId = entity.AppId,
-                    FormId = entity.FormId,
-                    CorpId = entity.CorpId,
+                    AppId = notify.AppId,
+                    FormId = notify.FormId,
+                    CorpId = notify.CorpId,
                     TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     ScheduleVersion = notify.ScheduleVersion,
                     TriggerTime = nextTriggerTime.Value,
-                    AnchorTime = anchorTime.Value,
+                    AnchorTime = adjustedAnchor,
                     TimeField = notify.TimeField
                 }, session);
             }

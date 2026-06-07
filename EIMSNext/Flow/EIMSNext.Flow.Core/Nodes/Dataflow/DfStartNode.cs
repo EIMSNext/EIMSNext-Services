@@ -27,6 +27,16 @@ namespace EIMSNext.Flow.Core.Nodes
                     ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = GetFormData(dataContext.DataId)! } }
                 });
             }
+            else if (string.IsNullOrEmpty(dataContext.DataId) && dataContext.TriggerData != null && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
+            {
+                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                {
+                    NodeId = Metadata.Id,
+                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                    FormId = dataContext.FormId,
+                    ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = dataContext.TriggerData } }
+                });
+            }
 
             return ExecutionResult.Next();
         }

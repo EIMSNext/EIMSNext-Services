@@ -63,18 +63,19 @@ namespace EIMSNext.Flow.Core.Nodes
                 if (!IsMeet(dataflow, paramter.Data))
                     return execResult;
 
-                var ctx = new DfDataContext()
-                {
-                    CorpId = paramter.Data.CorpId ?? "",
-                    UserId = paramter.UserId,
-                    AccessToken = paramter.AccessToken,
-                    AppId = paramter.Data.AppId,
-                    FormId = paramter.Data.FormId,
-                    DataId = paramter.Data.Id,
-                    WfStarter = paramter.Starter,
-                    DfCascade = dataflow.EventSetting!.CascadeMode,
-                    EventIds = dataflow.EventSetting.SpecifiedEvents
-                };
+                 var ctx = new DfDataContext()
+                 {
+                     CorpId = paramter.Data.CorpId ?? "",
+                     UserId = paramter.UserId,
+                     AccessToken = paramter.AccessToken,
+                     AppId = paramter.Data.AppId,
+                     FormId = paramter.Data.FormId,
+                     DataId = paramter.Data.Id,
+                     TriggerData = paramter.Data,
+                     WfStarter = paramter.Starter,
+                     DfCascade = dataflow.EventSetting!.CascadeMode,
+                     EventIds = dataflow.EventSetting.SpecifiedEvents
+                 };
 
                 try
                 {

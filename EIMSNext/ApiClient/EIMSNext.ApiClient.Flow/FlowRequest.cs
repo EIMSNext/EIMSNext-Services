@@ -128,7 +128,15 @@
         /// <summary>
         /// 按钮
         /// </summary>
-        Buttton
+        Button,
+        /// <summary>
+        /// 定时触发。
+        /// </summary>
+        Schedule,
+        /// <summary>
+        /// HTTP触发。
+        /// </summary>
+        Http
     }
     public enum EventType
     {

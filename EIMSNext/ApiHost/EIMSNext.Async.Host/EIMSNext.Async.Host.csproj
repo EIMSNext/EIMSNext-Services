@@ -22,6 +22,7 @@
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />

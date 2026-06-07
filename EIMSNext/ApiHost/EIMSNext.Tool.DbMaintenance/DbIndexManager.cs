@@ -30,6 +30,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWebhookIndexes(background);
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
+            CreateDataflowScheduleIndexes(background);
             CreateLogIndexes(background);
         }
 
@@ -341,6 +342,35 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<AuditLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EntityType).Ascending(x => x.Action).Descending(x => x.CreateTime),
                 options,
                 "ix_auditlog_corp_entity_action_createtime");
+        }
+
+        private void CreateDataflowScheduleIndexes(CreateIndexOptions options)
+        {
+            CreateCorpIdIndex<DataflowScheduleItem>(options, "ix_dataflowscheduleitem_corpid");
+
+            CreateIndex(GetCollection<DataflowScheduleItem>(),
+                Builders<DataflowScheduleItem>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.TriggerTime),
+                options,
+                "ix_dataflowscheduleitem_corp_dataflow_triggertime");
+
+            CreateIndex(GetCollection<DataflowScheduleItem>(),
+                Builders<DataflowScheduleItem>.IndexKeys
+                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.SourceType)
+                    .Ascending(x => x.FormId)
+                    .Ascending(x => x.DataId),
+                CreateUniqueOptions(options),
+                "ix_dataflowscheduleitem_dataflow_source_form_data_unique");
+
+            CreateIndex(GetCollection<DataflowScheduleItem>(),
+                Builders<DataflowScheduleItem>.IndexKeys
+                    .Ascending(x => x.ScheduleVersion)
+                    .Ascending(x => x.TriggerTime),
+                options,
+                "ix_dataflowscheduleitem_version_triggertime");
         }
 
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase
