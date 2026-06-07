@@ -552,6 +552,21 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string? NodeAction { get; set; }
 
+        /// <summary>
+        /// 触发类型。
+        /// </summary>
+        public DataflowTriggerKind TriggerKind { get; set; } = DataflowTriggerKind.Form;
+
+        /// <summary>
+        /// 定时触发设置。
+        /// </summary>
+        public DataflowTimeTriggerSetting? TimeTrigger { get; set; }
+
+        /// <summary>
+        /// HTTP触发设置。
+        /// </summary>
+        public DataflowHttpTriggerSetting? HttpTrigger { get; set; }
+
     }
 
     /// <summary>
@@ -991,7 +1006,15 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 按钮
         /// </summary>
-        Buttton
+        Button,
+        /// <summary>
+        /// 定时触发。
+        /// </summary>
+        Schedule,
+        /// <summary>
+        /// HTTP触发。
+        /// </summary>
+        Http
     }
 
     /// <summary>

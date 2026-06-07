@@ -10,6 +10,8 @@ using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.MongoDb;
+using EIMSNext.Service;
+using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
@@ -38,6 +40,7 @@ builder.Services.AddWorkflow(opt =>
 
 builder.Services.AddStepBodys();
 builder.Services.AddWorkflowServices();
+builder.Services.AddScoped<IDataflowScheduleService, DataflowScheduleService>();
 
 builder.Services.AddApiVersioning(opt =>
 {

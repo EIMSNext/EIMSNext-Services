@@ -1,6 +1,7 @@
 using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
@@ -146,6 +147,26 @@ namespace EIMSNext.Service
             }
 
             return long.TryParse(rawValue.ToString(), out var result) ? result : null;
+        }
+
+        /// <summary>
+        /// 把字段时间按 FormNotify 的补时/偏移规则调整为触发锚点。
+        /// </summary>
+        public static long? ResolveAdjustedAnchor(FormNotify notify, long rawFieldTime)
+        {
+            if (rawFieldTime <= 0)
+            {
+                return null;
+            }
+
+            var fieldDate = rawFieldTime.ToDateTimeMs();
+            return FormNotifyScheduleCalculator.ResolveAdjustedAnchor(
+                fieldDate,
+                notify.FieldFormat,
+                notify.FixedTime,
+                notify.Direction,
+                notify.OffsetValue,
+                notify.OffsetUnit);
         }
     }
 }

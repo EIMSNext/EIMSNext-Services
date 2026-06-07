@@ -15,7 +15,7 @@ namespace EIMSNext.Flow.Core
         public Operator? WfStarter { get; set; }
         public string? ErrMsg { get; set; }
 
-        //public FormData? TriggerData { get; set; }
+        public FormData? TriggerData { get; set; }
 
         public Dictionary<string, FormDef> FormDefs { get; set; } = new Dictionary<string, FormDef>();
         public Dictionary<string, DfNodeData> NodeDatas { get; set; } = new Dictionary<string, DfNodeData>();

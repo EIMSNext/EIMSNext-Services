@@ -14,6 +14,8 @@ using EIMSNext.Core.Services;
 using EIMSNext.MongoDb;
 using EIMSNext.Service.Entities;
 
+using MongoDB.Bson;
+
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -405,6 +407,11 @@ namespace EIMSNext.Service.Tests
             }
 
             public string NewId() => $"{typeof(T).Name}-{++_nextId}";
+
+            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null)
+            {
+                return Task.FromResult(new List<BsonValue>());
+            }
         }
     }
 }

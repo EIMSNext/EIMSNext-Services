@@ -149,6 +149,7 @@ namespace EIMSNext.Component
                     {
                         //TODO: 值为字段时，需要更详细的处理
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             subExp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},x.{subField})}})";
                             break;
@@ -166,6 +167,7 @@ namespace EIMSNext.Component
                             subExp = $" {oper}(x.{subField}) ";
                             break;
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             subExp = $" {oper}({value},x.{subField}) ";
                             break;
@@ -189,6 +191,7 @@ namespace EIMSNext.Component
                     {
                         //TODO: 值为字段时，需要更详细的处理
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             exp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},{field})}})";
                             break;
@@ -206,6 +209,7 @@ namespace EIMSNext.Component
                             exp = $" {oper}({field}) ";
                             break;
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             exp = $" {oper}({value},{field}) ";
                             break;
@@ -229,6 +233,12 @@ namespace EIMSNext.Component
                     break;
                 case FilterOp.Gte:
                     oper = "GE";
+                    break;
+                case FilterOp.AllIn:
+                    oper = "ALLIN";
+                    break;
+                case FilterOp.Between:
+                    oper = "BETWEEN";
                     break;
             }
 

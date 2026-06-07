@@ -12,6 +12,7 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Text.Json;
 
@@ -144,6 +145,82 @@ namespace EIMSNext.Service
             }
         }
 
+        public async Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query)
+        {
+            var rawValues = await Repository.DistinctFieldValuesAsync(query.Filter, query.FieldPath);
+            var items = ProcessDistinctValues(rawValues, query.Keyword, query.Limit);
+            return new FilterOptionResult { Items = items };
+        }
+
+        private static List<FilterOptionItem> ProcessDistinctValues(List<BsonValue> values, string? keyword, int limit)
+        {
+            var items = new List<FilterOptionItem>();
+            foreach (var value in values)
+            {
+                if (value == null || value.IsBsonNull) continue;
+
+                foreach (var option in ExpandOptionValues(value))
+                {
+                    if (!string.IsNullOrWhiteSpace(keyword) && option.Label?.Contains(keyword, StringComparison.OrdinalIgnoreCase) != true)
+                        continue;
+
+                    if (items.Any(x => x.Id == option.Id))
+                        continue;
+
+                    items.Add(option);
+                    if (items.Count >= limit) break;
+                }
+
+                if (items.Count >= limit) break;
+            }
+
+            return items;
+        }
+
+        private static IEnumerable<FilterOptionItem> ExpandOptionValues(BsonValue value)
+        {
+            if (value.IsBsonArray)
+            {
+                foreach (var item in value.AsBsonArray)
+                {
+                    foreach (var option in ExpandOptionValues(item))
+                        yield return option;
+                }
+                yield break;
+            }
+
+            if (value.IsBsonDocument)
+            {
+                var doc = value.AsBsonDocument;
+                var id = doc.TryGetValue("id", out var idValue) ? idValue.ToString() : value.ToString();
+                var label = doc.TryGetValue("label", out var labelValue)
+                    ? labelValue.ToString()
+                    : doc.TryGetValue("name", out var nameValue)
+                        ? nameValue.ToString()
+                        : id;
+
+                yield return new FilterOptionItem
+                {
+                    Id = id,
+                    Label = label,
+                    Value = BsonTypeMapper.MapToDotNetValue(value)
+                };
+                yield break;
+            }
+
+            var scalar = BsonTypeMapper.MapToDotNetValue(value);
+            var text = scalar?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(text))
+            {
+                yield return new FilterOptionItem
+                {
+                    Id = text,
+                    Label = text,
+                    Value = scalar
+                };
+            }
+        }
+
         private Task EnqueueFormNotify(IMessagePublisher messagePublisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
         {
             return messagePublisher.PublishAsync(new NotifyDispatchTaskArgs
@@ -220,7 +297,8 @@ namespace EIMSNext.Service
                     continue;
                 }
 
-                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, anchorTime.Value);
+                var adjustedAnchor = FormNotifyRuntime.ResolveAdjustedAnchor(notify, anchorTime.Value) ?? anchorTime.Value;
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, adjustedAnchor);
                 if (!nextTriggerTime.HasValue)
                 {
                     continue;
@@ -230,13 +308,13 @@ namespace EIMSNext.Service
                 {
                     NotifyId = notify.Id,
                     DataId = entity.Id,
-                    AppId = entity.AppId,
-                    FormId = entity.FormId,
-                    CorpId = entity.CorpId,
+                    AppId = notify.AppId,
+                    FormId = notify.FormId,
+                    CorpId = notify.CorpId,
                     TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     ScheduleVersion = notify.ScheduleVersion,
                     TriggerTime = nextTriggerTime.Value,
-                    AnchorTime = anchorTime.Value,
+                    AnchorTime = adjustedAnchor,
                     TimeField = notify.TimeField
                 }, session);
             }

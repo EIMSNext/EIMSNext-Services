@@ -167,6 +167,9 @@ namespace EIMSNext.Component
                         FormId = flowNode.Metadata.TriggerMeta?.FormId,
                         WfNodeId = flowNode.Metadata.TriggerMeta?.WfNodeId,
                         NodeAction = flowNode.Metadata.TriggerMeta?.NodeAction,
+                        TriggerKind = flowNode.Metadata.TriggerMeta?.TriggerKind ?? DataflowTriggerKind.Form,
+                        TimeTrigger = flowNode.Metadata.TriggerMeta?.TimeSettings,
+                        HttpTrigger = flowNode.Metadata.TriggerMeta?.HttpSettings,
                     };
 
                     break;
@@ -630,6 +633,9 @@ namespace EIMSNext.Component
             /// </summary>
             public List<string>? ChangeFields { get; set; }
             public bool SingleResult { get; set; }
+            public DataflowTriggerKind TriggerKind { get; set; } = DataflowTriggerKind.Form;
+            public DataflowTimeTriggerSetting? TimeSettings { get; set; }
+            public DataflowHttpTriggerSetting? HttpSettings { get; set; }
         }
 
         private class InsertMeta
