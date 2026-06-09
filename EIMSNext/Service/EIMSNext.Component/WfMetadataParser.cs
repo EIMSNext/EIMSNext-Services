@@ -138,7 +138,9 @@ namespace EIMSNext.Component
                             {
                                 Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting.Candidates
                             }
-                        }
+                        },
+                        SubmitCondition = ParseSubmitCondition(flowNode.Metadata.ApproveMeta?.SubmitCondition),
+                        NoApproverSetting = ParseNoApproverSetting(flowNode.Metadata.ApproveMeta?.NoApproverSetting)
                     };
                     break;
                 case WfNodeType.CopyTo:
@@ -354,6 +356,47 @@ namespace EIMSNext.Component
             if (cond == null) return ScriptExpression.TRUE;
 
             return cond.ToScriptExpression();
+        }
+
+        private SubmitConditionSetting? ParseSubmitCondition(SubmitConditionMeta? condition)
+        {
+            if (condition?.Enabled != true)
+            {
+                return null;
+            }
+
+            var expression = ParseFormulaExpression(condition.FormulaValue);
+            return new SubmitConditionSetting
+            {
+                Enabled = true,
+                Expression = string.IsNullOrWhiteSpace(expression) ? ScriptExpression.TRUE : expression,
+                PromptText = condition.PromptText
+            };
+        }
+
+        private NoApproverSetting ParseNoApproverSetting(NoApproverMeta? setting)
+        {
+            return new NoApproverSetting
+            {
+                ActionType = setting?.ActionType ?? NoApproverActionType.StopAndReport,
+                Candidates = setting?.Candidates
+            };
+        }
+
+        private string ParseFormulaExpression(FormulaValue? formulaValue)
+        {
+            if (formulaValue == null)
+            {
+                return string.Empty;
+            }
+
+            var exp = formulaValue.Expression ?? string.Empty;
+            foreach (var formulaRef in formulaValue.Refs)
+            {
+                exp = exp.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+            }
+
+            return exp;
         }
         #endregion
 
@@ -579,6 +622,21 @@ namespace EIMSNext.Component
             public List<NodeActionMeta>? NodeActions { get; set; }
             public NotifyChannel NotifyChannels { get; set; }
             public ExpireMeta? ExpireSetting { get; set; }
+            public SubmitConditionMeta? SubmitCondition { get; set; }
+            public NoApproverMeta? NoApproverSetting { get; set; }
+        }
+
+        private class SubmitConditionMeta
+        {
+            public bool? Enabled { get; set; }
+            public FormulaValue? FormulaValue { get; set; }
+            public string? PromptText { get; set; }
+        }
+
+        private class NoApproverMeta
+        {
+            public NoApproverActionType? ActionType { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
 
         private class NodeActionMeta

@@ -301,6 +301,74 @@ namespace EIMSNext.Service.Entities
         /// 超时处理设置
         /// </summary>
         public ExpireSetting? ExpireSetting { get; set; }
+
+        /// <summary>
+        /// 节点提交条件设置。
+        /// </summary>
+        public SubmitConditionSetting? SubmitCondition { get; set; }
+
+        /// <summary>
+        /// 找不到节点负责人时的处理设置。
+        /// </summary>
+        public NoApproverSetting? NoApproverSetting { get; set; }
+    }
+
+    /// <summary>
+    /// 节点提交条件设置。
+    /// </summary>
+    public class SubmitConditionSetting
+    {
+        /// <summary>
+        /// 是否启用提交条件。
+        /// </summary>
+        public bool Enabled { get; set; }
+
+        /// <summary>
+        /// 提交条件脚本表达式。
+        /// </summary>
+        public string? Expression { get; set; }
+
+        /// <summary>
+        /// 不满足条件时的提示文字。
+        /// </summary>
+        public string? PromptText { get; set; }
+    }
+
+    /// <summary>
+    /// 找不到节点负责人时的处理设置。
+    /// </summary>
+    public class NoApproverSetting
+    {
+        /// <summary>
+        /// 处理方式。
+        /// </summary>
+        public NoApproverActionType ActionType { get; set; } = NoApproverActionType.StopAndReport;
+
+        /// <summary>
+        /// 转交目标候选人。
+        /// </summary>
+        public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 找不到节点负责人时的处理方式。
+    /// </summary>
+    public enum NoApproverActionType
+    {
+        /// <summary>
+        /// 停止流转并报错。
+        /// </summary>
+        StopAndReport = 0,
+
+        /// <summary>
+        /// 转给指定成员。
+        /// </summary>
+        TransferToMember = 1,
+
+        /// <summary>
+        /// 自动提交。
+        /// </summary>
+        AutoSubmit = 2,
     }
 
     /// <summary>
