@@ -10,6 +10,7 @@ using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.DependencyInjection;
 
+using MongoDB.Bson;
 using MongoDB.Driver;
 
 using RabbitMQ.Client;
@@ -148,6 +149,7 @@ namespace EIMSNext.Async.Tests
             public IEnumerable<Webhook> EnsureId(IEnumerable<Webhook> entities) => throw new NotSupportedException();
             public Webhook EnsureId(Webhook entity) => throw new NotSupportedException();
             public string NewId() => throw new NotSupportedException();
+            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
         }
 
         private sealed class FakeWebhookAliasRepository(List<WebhookAlias> aliases) : IRepository<WebhookAlias>
@@ -198,6 +200,7 @@ namespace EIMSNext.Async.Tests
             public IEnumerable<WebhookAlias> EnsureId(IEnumerable<WebhookAlias> entities) => throw new NotSupportedException();
             public WebhookAlias EnsureId(WebhookAlias entity) => throw new NotSupportedException();
             public string NewId() => throw new NotSupportedException();
+            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
         }
 
         private sealed class FakeMessageRouteResolver : IMessageRouteResolver

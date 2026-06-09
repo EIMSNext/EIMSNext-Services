@@ -4,6 +4,8 @@ using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 
+using MongoDB.Bson;
+
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -151,6 +153,7 @@ namespace EIMSNext.Async.Tests
             public IEnumerable<TestEntity> EnsureId(IEnumerable<TestEntity> entities) => throw new NotSupportedException();
             public TestEntity EnsureId(TestEntity entity) => throw new NotSupportedException();
             public string NewId() => throw new NotSupportedException();
+            public Task<List<BsonValue>> DistinctFieldValuesAsync(EIMSNext.Core.Query.DynamicFilter filter, string field, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
         }
 
         private sealed class FakeMessageRouteResolver : IMessageRouteResolver

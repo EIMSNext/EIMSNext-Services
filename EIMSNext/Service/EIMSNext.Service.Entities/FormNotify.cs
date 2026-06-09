@@ -22,6 +22,31 @@ namespace EIMSNext.Service.Entities
         public string? TimeField { get; set; }
 
         /// <summary>
+        /// 字段日期不含分钟时补的固定时间(HH:mm)
+        /// </summary>
+        public string? FixedTime { get; set; }
+
+        /// <summary>
+        /// 时间偏移方向
+        /// </summary>
+        public TimerOffsetDirection Direction { get; set; } = TimerOffsetDirection.At;
+
+        /// <summary>
+        /// 时间偏移量
+        /// </summary>
+        public int? OffsetValue { get; set; }
+
+        /// <summary>
+        /// 时间偏移单位
+        /// </summary>
+        public TimerOffsetUnit? OffsetUnit { get; set; }
+
+        /// <summary>
+        /// 字段日期格式, 仅用于决定是否需要补时
+        /// </summary>
+        public string? FieldFormat { get; set; }
+
+        /// <summary>
         /// 开始提醒时间
         /// </summary>
         public long? StartTime { get; set; }
@@ -34,7 +59,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 重复类型
         /// </summary>
-        public FormNotifyRepeatType? RepeatType { get; set; }
+        public TimerRepeatType? RepeatType { get; set; }
 
         /// <summary>
         /// 重复配置(JSON)
@@ -116,41 +141,6 @@ namespace EIMSNext.Service.Entities
         /// 表单内时间字段
         /// </summary>
         TimeFieldScheduled
-    }
-
-    /// <summary>
-    /// 重复类型
-    /// </summary>
-    public enum FormNotifyRepeatType
-    {
-        /// <summary>
-        /// 只提醒一次
-        /// </summary>
-        Once,
-        /// <summary>
-        /// 每天提醒一次
-        /// </summary>
-        Daily,
-        /// <summary>
-        /// 每周提醒一次
-        /// </summary>
-        Weekly,
-        /// <summary>
-        /// 每两周提醒一次
-        /// </summary>
-        BiWeekly,
-        /// <summary>
-        /// 每月提醒一次
-        /// </summary>
-        Monthly,
-        /// <summary>
-        /// 每年提醒一次
-        /// </summary>
-        Yearly,
-        /// <summary>
-        /// 自定义重复
-        /// </summary>
-        Custom
     }
 
     /// <summary>

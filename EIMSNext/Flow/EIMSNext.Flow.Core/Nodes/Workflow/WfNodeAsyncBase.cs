@@ -111,11 +111,16 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task<List<Wf_Todo>> CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
         {
-            var empIds = await PopulateEmpIds(dataContext, wfStep.WfNodeSetting?.ApproveSetting?.Candidates);
+            var approveSetting = wfStep.WfNodeSetting?.ApproveSetting;
+            var empIds = (await PopulateEmpIds(dataContext, approveSetting?.Candidates)).ToList();
+            if (!empIds.Any() && approveSetting?.NoApproverSetting?.ActionType == NoApproverActionType.TransferToMember)
+            {
+                empIds = (await PopulateEmpIds(dataContext, approveSetting.NoApproverSetting.Candidates)).ToList();
+            }
 
             var todos = new List<Wf_Todo>();
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var expireTime = GetExpireTime(wfStep.WfNodeSetting?.ApproveSetting);
+            var expireTime = GetExpireTime(approveSetting);
             empIds.ForEach(empId =>
             {
                 todos.Add(new Wf_Todo

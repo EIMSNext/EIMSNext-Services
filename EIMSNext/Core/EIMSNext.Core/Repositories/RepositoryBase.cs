@@ -340,6 +340,14 @@ namespace EIMSNext.Core.Repositories
                 return Collection.DeleteManyAsync(session, filter);
         }
 
+        public virtual async Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null)
+        {
+            var bsonFilter = filter.ToFilterDefinition<T>();
+            session = GetSessionHandle(session);
+            using var cursor = await (session == null ? Collection.DistinctAsync<BsonValue>(field, bsonFilter) : Collection.DistinctAsync<BsonValue>(session, field, bsonFilter));
+            return await cursor.ToListAsync();
+        }
+
         #endregion
 
         #region Helper

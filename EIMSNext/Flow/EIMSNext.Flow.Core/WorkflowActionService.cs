@@ -10,6 +10,7 @@ using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.MongoDb;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
+using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
 using MongoDB.Driver;
@@ -260,6 +261,39 @@ namespace EIMSNext.Flow.Core
                     && withdrawRule != WorkflowWithdrawRule.Disabled
                     && (withdrawRule == WorkflowWithdrawRule.AllNodes || firstApproveNodeId == todo.ApproveNodeId)
             };
+        }
+
+        public Task ValidateSubmitConditionAsync(WorkflowInstance workflowInstance, Wf_Todo todo)
+        {
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId);
+            var submitCondition = step?.WfNodeSetting?.ApproveSetting?.SubmitCondition;
+            if (submitCondition?.Enabled != true || string.IsNullOrWhiteSpace(submitCondition.Expression))
+            {
+                return Task.CompletedTask;
+            }
+
+            var formData = _formDataRepo.Get(todo.DataId) ?? throw new InvalidOperationException("审批数据不存在");
+            var scriptData = formData.Data;
+            scriptData.TryAdd(EIMSNext.Common.Fields.CreateBy, formData.CreateBy);
+            scriptData.TryAdd(WfConsts.MatchedResult, false);
+
+            var wrapData = new ExpandoObject();
+            wrapData.TryAdd($"f_{formData.FormId}", scriptData);
+
+            var result = _resolver.Resolve<IScriptEngine>().Evaluate(submitCondition.Expression, new Dictionary<string, object>
+            {
+                ["data"] = wrapData,
+            });
+
+            if (!Convert.ToBoolean(result.Value))
+            {
+                throw new InvalidOperationException(string.IsNullOrWhiteSpace(submitCondition.PromptText)
+                    ? "当前数据不满足提交条件"
+                    : submitCondition.PromptText);
+            }
+
+            return Task.CompletedTask;
         }
 
         private async Task ValidateTargetEmployeeAsync(WorkflowInstance workflowInstance, Wf_Todo todo, NodeActionType actionType, string targetEmployeeId)

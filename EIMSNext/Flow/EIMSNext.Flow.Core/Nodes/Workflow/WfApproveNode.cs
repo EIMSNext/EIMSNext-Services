@@ -5,6 +5,7 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 
+using HKH.Common;
 using HKH.Mef2.Integration;
 
 using MongoDB.Driver;
@@ -173,6 +174,45 @@ namespace EIMSNext.Flow.Core.Nodes
 
                 //写入待办记录
                 var todos = await CreateTodos(context.Workflow, dataContext, meta, null);
+                if (todos.Count == 0)
+                {
+                    if (meta.WfNodeSetting?.ApproveSetting?.NoApproverSetting?.ActionType == NoApproverActionType.AutoSubmit)
+                    {
+                        var noApproverApproveData = new WfApproveData(
+                            dataContext.CorpId!,
+                            dataContext.UserId ?? string.Empty,
+                            string.Empty,
+                            string.Empty,
+                            "系统",
+                            ApproveAction.AutoApprove,
+                            "找不到节点负责人，系统自动提交",
+                            string.Empty,
+                            Guid.NewGuid().ToString());
+
+                        using (var scope = TodoRepository.NewTransactionScope())
+                        {
+                            AddApprovalLog(context.Workflow, new Wf_Todo { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, noApproverApproveData, scope.SessionHandle);
+                            scope.CommitTransaction();
+                        }
+
+                        CreateExecLog(context.Workflow, dataContext, meta, noApproverApproveData);
+                        return ExecutionResult.Next();
+                    }
+
+                    var noApproverData = new WfApproveData(
+                        dataContext.CorpId!,
+                        dataContext.UserId ?? string.Empty,
+                        string.Empty,
+                        string.Empty,
+                        "系统",
+                        ApproveAction.None,
+                        string.Empty,
+                        string.Empty,
+                        Guid.NewGuid().ToString());
+                    CreateExecLog(context.Workflow, dataContext, meta, noApproverData, "找不到节点负责人");
+                    throw new UnLogException("找不到节点负责人");
+                }
+
                 var def = GetWorkflowDefinition(context.Workflow);
                 var notifyChannels = meta.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
                 if (notifyChannels == NotifyChannel.None)

@@ -1,231 +1,120 @@
-using System.Text.Json;
+using System.Text.RegularExpressions;
+
 using EIMSNext.Common.Extensions;
-using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Entities
 {
+    /// <summary>
+    /// 表单提醒调度计算器：
+    /// 1) repeat 推进委托给 <see cref="RepeatScheduleCalculator"/>（业务实体无关 primitive）；
+    /// 2) 字段锚点（补时/偏移）方法专属于"按字段时间"提醒场景；
+    /// 3) 提醒文字字段占位符校验。
+    /// </summary>
     public static class FormNotifyScheduleCalculator
     {
+        private static readonly Regex HasMinuteRegex = new("([hH]{1,2}:mm)|([hH]{1,2}:m)", RegexOptions.Compiled);
+
+        /// <summary>
+        /// 基于 FormNotify 实体上的 repeat/StartTime 配置计算下一次触发时间。
+        /// 内部把 FormNotify 字段折叠为 <see cref="TimeTriggerParameter"/> 后委派给 primitive。
+        /// </summary>
         public static long? CalculateNextTriggerTime(FormNotify notify, long anchorTime, long? afterTime = null)
         {
-            if (notify.RepeatType == null)
-            {
-                return null;
-            }
-
-            var start = anchorTime.ToDateTimeMs();
-            var cursor = afterTime.HasValue && afterTime.Value > anchorTime
-                ? afterTime.Value.ToDateTimeMs()
-                : start;
-
-            DateTime? next = notify.RepeatType.Value switch
-            {
-                FormNotifyRepeatType.Once => afterTime.HasValue && afterTime.Value >= anchorTime ? null : start,
-                FormNotifyRepeatType.Daily => NextDaily(start, cursor, 1),
-                FormNotifyRepeatType.Weekly => NextWeekly(start, cursor, 1),
-                FormNotifyRepeatType.BiWeekly => NextWeekly(start, cursor, 2),
-                FormNotifyRepeatType.Monthly => NextMonthly(start, cursor, 1),
-                FormNotifyRepeatType.Yearly => NextYearly(start, cursor, 1),
-                FormNotifyRepeatType.Custom => NextCustom(start, cursor, notify.RepeatConfig),
-                _ => null
-            };
-
-            if (next == null)
-            {
-                return null;
-            }
-
-            var nextMs = DateTime.SpecifyKind(next.Value, DateTimeKind.Utc).ToTimeStampMs();
-            if (notify.EndTime.HasValue && nextMs > notify.EndTime.Value)
-            {
-                return null;
-            }
-
-            return nextMs;
+            return RepeatScheduleCalculator.CalculateNextTriggerTime(
+                TimeTriggerParameter.Of(notify.RepeatType, notify.RepeatConfig, notify.EndTime, anchorTime, afterTime));
         }
 
+        /// <summary>
+        /// 判断通知文案中是否含 {{...}} 形式的字段占位符。
+        /// </summary>
         public static bool ContainsFieldTokens(string? text)
         {
             return !string.IsNullOrWhiteSpace(text) && text.Contains("{{", StringComparison.Ordinal);
         }
 
-        private static DateTime? NextDaily(DateTime anchor, DateTime cursor, int days)
+        /// <summary>
+        /// 字段格式是否包含分钟精度（决定是否需要补时）。
+        /// </summary>
+        public static bool HasMinutePrecision(string? format)
         {
-            var next = anchor;
-            while (next <= cursor)
+            if (string.IsNullOrWhiteSpace(format))
             {
-                next = next.AddDays(days);
+                return true;
             }
 
-            return next;
+            return HasMinuteRegex.IsMatch(format);
         }
 
-        private static DateTime? NextWeekly(DateTime anchor, DateTime cursor, int weeks)
+        /// <summary>
+        /// 按统一规则将字段值调整为触发锚点：含分钟直接使用；不含分钟使用字段日期 + FixedTime(HH:mm)。
+        /// </summary>
+        public static DateTime ResolveFieldAnchor(DateTime fieldValue, string? fieldFormat, string? fixedTime)
         {
-            var next = anchor;
-            while (next <= cursor)
+            if (HasMinutePrecision(fieldFormat))
             {
-                next = next.AddDays(7 * weeks);
+                return DateTime.SpecifyKind(fieldValue, DateTimeKind.Utc);
             }
 
-            return next;
+            if (TryParseFixedTime(fixedTime, out var hh, out var mm))
+            {
+                return new DateTime(fieldValue.Year, fieldValue.Month, fieldValue.Day, hh, mm, 0, DateTimeKind.Utc);
+            }
+
+            return new DateTime(fieldValue.Year, fieldValue.Month, fieldValue.Day, 9, 0, 0, DateTimeKind.Utc);
         }
 
-        private static DateTime? NextMonthly(DateTime anchor, DateTime cursor, int months)
+        /// <summary>
+        /// 对锚点时间应用方向+偏移量，得到首次/下次触发的基准时间。
+        /// Direction=At 返回 anchor；Before/After 按单位前/后推 offset。
+        /// </summary>
+        public static DateTime ApplyOffset(DateTime anchor, TimerOffsetDirection direction, int? offsetValue, TimerOffsetUnit? offsetUnit)
         {
-            var next = anchor;
-            while (next <= cursor)
+            if (direction == TimerOffsetDirection.At || !offsetValue.HasValue || offsetValue.Value == 0)
             {
-                next = next.AddMonths(months);
+                return anchor;
             }
 
-            return next;
+            var value = Math.Max(0, offsetValue.Value);
+            var span = offsetUnit switch
+            {
+                TimerOffsetUnit.Minute => TimeSpan.FromMinutes(value),
+                TimerOffsetUnit.Hour => TimeSpan.FromHours(value),
+                TimerOffsetUnit.Day => TimeSpan.FromDays(value),
+                _ => TimeSpan.Zero,
+            };
+
+            return direction == TimerOffsetDirection.Before
+                ? anchor - span
+                : anchor + span;
         }
 
-        private static DateTime? NextYearly(DateTime anchor, DateTime cursor, int years)
+        /// <summary>
+        /// 对字段值做补时+偏移后取毫秒时间戳。
+        /// </summary>
+        public static long ResolveAdjustedAnchor(DateTime fieldValue, string? fieldFormat, string? fixedTime, TimerOffsetDirection direction, int? offsetValue, TimerOffsetUnit? offsetUnit)
         {
-            var next = anchor;
-            while (next <= cursor)
-            {
-                next = next.AddYears(years);
-            }
-
-            return next;
+            var anchor = ResolveFieldAnchor(fieldValue, fieldFormat, fixedTime);
+            var adjusted = ApplyOffset(anchor, direction, offsetValue, offsetUnit);
+            return DateTime.SpecifyKind(adjusted, DateTimeKind.Utc).ToTimeStampMs();
         }
 
-        private static DateTime? NextCustom(DateTime anchor, DateTime cursor, string? repeatConfig)
+        private static bool TryParseFixedTime(string? value, out int hour, out int minute)
         {
-            var config = ParseConfig(repeatConfig);
-            if (config == null)
+            hour = 0;
+            minute = 0;
+            if (string.IsNullOrWhiteSpace(value))
             {
-                return null;
+                return false;
             }
 
-            if (string.Equals(config.Mode, "weekly", StringComparison.OrdinalIgnoreCase))
+            var parts = value.Split(':', StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length < 2)
             {
-                return NextCustomWeekly(anchor, cursor, config);
+                return false;
             }
 
-            if (string.Equals(config.Mode, "monthly", StringComparison.OrdinalIgnoreCase))
-            {
-                return NextCustomMonthly(anchor, cursor, config);
-            }
-
-            return null;
-        }
-
-        private static DateTime? NextCustomWeekly(DateTime anchor, DateTime cursor, RepeatConfig? config)
-        {
-            var interval = Math.Max(1, config?.Interval ?? 1);
-            var weekdays = config?.Weekdays?.Distinct().Where(x => x >= 0 && x <= 6).OrderBy(x => x).ToList() ?? [];
-            if (weekdays.Count == 0)
-            {
-                weekdays = [(int)anchor.DayOfWeek];
-            }
-
-            var weekStart = anchor.Date.AddDays(-(int)anchor.DayOfWeek);
-            var timeOfDay = anchor.TimeOfDay;
-            for (var step = 0; step < 520; step++)
-            {
-                var baseWeek = weekStart.AddDays(step * 7 * interval);
-                foreach (var weekday in weekdays)
-                {
-                    var candidate = baseWeek.AddDays(weekday).Add(timeOfDay);
-                    if (candidate < anchor)
-                    {
-                        continue;
-                    }
-
-                    if (candidate > cursor)
-                    {
-                        return candidate;
-                    }
-                }
-            }
-
-            return null;
-        }
-
-        private static DateTime? NextCustomMonthly(DateTime anchor, DateTime cursor, RepeatConfig? config)
-        {
-            var interval = Math.Max(1, config?.Interval ?? 1);
-            for (var step = 0; step < 240; step++)
-            {
-                var monthBase = new DateTime(anchor.Year, anchor.Month, 1, anchor.Hour, anchor.Minute, anchor.Second, anchor.Millisecond, DateTimeKind.Utc).AddMonths(step * interval);
-                var candidate = BuildMonthlyCandidate(anchor, monthBase, config);
-                if (candidate < anchor)
-                {
-                    continue;
-                }
-
-                if (candidate > cursor)
-                {
-                    return candidate;
-                }
-            }
-
-            return null;
-        }
-
-        private static DateTime BuildMonthlyCandidate(DateTime anchor, DateTime monthBase, RepeatConfig? config)
-        {
-            if (string.Equals(config?.MonthlyMode, "relative", StringComparison.OrdinalIgnoreCase))
-            {
-                var weekIndex = Math.Max(1, config?.WeekIndex ?? GetWeekIndex(anchor));
-                var weekday = config?.Weekday ?? (int)anchor.DayOfWeek;
-                return ResolveNthWeekday(monthBase.Year, monthBase.Month, weekIndex, weekday, anchor.TimeOfDay);
-            }
-
-            var day = Math.Max(1, config?.MonthDay ?? anchor.Day);
-            day = Math.Min(day, DateTime.DaysInMonth(monthBase.Year, monthBase.Month));
-            return new DateTime(monthBase.Year, monthBase.Month, day, anchor.Hour, anchor.Minute, anchor.Second, anchor.Millisecond, DateTimeKind.Utc);
-        }
-
-        private static int GetWeekIndex(DateTime anchor)
-        {
-            return ((anchor.Day - 1) / 7) + 1;
-        }
-
-        private static DateTime ResolveNthWeekday(int year, int month, int weekIndex, int weekday, TimeSpan time)
-        {
-            var firstDay = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var offset = ((weekday - (int)firstDay.DayOfWeek) + 7) % 7;
-            var day = 1 + offset + ((weekIndex - 1) * 7);
-            var daysInMonth = DateTime.DaysInMonth(year, month);
-            while (day > daysInMonth)
-            {
-                day -= 7;
-            }
-
-            return new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc).Add(time);
-        }
-
-        private static RepeatConfig? ParseConfig(string? json)
-        {
-            if (string.IsNullOrWhiteSpace(json))
-            {
-                return null;
-            }
-
-            try
-            {
-                return JsonSerializer.Deserialize<RepeatConfig>(json);
-            }
-            catch
-            {
-                return null;
-            }
-        }
-
-        private sealed class RepeatConfig
-        {
-            public string? Mode { get; set; }
-            public int? Interval { get; set; }
-            public List<int>? Weekdays { get; set; }
-            public string? MonthlyMode { get; set; }
-            public int? MonthDay { get; set; }
-            public int? WeekIndex { get; set; }
-            public int? Weekday { get; set; }
+            return int.TryParse(parts[0], out hour) && int.TryParse(parts[1], out minute)
+                && hour >= 0 && hour < 24 && minute >= 0 && minute < 60;
         }
     }
 }

@@ -15,6 +15,10 @@ namespace EIMSNext.Service.Entities
         /// 表单ID，用于标识流水号所属的表单
         /// </summary>
         public string FormId { get; set; } = string.Empty;
+        /// <summary>
+        /// 同表单内流水号字段的标识(默认采用字段 fieldId),允许多个独立计数
+        /// </summary>
+        public string Key { get; set; } = string.Empty;
 
         /// <summary>
         /// 当前日期，用于按天重置流水号
@@ -45,6 +49,29 @@ namespace EIMSNext.Service.Entities
         /// 表单
         /// </summary>
         Form
+    }
+
+    /// <summary>
+    /// 流水号自动计数段的重置周期
+    /// </summary>
+    public enum SerialNoResetCycle
+    {
+        /// <summary>
+        /// 不重置，一直累加
+        /// </summary>
+        Never = 0,
+        /// <summary>
+        /// 每日重置
+        /// </summary>
+        Day = 1,
+        /// <summary>
+        /// 每月重置
+        /// </summary>
+        Month = 2,
+        /// <summary>
+        /// 每年重置
+        /// </summary>
+        Year = 3
     }
 
     /// <summary>

@@ -12,6 +12,7 @@ namespace EIMSNext.Async.Quartz
         {
             var formNotifyJobKey = new JobKey("FormNotifyScheduleJob", "Notify");
             var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Notify");
+            var dataflowJobKey = new JobKey("DataflowScheduleJob", "Dataflow");
             qz.AddJob<FormNotifyScheduleJob>(opts => opts
                 .WithIdentity(formNotifyJobKey)
                 .StoreDurably()
@@ -21,6 +22,11 @@ namespace EIMSNext.Async.Quartz
                 .WithIdentity(wfExpireJobKey)
                 .StoreDurably()
                 .WithDescription("流程待办超时扫描作业"));
+
+            qz.AddJob<DataflowScheduleJob>(opts => opts
+                .WithIdentity(dataflowJobKey)
+                .StoreDurably()
+                .WithDescription("数据流定时触发扫描作业"));
 
             qz.AddTrigger(opts => opts
                 .ForJob(formNotifyJobKey)
@@ -38,6 +44,15 @@ namespace EIMSNext.Async.Quartz
                     configuration["Quartz:WfExpireNotifyJob:Cron"] ?? "0 0/1 * * * ?",
                     cs => cs.InTimeZone(TimeZoneInfo.Local))
                 .WithDescription("每分钟触发流程待办超时扫描")
+                .StartNow());
+
+            qz.AddTrigger(opts => opts
+                .ForJob(dataflowJobKey)
+                .WithIdentity("DataflowScheduleTrigger", "Dataflow")
+                .WithCronSchedule(
+                    configuration["Quartz:DataflowScheduleJob:Cron"] ?? "0 0/1 * * * ?",
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
+                .WithDescription("每分钟扫描数据流定时调度")
                 .StartNow());
 
             return qz;

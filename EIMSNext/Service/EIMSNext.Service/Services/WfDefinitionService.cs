@@ -13,10 +13,12 @@ namespace EIMSNext.Service
     public class WfDefinitionService : EntityServiceBase<Wf_Definition>, IWfDefinitionService
     {
         private WfMetadataParser metadataParser;
+        private readonly IDataflowScheduleService _dataflowScheduleService;
 
         public WfDefinitionService(IResolver resolver) : base(resolver)
         {
             metadataParser = resolver.Resolve<WfMetadataParser>();
+            _dataflowScheduleService = resolver.Resolve<IDataflowScheduleService>();
         }
 
         public Wf_Definition? Find(string wfExternalId, int? version = null)
@@ -104,6 +106,26 @@ namespace EIMSNext.Service
             }
 
             return Task.CompletedTask;
+        }
+
+        protected override async Task AfterAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)
+        {
+            foreach (var entity in entities.Where(x => x.FlowType == FlowType.Dataflow))
+            {
+                await _dataflowScheduleService.RebuildScheduleAsync(entity, session);
+            }
+
+            await base.AfterAdd(entities, session);
+        }
+
+        protected override async Task AfterReplace(Wf_Definition entity, IClientSessionHandle? session)
+        {
+            if (entity.FlowType == FlowType.Dataflow)
+            {
+                await _dataflowScheduleService.RebuildScheduleAsync(entity, session);
+            }
+
+            await base.AfterReplace(entity, session);
         }
 
         protected override Task BeforeDelete(FilterDefinition<Wf_Definition> filter, IClientSessionHandle? session)

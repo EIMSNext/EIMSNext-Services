@@ -46,8 +46,12 @@
         public const string Employee2 = "employee2";
         public const string Department1 = "department1";
         public const string Department2 = "department2";
+        /// <summary>
+        /// 流水号(自动生成,只读,提交时由后端生成)
+        /// </summary>
+        public const string SerialNo = "serialno";
 
-        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, TableForm, Employee1, Employee2, Department1, Department2];
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
         public static bool IsInputField(string type)
         {
             return AllFieldTypes.Contains(type);

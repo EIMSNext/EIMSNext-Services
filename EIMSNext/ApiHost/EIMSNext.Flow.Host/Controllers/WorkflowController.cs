@@ -124,6 +124,17 @@ namespace EIMSNext.Flow.Host.Controllers
             request.WfNodeId = todo.ApproveNodeId;
             request.WfInstanceId = string.IsNullOrEmpty(request.WfInstanceId) ? todo.WfInstanceId : request.WfInstanceId;
 
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可审批");
+            }
+
+            if (request.Action == ApproveAction.Approve)
+            {
+                await _workflowActionService.ValidateSubmitConditionAsync(wfInst, todo);
+            }
+
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 

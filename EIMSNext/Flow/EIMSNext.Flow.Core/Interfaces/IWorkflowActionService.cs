@@ -14,6 +14,7 @@ namespace EIMSNext.Flow.Core.Interfaces
         Task<WorkflowActionResult> ReturnAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string targetNodeId, string comment);
         Task<List<ReturnTargetNodeResult>> GetReturnNodesAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo);
         WorkflowActionStatusResult GetActionStatus(string currentEmployeeId, Wf_Todo? todo, Wf_Definition? definition);
+        Task ValidateSubmitConditionAsync(WorkflowInstance workflowInstance, Wf_Todo todo);
     }
 
     public class WorkflowActionDataContext

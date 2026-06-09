@@ -1,3 +1,4 @@
+using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 
@@ -9,6 +10,6 @@ namespace EIMSNext.Service.Contracts
     {
         Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, CascadeMode cascade, string? eventIds);
 
-        //void EvalFormulas(FormDef formDef, IEnumerable<FormData> formDatas);
+        Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query);
     }
 }
