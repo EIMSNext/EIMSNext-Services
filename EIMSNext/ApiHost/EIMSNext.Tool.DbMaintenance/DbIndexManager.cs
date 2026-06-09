@@ -129,6 +129,16 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_dashboarddef_corp_app_delete");
 
+            CreateIndex(GetCollection<SerialNoSequence>(),
+                Builders<SerialNoSequence>.IndexKeys
+                    .Ascending(x => x.SerialNoType)
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.AppId)
+                    .Ascending(x => x.FormId)
+                    .Ascending(x => x.Key),
+                CreateUniqueOptions(options),
+                "ix_serialnosequence_scope_unique");
+
             CreateIndex(GetCollection<Wf_Definition>(),
                 Builders<Wf_Definition>.IndexKeys.Ascending(x => x.ExternalId).Ascending(x => x.Version),
                 options,

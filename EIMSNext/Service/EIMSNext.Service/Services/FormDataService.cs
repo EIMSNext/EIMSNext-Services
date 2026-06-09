@@ -1,9 +1,13 @@
 using System.Dynamic;
+using System.Globalization;
+using System.Text;
+using System.Text.Json;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Cache;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Core.Query;
 using EIMSNext.Common.Extensions;
@@ -14,16 +18,17 @@ using HKH.Common;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
 using MongoDB.Driver;
-using System.Text.Json;
 
 namespace EIMSNext.Service
 {
     public class FormDataService : EntityServiceBase<FormData>, IFormDataService
     {
         private FlowApiClient _flowClient;
+        private ISerialNoSequenceService? _serialNoSvc;
         public FormDataService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
+            _serialNoSvc = resolver.Resolve<ISerialNoSequenceService>();
         }
 
         protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
@@ -57,6 +62,10 @@ namespace EIMSNext.Service
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;
+            if (Context.Action == DataAction.Submit)
+            {
+                entities.ForEach(entity => ResolveSerialNumbers(entity, formDef, null));
+            }
             if (!formDef.UsingWorkflow)
             {
                 //非流程单据直接生效
@@ -110,6 +119,18 @@ namespace EIMSNext.Service
             await base.AfterReplace(entity, session);
         }
 
+        protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)
+        {
+            if (Context.Action == DataAction.Submit)
+            {
+                var formDef = GetFromStore<FormDef>(entity.FormId)!;
+                var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
+                ResolveSerialNumbers(entity, formDef, old);
+            }
+
+            return base.BeforeReplace(entity, session);
+        }
+
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, EIMSNext.Service.Entities.CascadeMode cascade, string? eventIds)
         {
             var entity = entities.First();
@@ -142,6 +163,166 @@ namespace EIMSNext.Service
                         }
                     }
                 }
+            }
+        }
+
+        /// <summary>
+        /// 解析表单数据中的所有 serialno 字段:
+        /// - 当前值非空时保留,允许外部系统/API 预写流水号
+        /// - 当前值为空但旧值非空时保留旧值
+        /// - 当前值和旧值都为空时按规则生成
+        /// </summary>
+        private void ResolveSerialNumbers(FormData entity, FormDef formDef, FormData? oldEntity)
+        {
+            if (_serialNoSvc == null || formDef?.Content == null) return;
+            var layout = formDef.Content.Layout;
+            if (string.IsNullOrWhiteSpace(layout)) return;
+
+            JsonDocument? doc = null;
+            try
+            {
+                doc = JsonDocument.Parse(layout);
+            }
+            catch
+            {
+                return;
+            }
+
+            var dataDict = (IDictionary<string, object?>)entity.Data!;
+            var oldDataDict = oldEntity?.Data as IDictionary<string, object?>;
+            WalkSerialNoRules(doc.RootElement, (rule) =>
+            {
+                if (!rule.TryGetProperty("field", out var fieldProp) || fieldProp.ValueKind != JsonValueKind.String) return;
+                var field = fieldProp.GetString();
+                if (string.IsNullOrEmpty(field)) return;
+
+                if (dataDict.TryGetValue(field, out var currentValue)
+                    && !string.IsNullOrWhiteSpace(currentValue?.ToString()))
+                {
+                    return;
+                }
+
+                if (oldDataDict != null
+                    && oldDataDict.TryGetValue(field, out var oldValue)
+                    && !string.IsNullOrWhiteSpace(oldValue?.ToString()))
+                {
+                    dataDict[field] = oldValue;
+                    return;
+                }
+
+                if (!rule.TryGetProperty("props", out var propsEl) || propsEl.ValueKind != JsonValueKind.Object) return;
+                if (!propsEl.TryGetProperty("segments", out var segmentsEl) || segmentsEl.ValueKind != JsonValueKind.Array) return;
+
+                var sb = new StringBuilder();
+                foreach (var seg in segmentsEl.EnumerateArray())
+                {
+                    AppendSegment(seg, sb, entity, dataDict, field);
+                }
+                dataDict[field] = sb.ToString();
+            });
+
+            doc.Dispose();
+        }
+
+        private void AppendSegment(JsonElement seg, StringBuilder sb, FormData entity, IDictionary<string, object?> dataDict, string serialNoField)
+        {
+            if (!seg.TryGetProperty("type", out var typeEl) || typeEl.ValueKind != JsonValueKind.String) return;
+            var type = typeEl.GetString();
+            switch (type)
+            {
+                case "fixed":
+                    {
+                        var v = seg.TryGetProperty("value", out var ve) && ve.ValueKind == JsonValueKind.String ? ve.GetString() : null;
+                        sb.Append(v ?? string.Empty);
+                        break;
+                    }
+                case "date":
+                    {
+                        var fmt = seg.TryGetProperty("format", out var fe) && fe.ValueKind == JsonValueKind.String
+                            ? fe.GetString()
+                            : "yyyyMMdd";
+                        sb.Append(DateTime.UtcNow.ToString(NormalizeDateFormat(fmt), CultureInfo.InvariantCulture));
+                        break;
+                    }
+                case "field":
+                    {
+                        if (seg.TryGetProperty("field", out var fe) && fe.ValueKind == JsonValueKind.String)
+                        {
+                            var refField = fe.GetString();
+                            if (!string.IsNullOrEmpty(refField) && dataDict.TryGetValue(refField, out var fv) && fv != null)
+                            {
+                                sb.Append(fv.ToString() ?? string.Empty);
+                            }
+                        }
+                        break;
+                    }
+                case "counter":
+                    {
+                        var digits = seg.TryGetProperty("digits", out var de) && de.ValueKind == JsonValueKind.Number ? de.GetInt32() : 5;
+                        var padZero = !(seg.TryGetProperty("padZero", out var pe) && pe.ValueKind == JsonValueKind.False);
+                        var cycle = SerialNoResetCycle.Never;
+                        if (seg.TryGetProperty("reset", out var re) && re.ValueKind == JsonValueKind.String)
+                        {
+                            cycle = re.GetString() switch
+                            {
+                                "day" => SerialNoResetCycle.Day,
+                                "month" => SerialNoResetCycle.Month,
+                                "year" => SerialNoResetCycle.Year,
+                                _ => SerialNoResetCycle.Never
+                            };
+                        }
+                        var seq = _serialNoSvc!.NextFormSerialNo(
+                            entity.CorpId ?? string.Empty,
+                            entity.AppId,
+                            entity.FormId,
+                            serialNoField,
+                            cycle);
+                        sb.Append(FormatCounter(seq, digits, padZero));
+                        break;
+                    }
+            }
+        }
+
+        private static string FormatCounter(int seq, int digits, bool padZero)
+        {
+            if (!padZero || digits <= 0) return seq.ToString(CultureInfo.InvariantCulture);
+            return seq.ToString("D" + Math.Min(digits, 10).ToString(CultureInfo.InvariantCulture), CultureInfo.InvariantCulture);
+        }
+
+        private static string NormalizeDateFormat(string? format)
+        {
+            if (string.IsNullOrWhiteSpace(format)) return "yyyyMMdd";
+            return format.All(c => c is 'y' or 'M' or 'd' or '-' or '_' or '/' or '.') ? format : "yyyyMMdd";
+        }
+
+        private static void WalkSerialNoRules(JsonElement node, Action<JsonElement> visit)
+        {
+            if (node.ValueKind == JsonValueKind.Object)
+            {
+                if (node.TryGetProperty("type", out var t) && t.ValueKind == JsonValueKind.String
+                    && t.GetString() == FieldType.SerialNo)
+                {
+                    visit(node);
+                    // 不递归 children,避免 tableform 内嵌的同名子规则被误处理
+                    return;
+                }
+                foreach (var prop in node.EnumerateObject())
+                {
+                    if (prop.Name == "children" && prop.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        foreach (var child in prop.Value.EnumerateArray())
+                            WalkSerialNoRules(child, visit);
+                    }
+                    else if (prop.Value.ValueKind == JsonValueKind.Object || prop.Value.ValueKind == JsonValueKind.Array)
+                    {
+                        WalkSerialNoRules(prop.Value, visit);
+                    }
+                }
+            }
+            else if (node.ValueKind == JsonValueKind.Array)
+            {
+                foreach (var item in node.EnumerateArray())
+                    WalkSerialNoRules(item, visit);
             }
         }
 
