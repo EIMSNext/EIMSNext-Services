@@ -35,6 +35,8 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<WfApprovalMode>();
             builder.EnumType<PrintDefType>();
             builder.EnumType<AuthGroupType>();
+            builder.EnumType<FormListViewType>();
+            builder.EnumType<MobileFormListViewType>();
             //builder.EnumType<DataPerms>();
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
