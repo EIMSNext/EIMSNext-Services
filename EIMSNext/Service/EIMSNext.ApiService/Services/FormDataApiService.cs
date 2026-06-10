@@ -20,11 +20,13 @@ namespace EIMSNext.ApiService
         private FlowApiClient _flowClient;
         private IFormDefService _formDefService;
         private IWfDefinitionService _wfDefinitionService;
+        private IFormDataChangeLogService _formDataChangeLogService;
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
             _formDefService = resolver.Resolve<IFormDefService>();
             _wfDefinitionService = resolver.Resolve<IWfDefinitionService>();
+            _formDataChangeLogService = resolver.Resolve<IFormDataChangeLogService>();
         }
 
         public override Task AddAsync(FormData entity)
@@ -121,6 +123,28 @@ namespace EIMSNext.ApiService
 
             var result = await CoreService.GetFieldOptionsAsync(query);
             return new FormDataFilterOptionsResponse { Items = result.Items };
+        }
+
+        public List<FormDataChangeLog> GetChangeLogs(string dataId, int skip, int top)
+        {
+            if (string.IsNullOrWhiteSpace(dataId)) return [];
+
+            skip = Math.Max(skip, 0);
+            top = Math.Clamp(top <= 0 ? 20 : top, 1, 200);
+
+            return _formDataChangeLogService
+                .Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.DataId == dataId && !x.DeleteFlag)
+                .OrderByDescending(x => x.OperateTime)
+                .Skip(skip)
+                .Take(top)
+                .ToList();
+        }
+
+        public long CountChangeLogs(string dataId)
+        {
+            if (string.IsNullOrWhiteSpace(dataId)) return 0;
+
+            return _formDataChangeLogService.Count(x => x.CorpId == IdentityContext.CurrentCorpId && x.DataId == dataId && !x.DeleteFlag);
         }
 
         private DynamicFilter BuildBaseFilter(FormDataFilterOptionsRequest request)

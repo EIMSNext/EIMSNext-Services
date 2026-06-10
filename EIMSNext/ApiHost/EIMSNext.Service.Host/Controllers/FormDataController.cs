@@ -79,10 +79,11 @@ namespace EIMSNext.Service.Host.Controllers
         {
             if (options.Select == null || options.Select.Count == 0)
             {
-                //不指定列时，不返回UpdateLog
+                //不指定列时，不返回历史日志字段
                 options.Select = new DynamicFieldList()
                 {
-                    DynamicField.Create("updateLog",false)
+                    DynamicField.Create("updateLog",false),
+                    DynamicField.Create("changeLog",false)
                 };
             }
             var result = ApiService.Find(FilterResult(options)).ToList();
@@ -281,6 +282,51 @@ namespace EIMSNext.Service.Host.Controllers
 
             request.Filter = filter;
             return request;
+        }
+
+        /// <summary>
+        /// 查询表单数据修改日志
+        /// </summary>
+        /// <param name="key">表单数据ID</param>
+        /// <param name="skip">跳过数量</param>
+        /// <param name="top">返回数量</param>
+        /// <param name="authGroupId">授权组ID</param>
+        /// <returns></returns>
+        [Permission(Operation = Operation.Read)]
+        [HttpGet("{key}/changelog")]
+        public ActionResult GetChangeLogs([FromRoute] string key, [FromQuery] int skip = 0, [FromQuery] int top = 20, [FromQuery] string? authGroupId = null)
+        {
+            if (!CanReadFormData(key, authGroupId)) return NotFound();
+
+            return Ok(new { value = ApiService.GetChangeLogs(key, skip, top) });
+        }
+
+        /// <summary>
+        /// 查询表单数据修改日志总数
+        /// </summary>
+        /// <param name="key">表单数据ID</param>
+        /// <param name="authGroupId">授权组ID</param>
+        /// <returns></returns>
+        [Permission(Operation = Operation.Read)]
+        [HttpGet("{key}/changelog/$count")]
+        public ActionResult GetChangeLogCount([FromRoute] string key, [FromQuery] string? authGroupId = null)
+        {
+            if (!CanReadFormData(key, authGroupId)) return NotFound();
+
+            return Ok(ApiService.CountChangeLogs(key));
+        }
+
+        private bool CanReadFormData(string key, string? authGroupId)
+        {
+            var options = new DynamicFindOptions<FormData>
+            {
+                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
+                Take = 1,
+                Scope = string.IsNullOrWhiteSpace(authGroupId) ? null : new DataScope { AuthGroupId = authGroupId }
+            };
+
+            return ApiService.Find(FilterResult(options)).FirstOrDefault() != null;
         }
 
         /// <summary>

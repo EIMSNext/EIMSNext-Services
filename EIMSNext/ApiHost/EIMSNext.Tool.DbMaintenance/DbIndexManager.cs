@@ -177,6 +177,16 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<FormData>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Ascending(x => x.AppId),
                 options,
                 "ix_formdata_corp_delete_app");
+
+            CreateIndex(GetCollection<FormDataChangeLog>(),
+                Builders<FormDataChangeLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DataId).Descending(x => x.OperateTime),
+                options,
+                "ix_formdatachangelog_corp_data_operatetime");
+
+            CreateIndex(GetCollection<FormDataChangeLog>(),
+                Builders<FormDataChangeLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.FormId).Descending(x => x.OperateTime),
+                options,
+                "ix_formdatachangelog_corp_form_operatetime");
         }
 
         private void CreateFormNotifyIndexes(CreateIndexOptions options)
