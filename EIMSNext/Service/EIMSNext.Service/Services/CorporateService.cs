@@ -19,6 +19,7 @@ namespace EIMSNext.Service
             var entity = entities.First();
             var deptRepo = Resolver.GetRepository<Department>();
             var empRepo = Resolver.GetRepository<Employee>();
+            var adminGroupRepo = Resolver.GetRepository<AdminGroup>();
             var clientRepo = Resolver.GetRepository<EIMSNext.Auth.Entities.Client>();
             var userRepo = Resolver.GetRepository<User>();
             var user = Context.User as User;
@@ -79,6 +80,16 @@ namespace EIMSNext.Service
 
             var emp_system = new Employee { CorpId = entity.Id, Id = $"system_{entity.Id}", Code = "system", EmpName = "System", UserId = "system", UserName = "System", IsDummy = true };
             var emp_anonymous = new Employee { CorpId = entity.Id, Id = $"anonymous_{entity.Id}", Code = "anonymous", EmpName = "Anonymous", UserId = "anonymous", UserName = "Anonymous", IsDummy = true };
+            var systemAdminGroup = new AdminGroup
+            {
+                CorpId = entity.Id,
+                Name = "系统管理员",
+                Type = AdminGroupType.System,
+                ParentId = string.Empty,
+                SortValue = -1,
+                EmployeeIds = []
+            };
+            adminGroupRepo.EnsureId(systemAdminGroup);
 
             var tasks = new List<Task>
             {
@@ -86,6 +97,7 @@ namespace EIMSNext.Service
                 clientRepo.InsertAsync(serviceClient,session),
                 deptRepo.InsertAsync(dept, session),
                 empRepo.InsertAsync(new List<Employee>{emp, emp_system,emp_anonymous}, session),
+                adminGroupRepo.InsertAsync(systemAdminGroup, session),
                 userRepo.ReplaceAsync(user, session)
             };
 
