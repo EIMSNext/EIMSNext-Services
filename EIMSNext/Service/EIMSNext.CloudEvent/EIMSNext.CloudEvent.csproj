@@ -13,7 +13,7 @@
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
-    <ProjectReference Include="..\EIMSNext.Common\EIMSNext.Common.csproj" />
   </ItemGroup>
 </Project>
