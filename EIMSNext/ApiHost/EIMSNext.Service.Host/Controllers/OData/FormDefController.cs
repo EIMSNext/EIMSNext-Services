@@ -32,11 +32,25 @@ namespace EIMSNext.Service.Host.Controllers.OData
                 //TODO: 性能不一定好，先这样写
                 var empId = emp.Id;
                 var roleIds = emp.Roles.Select(x => x.RoleId).ToList();
-                var deptId = emp.DepartmentId;
-                var pDeptIds = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|")).Select(x => x.Id).ToList();
+                var deptIds = Resolver.GetRepository<EmployeeDepartment>().Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == empId)
+                    .Select(x => x.DepartmentId)
+                    .ToList();
+                var departments = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                    .Select(x => new { x.Id, x.HeriarchyId })
+                    .ToList();
+                var employeeDepartmentHierarchies = departments
+                    .Where(x => deptIds.Contains(x.Id))
+                    .Select(x => x.HeriarchyId)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+                var pDeptIds = departments
+                    .Where(x => employeeDepartmentHierarchies.Any(heriarchyId => heriarchyId.Contains($"|{x.Id}|")))
+                    .Select(x => x.Id)
+                    .ToList();
 
                 string? appId = QueryAppId;
-                var formIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && (string.IsNullOrEmpty(appId) || x.AppId == appId) && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptId == m.Id)))).Select(x => x.FormId).Distinct().ToList();
+                var formIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && (string.IsNullOrEmpty(appId) || x.AppId == appId) && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptIds.Contains(m.Id))))).Select(x => x.FormId).Distinct().ToList();
 
                 return query.Where(x => formIds.Contains(x.Id));
             }

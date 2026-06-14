@@ -26,6 +26,7 @@ namespace EIMSNext.Flow.Core.Nodes
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             EmployeeRepository = resolver.GetRepository<Employee>();
+            EmployeeDepartmentRepository = resolver.GetRepository<EmployeeDepartment>();
             DepartmentRepository = resolver.GetRepository<Department>();
             Logger = resolver.GetLogger<T>();
         }
@@ -36,6 +37,7 @@ namespace EIMSNext.Flow.Core.Nodes
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IRepository<Employee> EmployeeRepository { get; private set; }
+        protected IRepository<EmployeeDepartment> EmployeeDepartmentRepository { get; private set; }
         protected IRepository<Department> DepartmentRepository { get; private set; }
         protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
 
@@ -173,7 +175,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
-            var resolver = new WorkflowCandidateResolver(EmployeeRepository, DepartmentRepository, FormDefRepository, FormDataRepository);
+            var resolver = new WorkflowCandidateResolver(EmployeeRepository, EmployeeDepartmentRepository, DepartmentRepository, FormDefRepository, FormDataRepository);
             return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 

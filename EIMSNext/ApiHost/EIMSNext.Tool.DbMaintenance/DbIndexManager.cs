@@ -56,6 +56,7 @@ namespace EIMSNext.Auth.DbMaintenance
         {
             CreateCorpIdIndex<Department>(options, "ix_department_corpid");
             CreateCorpIdIndex<Employee>(options, "ix_employee_corpid");
+            CreateCorpIdIndex<EmployeeDepartment>(options, "ix_employeedepartment_corpid");
             CreateCorpIdIndex<Role>(options, "ix_role_corpid");
 
             CreateIndex(GetCollection<Employee>(),
@@ -63,10 +64,15 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_employee_corp_user");
 
-            CreateIndex(GetCollection<Employee>(),
-                Builders<Employee>.IndexKeys.Ascending(x => x.DepartmentId).Ascending(x => x.Status).Ascending(x => x.IsDummy),
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys.Ascending(x => x.EmployeeId).Ascending(x => x.DepartmentId),
+                CreateUniqueOptions(options),
+                "ix_employeedepartment_employee_department_unique");
+
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys.Ascending(x => x.DepartmentId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_employee_department_status_dummy");
+                "ix_employeedepartment_department_employee");
 
             CreateIndex(GetCollection<Employee>(),
                 Builders<Employee>.IndexKeys.Ascending("Roles.RoleId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
