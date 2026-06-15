@@ -78,6 +78,7 @@ namespace EIMSNext.Service.Tests
             };
 
             var resolver = new TestResolver(services);
+            services[typeof(AdminPermissionEvaluator)] = new AdminPermissionEvaluator(resolver);
             _employeeApiService = new EmployeeApiService(resolver);
             _departmentService = new TestableDepartmentService(resolver);
         }
@@ -230,7 +231,7 @@ namespace EIMSNext.Service.Tests
             public string CurrentUserID => "user-test";
             public IUser? CurrentUser => null;
             public IEmployee? CurrentEmployee => null;
-            public IdentityType IdentityType => IdentityType.Employee;
+            public IdentityType IdentityType => IdentityType.CorpAdmin;
             public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.Allow;
             public string CurrentCorpId => corpId;
             public string AccessToken => string.Empty;

@@ -134,6 +134,32 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        public List<AuthGroup> GetUsageAuthGroupsForCurrentEmployee(string? formId)
+        {
+            var employee = IdentityContext.CurrentEmployee as Employee;
+            if (employee == null)
+            {
+                return [];
+            }
+
+            var empId = employee.Id;
+            var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
+            var deptIds = GetCurrentEmployeeDeptIds();
+            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
+
+            return Resolver.GetService<AuthGroup>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    !x.Disabled &&
+                    (string.IsNullOrEmpty(formId) || x.FormId == formId) &&
+                    x.Members.Any(m =>
+                        (m.Type == MemberType.Employee && m.Id == empId) ||
+                        (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                .ToList();
+        }
+
         public List<AppMenuPermissionItem> GetAppMenuPermissions(string appId)
         {
             if (HasUnrestrictedManagementIdentity)

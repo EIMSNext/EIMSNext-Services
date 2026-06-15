@@ -1,4 +1,5 @@
 using EIMSNext.Core.Query;
+using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -20,5 +21,12 @@ namespace EIMSNext.ApiService.RequestModels
     public class FormDataFilterOptionsResponse
     {
         public List<FilterOptionItem> Items { get; set; } = [];
+    }
+
+    public class FormDataPermissionScopeResponse
+    {
+        public DataPerms DataPerms { get; set; }
+
+        public List<FieldPerm>? FieldPerms { get; set; }
     }
 }
