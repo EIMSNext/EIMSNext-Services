@@ -1,15 +1,19 @@
+using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Interfaces;
+
+using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.Tokens;
+
+using OpenIddict.Abstractions;
+using OpenIddict.Server.AspNetCore;
+
 using System.Globalization;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
-using EIMSNext.Auth.Entities;
-using EIMSNext.Auth.Interfaces;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.IdentityModel.Tokens;
-using OpenIddict.Abstractions;
-using OpenIddict.Server.AspNetCore;
+
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace EIMSNext.Auth.Host.Controllers
@@ -42,7 +46,7 @@ namespace EIMSNext.Auth.Host.Controllers
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
 
-        [Route("auth/login"), HttpPost]
+        [Route("~/auth/login"), HttpPost]
         [Consumes("application/x-www-form-urlencoded")]
         [Produces("application/json")]
         public async Task<IActionResult> Login([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
