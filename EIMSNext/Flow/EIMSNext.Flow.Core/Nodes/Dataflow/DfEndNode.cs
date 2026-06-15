@@ -19,9 +19,11 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            _dataProcessor.Process(context.Workflow);
-
-            return ExecutionResult.Next();
+            return ExecuteWithLog(context, dataContext =>
+            {
+                _dataProcessor.Process(context.Workflow);
+                return ExecutionResult.Next();
+            });
         }
     }
 }

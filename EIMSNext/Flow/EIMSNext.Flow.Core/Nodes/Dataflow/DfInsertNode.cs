@@ -13,27 +13,27 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
-            var insertSetting = Metadata!.DfNodeSetting!.InsertSetting!;
-            var formDef = GetFormDef(dataContext, insertSetting.FormId);
-
-            if (insertSetting.FieldSettings.Count > 0)
+            return ExecuteWithLog(context, dataContext =>
             {
-                //填充字段
-                var insertDatas = BuildInsertDatas(dataContext, formDef, insertSetting.FieldSettings);
-                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                var insertSetting = Metadata!.DfNodeSetting!.InsertSetting!;
+                var formDef = GetFormDef(dataContext, insertSetting.FormId);
+
+                if (insertSetting.FieldSettings.Count > 0)
                 {
-                    NodeId = Metadata.Id,
-                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                    FormId = insertSetting.FormId,
-                    ActionDatas = insertDatas
-                });
+                    //填充字段
+                    var insertDatas = BuildInsertDatas(dataContext, formDef, insertSetting.FieldSettings);
+                    dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    {
+                        NodeId = Metadata.Id,
+                        SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                        FormId = insertSetting.FormId,
+                        ActionDatas = insertDatas
+                    });
 
-            }
+                }
 
-            CreateExecLog(context.Workflow, dataContext, Metadata!);
-
-            return ExecutionResult.Next();
+                return ExecutionResult.Next();
+            });
         }
     }
 }

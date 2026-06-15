@@ -15,22 +15,26 @@ namespace EIMSNext.Service.Host.Controllers.OData
     {
         protected override IQueryable<AppDefViewModel> FilterByPermission(IQueryable<AppDefViewModel> query, ODataQueryOptions<AppDefViewModel> options)
         {
-            if (IdentityType.App_Admins.HasFlag(IdentityContext.IdentityType))
+            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return base.FilterByPermission(query, options);
             }
-            else if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
+
+            if (IdentityContext.IdentityType == IdentityType.AppAdmin)
             {
                 query = base.FilterByPermission(query, options);
-                var emp = (IdentityContext.CurrentEmployee as Employee)!;
+                var appIds = evaluator.GetUsageAppIdsForCurrentEmployee()
+                    .Concat(evaluator.GetSnapshot().ManageableAppIds)
+                    .Distinct()
+                    .ToList();
+                return query.Where(x => appIds.Contains(x.Id));
+            }
 
-                var empId = emp.Id;
-                var roleIds = emp.Roles.Select(x => x.RoleId).ToList();
-                var deptId = emp.DepartmentId;
-                var pDeptIds = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|")) .Select(x => x.Id).ToList();
-
-                var appIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptId == m.Id)))).Select(x => x.AppId).Distinct().ToList();
-
+            if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
+            {
+                query = base.FilterByPermission(query, options);
+                var appIds = evaluator.GetUsageAppIdsForCurrentEmployee();
                 return query.Where(x => appIds.Contains(x.Id));
             }
 

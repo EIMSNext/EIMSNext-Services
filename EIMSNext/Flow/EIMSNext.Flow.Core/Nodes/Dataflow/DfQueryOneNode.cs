@@ -21,27 +21,26 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
-
-            var findOpt = Metadata!.DfNodeSetting!.QueryOneSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-            BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
-
-            var queryData = FormDataRepository.Find(findOpt).FirstOrDefault();
-
-            if (queryData != null)
+            return ExecuteWithLog(context, dataContext =>
             {
-                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                var findOpt = Metadata!.DfNodeSetting!.QueryOneSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
+                BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+
+                var queryData = FormDataRepository.Find(findOpt).FirstOrDefault();
+
+                if (queryData != null)
                 {
-                    NodeId = Metadata.Id,
-                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                    FormId = dataContext.FormId,
-                    ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = queryData } }
-                });
-            }
+                    dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    {
+                        NodeId = Metadata.Id,
+                        SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                        FormId = dataContext.FormId,
+                        ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = queryData } }
+                    });
+                }
 
-            CreateExecLog(context.Workflow, dataContext, Metadata!);
-
-            return ExecutionResult.Next();
+                return ExecutionResult.Next();
+            });
         }
     }
 }

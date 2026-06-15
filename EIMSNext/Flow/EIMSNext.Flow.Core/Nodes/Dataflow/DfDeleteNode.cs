@@ -16,7 +16,8 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
+            return ExecuteWithLog(context, dataContext =>
+            {
             var updateSetting = Metadata!.DfNodeSetting!.DeleteSetting!;
             var formDef = GetFormDef(dataContext, updateSetting.FormId);
 
@@ -27,7 +28,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             else if (updateSetting.DeleteMode == UpdateMode.Form)
             {
-                var findOpt = Metadata!.DfNodeSetting!.UpdateSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
+                var findOpt = updateSetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
                 BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
 
                 toRemoves = new List<ActionFormData> { };
@@ -45,9 +46,8 @@ namespace EIMSNext.Flow.Core.Nodes
                 });
             }
 
-            CreateExecLog(context.Workflow, dataContext, Metadata!);
-
             return ExecutionResult.Next();
+            });
         }
     }
 }

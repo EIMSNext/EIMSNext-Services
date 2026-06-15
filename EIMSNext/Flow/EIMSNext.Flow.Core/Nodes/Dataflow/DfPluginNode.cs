@@ -23,45 +23,65 @@ namespace EIMSNext.Flow.Core.Nodes
         public override ExecutionResult Run(IStepExecutionContext context)
         {
             var dataContext = GetDataContext(context);
+            var startTime = DateTime.UtcNow.ToTimeStampMs();
             var setting = Metadata?.DfNodeSetting?.PluginSetting;
             if (setting == null || string.IsNullOrWhiteSpace(setting.PluginId) || string.IsNullOrWhiteSpace(setting.FunctionId))
             {
-                CreateExecLog(context.Workflow, dataContext, Metadata!, "插件节点未配置");
+                CreateFailureExecLog(context.Workflow, dataContext, Metadata!, "插件节点未配置", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
                 return ExecutionResult.Next();
             }
 
-            var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
-            var payload = BuildPayload(dataContext, setting);
-            var invocationContext = new PluginInvocationContext
+            try
             {
-                Resolver = Resolver,
-                CorpId = dataContext.CorpId,
-                UserId = dataContext.UserId,
-                Items = new Dictionary<string, object?>
+                var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
+                var payload = BuildPayload(dataContext, setting);
+                var invocationContext = new PluginInvocationContext
                 {
-                    ["workflowId"] = context.Workflow.Id,
-                    ["nodeId"] = Metadata?.Id,
-                    ["dataId"] = dataContext.DataId,
+                    Resolver = Resolver,
+                    CorpId = dataContext.CorpId,
+                    UserId = dataContext.UserId,
+                    Items = new Dictionary<string, object?>
+                    {
+                        ["workflowId"] = context.Workflow.Id,
+                        ["nodeId"] = Metadata?.Id,
+                        ["dataId"] = dataContext.DataId,
+                    }
+                };
+
+                var result = runtimeManager.ExecuteAsync(
+                        setting.PluginId,
+                        setting,
+                        new PluginExecArgs { FunName = setting.FunctionId, FunArgs = JsonSerializer.Serialize(payload) },
+                        invocationContext,
+                        context.CancellationToken)
+                    .GetAwaiter()
+                    .GetResult();
+
+                if (result.Code != 0)
+                {
+                    CreateFailureExecLog(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
                 }
-            };
-
-            var result = runtimeManager.ExecuteAsync(
-                    setting.PluginId,
-                    setting,
-                    new PluginExecArgs { FunName = setting.FunctionId, FunArgs = JsonSerializer.Serialize(payload) },
-                    invocationContext,
-                    context.CancellationToken)
-                .GetAwaiter()
-                .GetResult();
-
-            if (result.Code != 0)
-            {
-                CreateExecLog(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败");
+                else
+                {
+                    SavePluginNodeResult(dataContext, result.Result, setting);
+                    CreateExecLog(context.Workflow, dataContext, Metadata!, startTime: startTime, endTime: DateTime.UtcNow.ToTimeStampMs(), summary: "执行成功");
+                }
             }
-            else
+            catch (Exception ex)
             {
-                SavePluginNodeResult(dataContext, result.Result, setting);
-                CreateExecLog(context.Workflow, dataContext, Metadata!);
+                var failure = ClassifyFailure(Metadata!, ex, pluginFailure: true);
+                dataContext.ErrMsg = failure.Reason;
+                CreateExecLog(
+                    context.Workflow,
+                    dataContext,
+                    Metadata!,
+                    ex.Message,
+                    startTime,
+                    DateTime.UtcNow.ToTimeStampMs(),
+                    failure.Reason,
+                    failure.Suggestion,
+                    failure.Summary);
+                throw;
             }
 
             return ExecutionResult.Next();

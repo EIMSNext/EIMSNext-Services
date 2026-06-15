@@ -15,30 +15,31 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
-
-            if (!string.IsNullOrEmpty(dataContext.DataId) && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
+            return ExecuteWithLog(context, dataContext =>
             {
-                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                if (!string.IsNullOrEmpty(dataContext.DataId) && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
                 {
-                    NodeId = Metadata.Id,
-                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                    FormId = dataContext.FormId,
-                    ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = GetFormData(dataContext.DataId)! } }
-                });
-            }
-            else if (string.IsNullOrEmpty(dataContext.DataId) && dataContext.TriggerData != null && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
-            {
-                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    {
+                        NodeId = Metadata.Id,
+                        SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                        FormId = dataContext.FormId,
+                        ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = GetFormData(dataContext.DataId)! } }
+                    });
+                }
+                else if (string.IsNullOrEmpty(dataContext.DataId) && dataContext.TriggerData != null && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
                 {
-                    NodeId = Metadata.Id,
-                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                    FormId = dataContext.FormId,
-                    ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = dataContext.TriggerData } }
-                });
-            }
+                    dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    {
+                        NodeId = Metadata.Id,
+                        SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                        FormId = dataContext.FormId,
+                        ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = dataContext.TriggerData } }
+                    });
+                }
 
-            return ExecutionResult.Next();
+                return ExecutionResult.Next();
+            });
         }
     }
 }

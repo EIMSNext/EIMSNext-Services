@@ -1,10 +1,12 @@
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
+using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -12,6 +14,7 @@ namespace EIMSNext.ApiService
     {
         public async Task AddEmployeesToRole(AddEmpsToRoleRequest request)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageRoleMembers(request.RoleId!, request.EmpIds ?? []);
             var role = CoreService.Get(request.RoleId!);
             if (role != null)
             {
@@ -22,12 +25,15 @@ namespace EIMSNext.ApiService
 
         public async Task RemoveEmployeesFromRole(RemoveEmpsToRoleRequest request)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageRoleMembers(request.RoleId!, request.EmpIds ?? []);
             var empService = Resolver.GetService<IEmployeeService, Employee>();
             await empService.RemoveFromRoleAsync(request.RoleId!, request.EmpIds!);
         }
 
         public async Task<bool> Move(MoveRoleTreeNodeRequest request)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有修改角色结构的权限");
+
             if (string.IsNullOrWhiteSpace(request.Id))
             {
                 return false;
@@ -120,6 +126,24 @@ namespace EIMSNext.ApiService
                     await ReplaceNode(node, groupService, roleService);
                 }
             }
+        }
+
+        protected override Task AddAsyncCore(Role entity)
+        {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有创建角色的权限");
+            return base.AddAsyncCore(entity);
+        }
+
+        protected override Task<ReplaceOneResult> ReplaceAsyncCore(Role entity)
+        {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有修改角色的权限");
+            return base.ReplaceAsyncCore(entity);
+        }
+
+        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有删除角色的权限");
+            return base.DeleteAsyncCore(ids);
         }
 
         private List<RoleSortNode> LoadRoleRootNodes(IRoleGroupService groupService, IRoleService roleService, string movingId)

@@ -13,7 +13,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecutionResult.Next();
+            return ExecuteWithLog(context, dataContext => ExecutionResult.Next());
         }
     }
 }

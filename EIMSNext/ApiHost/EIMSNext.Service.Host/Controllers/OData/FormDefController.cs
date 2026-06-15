@@ -20,24 +20,29 @@ namespace EIMSNext.Service.Host.Controllers.OData
     {
         protected override IQueryable<FormDefViewModel> FilterByPermission(IQueryable<FormDefViewModel> query, ODataQueryOptions<FormDefViewModel> options)
         {
-            if (IdentityType.App_Admins.HasFlag(IdentityContext.IdentityType))
+            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return base.FilterByPermission(query, options);
             }
-            else if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
+
+            if (IdentityContext.IdentityType == IdentityType.AppAdmin)
             {
                 query = base.FilterByPermission(query, options);
-                var emp = (IdentityContext.CurrentEmployee as Employee)!;
-
-                //TODO: 性能不一定好，先这样写
-                var empId = emp.Id;
-                var roleIds = emp.Roles.Select(x => x.RoleId).ToList();
-                var deptId = emp.DepartmentId;
-                var pDeptIds = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|")).Select(x => x.Id).ToList();
-
                 string? appId = QueryAppId;
-                var formIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && (string.IsNullOrEmpty(appId) || x.AppId == appId) && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptId == m.Id)))).Select(x => x.FormId).Distinct().ToList();
+                var formIds = evaluator.GetUsageFormIdsForCurrentEmployee(appId);
+                var manageableAppIds = evaluator.GetSnapshot().ManageableAppIds;
 
+                return query.Where(x =>
+                    formIds.Contains(x.Id) ||
+                    (manageableAppIds.Contains(x.AppId) && (string.IsNullOrEmpty(appId) || x.AppId == appId)));
+            }
+
+            if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
+            {
+                query = base.FilterByPermission(query, options);
+                string? appId = QueryAppId;
+                var formIds = evaluator.GetUsageFormIdsForCurrentEmployee(appId);
                 return query.Where(x => formIds.Contains(x.Id));
             }
 

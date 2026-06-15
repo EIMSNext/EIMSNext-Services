@@ -24,6 +24,8 @@ namespace EIMSNext.ApiService
 
         protected override async Task AddAsyncCore(Employee entity)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity);
+
             var platform = GetCurrentCorpPlatform();
             if (platform == PlatformType.Private)
             {
@@ -54,9 +56,11 @@ namespace EIMSNext.ApiService
 
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Employee entity)
         {
+            var original = await CoreService.GetAsync(entity.Id) ?? throw new InvalidOperationException("员工不存在");
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, original);
+
             if (GetCurrentCorpPlatform() == PlatformType.Private)
             {
-                var original = await CoreService.GetAsync(entity.Id) ?? throw new InvalidOperationException("员工不存在");
                 await BindPrivateUserAsync(entity, original, createWhenMissing: false);
             }
 
@@ -75,6 +79,8 @@ namespace EIMSNext.ApiService
             var userService = Resolver.GetService<User>();
             var employees = empService.Query(x => x.CorpId == IdentityContext.CurrentCorpId && idList.Contains(x.Id)).ToList();
             var isPrivate = GetCurrentCorpPlatform() == PlatformType.Private;
+
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployees(idList);
 
             foreach (var employee in employees)
             {
@@ -181,9 +187,9 @@ namespace EIMSNext.ApiService
 
         private async Task CreateAdminInviteRequestAsync(Employee entity)
         {
-            var requestRepo = Resolver.GetRepository<CorpOnboardingRequest>();
+            var requestService = Resolver.GetService<CorpOnboardingRequest>();
             var corporate = Resolver.GetService<Corporate>().Get(IdentityContext.CurrentCorpId);
-            var exists = requestRepo.Queryable.Any(x => x.EmployeeId == entity.Id);
+            var exists = requestService.All().Any(x => x.EmployeeId == entity.Id);
             if (exists)
             {
                 return;
@@ -202,8 +208,7 @@ namespace EIMSNext.ApiService
                 SourceType = CorpOnboardingSourceType.AdminInvite,
             };
 
-            requestRepo.EnsureId(request);
-            await requestRepo.InsertAsync(request);
+            await requestService.AddAsync(request);
         }
 
         private PlatformType GetCurrentCorpPlatform()

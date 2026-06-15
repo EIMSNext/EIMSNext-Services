@@ -1,7 +1,6 @@
 using EIMSNext.ApiService;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Service.Contracts;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -15,7 +14,6 @@ namespace EIMSNext.Service.Host.Authorization
     {
         private readonly ICacheClient _cache;
         private readonly IIdentityContext _identity;
-        private readonly IAdminGroupService _adminGroupService;
         private ILogger<PermissionFilter> _logger;
 
         /// <summary>
@@ -24,11 +22,10 @@ namespace EIMSNext.Service.Host.Authorization
         /// <param name="identityContext"></param>
         /// <param name="cache"></param>
         /// <param name="userService"></param>
-        public PermissionFilter(IIdentityContext identityContext, ICacheClient cache, IAdminGroupService adminGroupService, ILogger<PermissionFilter> logger)
+        public PermissionFilter(IIdentityContext identityContext, ICacheClient cache, ILogger<PermissionFilter> logger)
         {
             _identity = identityContext;
             _cache = cache;
-            _adminGroupService = adminGroupService;
             _logger = logger;
         }
         /// <summary>
@@ -36,13 +33,13 @@ namespace EIMSNext.Service.Host.Authorization
         /// </summary>
         /// <param name="context"></param>
         /// <returns></returns>
-        public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
+        public Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             if (_identity.IdentityType == IdentityType.Disabled)
             {
                 _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "用户已被禁用");
                 context.Result = new UnauthorizedResult();
-                return;
+                return Task.CompletedTask;
             }
 
             var actionContext = (ControllerActionDescriptor)context.ActionDescriptor;
@@ -52,7 +49,7 @@ namespace EIMSNext.Service.Host.Authorization
             {
                 //没有标记属性或总是允许，则不进行访问控制
                 _identity.AccessControlLevel = perAttr == null ? AccessControlLevel.Allow : perAttr.AccessControlLevel;
-                return;
+                return Task.CompletedTask;
             }
             else if (perAttr.AccessControlLevel == AccessControlLevel.Forbid)
             {
@@ -66,9 +63,6 @@ namespace EIMSNext.Service.Host.Authorization
                 {
                     if (perAttr.Operation != Operation.NotSet)  //确认配置了权限控制
                     {
-                        //TODO:此处为对管理组访问限制
-                        var a = await _adminGroupService.FindAsync(x => x.Name == "");
-
                         //UserPermissions? userPermissions = null;
                         //if (!_cache.TryGetValue($"{Constants.PermissionCacheKey}{_identity.CurrentUserID}", out userPermissions) || userPermissions == null)
                         //{
@@ -87,6 +81,8 @@ namespace EIMSNext.Service.Host.Authorization
                     }
                 }
             }
+
+            return Task.CompletedTask;
         }
     }
 }

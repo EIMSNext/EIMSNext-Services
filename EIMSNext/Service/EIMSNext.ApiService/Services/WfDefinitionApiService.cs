@@ -1,6 +1,7 @@
 using HKH.Mef2.Integration;
 
 using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Common;
 using EIMSNext.Service.Entities;
 using EIMSNext.ApiClient.Flow;
 
@@ -19,14 +20,37 @@ namespace EIMSNext.ApiService
 
         public override async Task AddAsync(Wf_Definition entity)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
             await base.AddAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
         }
         public override async Task<ReplaceOneResult> ReplaceAsync(Wf_Definition entity)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
             var result = await base.ReplaceAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
             return result;
+        }
+
+        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        {
+            var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var definitions = CoreService.All()
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && idList.Contains(x.Id))
+                .ToList();
+
+            if (definitions.Count != idList.Count)
+            {
+                throw new BadRequestException("流程定义不存在");
+            }
+
+            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            foreach (var definition in definitions)
+            {
+                evaluator.EnsureCanManageApp(definition.AppId);
+            }
+
+            return await base.DeleteAsyncCore(idList);
         }
     }
 }

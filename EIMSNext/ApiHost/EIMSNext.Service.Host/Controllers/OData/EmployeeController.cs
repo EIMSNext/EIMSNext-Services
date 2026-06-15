@@ -55,7 +55,27 @@ namespace EIMSNext.Service.Host.Controllers.OData
             query = base.FilterResult(query, options);
             query = query.Where(x => !x.IsDummy);
 
+            if (IsAdminScope())
+            {
+                var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+                if (evaluator.ShouldApplyNormalAdminRules)
+                {
+                    var snapshot = evaluator.GetSnapshot();
+                    if (snapshot.ContactViewDepartmentScopeMode != AdminPermissionSnapshot.ToWireScopeMode(ScopeMode.All))
+                    {
+                        var ids = snapshot.ContactViewDepartmentIds;
+                        query = ids.Count == 0 ? query.Where(x => false) : query.Where(x => ids.Contains(x.DepartmentId));
+                    }
+                }
+            }
+
             return query;
+        }
+
+        private bool IsAdminScope()
+        {
+            return Request.Query.TryGetValue("adminScope", out var value) &&
+                string.Equals(value.FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
         }
     }
 }
