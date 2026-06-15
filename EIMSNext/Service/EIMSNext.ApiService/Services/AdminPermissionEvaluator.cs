@@ -88,8 +88,8 @@ namespace EIMSNext.ApiService
 
             var empId = employee.Id;
             var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
-            var deptId = employee.DepartmentId;
-            var parentDeptIds = GetCurrentEmployeeParentDepartmentIds(deptId);
+            var deptIds = GetCurrentEmployeeDeptIds();
+            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
@@ -98,7 +98,7 @@ namespace EIMSNext.ApiService
                     x.Members.Any(m =>
                         (m.Type == MemberType.Employee && m.Id == empId) ||
                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && parentDeptIds.Contains(m.Id)) || deptId == m.Id))))
+                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.AppId)
                 .Distinct()
                 .ToList();
@@ -114,8 +114,8 @@ namespace EIMSNext.ApiService
 
             var empId = employee.Id;
             var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
-            var deptId = employee.DepartmentId;
-            var parentDeptIds = GetCurrentEmployeeParentDepartmentIds(deptId);
+            var deptIds = GetCurrentEmployeeDeptIds();
+            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
@@ -125,7 +125,7 @@ namespace EIMSNext.ApiService
                     x.Members.Any(m =>
                         (m.Type == MemberType.Employee && m.Id == empId) ||
                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && parentDeptIds.Contains(m.Id)) || deptId == m.Id))))
+                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.FormId)
                 .Distinct()
                 .ToList();
@@ -281,12 +281,30 @@ namespace EIMSNext.ApiService
             }
 
             var snapshot = GetSnapshot();
+            var employeeDeptRepo = Resolver.GetRepository<EmployeeDepartment>();
+
             if (original != null)
             {
-                EnsureDepartmentInScope(original.DepartmentId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+                var originalDeptIds = employeeDeptRepo.Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == original.Id)
+                    .Select(x => x.DepartmentId)
+                    .Distinct()
+                    .ToList();
+                foreach (var deptId in originalDeptIds)
+                {
+                    EnsureDepartmentInScope(deptId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+                }
             }
 
-            EnsureDepartmentInScope(entity.DepartmentId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+            var entityDeptIds = employeeDeptRepo.Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == entity.Id)
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
+            foreach (var deptId in entityDeptIds)
+            {
+                EnsureDepartmentInScope(deptId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+            }
         }
 
         public void EnsureCanManageEmployees(IEnumerable<string> employeeIds)
@@ -317,9 +335,19 @@ namespace EIMSNext.ApiService
             }
 
             var snapshot = GetSnapshot();
+            var employeeDeptRepo = Resolver.GetRepository<EmployeeDepartment>();
             foreach (var employee in employees)
             {
-                EnsureDepartmentInScope(employee.DepartmentId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+                var deptIds = employeeDeptRepo.Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == employee.Id)
+                    .Select(x => x.DepartmentId)
+                    .Distinct()
+                    .ToList();
+
+                foreach (var deptId in deptIds)
+                {
+                    EnsureDepartmentInScope(deptId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
+                }
             }
         }
 
@@ -443,10 +471,36 @@ namespace EIMSNext.ApiService
             return _normalGroups;
         }
 
-        private List<string> GetCurrentEmployeeParentDepartmentIds(string deptId)
+        private List<string> GetCurrentEmployeeDeptIds()
         {
-            return Resolver.GetService<Department>()
-                .Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|"))
+            var employee = IdentityContext.CurrentEmployee as Employee;
+            if (employee == null)
+            {
+                return [];
+            }
+
+            return Resolver.GetRepository<EmployeeDepartment>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == employee.Id)
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
+        }
+
+        private List<string> GetCurrentEmployeeChildDepartmentIds(IEnumerable<string> deptIds)
+        {
+            var idList = deptIds.ToList();
+            if (idList.Count == 0)
+            {
+                return [];
+            }
+
+            var allDepts = Resolver.GetService<Department>()
+                .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .Select(x => new { x.Id, x.HeriarchyId })
+                .ToList();
+
+            return allDepts
+                .Where(x => idList.Any(d => x.HeriarchyId.Contains($"|{d}|")))
                 .Select(x => x.Id)
                 .ToList();
         }
@@ -462,7 +516,21 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("员工不存在");
             }
 
-            EnsureDepartmentInScope(employee.DepartmentId, scopeMode, departmentIds, message);
+            var empDeptIds = Resolver.GetRepository<EmployeeDepartment>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == employeeId)
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
+
+            if (empDeptIds.Count == 0)
+            {
+                throw new BadRequestException("员工未分配部门");
+            }
+
+            foreach (var deptId in empDeptIds)
+            {
+                EnsureDepartmentInScope(deptId, scopeMode, departmentIds, message);
+            }
         }
 
         private void EnsureDepartmentInScope(string departmentId, string scopeMode, IEnumerable<string> departmentIds, string message)
@@ -521,7 +589,7 @@ namespace EIMSNext.ApiService
             return idList.Count == 0 ? query.Where(x => false) : query.Where(x => idList.Contains(x.Id));
         }
 
-        private static IQueryable<Employee> FilterEmployeesByDepartmentScope(IQueryable<Employee> query, string scopeMode, IEnumerable<string> departmentIds)
+        private IQueryable<Employee> FilterEmployeesByDepartmentScope(IQueryable<Employee> query, string scopeMode, IEnumerable<string> departmentIds)
         {
             if (scopeMode == AdminPermissionSnapshot.ToWireScopeMode(ScopeMode.All))
             {
@@ -529,7 +597,18 @@ namespace EIMSNext.ApiService
             }
 
             var idList = departmentIds.ToList();
-            return idList.Count == 0 ? query.Where(x => false) : query.Where(x => idList.Contains(x.DepartmentId));
+            if (idList.Count == 0)
+            {
+                return query.Where(x => false);
+            }
+
+            var empIds = Resolver.GetRepository<EmployeeDepartment>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && idList.Contains(x.DepartmentId))
+                .Select(x => x.EmployeeId)
+                .Distinct()
+                .ToList();
+
+            return query.Where(x => empIds.Contains(x.Id));
         }
 
         private static PermissionScope CombineScope(

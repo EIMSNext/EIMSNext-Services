@@ -25,19 +25,20 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public string WorkEmail { get; set; } = "";
 
-         /// <summary>
-        /// 在当前企业的部门Id
-        /// </summary>
-        public string DepartmentId { get; set; } = "";
-
-        /// <summary>
-        /// 是否部门主管
-        /// </summary>
-        public bool IsManager { get; set; }
+        public List<EmployeeDepartmentRequest> Departments { get; set; } = [];
 
         /// <summary>
         /// 邀请电话或Email
         /// </summary>
         public string? Invite { get; set; }
+    }
+
+    public class EmployeeDepartmentRequest
+    {
+        public string DepartmentId { get; set; } = "";
+
+        public bool IsManager { get; set; }
+
+        public int SortValue { get; set; }
     }
 }

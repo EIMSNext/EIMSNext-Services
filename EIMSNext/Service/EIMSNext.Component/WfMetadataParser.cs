@@ -110,37 +110,41 @@ namespace EIMSNext.Component
             switch (flowNode.NodeType)
             {
                 case WfNodeType.Approve:
+                    var approveMeta = flowNode.Metadata.ApproveMeta;
+                    var approverType = approveMeta?.ApproverType ?? ApproverType.Normal;
                     wfNodeSetting.ApproveSetting = new ApproveSetting
                     {
-                        ApprovalMode = flowNode.Metadata.ApproveMeta?.ApproveMode ?? WfApprovalMode.None,
-                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
-                        EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
-                        CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
-                        NodeActions = flowNode.Metadata.ApproveMeta?.NodeActions?.Select(x => new NodeActionConfig
+                        ApproverType = approverType,
+                        ApprovalMode = approveMeta?.ApproveMode ?? WfApprovalMode.None,
+                        Candidates = approverType == ApproverType.Normal ? approveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>() : new List<ApprovalCandidate>(),
+                        ByLevelApprovalSetting = approveMeta?.ByLevelApprovalSetting,
+                        EnableCopyto = approveMeta?.EnableCopyto,
+                        CopytoCandidates = approveMeta?.CopytoCandidates,
+                        NodeActions = approveMeta?.NodeActions?.Select(x => new NodeActionConfig
                         {
                             ActionType = Enum.TryParse<NodeActionType>(x.ActionType.ToString(), true, out var actionType) ? actionType : NodeActionType.Submit,
                             Enabled = x.Enabled ?? false,
                             Text = x.Text,
                             Candidates = x.Candidates?.ToList()
                         }).ToList(),
-                        NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
-                        ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
+                        NotifyChannels = approveMeta?.NotifyChannels ?? NotifyChannel.None,
+                        ExpireSetting = approveMeta?.ExpireSetting == null ? null : new ExpireSetting
                         {
-                            ActionType = flowNode.Metadata.ApproveMeta.ExpireSetting.ActionType,
-                            TimeValue = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeValue,
-                            TimeUnit = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeUnit,
-                            NotifySetting = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
+                            ActionType = approveMeta.ExpireSetting.ActionType,
+                            TimeValue = approveMeta.ExpireSetting.TimeValue,
+                            TimeUnit = approveMeta.ExpireSetting.TimeUnit,
+                            NotifySetting = approveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
                             {
-                                Channels = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Channels,
-                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Candidates
+                                Channels = approveMeta.ExpireSetting.NotifySetting.Channels,
+                                Candidates = approveMeta.ExpireSetting.NotifySetting.Candidates
                             },
-                            TransferSetting = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
+                            TransferSetting = approveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
                             {
-                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting.Candidates
+                                Candidates = approveMeta.ExpireSetting.TransferSetting.Candidates
                             }
                         },
-                        SubmitCondition = ParseSubmitCondition(flowNode.Metadata.ApproveMeta?.SubmitCondition),
-                        NoApproverSetting = ParseNoApproverSetting(flowNode.Metadata.ApproveMeta?.NoApproverSetting)
+                        SubmitCondition = ParseSubmitCondition(approveMeta?.SubmitCondition),
+                        NoApproverSetting = ParseNoApproverSetting(approveMeta?.NoApproverSetting)
                     };
                     break;
                 case WfNodeType.CopyTo:
@@ -615,8 +619,10 @@ namespace EIMSNext.Component
         }
         private class ApproveMeta
         {
+            public ApproverType ApproverType { get; set; } = ApproverType.Normal;
             public WfApprovalMode ApproveMode { get; set; }
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
+            public ByLevelApprovalSetting? ByLevelApprovalSetting { get; set; }
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
             public List<NodeActionMeta>? NodeActions { get; set; }

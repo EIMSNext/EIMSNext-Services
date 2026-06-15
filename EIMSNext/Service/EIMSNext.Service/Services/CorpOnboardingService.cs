@@ -18,6 +18,7 @@ namespace EIMSNext.Service
         private IRepository<Corporate> CorporateRepository => Resolver.GetRepository<Corporate>();
         private IRepository<Department> DepartmentRepository => Resolver.GetRepository<Department>();
         private IRepository<Employee> EmployeeRepository => Resolver.GetRepository<Employee>();
+        private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => Resolver.GetRepository<EmployeeDepartment>();
 
         public async Task ApplyJoinCorporateAsync(string corpId, User user)
         {
@@ -63,8 +64,6 @@ namespace EIMSNext.Service
                 EmpName = user.Name,
                 WorkPhone = user.Phone ?? string.Empty,
                 WorkEmail = user.Email ?? string.Empty,
-                DepartmentId = rootDepartment.Id,
-                IsManager = false,
                 UserBound = true,
                 Invite = user.Id,
                 UserId = user.Id,
@@ -76,6 +75,18 @@ namespace EIMSNext.Service
                 UpdateTime = now,
             };
             EmployeeRepository.EnsureId(employee);
+            var employeeDepartment = new EmployeeDepartment
+            {
+                CorpId = corporate.Id,
+                EmployeeId = employee.Id,
+                DepartmentId = rootDepartment.Id,
+                SortValue = 0,
+                CreateBy = Context.Operator,
+                UpdateBy = Context.Operator,
+                CreateTime = now,
+                UpdateTime = now,
+            };
+            EmployeeDepartmentRepository.EnsureId(employeeDepartment);
 
             var onboardingRequest = new CorpOnboardingRequest
             {
@@ -92,6 +103,7 @@ namespace EIMSNext.Service
             Repository.EnsureId(onboardingRequest);
 
             await EmployeeRepository.InsertAsync(employee);
+            await EmployeeDepartmentRepository.InsertAsync(employeeDepartment);
             await AddCoreAsync([onboardingRequest], null);
         }
 

@@ -27,6 +27,7 @@ namespace EIMSNext.Flow.Core
         private readonly IRepository<FormDef> _formDefRepo;
         private readonly IRepository<FormData> _formDataRepo;
         private readonly IRepository<Employee> _employeeRepo;
+        private readonly IRepository<EmployeeDepartment> _employeeDepartmentRepo;
         private readonly IRepository<Department> _departmentRepo;
         private readonly IMongoCollection<WorkflowInstance> _workflowCollection;
         private readonly IMongoCollection<EventSubscription> _subscriptionCollection;
@@ -40,6 +41,7 @@ namespace EIMSNext.Flow.Core
             _formDefRepo = resolver.GetRepository<FormDef>();
             _formDataRepo = resolver.GetRepository<FormData>();
             _employeeRepo = resolver.GetRepository<Employee>();
+            _employeeDepartmentRepo = resolver.GetRepository<EmployeeDepartment>();
             _departmentRepo = resolver.GetRepository<Department>();
             var db = resolver.Resolve<IMongoDbContex>().Database;
             _workflowCollection = db.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
@@ -323,7 +325,7 @@ namespace EIMSNext.Flow.Core
 
         private async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
-            var resolver = new WorkflowCandidateResolver(_employeeRepo, _departmentRepo, _formDefRepo, _formDataRepo);
+            var resolver = new WorkflowCandidateResolver(_employeeRepo, _employeeDepartmentRepo, _departmentRepo, _formDefRepo, _formDataRepo);
             return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 

@@ -1,5 +1,7 @@
 using EIMSNext.ApiService.ViewModels;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Auth.Entities;
+using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
 using EIMSNext.Service.Contracts;
@@ -20,6 +22,125 @@ namespace EIMSNext.ApiService
         public Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted)
         {
             return CoreService.AcceptInviteAsync(userId, phone, email, accepted);
+        }
+
+        public async Task AddAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
+        {
+            Resolver.GetRepository<Employee>().EnsureId(entity);
+            var relations = BuildEmployeeDepartments(entity, departments);
+
+            await AddAsync(entity);
+            await ReplaceEmployeeDepartmentsAsync(entity.Id, relations);
+        }
+
+        public async Task<ReplaceOneResult> ReplaceAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments, bool syncDepartments)
+        {
+            List<EmployeeDepartment>? relations = null;
+            if (syncDepartments)
+            {
+                relations = BuildEmployeeDepartments(entity, departments);
+            }
+
+            var result = await ReplaceAsync(entity);
+
+            if (syncDepartments)
+            {
+                await ReplaceEmployeeDepartmentsAsync(entity.Id, relations!);
+            }
+
+            return result;
+        }
+
+        public void FillDepartments(IEnumerable<EmployeeViewModel> employees)
+        {
+            var employeeList = employees.ToList();
+            var employeeIds = employeeList.Select(x => x.Id).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            if (employeeIds.Count == 0)
+            {
+                return;
+            }
+
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            var departmentRepo = Resolver.GetRepository<Department>();
+
+            var relations = relationRepo.Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && employeeIds.Contains(x.EmployeeId))
+                .OrderBy(x => x.SortValue)
+                .ToList();
+            var departmentIds = relations.Select(x => x.DepartmentId).Distinct().ToList();
+            var departments = departmentRepo.Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && departmentIds.Contains(x.Id))
+                .ToDictionary(x => x.Id, x => x.Name);
+
+            var relationMap = relations.GroupBy(x => x.EmployeeId).ToDictionary(x => x.Key, x => x.ToList());
+            foreach (var employee in employeeList)
+            {
+                employee.Departments = relationMap.TryGetValue(employee.Id, out var items)
+                    ? items
+                        .Where(x => departments.ContainsKey(x.DepartmentId))
+                        .Select(x => new DepartmentRef
+                        {
+                            Id = x.DepartmentId,
+                            Name = departments[x.DepartmentId],
+                            IsManager = x.IsManager,
+                            SortValue = x.SortValue
+                        })
+                        .ToList()
+                    : [];
+            }
+        }
+
+        public IQueryable<EmployeeViewModel> FilterByDepartment(IQueryable<EmployeeViewModel> query, string? departmentId, bool cascaded)
+        {
+            if (string.IsNullOrWhiteSpace(departmentId) || departmentId.Equals("all", StringComparison.OrdinalIgnoreCase))
+            {
+                return query;
+            }
+
+            var departmentIds = GetDepartmentScopeIds(departmentId, cascaded);
+            if (departmentIds.Count == 0)
+            {
+                return query.Where(x => false);
+            }
+
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            var employeeIds = relationRepo.Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId
+                    && !x.DeleteFlag
+                    && departmentIds.Contains(x.DepartmentId))
+                .Select(x => x.EmployeeId)
+                .Distinct()
+                .ToList();
+
+            return query.Where(x => employeeIds.Contains(x.Id));
+        }
+
+        public List<string> GetAncestorDepartmentIds(IEnumerable<string> departmentIds)
+        {
+            var ids = departmentIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (ids.Count == 0)
+            {
+                return [];
+            }
+
+            var departments = Resolver.GetRepository<Department>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .Select(x => new { x.Id, x.HeriarchyId })
+                .ToList();
+            var hierarchyIds = departments
+                .Where(x => ids.Contains(x.Id))
+                .Select(x => x.HeriarchyId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            return departments
+                .Where(x => hierarchyIds.Any(h => h.Contains($"|{x.Id}|")))
+                .Select(x => x.Id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
         }
 
         protected override async Task AddAsyncCore(Employee entity)
@@ -99,6 +220,9 @@ namespace EIMSNext.ApiService
 
                 empService.Replace(employee);
             }
+
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            await relationRepo.DeleteAsync(relationRepo.FilterBuilder.In(x => x.EmployeeId, employees.Select(x => x.Id)));
 
             return new { count = employees.Count };
         }
@@ -215,6 +339,90 @@ namespace EIMSNext.ApiService
         {
             var corporate = Resolver.GetService<Corporate>().Get(IdentityContext.CurrentCorpId);
             return corporate?.Platform ?? PlatformType.Public;
+        }
+
+        private List<EmployeeDepartment> BuildEmployeeDepartments(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
+        {
+            if (string.IsNullOrWhiteSpace(entity.CorpId))
+            {
+                entity.CorpId = IdentityContext.CurrentCorpId;
+            }
+
+            var items = departments?
+                .Where(x => !string.IsNullOrWhiteSpace(x.DepartmentId))
+                .Select((x, index) => new EmployeeDepartmentRequest
+                {
+                    DepartmentId = x.DepartmentId,
+                    IsManager = x.IsManager,
+                    SortValue = x.SortValue == 0 ? index : x.SortValue
+                })
+                .ToList() ?? [];
+
+            if (items.Count == 0)
+            {
+                throw new BadRequestException("员工至少需要选择一个部门");
+            }
+
+            var duplicated = items
+                .GroupBy(x => x.DepartmentId)
+                .FirstOrDefault(x => x.Count() > 1);
+            if (duplicated != null)
+            {
+                throw new BadRequestException("同一员工不能重复选择同一个部门");
+            }
+
+            var departmentIds = items.Select(x => x.DepartmentId).Distinct().ToList();
+            var departmentRepo = Resolver.GetRepository<Department>();
+            var validDepartmentIds = departmentRepo.Queryable
+                .Where(x => x.CorpId == entity.CorpId && !x.DeleteFlag && departmentIds.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToList();
+
+            if (validDepartmentIds.Count != departmentIds.Count)
+            {
+                throw new BadRequestException("员工部门不存在或不属于当前企业");
+            }
+
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            return items.Select(x =>
+            {
+                var relation = new EmployeeDepartment
+                {
+                    CorpId = entity.CorpId,
+                    EmployeeId = entity.Id,
+                    DepartmentId = x.DepartmentId,
+                    IsManager = x.IsManager,
+                    SortValue = x.SortValue
+                };
+                relationRepo.EnsureId(relation);
+                return relation;
+            }).ToList();
+        }
+
+        private async Task ReplaceEmployeeDepartmentsAsync(string employeeId, IEnumerable<EmployeeDepartment> relations)
+        {
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            await relationRepo.DeleteAsync(relationRepo.FilterBuilder.Eq(x => x.EmployeeId, employeeId));
+            await relationRepo.InsertAsync(relations);
+        }
+
+        private List<string> GetDepartmentScopeIds(string departmentId, bool cascaded)
+        {
+            var departmentRepo = Resolver.GetRepository<Department>();
+            if (!cascaded)
+            {
+                return departmentRepo.Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.Id == departmentId)
+                    .Select(x => x.Id)
+                    .ToList();
+            }
+
+            return departmentRepo.Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId
+                    && !x.DeleteFlag
+                    && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")))
+                .Select(x => x.Id)
+                .ToList();
         }
     }
 }

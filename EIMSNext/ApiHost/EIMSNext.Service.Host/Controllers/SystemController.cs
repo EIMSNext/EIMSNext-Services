@@ -41,6 +41,13 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var user = IdentityContext.CurrentUser!;
             var emp = IdentityContext.CurrentEmployee as Employee;
+            var departmentIds = emp == null
+                ? new List<string>()
+                : Resolver.GetRepository<EmployeeDepartment>().Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == emp.Id)
+                    .OrderBy(x => x.SortValue)
+                    .Select(x => x.DepartmentId)
+                    .ToList();
 
             return ApiResult.Success(new
             {
@@ -52,7 +59,7 @@ namespace EIMSNext.Service.Host.Controllers
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
                 corpId = IdentityContext.CurrentCorpId,
-                deptId = emp?.DepartmentId,
+                departmentIds,
                 userType = IdentityContext.IdentityType,
                 roles = emp?.Roles.Select(x => x.RoleId)
             }).ToActionResult();

@@ -1,5 +1,7 @@
 using Asp.Versioning;
 
+using EIMSNext.ApiService.RequestModels;
+using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
@@ -33,6 +35,7 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<CandidateType>();
             builder.EnumType<WfNodeType>();
             builder.EnumType<WfApprovalMode>();
+            builder.EnumType<ApproverType>();
             builder.EnumType<PrintDefType>();
             builder.EnumType<AuthGroupType>();
             builder.EnumType<FormListViewType>();
@@ -47,6 +50,8 @@ namespace EIMSNext.Service.Host.Edm
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();
+            builder.ComplexType<DepartmentRef>();
+            builder.ComplexType<EmployeeDepartmentRequest>();
             builder.ComplexType<FieldDef>();
             builder.ComplexType<FieldProp>();
             builder.ComplexType<ValueProp>();
@@ -59,6 +64,7 @@ namespace EIMSNext.Service.Host.Edm
             builder.ComplexType<WfMetadata>();
             builder.ComplexType<WfStep>();
             builder.ComplexType<ApprovalCandidate>();
+            builder.ComplexType<ByLevelApprovalSetting>();
         }
     }
 }
