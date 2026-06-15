@@ -2,8 +2,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.ViewModels
 {
-    public class DfExecLogViewModel : Df_ExecLog
+    public class DfRunLogNodeViewModel : Df_RunLogNode
     {
     }
 }
-

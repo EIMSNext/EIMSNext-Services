@@ -11,6 +11,9 @@ namespace EIMSNext.ApiService
 {
     public class AdminPermissionEvaluator(IResolver resolver) : ApiServiceBase(resolver)
     {
+        // 注意：此类的实例生命周期必须是 Scoped (per-request)，由 MEF2 容器保证。
+        // 下方的 _normalGroups / _snapshot 缓存在单次 HTTP 请求内复用，
+        // 以减少对 AdminGroup 的重复查询；切勿改为 Singleton，否则会跨请求泄漏用户权限数据。
         private IReadOnlyList<AdminGroup>? _normalGroups;
         private AdminPermissionSnapshot? _snapshot;
 

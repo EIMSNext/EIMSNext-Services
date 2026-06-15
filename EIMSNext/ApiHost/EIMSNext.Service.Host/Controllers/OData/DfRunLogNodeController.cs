@@ -10,12 +10,12 @@ using EIMSNext.ApiService;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class DfExecLogController(IResolver resolver) : ReadOnlyODataController<DfExecLogApiService, Df_ExecLog, DfExecLogViewModel>(resolver)
+	public class DfRunLogNodeController(IResolver resolver) : ReadOnlyODataController<DfRunLogNodeApiService, Df_RunLogNode, DfRunLogNodeViewModel>(resolver)
 	{
-		
+
 	}
 }

@@ -3,7 +3,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-	public interface IDfExecLogService : IService<Df_ExecLog>
+	public interface IDfRunLogNodeService : IService<Df_RunLogNode>
 	{
 	}
 }

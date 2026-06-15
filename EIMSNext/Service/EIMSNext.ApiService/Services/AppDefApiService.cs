@@ -2,7 +2,6 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core;
-using EIMSNext.Service;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;

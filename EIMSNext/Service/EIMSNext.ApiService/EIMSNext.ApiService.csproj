@@ -12,6 +12,8 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
     <ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />

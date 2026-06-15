@@ -6,7 +6,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
 {
-	public class DfExecLogApiService(IResolver resolver) : ApiServiceBase<Df_ExecLog, DfExecLogViewModel, IDfExecLogService>(resolver)
+	public class DfRunLogNodeApiService(IResolver resolver) : ApiServiceBase<Df_RunLogNode, DfRunLogNodeViewModel, IDfRunLogNodeService>(resolver)
 	{
 	}
 }

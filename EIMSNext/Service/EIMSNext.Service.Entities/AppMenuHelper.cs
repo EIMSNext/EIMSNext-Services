@@ -1,4 +1,4 @@
-namespace EIMSNext.Service
+namespace EIMSNext.Service.Entities
 {
     public static class AppMenuHelper
     {
