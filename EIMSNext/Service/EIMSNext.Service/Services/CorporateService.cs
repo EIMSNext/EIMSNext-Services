@@ -19,6 +19,8 @@ namespace EIMSNext.Service
             var entity = entities.First();
             var deptRepo = Resolver.GetRepository<Department>();
             var empRepo = Resolver.GetRepository<Employee>();
+            var empDeptRepo = Resolver.GetRepository<EmployeeDepartment>();
+            var adminGroupRepo = Resolver.GetRepository<AdminGroup>();
             var clientRepo = Resolver.GetRepository<EIMSNext.Auth.Entities.Client>();
             var userRepo = Resolver.GetRepository<User>();
             var user = Context.User as User;
@@ -60,8 +62,6 @@ namespace EIMSNext.Service
                 EmpName = Context.User?.Name ?? "",
                 WorkEmail = Context.User?.Email ?? "",
                 WorkPhone = Context.User?.Phone ?? "",
-                DepartmentId = dept.Id,
-                IsManager = false,
             };
             empRepo.EnsureId(emp);
 
@@ -79,6 +79,23 @@ namespace EIMSNext.Service
 
             var emp_system = new Employee { CorpId = entity.Id, Id = $"system_{entity.Id}", Code = "system", EmpName = "System", UserId = "system", UserName = "System", IsDummy = true };
             var emp_anonymous = new Employee { CorpId = entity.Id, Id = $"anonymous_{entity.Id}", Code = "anonymous", EmpName = "Anonymous", UserId = "anonymous", UserName = "Anonymous", IsDummy = true };
+            var empDepartments = new List<EmployeeDepartment>
+            {
+                new() { CorpId = entity.Id, EmployeeId = emp.Id, DepartmentId = dept.Id, SortValue = 0 },
+                new() { CorpId = entity.Id, EmployeeId = emp_system.Id, DepartmentId = dept.Id, SortValue = 0 },
+                new() { CorpId = entity.Id, EmployeeId = emp_anonymous.Id, DepartmentId = dept.Id, SortValue = 0 }
+            };
+            empDeptRepo.EnsureId(empDepartments);
+            var systemAdminGroup = new AdminGroup
+            {
+                CorpId = entity.Id,
+                Name = "系统管理员",
+                Type = AdminGroupType.System,
+                ParentId = string.Empty,
+                SortValue = -1,
+                EmployeeIds = []
+            };
+            adminGroupRepo.EnsureId(systemAdminGroup);
 
             var tasks = new List<Task>
             {
@@ -86,6 +103,8 @@ namespace EIMSNext.Service
                 clientRepo.InsertAsync(serviceClient,session),
                 deptRepo.InsertAsync(dept, session),
                 empRepo.InsertAsync(new List<Employee>{emp, emp_system,emp_anonymous}, session),
+                empDeptRepo.InsertAsync(empDepartments, session),
+                adminGroupRepo.InsertAsync(systemAdminGroup, session),
                 userRepo.ReplaceAsync(user, session)
             };
 

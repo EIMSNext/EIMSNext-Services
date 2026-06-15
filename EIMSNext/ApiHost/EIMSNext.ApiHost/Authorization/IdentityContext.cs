@@ -94,7 +94,7 @@ namespace EIMSNext.ApiHost.Authorization
         {
             if (!_retrieved)
             {
-                _user = _resolver.GetRepository<User>().Get(CurrentUserID);
+                _user = _resolver.GetService<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
                     if (string.IsNullOrWhiteSpace(CurrentCorpId))
@@ -104,7 +104,7 @@ namespace EIMSNext.ApiHost.Authorization
                             ?? string.Empty;
                     }
 
-                    _employee = _resolver.GetRepository<Employee>().Queryable.FirstOrDefault(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id);
+                    _employee = _resolver.GetService<Employee>().Query(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
                 }
                 _retrieved = true;
             }
@@ -132,9 +132,16 @@ namespace EIMSNext.ApiHost.Authorization
                             {
                                 _type = IdentityType.Disabled;
                             }
+                            else if (_employee != null && _resolver.GetService<AdminGroup>().All().Any(x =>
+                                x.CorpId == CurrentCorpId &&
+                                !x.DeleteFlag &&
+                                x.Type == AdminGroupType.Normal &&
+                                x.EmployeeIds.Contains(_employee.Id)))
+                            {
+                                _type = IdentityType.AppAdmin;
+                            }
                             else
                             {
-                                //TODO:将来根据角色来指定身份
                                 _type = IdentityType.Employee;
                             }
 

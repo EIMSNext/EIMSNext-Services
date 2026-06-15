@@ -33,30 +33,80 @@ namespace EIMSNext.Service
 
         protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
         {
-            if (oldData == null || !oldData.Any())
+            base.CreateAuditLog(action, oldData, newData, filter, update, session);
+
+            // FormDataChangeLog 是 FormData 详情页右侧的业务变更记录，不在通用审计日志方法里写入。
+            // if (oldData == null || !oldData.Any())
+            // {
+            //     // 新增不写 FormDataChangeLog
+            // }
+            // else if (newData == null || !newData.Any())
+            // {
+            //     // 删除不写 FormDataChangeLog
+            // }
+            // else
+            // {
+            //     // FormDataChangeLog 的更新记录已移动到 AfterReplace 中写入。
+            //     // var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
+            // }
+            //
+            // var dataLog = new FormDataChangeLog();
+            // TODO: 保存变更日志
+            // switch (action)
+            // {
+            //     case DbAction.Insert:
+            //         break;
+            //     case DbAction.Update:
+            //         break;
+            //     default:
+            //         break;
+            // }
+        }
+
+        private static Dictionary<string, FieldDef> BuildFieldLookup(FormDef? formDef)
+        {
+            var lookup = new Dictionary<string, FieldDef>(StringComparer.OrdinalIgnoreCase);
+            if (formDef?.Content?.Items == null) return lookup;
+
+            foreach (var field in formDef.Content.Items)
             {
-                //新增
-            }
-            else if (newData == null || !newData.Any())
-            {
-                //删除
-            }
-            else
-            {
-                //TODO:此处需要循环
-                var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
+                AddField(field, null);
             }
 
-            var dataLog = new DataChangeLog();
-            //TODO: 保存变更日志
-            switch (action)
+            return lookup;
+
+            void AddField(FieldDef field, string? parentField)
             {
-                case DbAction.Insert:
-                    break;
-                case DbAction.Update:
-                    break;
-                default: break;
+                if (string.IsNullOrWhiteSpace(field.Field)) return;
+
+                lookup.TryAdd(field.Field, field);
+
+                if (!string.IsNullOrWhiteSpace(parentField))
+                {
+                    lookup.TryAdd($"{parentField}>{field.Field}", field);
+                }
+
+                if (field.Columns == null) return;
+                foreach (var column in field.Columns)
+                {
+                    AddField(column, field.Field);
+                }
             }
+        }
+
+        private static DataChangeContent ToDataChangeContent(ExpandoChangeLog changeLog, IReadOnlyDictionary<string, FieldDef> fieldLookup)
+        {
+            fieldLookup.TryGetValue(changeLog.FieldId, out var fieldDef);
+
+            return new DataChangeContent
+            {
+                FieldId = changeLog.FieldId,
+                FieldLabel = string.IsNullOrWhiteSpace(fieldDef?.Title) ? changeLog.FieldId : fieldDef.Title,
+                FieldType = string.IsNullOrWhiteSpace(fieldDef?.Type) ? FieldType.Input : fieldDef.Type,
+                ChangeType = changeLog.ChangeType,
+                OriVallue = changeLog.OriValue,
+                NewVallue = changeLog.NewValue
+            };
         }
 
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
@@ -103,10 +153,12 @@ namespace EIMSNext.Service
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
             var oriValue = new ExpandoObject();
+            IList<ExpandoChangeLog> changeLogs = [];
             if (old != null)
             {
-                var changeLog = ExpandoComparer.Compare(old.Data, entity.Data);
-                changeLog.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+                changeLogs = ExpandoComparer.Compare(old.Data, entity.Data);
+                changeLogs.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
+                CreateFormDataChangeLog(entity, changeLogs, session);
             }
 
             var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
@@ -117,6 +169,32 @@ namespace EIMSNext.Service
             await RebuildTimeFieldNotifySchedulesAsync(entity, session);
 
             await base.AfterReplace(entity, session);
+        }
+
+        private void CreateFormDataChangeLog(FormData entity, IList<ExpandoChangeLog> changeLogs, IClientSessionHandle? session)
+        {
+            if (changeLogs.Count == 0) return;
+
+            var formDef = GetFromStore<FormDef>(entity.FormId);
+            var fieldLookup = BuildFieldLookup(formDef);
+            var content = changeLogs.Select(x => ToDataChangeContent(x, fieldLookup)).ToList();
+            if (content.Count == 0) return;
+
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            Resolver.GetRepository<FormDataChangeLog>().Insert(new FormDataChangeLog
+            {
+                CorpId = entity.CorpId ?? Context.CorpId,
+                AppId = entity.AppId,
+                FormId = entity.FormId,
+                DataId = entity.Id,
+                Operator = Context.Operator,
+                OperateTime = now,
+                Content = content,
+                CreateBy = Context.Operator,
+                CreateTime = now,
+                UpdateBy = Context.Operator,
+                UpdateTime = now
+            }, session);
         }
 
         protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)

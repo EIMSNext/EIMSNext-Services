@@ -1,10 +1,8 @@
-using EIMSNext.Service.Entities;
-
 namespace EIMSNext.Service
 {
     public static class AppMenuHelper
     {
-        public static AppMenu? FindMenu(List<AppMenu> menus, string menuId)
+        public static Entities.AppMenu? FindMenu(List<Entities.AppMenu> menus, string menuId)
         {
             foreach (var menu in menus)
             {
@@ -26,7 +24,7 @@ namespace EIMSNext.Service
             return null;
         }
 
-        public static bool RemoveMenu(List<AppMenu> menus, string menuId)
+        public static bool RemoveMenu(List<Entities.AppMenu> menus, string menuId)
         {
             var removed = menus.RemoveAll(x => x.MenuId == menuId) > 0;
             if (removed)
@@ -45,7 +43,7 @@ namespace EIMSNext.Service
             return false;
         }
 
-        public static IEnumerable<AppMenu> Flatten(IEnumerable<AppMenu> menus)
+        public static IEnumerable<Entities.AppMenu> Flatten(IEnumerable<Entities.AppMenu> menus)
         {
             foreach (var menu in menus)
             {
@@ -61,14 +59,14 @@ namespace EIMSNext.Service
             }
         }
 
-        public static List<AppMenu> Normalize(List<AppMenu> menus)
+        public static List<Entities.AppMenu> Normalize(List<Entities.AppMenu> menus)
         {
             for (var i = 0; i < menus.Count; i++)
             {
                 var menu = menus[i];
                 menu.SortIndex = (i + 1) * 100;
 
-                if (menu.MenuType == FormType.Group)
+                if (menu.MenuType == Entities.FormType.Group)
                 {
                     menu.SubMenus ??= [];
                     Normalize(menu.SubMenus);
@@ -82,18 +80,18 @@ namespace EIMSNext.Service
             return menus;
         }
 
-        public static bool ValidateTree(IEnumerable<AppMenu> menus)
+        public static bool ValidateTree(IEnumerable<Entities.AppMenu> menus)
         {
             foreach (var menu in menus)
             {
-                if (menu.MenuType == FormType.Group)
+                if (menu.MenuType == Entities.FormType.Group)
                 {
                     if (menu.SubMenus == null)
                     {
                         continue;
                     }
 
-                    if (menu.SubMenus.Any(x => x.MenuType == FormType.Group))
+                    if (menu.SubMenus.Any(x => x.MenuType == Entities.FormType.Group))
                     {
                         return false;
                     }

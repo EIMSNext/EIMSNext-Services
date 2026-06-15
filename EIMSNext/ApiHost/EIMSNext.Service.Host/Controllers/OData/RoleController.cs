@@ -13,6 +13,7 @@ using EIMSNext.ApiService;
 using EIMSNext.Service.Host.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Formatter;
+using EIMSNext.Common.Extensions;
 
 namespace EIMSNext.Service.Host.Controllers.OData
 {
@@ -46,6 +47,36 @@ namespace EIMSNext.Service.Host.Controllers.OData
             }
 
             return base.Expand(query, options);
+        }
+
+        protected override IQueryable<RoleViewModel> FilterByPermission(IQueryable<RoleViewModel> query, ODataQueryOptions<RoleViewModel> options)
+        {
+            query = base.FilterByPermission(query, options);
+            if (!IsAdminScope())
+            {
+                return query;
+            }
+
+            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            if (!evaluator.ShouldApplyNormalAdminRules)
+            {
+                return query;
+            }
+
+            var snapshot = evaluator.GetSnapshot();
+            if (snapshot.ContactViewRoleScopeMode == AdminPermissionSnapshot.ToWireScopeMode(ScopeMode.All))
+            {
+                return query;
+            }
+
+            var ids = snapshot.ContactViewRoleIds;
+            return ids.Count == 0 ? query.Where(x => false) : query.Where(x => ids.Contains(x.Id));
+        }
+
+        private bool IsAdminScope()
+        {
+            return Request.Query.TryGetValue("adminScope", out var value) &&
+                value.FirstOrDefault().EqualsIgnoreCase("true");
         }
     }
 }

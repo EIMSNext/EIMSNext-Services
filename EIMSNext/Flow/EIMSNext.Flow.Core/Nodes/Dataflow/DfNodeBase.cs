@@ -38,6 +38,51 @@ namespace EIMSNext.Flow.Core.Nodes
             return (DfDataContext)context.Workflow.Data;
         }
 
+        protected ExecutionResult ExecuteWithLog(IStepExecutionContext context, Func<DfDataContext, ExecutionResult> action, string successSummary = "执行成功")
+        {
+            var dataContext = GetDataContext(context);
+            var startTime = DateTime.UtcNow.ToTimeStampMs();
+
+            try
+            {
+                var result = action(dataContext);
+                var endTime = DateTime.UtcNow.ToTimeStampMs();
+                CreateExecLog(context.Workflow, dataContext, Metadata!, string.Empty, startTime, endTime, summary: successSummary);
+                return result;
+            }
+            catch (Exception ex)
+            {
+                var endTime = DateTime.UtcNow.ToTimeStampMs();
+                var failure = ClassifyFailure(Metadata!, ex);
+                dataContext.ErrMsg = failure.Reason;
+                CreateExecLog(
+                    context.Workflow,
+                    dataContext,
+                    Metadata!,
+                    ex.Message,
+                    startTime,
+                    endTime,
+                    failure.Reason,
+                    failure.Suggestion,
+                    failure.Summary);
+                throw;
+            }
+        }
+
+        protected void CreateFailureExecLog(
+            WorkflowInstance wfInst,
+            DfDataContext dataContext,
+            WfStep wfStep,
+            string errMsg,
+            long startTime,
+            long endTime,
+            bool pluginFailure = false)
+        {
+            var failure = ClassifyFailure(wfStep, null, errMsg, pluginFailure);
+            dataContext.ErrMsg = failure.Reason;
+            CreateExecLog(wfInst, dataContext, wfStep, errMsg, startTime, endTime, failure.Reason, failure.Suggestion, failure.Summary);
+        }
+
         protected Dictionary<string, object> GetNodeScriptData(DfDataContext dataContext)
         {
             var wrapData = new ExpandoObject();
@@ -72,12 +117,43 @@ namespace EIMSNext.Flow.Core.Nodes
             return new Dictionary<string, object>() { ["data"] = wrapData };
         }
 
-        protected void CreateExecLog(WorkflowInstance wfInst, DfDataContext dataContext, WfStep wfStep, string errMsg = "")
+        protected void CreateExecLog(
+            WorkflowInstance wfInst,
+            DfDataContext dataContext,
+            WfStep wfStep,
+            string errMsg = "",
+            long? startTime = null,
+            long? endTime = null,
+            string failureReason = "",
+            string troubleshootingSuggestion = "",
+            string summary = "")
         {
             Df_ExecLog? execLog = null;
             try
             {
-                execLog = new Df_ExecLog() { Id = string.Empty, DataId = dataContext.DataId ?? "", WfInstanceId = wfInst.Id, NodeId = wfStep.Id, ExecTime = DateTime.UtcNow.ToTimeStampMs(), ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
+                var finishedAt = endTime ?? DateTime.UtcNow.ToTimeStampMs();
+                var startedAt = startTime ?? finishedAt;
+                var success = string.IsNullOrEmpty(errMsg);
+                execLog = new Df_ExecLog()
+                {
+                    Id = string.Empty,
+                    RunLogId = dataContext.RunLogId,
+                    CorpId = dataContext.CorpId,
+                    DataflowId = dataContext.DataflowId,
+                    DataId = dataContext.DataId ?? "",
+                    WfInstanceId = wfInst.Id,
+                    NodeId = wfStep.Id,
+                    NodeName = wfStep.Name,
+                    NodeType = wfStep.NodeType,
+                    StartTime = startedAt,
+                    EndTime = finishedAt,
+                    ExecTime = finishedAt,
+                    ErrMsg = errMsg,
+                    FailureReason = failureReason,
+                    TroubleshootingSuggestion = troubleshootingSuggestion,
+                    Summary = string.IsNullOrWhiteSpace(summary) ? (success ? "执行成功" : failureReason) : summary,
+                    Success = success
+                };
                 ExecLogRepository.Insert(execLog);
             }
             catch (Exception ex)    //写日志失败不影响整个数据流程
@@ -85,6 +161,75 @@ namespace EIMSNext.Flow.Core.Nodes
                 Logger.LogError(ex, "写入数据流程执行日志失败。ExecLog={ExecLog}", execLog);
             }
         }
+
+        protected NodeFailureInfo ClassifyFailure(WfStep wfStep, Exception? ex, string? errMsg = null, bool pluginFailure = false)
+        {
+            var summary = NormalizeError(errMsg ?? ex?.Message);
+            var message = summary.ToLowerInvariant();
+
+            if (IsFormMissing(message))
+            {
+                return new NodeFailureInfo("节点引用的表单不存在", "检查目标表单或触发表单是否已删除或无权限访问", summary);
+            }
+
+            if (IsFieldMissing(ex, message))
+            {
+                return new NodeFailureInfo("节点中引用的字段不存在", "检查节点中使用的字段是否已经被删除", summary);
+            }
+
+            if (pluginFailure || wfStep.NodeType == WfNodeType.Plugin)
+            {
+                return new NodeFailureInfo(summary, "检查插件、插件函数、订阅/配置和入参映射", summary);
+            }
+
+            if (IsConditionOrDataMutationNode(wfStep.NodeType))
+            {
+                return new NodeFailureInfo(summary, "检查筛选条件中的字段、比较符和值来源", summary);
+            }
+
+            return new NodeFailureInfo(summary, "检查该节点配置及前置节点输出数据", summary);
+        }
+
+        private static bool IsFormMissing(string message)
+        {
+            return message.Contains("表单定义不存在")
+                || message.Contains("表单不存在")
+                || message.Contains("form definition")
+                || message.Contains("form not found");
+        }
+
+        private static bool IsFieldMissing(Exception? ex, string message)
+        {
+            return (ex is KeyNotFoundException && !message.Contains("n_"))
+                || message.Contains("字段不存在")
+                || message.Contains("字段被删除")
+                || message.Contains("已删除字段")
+                || message.Contains("field not found")
+                || message.Contains("does not exist")
+                || message.Contains("not present in the dictionary");
+        }
+
+        private static bool IsConditionOrDataMutationNode(WfNodeType nodeType)
+        {
+            return nodeType == WfNodeType.QueryOne
+                || nodeType == WfNodeType.QueryMany
+                || nodeType == WfNodeType.Update
+                || nodeType == WfNodeType.Delete
+                || nodeType == WfNodeType.Insert;
+        }
+
+        private static string NormalizeError(string? message)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                return "执行失败";
+            }
+
+            var firstLine = message.Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault() ?? message;
+            return firstLine.Length > 300 ? $"{firstLine[..300]}..." : firstLine;
+        }
+
+        protected record NodeFailureInfo(string Reason, string Suggestion, string Summary);
 
         #region Form
         protected FormData? GetFormData(string dataId)

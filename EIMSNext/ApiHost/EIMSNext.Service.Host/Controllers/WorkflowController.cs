@@ -35,6 +35,7 @@ namespace EIMSNext.Service.Host.Controllers
             var todoService = Resolver.GetService<Wf_Todo>();
             var employeeService = Resolver.GetService<Employee>();
             var departmentService = Resolver.GetService<Department>();
+            var employeeDepartmentRepo = Resolver.GetRepository<EmployeeDepartment>();
             var formDefRepo = Resolver.GetRepository<FormDef>();
 
             var query = todoService.Query(x => x.CorpId == IdentityContext.CurrentCorpId);
@@ -52,14 +53,21 @@ namespace EIMSNext.Service.Host.Controllers
             var employeeIds = pagedTodos.Select(x => x.EmployeeId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var employeeMap = employeeService.Query(x => employeeIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x);
 
-            var deptIds = employeeMap.Values.Select(x => x.DepartmentId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var employeeDepartments = employeeDepartmentRepo.Queryable
+                .Where(x => employeeIds.Contains(x.EmployeeId))
+                .OrderBy(x => x.SortValue)
+                .ToList();
+            var deptIds = employeeDepartments.Select(x => x.DepartmentId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var deptMap = departmentService.Query(x => deptIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x.Name);
+            var employeeDepartmentMap = employeeDepartments
+                .GroupBy(x => x.EmployeeId)
+                .ToDictionary(x => x.Key, x => x.Select(y => y.DepartmentId).ToList());
 
             var items = pagedTodos.Select(todo =>
             {
                 employeeMap.TryGetValue(todo.EmployeeId, out var employee);
-                var departmentName = !string.IsNullOrWhiteSpace(employee?.DepartmentId) && deptMap.TryGetValue(employee.DepartmentId, out var deptName)
-                    ? deptName
+                var departmentName = employeeDepartmentMap.TryGetValue(todo.EmployeeId, out var employeeDeptIds)
+                    ? string.Join(", ", employeeDeptIds.Where(deptMap.ContainsKey).Select(x => deptMap[x]))
                     : string.Empty;
 
                 return new FlowManageTodoItem

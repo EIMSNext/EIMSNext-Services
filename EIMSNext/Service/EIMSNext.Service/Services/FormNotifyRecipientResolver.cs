@@ -17,6 +17,8 @@ namespace EIMSNext.Service
     public class FormNotifyRecipientResolver(IResolver resolver) : IFormNotifyRecipientResolver
     {
         private IRepository<Employee> EmployeeRepository => resolver.GetRepository<Employee>();
+        private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => resolver.GetRepository<EmployeeDepartment>();
+        private IRepository<Department> DepartmentRepository => resolver.GetRepository<Department>();
 
         public async Task<List<NotifyReceiver>> ResolveAsync(FormData data, FormDef formDef, string? notifiersJson, string? operatorEmpId)
         {
@@ -43,7 +45,10 @@ namespace EIMSNext.Service
                     case CandidateType.Department:
                         if (!string.IsNullOrWhiteSpace(notifier.CandidateId))
                         {
-                            deptIds.Add(notifier.CandidateId);
+                            foreach (var departmentId in GetDepartmentScopeIds(notifier.CandidateId, notifier.CascadedDept))
+                            {
+                                deptIds.Add(departmentId);
+                            }
                         }
                         break;
                     case CandidateType.Role:
@@ -59,7 +64,7 @@ namespace EIMSNext.Service
                         }
                         break;
                     case CandidateType.FormField:
-                        ExpandFormFieldCandidate(data, formDef, notifier.CandidateId, deptIds, empIds);
+                        ExpandFormFieldCandidate(data, formDef, notifier, deptIds, empIds);
                         break;
                 }
             }
@@ -72,7 +77,12 @@ namespace EIMSNext.Service
 
             if (deptIds.Count > 0)
             {
-                filters.Add(Builders<Employee>.Filter.In(x => x.DepartmentId, deptIds));
+                var departmentEmployeeIds = EmployeeDepartmentRepository.Queryable
+                    .Where(x => deptIds.Contains(x.DepartmentId))
+                    .Select(x => x.EmployeeId)
+                    .Distinct()
+                    .ToList();
+                filters.Add(Builders<Employee>.Filter.In(x => x.Id, departmentEmployeeIds));
             }
 
             if (roleIds.Count > 0)
@@ -112,8 +122,9 @@ namespace EIMSNext.Service
             return receivers.Values.Take(200).ToList();
         }
 
-        private static void ExpandFormFieldCandidate(FormData data, FormDef formDef, string fieldKey, ISet<string> deptIds, ISet<string> empIds)
+        private void ExpandFormFieldCandidate(FormData data, FormDef formDef, ApprovalCandidate notifier, ISet<string> deptIds, ISet<string> empIds)
         {
+            var fieldKey = notifier.CandidateId;
             var fieldDef = formDef.Content.Items?.FirstOrDefault(x => x.Field.Equals(fieldKey, StringComparison.OrdinalIgnoreCase));
             if (fieldDef == null)
             {
@@ -131,7 +142,10 @@ namespace EIMSNext.Service
             {
                 foreach (var value in values)
                 {
-                    deptIds.Add(value);
+                    foreach (var departmentId in GetDepartmentScopeIds(value, notifier.CascadedDept))
+                    {
+                        deptIds.Add(departmentId);
+                    }
                 }
             }
             else if (fieldDef.Type == FieldType.Employee1 || fieldDef.Type == FieldType.Employee2)
@@ -141,6 +155,24 @@ namespace EIMSNext.Service
                     empIds.Add(value);
                 }
             }
+        }
+
+        private List<string> GetDepartmentScopeIds(string departmentId, bool cascaded)
+        {
+            if (string.IsNullOrWhiteSpace(departmentId))
+            {
+                return [];
+            }
+
+            var query = DepartmentRepository.Queryable
+                .Where(x => !x.DeleteFlag && x.Id == departmentId);
+            if (cascaded)
+            {
+                query = DepartmentRepository.Queryable
+                    .Where(x => !x.DeleteFlag && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")));
+            }
+
+            return query.Select(x => x.Id).Distinct().ToList();
         }
 
         private static List<string> ExtractCandidateValues(object rawValue)

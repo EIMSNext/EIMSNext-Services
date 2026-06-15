@@ -16,6 +16,7 @@ namespace EIMSNext.Service
     {
         private IRepository<CorpOnboardingRequest> RequestRepository => Resolver.GetRepository<CorpOnboardingRequest>();
         private IRepository<User> UserRepository => Resolver.GetRepository<User>();
+        private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => Resolver.GetRepository<EmployeeDepartment>();
 
         public Task<UpdateResult> AddToRoleAsync(Role role, IEnumerable<string> empIds)
         {
@@ -79,6 +80,7 @@ namespace EIMSNext.Service
                 if (!approved)
                 {
                     await Repository.DeleteAsync(employee.Id);
+                    await EmployeeDepartmentRepository.DeleteAsync(EmployeeDepartmentRepository.FilterBuilder.Eq(x => x.EmployeeId, employee.Id));
                     await RequestRepository.DeleteAsync(request.Id);
                     await AuditLogRepository.InsertAsync(new AuditLog
                     {

@@ -160,6 +160,10 @@ namespace EIMSNext.Auth.Tests
             public IQueryable<Client> Clients => _clients.AsQueryable();
             public IQueryable<User> Users => _users.AsQueryable();
 
+            public IQueryable<IntegrationLoginSetting> IntegrationLoginSettings => throw new NotImplementedException();
+
+            public IQueryable<UserIntegrationBinding> UserIntegrationBindings => throw new NotImplementedException();
+
             public Task AddClient(Client entity)
             {
                 _clients.Add(entity);
@@ -196,6 +200,26 @@ namespace EIMSNext.Auth.Tests
 
             public void Dispose()
             {
+            }
+
+            public Task AddIntegrationLoginSetting(IntegrationLoginSetting entity)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task UpdateIntegrationLoginSetting(IntegrationLoginSetting entity)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task AddUserIntegrationBinding(UserIntegrationBinding entity)
+            {
+                throw new NotImplementedException();
+            }
+
+            public Task UpdateUserIntegrationBinding(UserIntegrationBinding entity)
+            {
+                throw new NotImplementedException();
             }
         }
 

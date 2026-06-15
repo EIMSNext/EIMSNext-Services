@@ -41,6 +41,13 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var user = IdentityContext.CurrentUser!;
             var emp = IdentityContext.CurrentEmployee as Employee;
+            var departmentIds = emp == null
+                ? new List<string>()
+                : Resolver.GetRepository<EmployeeDepartment>().Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == emp.Id)
+                    .OrderBy(x => x.SortValue)
+                    .Select(x => x.DepartmentId)
+                    .ToList();
 
             return ApiResult.Success(new
             {
@@ -52,37 +59,22 @@ namespace EIMSNext.Service.Host.Controllers
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
                 corpId = IdentityContext.CurrentCorpId,
-                deptId = emp?.DepartmentId,
+                departmentIds,
                 userType = IdentityContext.IdentityType,
                 roles = emp?.Roles.Select(x => x.RoleId)
             }).ToActionResult();
         }
 
+        [HttpGet("AdminPermissions")]
+        public IActionResult GetAdminPermissions()
+        {
+            return ApiResult.Success(Resolver.Resolve<AdminPermissionEvaluator>().GetSnapshot()).ToActionResult();
+        }
+
         [HttpGet("AppMenuPerms")]
         public IActionResult GetAppMenuPerms(string appId)
         {
-            if (IdentityType.App_Admins.HasFlag(IdentityContext.IdentityType))  //此种类型不应该请求进来
-            {
-                return Ok(Array.Empty<object>());
-            }
-            else if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
-            {
-                var emp = (IdentityContext.CurrentEmployee as Employee)!;
-
-                //TODO: 性能不一定好，先这样写
-                var empId = emp.Id;
-                var roleIds = emp.Roles.Select(x => x.RoleId).ToList();
-                var deptId = emp.DepartmentId;
-                var pDeptIds = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|")).Select(x => x.Id).ToList();
-                var formIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.AppId == appId && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptId == m.Id)))).Select(x => x.FormId).Distinct().ToList();
-
-                //TODO:仪表盘还没有发布功能，返回所有
-                var dashIds = Resolver.GetService<DashboardDef>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.AppId == appId).Select(x => x.Id).Distinct().ToList(); ;
-
-                return Ok(formIds.Select(x => new { id = x, type = FormType.Form }).Concat(dashIds.Select(y => new { id = y, type = FormType.Dashboard })));
-            }
-
-            return Ok(Array.Empty<object>());
+            return Ok(Resolver.Resolve<AdminPermissionEvaluator>().GetAppMenuPermissions(appId));
         }
 
         /// <summary>

@@ -24,29 +24,28 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
-
-            var findOpt = Metadata!.DfNodeSetting!.QueryManySetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-            BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
-
-            var queryData = FormDataRepository.Find(findOpt).ToList();
-
-            if (queryData?.Count > 0)
+            return ExecuteWithLog(context, dataContext =>
             {
-                var datas = new List<ActionFormData>();
-                queryData.ForEach(x => datas.Add(new ActionFormData { State = DataState.Unchanged, FormData = x }));
-                dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                var findOpt = Metadata!.DfNodeSetting!.QueryManySetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
+                BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+
+                var queryData = FormDataRepository.Find(findOpt).ToList();
+
+                if (queryData?.Count > 0)
                 {
-                    NodeId = Metadata.Id,
-                    SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                    FormId = dataContext.FormId,
-                    ActionDatas = datas
-                });
-            }
+                    var datas = new List<ActionFormData>();
+                    queryData.ForEach(x => datas.Add(new ActionFormData { State = DataState.Unchanged, FormData = x }));
+                    dataContext.NodeDatas.Add(Metadata!.Id, new DfNodeData
+                    {
+                        NodeId = Metadata.Id,
+                        SingleResult = Metadata.DfNodeSetting!.SingleResult,
+                        FormId = dataContext.FormId,
+                        ActionDatas = datas
+                    });
+                }
 
-            CreateExecLog(context.Workflow, dataContext, Metadata!);
-
-            return ExecutionResult.Next();
+                return ExecutionResult.Next();
+            });
         }
     }
 }

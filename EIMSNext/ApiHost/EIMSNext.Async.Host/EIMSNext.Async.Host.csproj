@@ -26,8 +26,8 @@
     <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />

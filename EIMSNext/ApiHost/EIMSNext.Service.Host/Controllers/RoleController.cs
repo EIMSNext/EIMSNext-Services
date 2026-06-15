@@ -47,5 +47,25 @@ namespace EIMSNext.Service.Host.Controllers
 
             return BadRequest();
         }
+
+        [HttpPost("Move")]
+        [Permission(Operation = Operation.Write)]
+        public virtual async Task<ActionResult> Move([FromBody] MoveRoleTreeNodeRequest request)
+        {
+            try
+            {
+                var moved = await ApiService.Move(request);
+                if (!moved)
+                {
+                    return string.IsNullOrWhiteSpace(request.Id) ? BadRequest() : NotFound();
+                }
+
+                return Ok(ApiResult.Success());
+            }
+            catch (ArgumentException ex)
+            {
+                return BadRequest(ex.Message);
+            }
+        }
     }
 }

@@ -21,7 +21,8 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            var dataContext = GetDataContext(context);
+            return ExecuteWithLog(context, dataContext =>
+            {
             var updateSetting = Metadata!.DfNodeSetting!.UpdateSetting!;
             var formDef = GetFormDef(dataContext, updateSetting.FormId);
             var actionDatas = new List<ActionFormData>();
@@ -317,9 +318,8 @@ namespace EIMSNext.Flow.Core.Nodes
                 });
             }
 
-            CreateExecLog(context.Workflow, dataContext, Metadata!);
-
             return ExecutionResult.Next();
+            });
 
         }
 

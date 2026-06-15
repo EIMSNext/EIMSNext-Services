@@ -10,6 +10,8 @@ namespace EIMSNext.Flow.Core
         public string UserId { get; set; } = string.Empty;
         public string AccessToken { get; set; } = string.Empty;
         public string AppId { get; set; } = string.Empty;
+        public string DataflowId { get; set; } = string.Empty;
+        public string RunLogId { get; set; } = string.Empty;
         public string? FormId { get; set; }
         public string? DataId { get; set; }
         public Operator? WfStarter { get; set; }

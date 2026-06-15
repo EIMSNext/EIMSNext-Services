@@ -273,6 +273,8 @@ namespace EIMSNext.Service.Entities
     /// </summary>
     public class ApproveSetting
     {
+        public ApproverType ApproverType { get; set; } = ApproverType.Normal;
+
         /// <summary>
         /// 审批模式（或签、会签、自动签）
         /// </summary>
@@ -281,6 +283,9 @@ namespace EIMSNext.Service.Entities
         /// 审批候选人列表
         /// </summary>
         public IList<ApprovalCandidate>? Candidates { get; set; }
+
+        public ByLevelApprovalSetting? ByLevelApprovalSetting { get; set; }
+
         /// <summary>
         /// 是否启用抄送
         /// </summary>
@@ -997,6 +1002,27 @@ namespace EIMSNext.Service.Entities
         /// 自动签（系统自动审批）
         /// </summary>
         AutoSign
+    }
+
+    public enum ApproverType
+    {
+        Normal = 0,
+        ByLevel = 1
+    }
+
+    public class ByLevelApprovalSetting
+    {
+        public ByLevelApprovalTerminal Terminal { get; set; } = ByLevelApprovalTerminal.StarterDepartment;
+
+        public int StartLevel { get; set; } = 1;
+
+        public int EndLevel { get; set; } = 1;
+    }
+
+    public enum ByLevelApprovalTerminal
+    {
+        StarterDepartment = 0,
+        Organization = 1
     }
 
     /// <summary>

@@ -51,4 +51,31 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public List<string>? EmpIds { get; set; }
     }
+
+    /// <summary>
+    /// 移动角色树节点请求
+    /// </summary>
+    public class MoveRoleTreeNodeRequest
+    {
+        /// <summary>
+        /// 被移动节点ID
+        /// </summary>
+        public string Id { get; set; } = string.Empty;
+        /// <summary>
+        /// 是否角色组
+        /// </summary>
+        public bool IsGroup { get; set; }
+        /// <summary>
+        /// 新角色组ID，空表示根级
+        /// </summary>
+        public string RoleGroupId { get; set; } = string.Empty;
+        /// <summary>
+        /// 移动后前一个同级节点ID
+        /// </summary>
+        public string PreviousId { get; set; } = string.Empty;
+        /// <summary>
+        /// 移动后后一个同级节点ID
+        /// </summary>
+        public string NextId { get; set; } = string.Empty;
+    }
 }
