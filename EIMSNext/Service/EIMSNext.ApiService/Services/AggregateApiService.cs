@@ -21,6 +21,11 @@ namespace EIMSNext.ApiService
 
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request)
         {
+            return await Calucate(request, ServiceContext.CorpId);
+        }
+
+        public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId)
+        {
             IMongoCollection<BsonDocument> collection;
             if (request.DataSource!.Type == AgDataSourceType.Form)
             {
@@ -30,7 +35,7 @@ namespace EIMSNext.ApiService
                 if (filter == null) { filter = new DynamicFilter(); }
                 if (filter.IsGroup && filter.Rel == FilterRel.And)
                 {
-                    filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId });
+                    filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = corpId });
                     filter.Items!.Add(new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id });
                 }
                 else
@@ -39,7 +44,7 @@ namespace EIMSNext.ApiService
                     {
                         Rel = FilterRel.And,
                         Items = [
-                            new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId },
+                            new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = corpId },
                             new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id },
                             filter
                         ]

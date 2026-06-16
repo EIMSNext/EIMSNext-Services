@@ -162,6 +162,7 @@ namespace EIMSNext.ApiService
         {
             var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
             evaluator.EnsureCanCreateApp();
+            ValidateHomeEntry(entity);
 
             await base.AddAsyncCore(entity);
             await evaluator.SyncCreatedAppToNormalAdminGroupsAsync(entity.Id);
@@ -170,6 +171,7 @@ namespace EIMSNext.ApiService
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(AppDef entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.Id);
+            ValidateHomeEntry(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
@@ -195,6 +197,21 @@ namespace EIMSNext.ApiService
             }
 
             return app;
+        }
+
+        private static void ValidateHomeEntry(AppDef entity)
+        {
+            if (string.IsNullOrWhiteSpace(entity.HomeEntryId))
+            {
+                entity.HomeEntryId = null;
+                return;
+            }
+
+            var menu = AppMenuHelper.FindMenu(entity.AppMenus ?? [], entity.HomeEntryId);
+            if (menu == null || menu.MenuType == FormType.Group)
+            {
+                throw new BadRequestException("应用首页入口必须指向当前应用菜单中的表单或仪表盘");
+            }
         }
     }
 }

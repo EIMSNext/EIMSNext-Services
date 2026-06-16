@@ -17,6 +17,11 @@ namespace EIMSNext.Service.Entities
         public string FormId { get; set; } = "";
 
         /// <summary>
+        /// 提醒目标类型。FormId 字段承载该目标类型对应的目标ID。
+        /// </summary>
+        public NotifyTargetType TargetType { get; set; } = NotifyTargetType.Form;
+
+        /// <summary>
         /// 用于字段提醒的日期时间字段
         /// </summary>
         public string? TimeField { get; set; }
@@ -118,6 +123,21 @@ namespace EIMSNext.Service.Entities
         /// 是否禁用
         /// </summary>
         public bool Disabled { get; set; }
+    }
+
+    /// <summary>
+    /// 提醒目标类型
+    /// </summary>
+    public enum NotifyTargetType
+    {
+        /// <summary>
+        /// 表单
+        /// </summary>
+        Form = 0,
+        /// <summary>
+        /// 仪表盘
+        /// </summary>
+        Dashboard = 1
     }
 
     /// <summary>

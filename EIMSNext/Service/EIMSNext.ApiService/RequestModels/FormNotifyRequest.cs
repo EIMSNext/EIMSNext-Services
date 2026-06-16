@@ -18,6 +18,11 @@ namespace EIMSNext.ApiService.RequestModels
         public string FormId { get; set; } = string.Empty;
 
         /// <summary>
+        /// 提醒目标类型。FormId 字段承载该目标类型对应的目标ID。
+        /// </summary>
+        public NotifyTargetType TargetType { get; set; } = NotifyTargetType.Form;
+
+        /// <summary>
         /// 提醒类型
         /// </summary>
         public FormNotifyTriggerMode TriggerMode { get; set; }

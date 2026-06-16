@@ -28,18 +28,15 @@ namespace EIMSNext.Service.Host.Controllers.OData
             if (IdentityContext.IdentityType == IdentityType.AppAdmin)
             {
                 query = base.FilterByPermission(query, options);
-                var appIds = evaluator.GetUsageAppIdsForCurrentEmployee()
-                    .Concat(evaluator.GetSnapshot().ManageableAppIds)
-                    .Distinct()
-                    .ToList();
-                return query.Where(x => appIds.Contains(x.AppId));
+                var dashboardIds = evaluator.GetUsageDashboardIdsForCurrentEmployee(QueryAppId);
+                return query.Where(x => dashboardIds.Contains(x.Id));
             }
 
             if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
             {
                 query = base.FilterByPermission(query, options);
-                var appIds = evaluator.GetUsageAppIdsForCurrentEmployee();
-                return query.Where(x => appIds.Contains(x.AppId));
+                var dashboardIds = evaluator.GetUsageDashboardIdsForCurrentEmployee(QueryAppId);
+                return query.Where(x => dashboardIds.Contains(x.Id));
             }
 
             return query.Where(x => false);

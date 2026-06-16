@@ -488,6 +488,7 @@ namespace EIMSNext.Service
                 MessageType = MessageType.FormNotify,
                 AppId = newData.AppId,
                 FormId = newData.FormId,
+                TargetType = NotifyTargetType.Form,
                 DataId = newData.Id,
                 FormTriggerMode = triggerMode,
                 Operator = Context.Operator,
@@ -522,6 +523,7 @@ namespace EIMSNext.Service
                 x.CorpId == entity.CorpId &&
                 x.AppId == entity.AppId &&
                 x.FormId == entity.FormId &&
+                x.TargetType == NotifyTargetType.Form &&
                 !x.Disabled &&
                 x.TriggerMode == FormNotifyTriggerMode.TimeFieldScheduled).ToList();
 
@@ -542,6 +544,7 @@ namespace EIMSNext.Service
                     DataId = entity.Id,
                     AppId = entity.AppId,
                     FormId = entity.FormId,
+                    TargetType = NotifyTargetType.Form,
                     FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     NewData = entity
                 });
@@ -569,6 +572,7 @@ namespace EIMSNext.Service
                     DataId = entity.Id,
                     AppId = notify.AppId,
                     FormId = notify.FormId,
+                    TargetType = NotifyTargetType.Form,
                     CorpId = notify.CorpId,
                     TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     ScheduleVersion = notify.ScheduleVersion,

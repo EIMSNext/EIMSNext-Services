@@ -7,5 +7,6 @@ namespace EIMSNext.ApiService
     public interface IAggregateApiService: IApiService
     {
         Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request);
+        Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId);
     }
 }

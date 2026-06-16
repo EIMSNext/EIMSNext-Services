@@ -17,21 +17,23 @@ namespace EIMSNext.ApiService
         {
             var corpId = IdentityContext.CurrentCorpId;
             var appIds = WorkbenchTargetResolver.GetAccessibleAppIds(Resolver, IdentityContext);
+            var formIds = WorkbenchTargetResolver.GetAccessibleFormIds(Resolver, IdentityContext, null);
+            var dashboardIds = WorkbenchTargetResolver.GetAccessibleDashboardIds(Resolver, IdentityContext, null);
             var apps = Resolver.GetRepository<AppDef>().Queryable
                 .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.Id))
                 .OrderBy(x => x.SortIndex)
                 .ThenBy(x => x.Name)
                 .ToList();
             var forms = Resolver.GetRepository<FormDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
+                .Where(x => x.CorpId == corpId && !x.DeleteFlag && formIds.Contains(x.Id))
                 .ToDictionary(x => x.Id);
             var dashboards = Resolver.GetRepository<DashboardDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
+                .Where(x => x.CorpId == corpId && !x.DeleteFlag && dashboardIds.Contains(x.Id))
                 .OrderBy(x => x.Name)
                 .ToList();
             var dashboardMap = dashboards.ToDictionary(x => x.Id);
             var chartItems = Resolver.GetRepository<DashboardItemDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && x.ItemType == "chart" && appIds.Contains(x.AppId))
+                .Where(x => x.CorpId == corpId && !x.DeleteFlag && x.ItemType == "chart" && dashboardIds.Contains(x.DashboardId))
                 .OrderBy(x => x.Name)
                 .ToList();
             var chartGroups = chartItems.GroupBy(x => x.DashboardId).ToDictionary(x => x.Key, x => x.ToList());
@@ -68,9 +70,9 @@ namespace EIMSNext.ApiService
         public DashboardItemDef? GetChartItem(string dashboardItemId)
         {
             var corpId = IdentityContext.CurrentCorpId;
-            var appIds = WorkbenchTargetResolver.GetAccessibleAppIds(Resolver, IdentityContext);
+            var dashboardIds = WorkbenchTargetResolver.GetAccessibleDashboardIds(Resolver, IdentityContext, null);
             var item = Resolver.GetRepository<DashboardItemDef>().Get(dashboardItemId);
-            if (item == null || item.CorpId != corpId || item.DeleteFlag || item.ItemType != "chart" || !appIds.Contains(item.AppId))
+            if (item == null || item.CorpId != corpId || item.DeleteFlag || item.ItemType != "chart" || !dashboardIds.Contains(item.DashboardId))
             {
                 return null;
             }
@@ -204,14 +206,8 @@ namespace EIMSNext.ApiService
             var corpId = IdentityContext.CurrentCorpId;
             var employeeId = CurrentEmployeeId;
             var appIds = WorkbenchTargetResolver.GetAccessibleAppIds(Resolver, IdentityContext).ToList();
-            var formIds = Resolver.GetRepository<FormDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
-                .Select(x => x.Id)
-                .ToList();
-            var dashboardIds = Resolver.GetRepository<DashboardDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
-                .Select(x => x.Id)
-                .ToList();
+            var formIds = WorkbenchTargetResolver.GetAccessibleFormIds(Resolver, IdentityContext, null);
+            var dashboardIds = WorkbenchTargetResolver.GetAccessibleDashboardIds(Resolver, IdentityContext, null);
 
             return CoreService.All()
                 .Where(x =>
@@ -324,15 +320,8 @@ namespace EIMSNext.ApiService
         {
             var corpId = IdentityContext.CurrentCorpId;
             var employeeId = CurrentEmployeeId;
-            var appIds = WorkbenchTargetResolver.GetAccessibleAppIds(Resolver, IdentityContext).ToList();
-            var formIds = Resolver.GetRepository<FormDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
-                .Select(x => x.Id)
-                .ToList();
-            var dashboardIds = Resolver.GetRepository<DashboardDef>().Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag && appIds.Contains(x.AppId))
-                .Select(x => x.Id)
-                .ToList();
+            var formIds = WorkbenchTargetResolver.GetAccessibleFormIds(Resolver, IdentityContext, null);
+            var dashboardIds = WorkbenchTargetResolver.GetAccessibleDashboardIds(Resolver, IdentityContext, null);
 
             return CoreService.All()
                 .Where(x =>
@@ -504,7 +493,8 @@ namespace EIMSNext.ApiService
             if (targetType == WorkbenchTargetType.Form)
             {
                 var form = resolver.GetRepository<FormDef>().Get(targetId);
-                if (form == null || form.CorpId != corpId || form.DeleteFlag || !appIds.Contains(form.AppId))
+                var formIds = GetAccessibleFormIds(resolver, identityContext, form?.AppId);
+                if (form == null || form.CorpId != corpId || form.DeleteFlag || !formIds.Contains(form.Id))
                 {
                     return null;
                 }
@@ -523,7 +513,8 @@ namespace EIMSNext.ApiService
             if (targetType == WorkbenchTargetType.Dashboard)
             {
                 var dashboard = resolver.GetRepository<DashboardDef>().Get(targetId);
-                if (dashboard == null || dashboard.CorpId != corpId || dashboard.DeleteFlag || !appIds.Contains(dashboard.AppId))
+                var dashboardIds = GetAccessibleDashboardIds(resolver, identityContext, dashboard?.AppId);
+                if (dashboard == null || dashboard.CorpId != corpId || dashboard.DeleteFlag || !dashboardIds.Contains(dashboard.Id))
                 {
                     return null;
                 }
@@ -540,6 +531,48 @@ namespace EIMSNext.ApiService
             }
 
             return null;
+        }
+
+        public static List<string> GetAccessibleFormIds(IResolver resolver, IIdentityContext identityContext, string? appId)
+        {
+            var corpId = identityContext.CurrentCorpId;
+            var evaluator = resolver.Resolve<AdminPermissionEvaluator>();
+            if (evaluator.HasUnrestrictedManagementIdentity)
+            {
+                return resolver.GetRepository<FormDef>().Queryable
+                    .Where(x =>
+                        x.CorpId == corpId &&
+                        !x.DeleteFlag &&
+                        (string.IsNullOrEmpty(appId) || x.AppId == appId))
+                    .Select(x => x.Id)
+                    .ToList();
+            }
+
+            if (identityContext.IdentityType == IdentityType.AppAdmin)
+            {
+                var formIds = evaluator.GetUsageFormIdsForCurrentEmployee(appId);
+                var manageableAppIds = evaluator.GetSnapshot().ManageableAppIds;
+                return resolver.GetRepository<FormDef>().Queryable
+                    .Where(x =>
+                        x.CorpId == corpId &&
+                        !x.DeleteFlag &&
+                        (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
+                        (formIds.Contains(x.Id) || manageableAppIds.Contains(x.AppId)))
+                    .Select(x => x.Id)
+                    .ToList();
+            }
+
+            if (IdentityType.Employee_Admins.HasFlag(identityContext.IdentityType))
+            {
+                return evaluator.GetUsageFormIdsForCurrentEmployee(appId);
+            }
+
+            return [];
+        }
+
+        public static List<string> GetAccessibleDashboardIds(IResolver resolver, IIdentityContext identityContext, string? appId)
+        {
+            return resolver.Resolve<AdminPermissionEvaluator>().GetUsageDashboardIdsForCurrentEmployee(appId);
         }
 
         public static HashSet<string> GetAccessibleAppIds(IResolver resolver, IIdentityContext identityContext)

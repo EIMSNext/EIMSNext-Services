@@ -33,6 +33,28 @@ namespace EIMSNext.Service
 
         public async Task<List<NotifyReceiver>> ResolveCandidatesAsync(FormData data, FormDef formDef, IEnumerable<ApprovalCandidate> candidates, string? operatorEmpId)
         {
+            return await ResolveCandidatesInternalAsync(candidates, operatorEmpId, (notifier, deptIds, empIds) =>
+            {
+                if (notifier.CandidateType == CandidateType.FormField)
+                {
+                    ExpandFormFieldCandidate(data, formDef, notifier, deptIds, empIds);
+                }
+            });
+        }
+
+        public async Task<List<NotifyReceiver>> ResolveCandidatesAsync(IEnumerable<ApprovalCandidate> candidates, string? operatorEmpId)
+        {
+            return await ResolveCandidatesInternalAsync(
+                candidates.Where(x => x.CandidateType != CandidateType.FormField),
+                operatorEmpId,
+                null);
+        }
+
+        private async Task<List<NotifyReceiver>> ResolveCandidatesInternalAsync(
+            IEnumerable<ApprovalCandidate> candidates,
+            string? operatorEmpId,
+            Action<ApprovalCandidate, ISet<string>, ISet<string>>? expandDynamicCandidate)
+        {
             var receivers = new Dictionary<string, NotifyReceiver>(StringComparer.OrdinalIgnoreCase);
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var roleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -64,7 +86,7 @@ namespace EIMSNext.Service
                         }
                         break;
                     case CandidateType.FormField:
-                        ExpandFormFieldCandidate(data, formDef, notifier, deptIds, empIds);
+                        expandDynamicCandidate?.Invoke(notifier, deptIds, empIds);
                         break;
                 }
             }

@@ -83,16 +83,12 @@ namespace EIMSNext.ApiService
 
         public List<string> GetUsageAppIdsForCurrentEmployee()
         {
-            var employee = IdentityContext.CurrentEmployee as Employee;
-            if (employee == null)
-            {
-                return [];
-            }
-
-            var empId = employee.Id;
-            var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
-            var deptIds = GetCurrentEmployeeDeptIds();
-            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var childDeptIds = memberScope.ChildDepartmentIds.ToList();
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
@@ -104,21 +100,19 @@ namespace EIMSNext.ApiService
                         (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.AppId)
                 .Distinct()
+                .Concat(GetPublishedDashboardAppIds(memberScope))
+                .Distinct()
                 .ToList();
         }
 
         public List<string> GetUsageFormIdsForCurrentEmployee(string? appId)
         {
-            var employee = IdentityContext.CurrentEmployee as Employee;
-            if (employee == null)
-            {
-                return [];
-            }
-
-            var empId = employee.Id;
-            var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
-            var deptIds = GetCurrentEmployeeDeptIds();
-            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var childDeptIds = memberScope.ChildDepartmentIds.ToList();
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
@@ -130,6 +124,43 @@ namespace EIMSNext.ApiService
                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
                         (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.FormId)
+                .Distinct()
+                .ToList();
+        }
+
+        public List<string> GetUsageDashboardIdsForCurrentEmployee(string? appId)
+        {
+            if (HasUnrestrictedManagementIdentity)
+            {
+                return Resolver.GetService<DashboardDef>()
+                    .Query(x =>
+                        x.CorpId == IdentityContext.CurrentCorpId &&
+                        !x.DeleteFlag &&
+                        (string.IsNullOrEmpty(appId) || x.AppId == appId))
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
+            }
+
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var childDeptIds = memberScope.ChildDepartmentIds.ToList();
+            var manageableAppIds = ShouldApplyNormalAdminRules ? GetSnapshot().ManageableAppIds : new List<string>();
+            return Resolver.GetService<DashboardDef>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
+                    (manageableAppIds.Contains(x.AppId) ||
+                     (x.MemberPublishEnabled && x.PublishMembers.Any(m =>
+                         (m.Type == MemberType.Employee && m.Id == empId) ||
+                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                         (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))))
+                .Select(x => x.Id)
                 .Distinct()
                 .ToList();
         }
@@ -180,19 +211,7 @@ namespace EIMSNext.ApiService
                         .ToList();
                 }
 
-                var usageAppIds = GetUsageAppIdsForCurrentEmployee();
-                var dashQuery = Resolver.GetService<DashboardDef>()
-                    .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.AppId == appId);
-
-                if (!isManagedApp)
-                {
-                    dashQuery = dashQuery.Where(x => usageAppIds.Contains(x.AppId));
-                }
-
-                var dashIds = dashQuery
-                    .Select(x => x.Id)
-                    .Distinct()
-                    .ToList();
+                var dashIds = GetUsageDashboardIdsForCurrentEmployee(appId);
 
                 return BuildAppMenuPermissions(formIds, dashIds);
             }
@@ -200,12 +219,7 @@ namespace EIMSNext.ApiService
             if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
             {
                 var formIds = GetUsageFormIdsForCurrentEmployee(appId);
-                var usageAppIds = GetUsageAppIdsForCurrentEmployee();
-                var dashIds = Resolver.GetService<DashboardDef>()
-                    .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.AppId == appId && usageAppIds.Contains(x.AppId))
-                    .Select(x => x.Id)
-                    .Distinct()
-                    .ToList();
+                var dashIds = GetUsageDashboardIdsForCurrentEmployee(appId);
 
                 return BuildAppMenuPermissions(formIds, dashIds);
             }
@@ -534,6 +548,43 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        private EmployeeMemberScope? GetCurrentEmployeeMemberScope()
+        {
+            var employee = IdentityContext.CurrentEmployee as Employee;
+            if (employee == null)
+            {
+                return null;
+            }
+
+            var deptIds = GetCurrentEmployeeDeptIds();
+            return new EmployeeMemberScope(
+                employee.Id,
+                employee.Roles.Select(x => x.RoleId).ToHashSet(),
+                deptIds.ToHashSet(),
+                GetCurrentEmployeeChildDepartmentIds(deptIds).ToHashSet());
+        }
+
+        private List<string> GetPublishedDashboardAppIds(EmployeeMemberScope memberScope)
+        {
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var childDeptIds = memberScope.ChildDepartmentIds.ToList();
+
+            return Resolver.GetService<DashboardDef>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.MemberPublishEnabled &&
+                    x.PublishMembers.Any(m =>
+                        (m.Type == MemberType.Employee && m.Id == empId) ||
+                        (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                .Select(x => x.AppId)
+                .Distinct()
+                .ToList();
+        }
+
         private void EnsureEmployeeDepartmentInScope(string employeeId, string scopeMode, IEnumerable<string> departmentIds, string message)
         {
             var employee = Resolver.GetService<Employee>()
@@ -688,5 +739,20 @@ namespace EIMSNext.ApiService
         }
 
         private sealed record PermissionScope(bool All, List<string> Ids);
+
+        private sealed record EmployeeMemberScope(
+            string EmployeeId,
+            HashSet<string> RoleIds,
+            HashSet<string> DepartmentIds,
+            HashSet<string> ChildDepartmentIds)
+        {
+            public bool Matches(Member member)
+            {
+                return (member.Type == MemberType.Employee && member.Id == EmployeeId) ||
+                       (member.Type == MemberType.Role && RoleIds.Contains(member.Id)) ||
+                       (member.Type == MemberType.Department &&
+                        ((member.CascadedDept && ChildDepartmentIds.Contains(member.Id)) || DepartmentIds.Contains(member.Id)));
+            }
+        }
     }
 }

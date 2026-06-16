@@ -43,6 +43,7 @@ namespace EIMSNext.Service.Host.Edm
             //builder.EnumType<DataPerms>();
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
+            builder.EnumType<NotifyTargetType>();
             builder.EnumType<FormNotifyTriggerMode>();
             builder.EnumType<NotifyChannel>();
             builder.EnumType<WfExpireActionType>();

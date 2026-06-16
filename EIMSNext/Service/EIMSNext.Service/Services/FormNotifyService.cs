@@ -79,6 +79,12 @@ namespace EIMSNext.Service
 
         private void ValidateEntity(FormNotify entity)
         {
+            if (entity.TargetType == NotifyTargetType.Dashboard)
+            {
+                ValidateDashboardNotify(entity);
+                return;
+            }
+
             switch (entity.TriggerMode)
             {
                 case FormNotifyTriggerMode.CustomScheduled:
@@ -134,6 +140,26 @@ namespace EIMSNext.Service
             entity.DataExpressFilter = null;
         }
 
+        private static void ValidateDashboardNotify(FormNotify entity)
+        {
+            if (entity.TriggerMode != FormNotifyTriggerMode.CustomScheduled)
+            {
+                throw new BadRequestException("仪表盘提醒仅支持自定义定时提醒");
+            }
+
+            ValidateCustomScheduled(entity);
+            entity.TimeField = null;
+            entity.FixedTime = null;
+            entity.Direction = TimerOffsetDirection.At;
+            entity.OffsetValue = null;
+            entity.OffsetUnit = null;
+            entity.FieldFormat = null;
+            entity.ChangeFields = [];
+            entity.DataFilter = null;
+            entity.DataDynamicFilter = null;
+            entity.DataExpressFilter = null;
+        }
+
         private void ValidateTimeFieldScheduled(FormNotify entity)
         {
             if (string.IsNullOrWhiteSpace(entity.TimeField))
@@ -178,6 +204,7 @@ namespace EIMSNext.Service
                     CorpId = entity.CorpId,
                     AppId = entity.AppId,
                     FormId = entity.FormId,
+                    TargetType = entity.TargetType,
                     TriggerMode = entity.TriggerMode,
                     ScheduleVersion = entity.ScheduleVersion,
                     TriggerTime = entity.NextTriggerTime.Value,
@@ -215,6 +242,7 @@ namespace EIMSNext.Service
                     CorpId = entity.CorpId,
                     AppId = entity.AppId,
                     FormId = entity.FormId,
+                    TargetType = entity.TargetType,
                     DataId = data.Id,
                     TriggerMode = entity.TriggerMode,
                     ScheduleVersion = entity.ScheduleVersion,

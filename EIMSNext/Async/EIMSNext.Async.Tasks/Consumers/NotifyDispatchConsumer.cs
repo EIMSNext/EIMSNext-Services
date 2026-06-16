@@ -11,6 +11,7 @@ using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -35,7 +36,18 @@ namespace EIMSNext.Async.Tasks.Consumers
 
         private static async Task HandleFormNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
         {
-            if (args.NewData == null || !args.FormTriggerMode.HasValue)
+            if (!args.FormTriggerMode.HasValue)
+            {
+                return;
+            }
+
+            if (args.TargetType == NotifyTargetType.Dashboard)
+            {
+                await HandleDashboardNotifyAsync(args, ct, resolver);
+                return;
+            }
+
+            if (args.NewData == null)
             {
                 return;
             }
@@ -69,6 +81,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 x.CorpId == args.CorpId &&
                 x.AppId == currentData.AppId &&
                 x.FormId == currentData.FormId &&
+                x.TargetType == NotifyTargetType.Form &&
                 !x.Disabled &&
                 x.TriggerMode == args.FormTriggerMode.Value).ToList();
 
@@ -93,6 +106,53 @@ namespace EIMSNext.Async.Tasks.Consumers
                 var url = args.FormTriggerMode == FormNotifyTriggerMode.CustomScheduled
                     ? $"/app/{notify.AppId}/form/{notify.FormId}"
                     : $"/app/{currentData.AppId}/form/{currentData.FormId}/data/{args.DataId}";
+                var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
+                var channels = (NotifyChannel)notify.Channels;
+
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
+            }
+        }
+
+        private static async Task HandleDashboardNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
+        {
+            if (string.IsNullOrWhiteSpace(args.AppId) || string.IsNullOrWhiteSpace(args.FormId))
+            {
+                return;
+            }
+
+            var notifyRepo = resolver.GetRepository<FormNotify>();
+            var dashboardRepo = resolver.GetRepository<DashboardDef>();
+            var publisher = resolver.Resolve<IMessagePublisher>();
+            var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
+
+            var dashboard = dashboardRepo.Get(args.FormId);
+            if (dashboard == null || dashboard.DeleteFlag || dashboard.CorpId != args.CorpId)
+            {
+                return;
+            }
+
+            var notifies = notifyRepo.Find(x =>
+                x.CorpId == args.CorpId &&
+                x.AppId == args.AppId &&
+                x.FormId == args.FormId &&
+                x.TargetType == NotifyTargetType.Dashboard &&
+                !x.Disabled &&
+                x.TriggerMode == FormNotifyTriggerMode.CustomScheduled).ToList();
+
+            foreach (var notify in notifies)
+            {
+                var candidates = (notify.Notifiers ?? "[]").DeserializeFromJson<List<ApprovalCandidate>>() ?? [];
+                var receivers = await recipientResolver.ResolveCandidatesAsync(candidates, args.Operator?.Id);
+                if (receivers.Count == 0)
+                {
+                    continue;
+                }
+
+                var title = string.IsNullOrWhiteSpace(notify.NotifyText)
+                    ? dashboard.Name
+                    : notify.NotifyText!;
+                var detail = dashboard.Name;
+                var url = $"/app/{notify.AppId}/dash/{notify.FormId}";
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;
 
