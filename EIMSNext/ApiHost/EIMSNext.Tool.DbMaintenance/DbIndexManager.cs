@@ -31,6 +31,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
             CreateDataflowScheduleIndexes(background);
+            CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
         }
 
@@ -397,6 +398,44 @@ namespace EIMSNext.Auth.DbMaintenance
                     .Ascending(x => x.TriggerTime),
                 options,
                 "ix_dataflowscheduleitem_version_triggertime");
+        }
+
+        private void CreateWorkbenchIndexes(CreateIndexOptions options)
+        {
+            CreateIndex(GetCollection<WorkbenchConfig>(),
+                Builders<WorkbenchConfig>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchconfig_corp_employee_delete");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId)
+                    .Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchfavorite_target");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.SortIndex),
+                options,
+                "ix_workbenchfavorite_sort");
+
+            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+                Builders<WorkbenchRecentVisit>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId)
+                    .Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchrecent_target");
+
+            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+                Builders<WorkbenchRecentVisit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Descending(x => x.LastVisitTime),
+                options,
+                "ix_workbenchrecent_lastvisit");
         }
 
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase
