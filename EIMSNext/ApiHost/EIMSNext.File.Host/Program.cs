@@ -69,10 +69,7 @@ app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>
     {
-        e.Context.Response.Headers.AccessControlAllowOrigin = e.Context.Request.Headers.Origin;
-        e.Context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-        e.Context.Response.Headers.AccessControlAllowHeaders = e.Context.Request.Headers.AccessControlRequestHeaders;
-        e.Context.Response.Headers.AccessControlAllowCredentials = "true";
+        e.Context.RequestServices.GetRequiredService<CorsPolicyHelper>().Apply(e.Context);
     }
 });
 

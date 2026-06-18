@@ -1,4 +1,4 @@
-﻿using EIMSNext.Common;
+using EIMSNext.Common;
 
 namespace EIMSNext.Core.Query
 {

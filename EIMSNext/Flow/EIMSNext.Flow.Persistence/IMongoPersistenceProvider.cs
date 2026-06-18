@@ -1,4 +1,4 @@
-﻿using WorkflowCore.Interface;
+using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Persistence

@@ -1,4 +1,4 @@
-﻿using EIMSNext.ApiCore;
+using EIMSNext.ApiCore;
 using EIMSNext.Auth.DbMaintenance;
 using EIMSNext.MongoDb;
 using Microsoft.Extensions.Configuration;

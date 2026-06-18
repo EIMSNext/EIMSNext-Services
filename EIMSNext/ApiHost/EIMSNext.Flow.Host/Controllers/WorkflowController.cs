@@ -562,7 +562,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
 
         [HttpPost, Route("Definition/Delete")]
-        public IActionResult DeleteDef(DeleteRequest request)
+        public async Task<IActionResult> DeleteDef(DeleteRequest request)
         {
             List<string>? defIds = null;
             if (!string.IsNullOrEmpty(request.AppId))
@@ -572,8 +572,18 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (defIds?.Count > 0)
             {
-                var wfInsts = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id);
-                wfInsts.ForEach(x => _wfHost.TerminateWorkflow(x));
+                var wfInstIds = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id).ToList();
+                var terminateResults = await Task.WhenAll(wfInstIds.Select(async id => new
+                {
+                    Id = id,
+                    Success = await _wfHost.TerminateWorkflow(id)
+                }));
+
+                var failedIds = terminateResults.Where(x => !x.Success).Select(x => x.Id).ToList();
+                if (failedIds.Count > 0)
+                {
+                    return ApiResult.Fail(-1, "审批流程实例中止失败", new { ids = failedIds }).ToActionResult();
+                }
             }
 
             if (request.DeleteDef.HasValue && request.DeleteDef.Value)

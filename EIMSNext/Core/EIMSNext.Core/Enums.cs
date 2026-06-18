@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Core
+namespace EIMSNext.Core
 {
     public enum DbAction
     {

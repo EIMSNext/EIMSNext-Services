@@ -1,4 +1,4 @@
-﻿using EIMSNext.Core.Serialization;
+using EIMSNext.Core.Serialization;
 
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;

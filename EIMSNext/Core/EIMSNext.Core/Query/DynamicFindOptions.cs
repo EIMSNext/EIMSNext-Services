@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Core.Query
+namespace EIMSNext.Core.Query
 {
     public class DynamicFindOptions<T>
     {

@@ -1,4 +1,4 @@
-﻿using EIMSNext.Core.Entities;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Service.Entities
 {

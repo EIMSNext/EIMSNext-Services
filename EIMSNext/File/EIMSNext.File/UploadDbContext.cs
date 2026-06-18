@@ -1,4 +1,4 @@
-﻿using EIMSNext.MongoDb;
+using EIMSNext.MongoDb;
 using Microsoft.Extensions.Options;
 
 namespace EIMSNext.File

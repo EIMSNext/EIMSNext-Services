@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.ApiService
+namespace EIMSNext.ApiService
 {
     public interface IClientApiService : IApiService<EIMSNext.Auth.Entities.Client, EIMSNext.Auth.Entities.Client>
     {

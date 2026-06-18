@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.ApiService
+namespace EIMSNext.ApiService
 {
     [Flags]
     public enum IdentityType

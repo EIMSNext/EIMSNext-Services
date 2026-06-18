@@ -1,4 +1,4 @@
-﻿using EIMSNext.MongoDb;
+using EIMSNext.MongoDb;
 
 using MongoDB.Driver;
 

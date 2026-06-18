@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.ApiClient.Flow
+namespace EIMSNext.ApiClient.Flow
 {
     public interface IFlowClient
     {

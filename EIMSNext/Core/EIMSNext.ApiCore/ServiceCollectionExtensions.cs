@@ -1,4 +1,4 @@
-﻿using EIMSNext.Cache;
+using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
 using EIMSNext.Json.Serialization;
@@ -50,6 +50,8 @@ namespace EIMSNext.ApiCore
 
             services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
             services.Configure<StorageConfiguration>(configuration.GetSection("Storage"));
+            services.Configure<CorsOptions>(configuration.GetSection("Cors"));
+            services.AddSingleton<CorsPolicyHelper>();
 
             services.Configure<JsonOptions>(opt =>
             {

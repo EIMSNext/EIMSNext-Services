@@ -1,4 +1,3 @@
-﻿using Microsoft.AspNetCore.Cors.Infrastructure;
 using Microsoft.AspNetCore.Http;
 
 namespace EIMSNext.ApiCore
@@ -9,14 +8,17 @@ namespace EIMSNext.ApiCore
     public class CorsMiddleware
     {
         private readonly RequestDelegate _next;
+        private readonly CorsPolicyHelper _corsPolicy;
 
         /// <summary>
         /// 
         /// </summary>
         /// <param name="next"></param>
-        public CorsMiddleware(RequestDelegate next)
+        /// <param name="corsPolicy"></param>
+        public CorsMiddleware(RequestDelegate next, CorsPolicyHelper corsPolicy)
         {
             _next = next;
+            _corsPolicy = corsPolicy;
         }
         /// <summary>
         /// 
@@ -25,18 +27,11 @@ namespace EIMSNext.ApiCore
         /// <returns></returns>
         public async Task Invoke(HttpContext context)
         {
-            if (context.Request.Headers.ContainsKey(CorsConstants.Origin))
+            var corsApplied = _corsPolicy.Apply(context);
+            if (corsApplied && context.Request.Method.Equals(HttpMethod.Options.ToString()))
             {
-                context.Response.Headers.AccessControlAllowOrigin = context.Request.Headers.Origin;
-                context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-                context.Response.Headers.AccessControlAllowHeaders = context.Request.Headers.AccessControlRequestHeaders;
-                context.Response.Headers.AccessControlAllowCredentials = "true";
-
-                if (context.Request.Method.Equals(HttpMethod.Options.ToString()))
-                {
-                    context.Response.StatusCode = StatusCodes.Status200OK;
-                    return;
-                }
+                context.Response.StatusCode = StatusCodes.Status200OK;
+                return;
             }
 
             await _next(context);

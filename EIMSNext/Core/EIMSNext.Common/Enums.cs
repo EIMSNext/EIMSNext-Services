@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Common
+namespace EIMSNext.Common
 {
     [Flags]
     public enum Operation
