@@ -17,6 +17,11 @@ namespace EIMSNext.Service.Entities
         public string FormId { get; set; } = "";
 
         /// <summary>
+        /// 推送名称
+        /// </summary>
+        public string? Name { get; set; }
+
+        /// <summary>
         /// 
         /// </summary>
         public string SourceType { get; set; } = WebHookSource.Form;
@@ -29,6 +34,11 @@ namespace EIMSNext.Service.Entities
         /// Secret
         /// </summary>
         public string Secret { get; set; } = "";
+
+        /// <summary>
+        /// 备注
+        /// </summary>
+        public string? Remark { get; set; }
 
         /// <summary>
         /// WebHook触发模式，类型为WebHookTrigger

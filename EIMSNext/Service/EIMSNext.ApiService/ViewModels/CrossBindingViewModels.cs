@@ -2,9 +2,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.ViewModels
 {
-    public class FormDefViewModel : FormDef
+    public class CrossBindingViewModel : CrossBinding
     {
-        public bool External { get; set; }
     }
 }
-

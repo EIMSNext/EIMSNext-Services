@@ -162,7 +162,7 @@ namespace EIMSNext.ApiService
         {
             var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
             evaluator.EnsureCanCreateApp();
-            ValidateHomeEntry(entity);
+            ValidateHomeEntries(entity);
 
             await base.AddAsyncCore(entity);
             await evaluator.SyncCreatedAppToNormalAdminGroupsAsync(entity.Id);
@@ -171,7 +171,7 @@ namespace EIMSNext.ApiService
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(AppDef entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.Id);
-            ValidateHomeEntry(entity);
+            ValidateHomeEntries(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
@@ -199,18 +199,26 @@ namespace EIMSNext.ApiService
             return app;
         }
 
-        private static void ValidateHomeEntry(AppDef entity)
+        private static void ValidateHomeEntries(AppDef entity)
         {
-            if (string.IsNullOrWhiteSpace(entity.HomeEntryId))
+            entity.HomeEntryIds = (entity.HomeEntryIds ?? [])
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Select(x => x.Trim())
+                .Distinct()
+                .ToList();
+
+            if (entity.HomeEntryIds.Count == 0)
             {
-                entity.HomeEntryId = null;
                 return;
             }
 
-            var menu = AppMenuHelper.FindMenu(entity.AppMenus ?? [], entity.HomeEntryId);
-            if (menu == null || menu.MenuType == FormType.Group)
+            foreach (var entryId in entity.HomeEntryIds)
             {
-                throw new BadRequestException("应用首页入口必须指向当前应用菜单中的表单或仪表盘");
+                var menu = AppMenuHelper.FindMenu(entity.AppMenus ?? [], entryId);
+                if (menu == null || menu.MenuType != FormType.Dashboard)
+                {
+                    throw new BadRequestException("应用首页入口必须指向当前应用菜单中的仪表盘");
+                }
             }
         }
     }

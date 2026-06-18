@@ -131,6 +131,15 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_formdef_corp_app_delete");
 
+            CreateIndex(GetCollection<CrossBinding>(),
+                Builders<CrossBinding>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.TargetAppId)
+                    .Ascending(x => x.SourceFormId)
+                    .Ascending(x => x.DeleteFlag),
+                CreateUniqueOptions(options),
+                "ix_crossbinding_target_form_delete_unique");
+
             CreateIndex(GetCollection<DashboardDef>(),
                 Builders<DashboardDef>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.AppId).Ascending(x => x.DeleteFlag),
                 options,

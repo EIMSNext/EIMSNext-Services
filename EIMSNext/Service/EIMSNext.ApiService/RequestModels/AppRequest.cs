@@ -27,8 +27,8 @@ namespace EIMSNext.ApiService.RequestModels
         public int SortIndex { get; set; }
 
         /// <summary>
-        /// 应用首页入口ID，可指向当前应用菜单中的表单或仪表盘。
+        /// 应用首页入口ID列表，可指向当前应用菜单中的仪表盘。
         /// </summary>
-        public string? HomeEntryId { get; set; }
+        public List<string> HomeEntryIds { get; set; } = [];
     }
 }

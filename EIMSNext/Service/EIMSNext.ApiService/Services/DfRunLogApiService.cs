@@ -1,4 +1,5 @@
 using EIMSNext.Core;
+using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -27,6 +28,8 @@ namespace EIMSNext.ApiService
             int skip,
             int top)
         {
+            EnsureCanManageDataflow(dataflowId);
+
             var fb = RunLogService.Collection;
             var filterBuilder = Builders<Df_RunLog>.Filter;
             var filter = filterBuilder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId)
@@ -67,6 +70,8 @@ namespace EIMSNext.ApiService
                 return null;
             }
 
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(run.AppId);
+
             var fb = RunLogNodeService.Collection;
             var nodes = await fb
                 .Find(Builders<Df_RunLogNode>.Filter.And(
@@ -82,6 +87,24 @@ namespace EIMSNext.ApiService
                 ExecutedNodeIds = nodes.Select(x => x.NodeId).Distinct().ToList(),
                 FailedNodeIds = nodes.Where(x => !x.Success).Select(x => x.NodeId).Distinct().ToList(),
             };
+        }
+
+        private void EnsureCanManageDataflow(string dataflowId)
+        {
+            var definition = Resolver.GetService<Wf_Definition>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.Id == dataflowId &&
+                    x.FlowType == FlowType.Dataflow)
+                .FirstOrDefault();
+
+            if (definition == null)
+            {
+                throw new BadRequestException("智能助手不存在");
+            }
+
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(definition.AppId);
         }
     }
 
