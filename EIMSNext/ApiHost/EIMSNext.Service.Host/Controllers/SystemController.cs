@@ -25,6 +25,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
         private IClientApiService ClientApiService => Resolver.Resolve<IClientApiService>();
@@ -119,6 +120,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost("UpdateSecret")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> UpdateClientSecret(UpdateSecretRequest req)
         {
             if (string.IsNullOrWhiteSpace(req.ClientId)) return NotFound();
@@ -148,6 +150,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("ReloadPlugin")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
         public async Task<IActionResult> ReloadPlugin(CancellationToken cancellationToken)
         {
             var pluginRuntimeManager = Resolver.Resolve<IPluginRuntimeManager>();
@@ -156,12 +159,14 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("PluginInstalls")]
+        [IdentityType(IdentityTypeDefaults.AppAdmin)]
         public IActionResult GetPluginInstalls()
         {
             return ApiResult.Success(PluginStoreApiService.GetPluginInstalls()).ToActionResult();
         }
 
         [HttpPost("PluginInstalls/{id}/Enable")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> EnablePluginInstall(string id)
         {
             var entity = await PluginStoreApiService.EnablePluginInstallAsync(id);
@@ -173,6 +178,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("PluginInstalls/{id}/Disable")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> DisablePluginInstall(string id)
         {
             var entity = await PluginStoreApiService.DisablePluginInstallAsync(id);
@@ -184,6 +190,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpDelete("PluginInstalls/{id}")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> DeletePluginInstall(string id)
         {
             var entity = await PluginStoreApiService.DeletePluginInstallAsync(id);
@@ -213,6 +220,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("pluginstore/{id}/install")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> InstallPlugin(string id)
         {
             var result = await PluginStoreApiService.InstallPluginAsync(id);

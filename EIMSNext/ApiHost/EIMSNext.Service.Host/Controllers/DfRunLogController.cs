@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiService;
+using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,6 +11,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// 数据流运行日志聚合接口。
     /// </summary>
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class DfRunLogController(IResolver resolver) : MefControllerBase(resolver)
     {
         private DfRunLogApiService RunLogApiService => Resolver.Resolve<DfRunLogApiService>();

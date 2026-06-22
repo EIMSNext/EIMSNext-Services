@@ -66,12 +66,17 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 无企业用户
         /// </summary>
-        NoCorp = 248,
+        NoCorp = 128,
 
         /// <summary>
-        /// 匿名用户
+        /// 平台管理员
         /// </summary>
-        Anonymous = 32768,
+        PlatAdmin = 256,
+
+        /// <summary>
+        /// 公开访问用户
+        /// </summary>
+        Public = 32768,
 
         /// <summary>
         /// 用户已被禁用

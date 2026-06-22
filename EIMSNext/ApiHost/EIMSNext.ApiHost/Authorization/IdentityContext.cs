@@ -17,12 +17,13 @@ namespace EIMSNext.ApiHost.Authorization
         private bool _retrieved = false;
 
         private IdentityType _type = IdentityType.None;
+        private PublicScope _publicScope = PublicScope.None;
         private IResolver _resolver;
         private User? _user;
         private Employee? _employee;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="resolver"></param>
         public IdentityContext(IResolver resolver)
@@ -32,8 +33,34 @@ namespace EIMSNext.ApiHost.Authorization
             AccessToken = httpContextAccessor.HttpContext?.Request.Headers.Authorization.FirstOrDefault() ?? "";
             var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Id);
             var corpClaim = httpContextAccessor.HttpContext?.User.FindFirst("corp");
+            var identityTypeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.IdentityType);
+            var dashboardIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.DashboardId);
+            var publicTargetIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicTargetId);
+            var publicScopeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicScope);
             CurrentUserID = idClaim?.Value ?? string.Empty;
             CurrentCorpId = corpClaim?.Value ?? string.Empty;
+            CurrentDashboardId = publicTargetIdClaim?.Value ?? dashboardIdClaim?.Value ?? string.Empty;
+            _publicScope = ParsePublicScope(publicScopeClaim?.Value);
+
+            if (string.Equals(identityTypeClaim?.Value, "public", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(CurrentDashboardId))
+            {
+                _type = IdentityType.Public;
+                _user = new User { Id = "public", Name = "public" };
+                _employee = new Employee
+                {
+                    Id = "public",
+                    CorpId = CurrentCorpId,
+                    UserId = "public",
+                    UserName = "public",
+                    Code = "public",
+                    EmpName = "public",
+                    IsDummy = true,
+                    UserBound = true,
+                    Status = EmployeeStatus.Active,
+                };
+                _retrieved = true;
+            }
 
             if (idClaim == null && corpClaim == null)
             {
@@ -59,6 +86,13 @@ namespace EIMSNext.ApiHost.Authorization
             serviceContext.ClientIp = IpHelper.GetClientIp(httpContextAccessor);
         }
 
+        private static PublicScope ParsePublicScope(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return PublicScope.None;
+            if (int.TryParse(value, out var num)) return (PublicScope)num;
+            return PublicScope.None;
+        }
+
         /// <summary>
         /// 当前用户ID
         /// </summary>
@@ -78,7 +112,7 @@ namespace EIMSNext.ApiHost.Authorization
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public IEmployee? CurrentEmployee
         {
@@ -163,6 +197,11 @@ namespace EIMSNext.ApiHost.Authorization
         public string CurrentCorpId { get; private set; }
 
         /// <summary>
+        /// 当前公开访问仪表盘ID
+        /// </summary>
+        public string CurrentDashboardId { get; private set; } = string.Empty;
+
+        /// <summary>
         /// 当前应用Id
         /// </summary>
         public string? CurrentAppId { get; private set; }
@@ -180,5 +219,10 @@ namespace EIMSNext.ApiHost.Authorization
         /// 当前用户对资源的访问范围
         /// </summary>
         public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.NotSet;
+
+        /// <summary>
+        /// 公开访问 scope（仅 Public 身份有效）
+        /// </summary>
+        public PublicScope PublicScope => _publicScope;
     }
 }

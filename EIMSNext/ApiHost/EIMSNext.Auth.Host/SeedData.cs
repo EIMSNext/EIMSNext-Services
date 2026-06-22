@@ -15,7 +15,8 @@ namespace EIMSNext.Auth.Host
                     [
                         new Auth.Entities.ClientGrantType { GrantType = "password" },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.VerificationCode },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn },
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Public }
                     ],
                     AllowedScopes =
                     [

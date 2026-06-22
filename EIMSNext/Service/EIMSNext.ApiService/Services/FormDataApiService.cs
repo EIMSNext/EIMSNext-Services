@@ -110,6 +110,17 @@ namespace EIMSNext.ApiService
         public async Task<FormDataFilterOptionsResponse> GetFilterOptionsAsync(FormDataFilterOptionsRequest request)
         {
             var filter = BuildBaseFilter(request);
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanQueryFormData(request.FormId) && !validator.CanReadDashboardForm(request.FormId))
+                {
+                    return new FormDataFilterOptionsResponse { Items = [] };
+                }
+
+                filter = validator.ApplyFormDataScope(request.FormId, request.Filter);
+            }
+
             var field = DynamicField.FormatFieldForFilter($"data.{request.Field}", request.FieldType);
             var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 200);
 

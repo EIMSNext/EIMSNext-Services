@@ -4,6 +4,7 @@ using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
+using EIMSNext.Service.Host.Authorization;
 
 using HKH.Mef2.Integration;
 
@@ -12,6 +13,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EIMSNext.Service.Host.Controllers
 {
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class WorkbenchController(IResolver resolver) : MefControllerBase(resolver)
     {
         private readonly WorkbenchQueryApiService _workbenchQueryApiService = resolver.Resolve<WorkbenchQueryApiService>();

@@ -73,6 +73,8 @@ namespace EIMSNext.ApiService
         public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            var existing = CoreService.Get(entity.Id);
+            PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 

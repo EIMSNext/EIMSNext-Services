@@ -166,6 +166,17 @@ namespace EIMSNext.Auth.Tests
                 return Task.CompletedTask;
             }
 
+            public Task UpdateClient(Client entity)
+            {
+                var index = _clients.FindIndex(x => x.Id == entity.Id);
+                if (index >= 0)
+                {
+                    _clients[index] = entity;
+                }
+
+                return Task.CompletedTask;
+            }
+
             public Task AddUser(User entity)
             {
                 if (string.IsNullOrWhiteSpace(entity.Id))

@@ -75,13 +75,7 @@ namespace EIMSNext.Service
 
                 updated.ForEach(e =>
                 {
-                    var needsPublicToken = e.PublicEnabled && string.IsNullOrWhiteSpace(e.PublicToken);
                     PrepareEntity(e);
-                    if (needsPublicToken)
-                    {
-                        dashboardRepo.Replace(e, session);
-                    }
-
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
@@ -130,11 +124,6 @@ namespace EIMSNext.Service
             }
 
             entity.PublishMembers ??= [];
-
-            if (entity.PublicEnabled && string.IsNullOrWhiteSpace(entity.PublicToken))
-            {
-                entity.PublicToken = Guid.NewGuid().ToString("N");
-            }
         }
     }
 }

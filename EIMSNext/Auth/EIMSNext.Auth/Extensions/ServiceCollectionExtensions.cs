@@ -1,5 +1,6 @@
 using System.Security.Cryptography.X509Certificates;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Persistence;
 using EIMSNext.Auth.Services;
 using EIMSNext.MongoDb;
@@ -17,14 +18,18 @@ namespace EIMSNext.Auth.Extensions
         public static IServiceCollection AddAuthServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
             services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
+            services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
             services.AddScoped<IAuthDbContext, AuthDbContext>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IPublicTokenService, PublicTokenService>();
+            services.AddScoped<PublicSettingLookupService>();
             services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             services.AddScoped<ISingleSignOnService, SingleSignOnService>();
             services.AddScoped<IAuditLoginService, AuditLoginService>();
             services.AddScoped<ITokenGrantHandler, PasswordTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, VerificationCodeTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, PublicTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
             var certificatePath = Path.Combine(contentRootPath, configuration.GetSection("Certificates:CerPath").Value!);
@@ -43,6 +48,7 @@ namespace EIMSNext.Auth.Extensions
                     options.AllowPasswordFlow();
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SingleSignOn);
+                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Public);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();

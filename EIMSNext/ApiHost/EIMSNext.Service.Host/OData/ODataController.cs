@@ -34,6 +34,7 @@ namespace EIMSNext.Service.Host.OData
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="V"></typeparam>
     [Authorize]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public abstract class ReadOnlyODataController<S, T, V> : ODataController
         where S : class, IApiService<T, V>
         where T : class, IMongoEntity

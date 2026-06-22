@@ -2,6 +2,7 @@ using Asp.Versioning;
 
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Service.Contracts;
@@ -9,7 +10,6 @@ using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Reflection;
-using EIMSNext.ApiService.RequestModels;
 
 namespace EIMSNext.Service.Host.Controllers
 {
@@ -20,7 +20,6 @@ namespace EIMSNext.Service.Host.Controllers
     public class OpenController(IResolver resolver) : ControllerBase
     {
         private readonly AppStoreApiService _appStoreApiService = resolver.Resolve<AppStoreApiService>();
-        private readonly DashboardPublicApiService _dashboardPublicApiService = resolver.Resolve<DashboardPublicApiService>();
         private readonly IAppInstallService _appInstallService = resolver.Resolve<IAppInstallService>();
 
         /// <summary>
@@ -64,56 +63,36 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpGet("api/v{version:apiVersion}/open/dashboard/{token}")]
         public IActionResult GetDashboard(string token)
         {
-            var payload = _dashboardPublicApiService.GetDashboard(token);
-            if (payload == null)
-            {
-                return NotFound();
-            }
-
-            return ApiResult.Success(payload).ToActionResult();
+            return DashboardPublicApiGone();
         }
 
         [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/chart")]
-        public async Task<IActionResult> CalculateChart(string token, [FromBody] AggCalcRequest request, [FromQuery] string itemId)
+        public IActionResult CalculateChart(string token)
         {
-            var result = await _dashboardPublicApiService.CalculateChart(token, itemId, request);
-            if (result == null)
-            {
-                return NotFound();
-            }
-
-            return ApiResult.Success(result).ToActionResult();
+            return DashboardPublicApiGone();
         }
 
         [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/data/count")]
-        public IActionResult CountData(string token, [FromBody] DashboardPublicDataRequest request)
+        public IActionResult CountData(string token)
         {
-            var count = _dashboardPublicApiService.CountData(token, request);
-            return count == null ? NotFound() : Ok(count.Value);
+            return DashboardPublicApiGone();
         }
 
         [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/data/query")]
-        public IActionResult QueryData(string token, [FromBody] DashboardPublicDataRequest request)
+        public IActionResult QueryData(string token)
         {
-            var result = _dashboardPublicApiService.QueryData(token, request);
-            if (result == null)
-            {
-                return NotFound();
-            }
-
-            return Ok(new { value = result });
+            return DashboardPublicApiGone();
         }
 
         [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/filter/options")]
-        public async Task<IActionResult> GetFilterOptions(string token, [FromBody] DashboardPublicFilterOptionsRequest request)
+        public IActionResult GetFilterOptions(string token)
         {
-            var result = await _dashboardPublicApiService.GetFilterOptions(token, request);
-            if (result == null)
-            {
-                return NotFound();
-            }
+            return DashboardPublicApiGone();
+        }
 
-            return Ok(result);
+        private IActionResult DashboardPublicApiGone()
+        {
+            return StatusCode(StatusCodes.Status410Gone, "公开仪表盘匿名接口已关闭，请通过 public/token 获取 Public 身份后访问普通接口。");
         }
     }
 }

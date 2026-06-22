@@ -10,6 +10,7 @@ using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
+using EIMSNext.Service.Host.Authorization;
 
 using HKH.Mef2.Integration;
 
@@ -25,6 +26,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="Q"></typeparam>
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public abstract class MefControllerBase<S, T, Q> : MefControllerBase
         where S : class, IApiService<T, Q>
         where T : class, IEntity

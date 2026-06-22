@@ -5,6 +5,7 @@ using EIMSNext.ApiService;
 using EIMSNext.Common;
 using EIMSNext.Component;
 using EIMSNext.Print.Abstractions;
+using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
@@ -18,6 +19,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param> 
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class CustomPrintController(IResolver resolver) : MefControllerBase(resolver)
     {
         [HttpPost("Preview")]

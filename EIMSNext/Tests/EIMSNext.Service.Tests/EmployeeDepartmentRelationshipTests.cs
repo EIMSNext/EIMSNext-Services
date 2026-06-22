@@ -232,8 +232,10 @@ namespace EIMSNext.Service.Tests
             public IUser? CurrentUser => null;
             public IEmployee? CurrentEmployee => null;
             public IdentityType IdentityType => IdentityType.CorpAdmin;
+            public PublicScope PublicScope => PublicScope.None;
             public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.Allow;
             public string CurrentCorpId => corpId;
+            public string CurrentDashboardId => string.Empty;
             public string AccessToken => string.Empty;
         }
 

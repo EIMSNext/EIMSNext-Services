@@ -13,6 +13,10 @@ namespace EIMSNext.ApiService
 
         string CurrentCorpId { get; }
 
+        string CurrentDashboardId { get; }
+
         string AccessToken { get; }
+
+        PublicScope PublicScope { get; }
     }
 }

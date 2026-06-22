@@ -13,5 +13,6 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
   </ItemGroup>
 </Project>

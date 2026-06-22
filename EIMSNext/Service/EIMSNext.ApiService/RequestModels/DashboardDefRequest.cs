@@ -42,14 +42,5 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public List<Member> PublishMembers { get; set; } = [];
 
-        /// <summary>
-        /// 是否公开发布
-        /// </summary>
-        public bool PublicEnabled { get; set; }
-
-        /// <summary>
-        /// 公开访问Token
-        /// </summary>
-        public string PublicToken { get; set; } = string.Empty;
     }
 }

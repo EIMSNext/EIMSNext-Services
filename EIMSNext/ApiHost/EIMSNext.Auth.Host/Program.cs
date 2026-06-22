@@ -65,11 +65,39 @@ app.Run();
 
 void EnsureSeedData(IAuthDbContext context)
 {
+    var seedClients = SeedData.GetClients().ToList();
     if (!context.Clients.Any())
     {
-        foreach (var client in SeedData.GetClients().ToList())
+        foreach (var client in seedClients)
         {
             context.AddClient(client);
+        }
+    }
+    else
+    {
+        foreach (var seedClient in seedClients)
+        {
+            var client = context.Clients.FirstOrDefault(x => x.Id == seedClient.Id);
+            if (client == null)
+            {
+                context.AddClient(seedClient).GetAwaiter().GetResult();
+                continue;
+            }
+
+            var changed = false;
+            foreach (var grantType in seedClient.AllowedGrantTypes)
+            {
+                if (!client.AllowedGrantTypes.Any(x => x.GrantType == grantType.GrantType))
+                {
+                    client.AllowedGrantTypes.Add(grantType);
+                    changed = true;
+                }
+            }
+
+            if (changed)
+            {
+                context.UpdateClient(client).GetAwaiter().GetResult();
+            }
         }
     }
 
