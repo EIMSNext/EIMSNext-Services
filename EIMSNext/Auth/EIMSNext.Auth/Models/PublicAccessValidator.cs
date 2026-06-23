@@ -1,5 +1,7 @@
 using EIMSNext.ApiService;
 using EIMSNext.Common;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EIMSNext.Auth.Models
 {
@@ -62,14 +64,29 @@ namespace EIMSNext.Auth.Models
 
             if (section!.AccessCodeEnabled)
             {
-                if (string.IsNullOrEmpty(section.AccessCodeHash) || string.IsNullOrEmpty(password))
+                if (string.IsNullOrWhiteSpace(section.AccessCodeHash) || string.IsNullOrEmpty(password))
                 {
                     return false;
                 }
-                return string.Equals(password, section.AccessCodeHash, StringComparison.OrdinalIgnoreCase);
+
+                return FixedTimeEquals(HashAccessCode(password), section.AccessCodeHash);
             }
 
             return PublicPasswordHelper.ValidateChallenge(targetId, secretKey, password ?? string.Empty, timestampWindowMs);
+        }
+
+        private static string HashAccessCode(string accessCode)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(accessCode));
+            return Convert.ToHexString(hash).ToLowerInvariant();
+        }
+
+        private static bool FixedTimeEquals(string left, string right)
+        {
+            var leftBytes = Encoding.UTF8.GetBytes(left.Trim().ToLowerInvariant());
+            var rightBytes = Encoding.UTF8.GetBytes(right.Trim().ToLowerInvariant());
+            return leftBytes.Length == rightBytes.Length &&
+                   CryptographicOperations.FixedTimeEquals(leftBytes, rightBytes);
         }
     }
 }

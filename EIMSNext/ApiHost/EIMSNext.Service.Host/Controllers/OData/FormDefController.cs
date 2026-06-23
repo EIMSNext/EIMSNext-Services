@@ -1,15 +1,16 @@
 using Asp.Versioning;
 
-using HKH.Mef2.Integration;
-using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
-using EIMSNext.Core;
+using EIMSNext.Service.Host.Authorization;
+using EIMSNext.Service.Host.OData;
+
+using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
-using EIMSNext.Service.Host.Authorization;
 
 namespace EIMSNext.Service.Host.Controllers.OData
 {
@@ -22,14 +23,14 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class FormDefController(IResolver resolver) : ODataController<FormDefApiService, FormDef, FormDefViewModel, FormDefRequest>(resolver)
     {
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.DashLink)]
+        [PublicScope(PublicScope.DashLink | PublicScope.FormLink | PublicScope.DataLink | PublicScope.QueryLink)]
         public override IActionResult Get(ODataQueryOptions<FormDefViewModel> options)
         {
             return base.Get(options);
         }
 
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.DashLink)]
+        [PublicScope(PublicScope.DashLink | PublicScope.FormLink | PublicScope.DataLink | PublicScope.QueryLink)]
         public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<FormDefViewModel> options)
         {
             if (IdentityContext.IdentityType == IdentityType.Public && !Resolver.Resolve<IPublicAccessValidator>().CanReadFormDefinition(key))

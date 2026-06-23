@@ -1,6 +1,8 @@
 using EIMSNext.ApiService;
 using EIMSNext.Auth.Models;
 using EIMSNext.Common;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EIMSNext.Auth.Tests
 {
@@ -186,8 +188,14 @@ namespace EIMSNext.Auth.Tests
             {
                 Enabled = enabled,
                 AccessCodeEnabled = accessCodeEnabled,
-                AccessCodeHash = accessCodeHash
+                AccessCodeHash = string.IsNullOrEmpty(accessCodeHash) ? string.Empty : HashAccessCode(accessCodeHash)
             };
+        }
+
+        private static string HashAccessCode(string accessCode)
+        {
+            var hash = SHA256.HashData(Encoding.UTF8.GetBytes(accessCode));
+            return Convert.ToHexString(hash).ToLowerInvariant();
         }
     }
 }
