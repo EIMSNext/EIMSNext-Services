@@ -16,6 +16,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.CorpAdmin)]
 	public class AdminGroupController(IResolver resolver) : ApiControllerBase<AdminGroupApiService, AdminGroup, AdminGroupViewModel>(resolver)
 	{
         [HttpPost("Move")]

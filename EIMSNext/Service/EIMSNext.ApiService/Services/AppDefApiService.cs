@@ -147,13 +147,13 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("应用ID不能为空");
             }
 
-            if (!AppMenuHelper.ValidateTree(request.AppMenus))
+            if (!AppMenuHelper.ValidateTree(request.AppMenus ?? []))
             {
                 throw new BadRequestException("分组内不能再包含分组");
             }
 
             var app = await GetManageableAppAsync(request.AppId);
-            app.AppMenus = AppMenuHelper.Normalize(request.AppMenus ?? []);
+            app.AppMenus = RebuildSortableMenuTree(request.AppMenus ?? [], app.AppMenus ?? []);
             await CoreService.ReplaceAsync(app);
             return app;
         }
@@ -220,6 +220,75 @@ namespace EIMSNext.ApiService
                     throw new BadRequestException("应用首页入口必须指向当前应用菜单中的仪表盘");
                 }
             }
+        }
+
+        private static List<AppMenu> RebuildSortableMenuTree(List<AppMenu> submittedMenus, List<AppMenu> existingMenus)
+        {
+            var existingFlat = AppMenuHelper.Flatten(existingMenus).ToList();
+            var existingIds = existingFlat
+                .Where(x => !string.IsNullOrWhiteSpace(x.MenuId))
+                .Select(x => x.MenuId)
+                .ToList();
+            var submittedFlat = AppMenuHelper.Flatten(submittedMenus).ToList();
+            var submittedIds = submittedFlat
+                .Where(x => !string.IsNullOrWhiteSpace(x.MenuId))
+                .Select(x => x.MenuId)
+                .ToList();
+
+            if (existingFlat.Any(x => string.IsNullOrWhiteSpace(x.MenuId)) ||
+                existingIds.Count != existingFlat.Count ||
+                existingIds.Count != existingIds.Distinct().Count())
+            {
+                throw new BadRequestException("当前应用菜单包含无效数据");
+            }
+
+            if (submittedFlat.Any(x => string.IsNullOrWhiteSpace(x.MenuId)) || submittedIds.Count != submittedFlat.Count)
+            {
+                throw new BadRequestException("菜单包含无效数据");
+            }
+
+            if (submittedIds.Count != submittedIds.Distinct().Count())
+            {
+                throw new BadRequestException("菜单包含重复数据");
+            }
+
+            var existingIdSet = existingIds.ToHashSet();
+            var submittedIdSet = submittedIds.ToHashSet();
+            if (submittedIdSet.Any(x => !existingIdSet.Contains(x)) || existingIdSet.Any(x => !submittedIdSet.Contains(x)))
+            {
+                throw new BadRequestException("菜单数据与当前应用不一致");
+            }
+
+            var existingById = existingFlat.ToDictionary(x => x.MenuId, x => x);
+            foreach (var submitted in submittedFlat)
+            {
+                if (existingById[submitted.MenuId].MenuType != submitted.MenuType)
+                {
+                    throw new BadRequestException("菜单类型不能修改");
+                }
+            }
+
+            return AppMenuHelper.Normalize(CloneSortableMenuTree(submittedMenus, existingById));
+        }
+
+        private static List<AppMenu> CloneSortableMenuTree(IEnumerable<AppMenu> submittedMenus, Dictionary<string, AppMenu> existingById)
+        {
+            return submittedMenus.Select(submitted =>
+            {
+                var existing = existingById[submitted.MenuId];
+                return new AppMenu
+                {
+                    MenuId = existing.MenuId,
+                    Title = existing.Title,
+                    Icon = existing.Icon,
+                    IconColor = existing.IconColor,
+                    MenuType = existing.MenuType,
+                    SortIndex = existing.SortIndex,
+                    SubMenus = existing.MenuType == FormType.Group
+                        ? CloneSortableMenuTree(submitted.SubMenus ?? [], existingById)
+                        : null,
+                };
+            }).ToList();
         }
     }
 }

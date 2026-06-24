@@ -6,6 +6,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -18,6 +19,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.CorpAdmin)]
 	public class AdminGroupController(IResolver resolver) : ODataController<AdminGroupApiService, AdminGroup, AdminGroupViewModel, AdminGroupRequest>(resolver)
 	{
         public override async Task<ActionResult> Post([FromBody] AdminGroupRequest model)
