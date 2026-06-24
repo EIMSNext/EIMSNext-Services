@@ -28,6 +28,7 @@ namespace EIMSNext.ApiService
         {
             Resolver.GetRepository<Employee>().EnsureId(entity);
             var relations = BuildEmployeeDepartments(entity, departments);
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, null, relations.Select(x => x.DepartmentId));
 
             await AddAsync(entity);
             await ReplaceEmployeeDepartmentsAsync(entity.Id, relations);
@@ -41,6 +42,7 @@ namespace EIMSNext.ApiService
                 relations = BuildEmployeeDepartments(entity, departments);
             }
 
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, original: null, relations?.Select(x => x.DepartmentId));
             var result = await ReplaceAsync(entity);
 
             if (syncDepartments)
@@ -145,8 +147,6 @@ namespace EIMSNext.ApiService
 
         protected override async Task AddAsyncCore(Employee entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity);
-
             var platform = GetCurrentCorpPlatform();
             if (platform == PlatformType.Private)
             {
