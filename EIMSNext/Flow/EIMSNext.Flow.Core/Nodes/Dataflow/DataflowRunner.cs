@@ -56,56 +56,178 @@ namespace EIMSNext.Flow.Core.Nodes
                 return execResult;
             }
 
-            var dataflow = _resolver.Resolve<IRepository<Wf_Definition>>().Find(x => x.CorpId == paramter.Data.CorpId && x.FlowType == FlowType.Dataflow
-               && x.EventSource == paramter.EventSource && paramter.Data.FormId.Equals(x.SourceId) && x.EventSetting != null && x.EventSetting.EventType.HasFlag(paramter.EventType)).FirstOrDefault();
+            var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
+            var candidates = repository.Find(x => x.CorpId == paramter.Data.CorpId
+                && x.FlowType == FlowType.Dataflow
+                && !x.DeleteFlag
+                && !x.Disabled
+                && x.EventSetting != null
+                && x.EventSource == paramter.EventSource).ToList();
 
-            if (dataflow != null && (paramter.Cascade == CascadeMode.NotSet || paramter.Cascade == CascadeMode.All || (!string.IsNullOrEmpty(paramter.EventIds) && paramter.EventIds.Contains($",{dataflow.Id},"))))
+            if (!string.IsNullOrEmpty(paramter.DataflowId))
             {
-                if (!IsMeet(dataflow, paramter.Data))
-                    return execResult;
+                candidates = candidates.Where(x => x.Id == paramter.DataflowId).ToList();
+            }
 
-                var runLogRepository = _resolver.Resolve<IRepository<Df_RunLog>>();
-                var startTime = DateTime.UtcNow.ToTimeStampMs();
-                var runLog = CreateRunLog(dataflow, paramter, startTime);
-                try
-                {
-                    runLogRepository.Insert(runLog);
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "写入数据流运行日志失败。DataflowId={DataflowId}", dataflow.Id);
-                    runLog = null;
-                }
+            foreach (var dataflow in candidates.Where(x => IsRunnableDataflow(x, paramter)))
+            {
+                var result = await RunSingleAsync(dataflow, paramter);
+                execResult.DfInstance = result.DfInstance ?? execResult.DfInstance;
 
-                 var ctx = new DfDataContext()
-                 {
-                     CorpId = paramter.Data.CorpId ?? "",
-                     UserId = paramter.UserId,
-                     AccessToken = paramter.AccessToken,
-                     AppId = paramter.Data.AppId,
-                     DataflowId = dataflow.Id,
-                     RunLogId = runLog?.Id ?? string.Empty,
-                     FormId = paramter.Data.FormId,
-                     DataId = paramter.Data.Id,
-                     TriggerData = paramter.Data,
-                     WfStarter = paramter.Starter,
-                     DfCascade = dataflow.EventSetting!.CascadeMode,
-                     EventIds = dataflow.EventSetting.SpecifiedEvents
-                 };
+                if (!result.Success)
+                {
+                    execResult.Error = string.IsNullOrEmpty(execResult.Error)
+                        ? result.Error
+                        : $"{execResult.Error}; {result.Error}";
+                }
+            }
 
-                try
-                {
-                    var dfInst = await SyncWfRunner.RunWorkflowSync(dataflow.ExternalId, 1, ctx, "", CancellationToken.None, false);
-                    var dfDataContext = dfInst.Data as DfDataContext;
-                    execResult.DfInstance = dfInst;
-                    execResult.Error = dfDataContext?.ErrMsg;
-                    UpdateRunLog(runLogRepository, runLog, dfInst.Id, string.IsNullOrEmpty(execResult.Error), execResult.Error);
-                }
-                catch (Exception ex)
-                {
-                    execResult.Error = ex.Message;
-                    UpdateRunLog(runLogRepository, runLog, string.Empty, false, ex.Message);
-                }
+            return execResult;
+        }
+
+        private bool IsRunnableDataflow(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            if (!IsCascadeAllowed(dataflow, paramter))
+            {
+                return false;
+            }
+
+            if (!IsSourceMatched(dataflow, paramter))
+            {
+                return false;
+            }
+
+            if (!IsEventMatched(dataflow, paramter))
+            {
+                return false;
+            }
+
+            var setting = dataflow.EventSetting!;
+            if (!string.IsNullOrEmpty(setting.WfNodeId)
+                && !string.Equals(setting.WfNodeId, paramter.WfNodeId, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrEmpty(setting.NodeAction)
+                && !string.Equals(setting.NodeAction, paramter.NodeAction, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            if (!IsChangeFieldsMatched(dataflow, paramter))
+            {
+                return false;
+            }
+
+            return IsMeet(dataflow, paramter.Data);
+        }
+
+        private static bool IsCascadeAllowed(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            return paramter.Cascade == CascadeMode.NotSet
+                || paramter.Cascade == CascadeMode.All
+                || IsSpecified(paramter.EventIds, dataflow.Id);
+        }
+
+        private static bool IsSourceMatched(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            return string.IsNullOrEmpty(dataflow.SourceId)
+                || string.Equals(paramter.Data.FormId, dataflow.SourceId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static bool IsEventMatched(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            var configured = dataflow.EventSetting!.EventType;
+            return paramter.EventType == EventType.None
+                ? configured == EventType.None
+                : configured.HasFlag(paramter.EventType);
+        }
+
+        private static bool IsChangeFieldsMatched(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            if (paramter.EventType != EventType.Modified)
+            {
+                return true;
+            }
+
+            var configured = dataflow.Metadata.Steps
+                .FirstOrDefault()?
+                .DfNodeSetting?
+                .TriggerSetting?
+                .ChangeFields;
+
+            if (configured == null || configured.Count == 0)
+            {
+                return true;
+            }
+
+            if (paramter.ChangeFields == null || paramter.ChangeFields.Count == 0)
+            {
+                return false;
+            }
+
+            return configured
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Intersect(paramter.ChangeFields, StringComparer.OrdinalIgnoreCase)
+                .Any();
+        }
+
+        private static bool IsSpecified(string? eventIds, string dataflowId)
+        {
+            if (string.IsNullOrWhiteSpace(eventIds))
+            {
+                return false;
+            }
+
+            return eventIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Contains(dataflowId, StringComparer.OrdinalIgnoreCase);
+        }
+
+        private async Task<DfExecResult> RunSingleAsync(Wf_Definition dataflow, DfRunParamter paramter)
+        {
+            var execResult = new DfExecResult();
+            var runLogRepository = _resolver.Resolve<IRepository<Df_RunLog>>();
+            var startTime = DateTime.UtcNow.ToTimeStampMs();
+            var runLog = CreateRunLog(dataflow, paramter, startTime);
+            try
+            {
+                runLogRepository.Insert(runLog);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "写入数据流运行日志失败。DataflowId={DataflowId}", dataflow.Id);
+                runLog = null;
+            }
+
+            var ctx = new DfDataContext()
+            {
+                CorpId = paramter.Data.CorpId ?? "",
+                UserId = paramter.UserId,
+                AccessToken = paramter.AccessToken,
+                AppId = paramter.Data.AppId,
+                DataflowId = dataflow.Id,
+                RunLogId = runLog?.Id ?? string.Empty,
+                FormId = paramter.Data.FormId,
+                DataId = paramter.Data.Id,
+                TriggerData = paramter.Data,
+                WfStarter = paramter.Starter,
+                DfCascade = dataflow.EventSetting!.CascadeMode,
+                EventIds = dataflow.EventSetting.SpecifiedEvents
+            };
+
+            try
+            {
+                var dfInst = await SyncWfRunner.RunWorkflowSync(dataflow.ExternalId, 1, ctx, "", CancellationToken.None, false);
+                var dfDataContext = dfInst.Data as DfDataContext;
+                execResult.DfInstance = dfInst;
+                execResult.Error = dfDataContext?.ErrMsg;
+                UpdateRunLog(runLogRepository, runLog, dfInst.Id, string.IsNullOrEmpty(execResult.Error), execResult.Error);
+            }
+            catch (Exception ex)
+            {
+                execResult.Error = ex.Message;
+                UpdateRunLog(runLogRepository, runLog, string.Empty, false, ex.Message);
             }
 
             return execResult;

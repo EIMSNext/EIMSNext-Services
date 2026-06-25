@@ -24,7 +24,11 @@ namespace EIMSNext.Flow.Core.Nodes
             List<ActionFormData>? toRemoves = null;
             if (updateSetting.DeleteMode == UpdateMode.Node)
             {
-                toRemoves = dataContext.NodeDatas.FirstOrDefault(x => x.Key == updateSetting.NodeId).Value.ActionDatas.ToList();
+                toRemoves = dataContext.NodeDatas.TryGetValue(updateSetting.NodeId ?? string.Empty, out var nodeData)
+                    ? nodeData.ActionDatas
+                        .Select(x => new ActionFormData { State = DataState.Removed, FormData = x.FormData })
+                        .ToList()
+                    : new List<ActionFormData>();
             }
             else if (updateSetting.DeleteMode == UpdateMode.Form)
             {

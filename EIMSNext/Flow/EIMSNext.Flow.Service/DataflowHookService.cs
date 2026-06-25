@@ -257,7 +257,8 @@ namespace EIMSNext.Flow.Service
                 Data = ToExpando(requestContext),
             };
 
-            return _dataflowRunner.RunAsync(new DfRunParamter(string.Empty, string.Empty, data, EventSourceType.Http, EventType.None, string.Empty, null, CascadeMode.All, null));
+            return _dataflowRunner.RunAsync(new DfRunParamter(string.Empty, string.Empty, data, EventSourceType.Http, EventType.None, string.Empty, null, CascadeMode.All, null)
+                .WithDataflowId(definition.Id));
         }
 
         private static ExpandoObject ToExpando(DataflowHttpRequestContext requestContext)

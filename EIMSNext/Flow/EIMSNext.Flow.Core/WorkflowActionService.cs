@@ -215,14 +215,13 @@ namespace EIMSNext.Flow.Core
                 Rel = "and",
                 Items = [
                     new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = workflowInstance.Id },
-                    new DynamicFilter { Field = "ApproveNodeId", Op = FilterOp.Eq, Value = todo.ApproveNodeId },
                 ]
             }, scope.SessionHandle);
 
             if (target.NodeType == WfNodeType.Start)
             {
                 workflowInstance.Status = WorkflowStatus.Suspended;
-                ResetWorkflowPointers(workflowInstance, definition);
+                ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
                 _workflowCollection.ReplaceOne(scope.SessionHandle, x => x.Id == workflowInstance.Id, workflowInstance);
                 _subscriptionCollection.DeleteMany(scope.SessionHandle, x => x.WorkflowId == workflowInstance.Id);
                 UpdateFormStatus(todo.DataId, FlowStatus.Draft, scope.SessionHandle);
@@ -230,12 +229,9 @@ namespace EIMSNext.Flow.Core
             else
             {
                 workflowInstance.Status = WorkflowStatus.Runnable;
+                ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
                 _workflowCollection.ReplaceOne(scope.SessionHandle, x => x.Id == workflowInstance.Id, workflowInstance);
-                var targetTodo = await CreateTodoForNodeAsync(workflowInstance, dataContext, target.NodeId, scope.SessionHandle);
-                if (targetTodo == null)
-                {
-                    throw new InvalidOperationException("回退目标节点未生成待办");
-                }
+                _subscriptionCollection.DeleteMany(scope.SessionHandle, x => x.WorkflowId == workflowInstance.Id);
                 UpdateFormStatus(todo.DataId, FlowStatus.Approving, scope.SessionHandle);
             }
 
@@ -558,25 +554,71 @@ namespace EIMSNext.Flow.Core
             return _definitionService.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
         }
 
-        private static void ResetWorkflowPointers(WorkflowInstance wfInst, Wf_Definition? definition)
+        private static void ResetWorkflowPointers(WorkflowInstance wfInst, Wf_Definition? definition, string? targetNodeId = null)
         {
-            var startStep = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Start);
-            if (startStep == null)
+            var target = FindWorkflowCoreStep(definition?.Metadata?.Steps, targetNodeId);
+            if (target == null)
             {
-                throw new InvalidOperationException("流程定义缺少开始节点，无法重置流程实例");
+                throw new InvalidOperationException("流程定义缺少目标节点，无法重置流程实例");
             }
+            var (targetStep, stepId) = target.Value;
 
             wfInst.ExecutionPointers.Clear();
             wfInst.ExecutionPointers.Add(new ExecutionPointer
             {
                 Id = ObjectId.GenerateNewId().ToString(),
-                StepId = 0,
-                StepName = startStep.Name,
+                StepId = stepId,
+                StepName = targetStep.Name,
                 Active = true,
                 Status = PointerStatus.Pending,
                 Children = [],
                 Scope = []
             });
+        }
+
+        private static (WfStep Step, int StepId)? FindWorkflowCoreStep(IEnumerable<WfStep>? source, string? targetNodeId)
+        {
+            if (source == null)
+            {
+                return null;
+            }
+
+            var stack = new Stack<WfStep>(source.Reverse());
+            var stepId = 0;
+            while (stack.Count > 0)
+            {
+                var nextStep = stack.Pop();
+                var isMatch = string.IsNullOrWhiteSpace(targetNodeId)
+                    ? nextStep.NodeType == WfNodeType.Start
+                    : string.Equals(nextStep.Id, targetNodeId, StringComparison.OrdinalIgnoreCase);
+                if (isMatch)
+                {
+                    return (nextStep, stepId);
+                }
+
+                if (nextStep.Work != null)
+                {
+                    foreach (var branch in nextStep.Work)
+                    {
+                        foreach (var child in branch.Reverse<WfStep>())
+                        {
+                            stack.Push(child);
+                        }
+                    }
+                }
+
+                if (nextStep.CompensateWith != null)
+                {
+                    foreach (var child in nextStep.CompensateWith.Reverse<WfStep>())
+                    {
+                        stack.Push(child);
+                    }
+                }
+
+                stepId++;
+            }
+
+            return null;
         }
     }
 }

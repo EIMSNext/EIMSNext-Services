@@ -216,7 +216,7 @@ namespace EIMSNext.Flow.Core.Nodes
             if (rule == WorkflowAutoProcessRule.FirstNodeOnly)
             {
                 var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
-                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId != wfStep.Id;
+                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId == wfStep.Id;
             }
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)

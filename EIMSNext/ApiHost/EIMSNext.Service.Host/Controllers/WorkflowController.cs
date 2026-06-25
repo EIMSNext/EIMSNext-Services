@@ -150,7 +150,8 @@ namespace EIMSNext.Service.Host.Controllers
             if (data != null)
             {
                 var todoService = Resolver.GetService<Wf_Todo>();
-                var todo = todoService.Query(x => x.DataId == request.DataId).FirstOrDefault();
+                var currentEmployeeId = IdentityContext.CurrentEmployee?.Id;
+                var todo = todoService.Query(x => x.DataId == request.DataId && x.EmployeeId == currentEmployeeId).FirstOrDefault();
                 if (todo != null)
                 {
                     var approveReq = new ApproveRequest

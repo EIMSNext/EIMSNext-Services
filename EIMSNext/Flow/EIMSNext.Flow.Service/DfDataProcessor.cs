@@ -63,12 +63,11 @@ namespace EIMSNext.Flow.Service
                     });
                 });
 
-                //TODO: 此处应该调用Service, 以处理业务，待重构
-                if (removed.Any()) { FormDataService.Delete(removed.Select(x => x.Id)); }
-                modified.ForEach(x => { FormDataService.Replace(x); });
+                if (removed.Any()) { FormDataService.Delete(removed.Select(x => x.Id), scope.SessionHandle); }
+                modified.ForEach(x => { FormDataService.Replace(x, scope.SessionHandle); });
                 if (inserted.Any())
                 {
-                    FormDataService.Add(inserted);
+                    FormDataService.Add(inserted, scope.SessionHandle);
                 }
 
                 scope.CommitTransaction();
@@ -99,6 +98,7 @@ namespace EIMSNext.Flow.Service
             ServiceContext.UserId = dataContext.UserId;
             ServiceContext.AccessToken = dataContext.AccessToken;
             ServiceContext.Operator = dataContext.WfStarter ?? Operator.Empty;
+            ServiceContext.Action = DataAction.Dataflow;
         }
     }
 }

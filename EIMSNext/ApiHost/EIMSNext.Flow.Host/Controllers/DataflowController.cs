@@ -54,27 +54,65 @@ namespace EIMSNext.Flow.Host.Controllers
         public async Task<IActionResult> RunAsync(DfRunRequest request)
         {
             if (request.DfCascade == CascadeMode.Never)
-                return ApiResult.Success(new { Id = "", ErrMsg = "" }).ToActionResult();
+                return ApiResult.Success(new { Id = "", Error = "" }).ToActionResult();
 
-            if (string.IsNullOrEmpty(request.DataId))
+            FormData? formData = null;
+            Wf_Definition? dataflow = null;
+
+            if (!string.IsNullOrEmpty(request.DataflowId))
+            {
+                dataflow = _defservice.Get(request.DataflowId);
+                if (dataflow == null || dataflow.FlowType != FlowType.Dataflow || dataflow.DeleteFlag || dataflow.Disabled)
+                {
+                    return BadRequest("数据流定义不存在或已禁用");
+                }
+            }
+
+            if (!string.IsNullOrEmpty(request.DataId))
+            {
+                formData = _formDataservice.Get(request.DataId);
+                if (formData == null)
+                {
+                    return NotFound("数据不存在");
+                }
+            }
+            else if (dataflow != null)
+            {
+                formData = new FormData
+                {
+                    CorpId = dataflow.CorpId,
+                    AppId = dataflow.AppId,
+                    FormId = dataflow.SourceId ?? string.Empty,
+                    Data = new System.Dynamic.ExpandoObject()
+                };
+            }
+            else
             {
                 return BadRequest("数据Id不能为空");
             }
 
-            var formData = _formDataservice.Get(request.DataId);
-            if (formData != null)
+            var runParamter = new DfRunParamter(
+                    IdentityContext.CurrentUserID,
+                    IdentityContext.AccessToken,
+                    formData,
+                    request.EventSource,
+                    request.EventType,
+                    request.WfNodeId,
+                    IdentityContext.CurrentEmployee?.ToOperator(),
+                    request.DfCascade,
+                    request.EventIds)
+                .WithDataflowId(request.DataflowId)
+                .WithNodeAction(request.NodeAction)
+                .WithChangeFields(request.ChangeFields);
+
+            var dfExecResult = await _dataflowRunner.RunAsync(runParamter);
+
+            if (!dfExecResult.Success)
             {
-                var dfExecResult = await _dataflowRunner.RunAsync(new DfRunParamter(IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData, request.EventSource, request.EventType, "", IdentityContext.CurrentEmployee?.ToOperator(), request.DfCascade, request.EventIds));
-
-                if (!dfExecResult.Success)
-                {
-                    return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id, ErrMsg = dfExecResult.Error }).ToActionResult();
-                }
-
-                return ApiResult.Success(new { Id = "", ErrMsg = "" }).ToActionResult();
+                return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id, Error = dfExecResult.Error }).ToActionResult();
             }
 
-            return NotFound("数据不存在");
+            return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id ?? "", Error = "" }).ToActionResult();
         }
 
 #if DEBUG
@@ -130,10 +168,14 @@ namespace EIMSNext.Flow.Host.Controllers
     }
     public class DfRunRequest
     {
+        public string DataflowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
+        public string WfNodeId { get; set; } = string.Empty;
+        public string? NodeAction { get; set; }
         public CascadeMode DfCascade { get; set; }
         public string? EventIds { get; set; }
+        public List<string>? ChangeFields { get; set; }
     }
 }

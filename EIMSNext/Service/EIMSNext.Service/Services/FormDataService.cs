@@ -130,6 +130,11 @@ namespace EIMSNext.Service
             await SubmitAsync(entities, null, EIMSNext.Service.Entities.CascadeMode.NotSet, null);
         }
 
+        public void Add(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        {
+            AddCore(entities, session);
+        }
+
         protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
@@ -143,8 +148,83 @@ namespace EIMSNext.Service
 
         public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
         {
+            var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
+            if (old == null && ShouldTriggerFormDataChangeDataflow())
+            {
+                old = Get(entity.Id);
+                if (old != null)
+                {
+                    ScopeCache.Set(entity.Id, old.DeepClone(), DataVersion.Old);
+                }
+            }
+
+            var changeFields = old == null
+                ? []
+                : ExpandoComparer.Compare(old.Data, entity.Data)
+                    .Select(x => x.FieldId)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
             var result = await base.ReplaceAsync(entity);
             await SubmitAsync([entity], null, EIMSNext.Service.Entities.CascadeMode.NotSet, null);
+
+            if (ShouldTriggerFormDataChangeDataflow() && changeFields.Count > 0)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Modified, EIMSNext.Service.Entities.CascadeMode.NotSet, null, changeFields);
+            }
+
+            return result;
+        }
+
+        public ReplaceOneResult Replace(FormData entity, IClientSessionHandle? session)
+        {
+            return ReplaceCore(entity, session);
+        }
+
+        public object Delete(IEnumerable<string> ids, IClientSessionHandle? session)
+        {
+            return DeleteCore(FilterBuilder.In(x => x.Id, ids), session);
+        }
+
+        public override Task<object> DeleteAsync(string id)
+        {
+            return DeleteAsync([id]);
+        }
+
+        public override async Task<object> DeleteAsync(IEnumerable<string> ids)
+        {
+            var idList = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var deleting = ShouldTriggerFormDataChangeDataflow() && idList.Count > 0
+                ? Find(x => idList.Contains(x.Id)).ToList()
+                : [];
+
+            var result = await base.DeleteAsync(idList);
+
+            foreach (var entity in deleting)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+            }
+
+            return result;
+        }
+
+        public override async Task<object> DeleteAsync(DynamicFilter filter)
+        {
+            var deleting = ShouldTriggerFormDataChangeDataflow()
+                ? Repository.Collection.Find(filter.ToFilterDefinition<FormData>()).ToList()
+                : [];
+
+            var result = await base.DeleteAsync(filter);
+
+            foreach (var entity in deleting)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+            }
+
             return result;
         }
 
@@ -231,16 +311,43 @@ namespace EIMSNext.Service
                 }
                 else
                 {
-                    if (cascade != EIMSNext.Service.Entities.CascadeMode.Never)
-                    {
-                        //非流程单据直接提交
-                        var dfResp = await _flowClient.RunDataflow(new DfRunRequest { DataId = entity.Id, EventSource = ApiClient.Flow.EventSourceType.Form, EventType = ApiClient.Flow.EventType.Submit }, Context.AccessToken);
-                        if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
-                        {
-                            throw new UnLogException(dfResp.Error);
-                        }
-                    }
+                    await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
                 }
+            }
+        }
+
+        private bool ShouldTriggerFormDataChangeDataflow()
+        {
+            return Context.Action == DataAction.None || Context.Action == DataAction.Save;
+        }
+
+        private async Task RunFormDataflowAsync(
+            FormData entity,
+            ApiClient.Flow.EventType eventType,
+            EIMSNext.Service.Entities.CascadeMode cascade,
+            string? eventIds,
+            IEnumerable<string>? changeFields)
+        {
+            if (cascade == EIMSNext.Service.Entities.CascadeMode.Never)
+            {
+                return;
+            }
+
+            var dfResp = await _flowClient.RunDataflow(new DfRunRequest
+            {
+                DataId = entity.Id,
+                EventSource = ApiClient.Flow.EventSourceType.Form,
+                EventType = eventType,
+                DfCascade = (ApiClient.Flow.CascadeMode)cascade,
+                EventIds = eventIds,
+                ChangeFields = changeFields?
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            }, Context.AccessToken);
+            if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
+            {
+                throw new UnLogException(dfResp.Error);
             }
         }
 
