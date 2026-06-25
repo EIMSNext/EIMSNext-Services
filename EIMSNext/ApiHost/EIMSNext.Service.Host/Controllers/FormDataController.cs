@@ -8,6 +8,7 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -490,10 +491,18 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             FormData entity = model.CastTo<FormDataRequest, FormData>();
-            if (IdentityContext.IdentityType == IdentityType.Public &&
-                !Resolver.Resolve<IPublicAccessValidator>().CanSubmitForm(entity.FormId))
+            if (IdentityContext.IdentityType == IdentityType.Public)
             {
-                return Forbid();
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanSubmitForm(entity.FormId))
+                {
+                    return Forbid();
+                }
+
+                if (!ValidatePublicWechatOpenId(validator, entity, model.Action, out var message))
+                {
+                    return BadRequest(message);
+                }
             }
 
             //默认草稿
@@ -504,6 +513,34 @@ namespace EIMSNext.Service.Host.Controllers
 
             await ApiService.AddAsync(entity, model.Action);
             return Ok(ToFormDataViewModel(entity));
+        }
+
+        private static bool ValidatePublicWechatOpenId(IPublicAccessValidator validator, FormData entity, DataAction action, out string message)
+        {
+            message = string.Empty;
+            if (action != DataAction.Submit)
+            {
+                return true;
+            }
+
+            var setting = validator.GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form ||
+                setting.Form.FormLink.Wechat.Enabled != true)
+            {
+                return true;
+            }
+
+            var data = entity.Data as IDictionary<string, object?>;
+            if (data != null &&
+                data.TryGetValue(PublicFormSystemFieldHelper.WxOpenId, out var value) &&
+                value != null &&
+                !string.IsNullOrWhiteSpace(value.ToString()))
+            {
+                return true;
+            }
+
+            message = "微信 OpenId 不能为空";
+            return false;
         }
 
         /// <summary>
@@ -768,7 +805,8 @@ namespace EIMSNext.Service.Host.Controllers
         {
             foreach (var field in fields)
             {
-                if (field.Hidden || PublicFormSystemFieldHelper.IsPublicSystemField(field.Field) || IsOrgField(field.Type))
+                var publicSystemField = IsPublicSystemField(field);
+                if ((!publicSystemField && field.Hidden) || IsOrgField(field.Type))
                 {
                     continue;
                 }
@@ -784,6 +822,13 @@ namespace EIMSNext.Service.Host.Controllers
 
                 yield return field.Field;
             }
+        }
+
+        private static bool IsPublicSystemField(FieldDef field)
+        {
+            return PublicFormSystemFieldHelper.IsPublicSystemField(field.Field) &&
+                   (string.Equals(field.Source, PublicFormSystemFieldHelper.Source, StringComparison.OrdinalIgnoreCase) ||
+                    PublicFormSystemFieldHelper.IsPublicSystemField(field.SystemKind));
         }
 
         private static bool IsOrgField(string? type)
