@@ -17,8 +17,8 @@ namespace EIMSNext.Auth.Extensions
     {
         public static IServiceCollection AddAuthServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
-            services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
             services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
+            services.AddAuthMongoCollections(configuration);
             services.AddScoped<IAuthDbContext, AuthDbContext>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
@@ -42,7 +42,10 @@ namespace EIMSNext.Auth.Extensions
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
-                    options.SetIssuer(new Uri("https://auth.eimsnext.com"));
+                    var issuerValue = configuration.GetSection("OAuth:Issuer").Value
+                        ?? configuration.GetSection("OAuth:Authority").Value
+                        ?? "https://auth.eimsnext.com";
+                    options.SetIssuer(new Uri(issuerValue));
                     options.SetTokenEndpointUris("connect/token");
 
                     options.AllowPasswordFlow();

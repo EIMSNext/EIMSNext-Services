@@ -1,3 +1,4 @@
+using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Services;
 using EIMSNext.Common;
@@ -18,17 +19,20 @@ namespace EIMSNext.Auth.Host.Controllers
         private readonly ILogger<OpenController> _logger;
         private readonly PublicAccessOptions _publicAccessOptions;
         private readonly PublicSettingLookupService _publicSettingLookup;
+        private readonly PublicRateLimiter _rateLimiter;
 
         public OpenController(
             IConfiguration configuration,
             ILogger<OpenController> logger,
             IOptions<PublicAccessOptions> publicAccessOptions,
-            PublicSettingLookupService publicSettingLookup)
+            PublicSettingLookupService publicSettingLookup,
+            PublicRateLimiter rateLimiter)
         {
             _configuration = configuration;
             _logger = logger;
             _publicAccessOptions = publicAccessOptions.Value;
             _publicSettingLookup = publicSettingLookup;
+            _rateLimiter = rateLimiter;
         }
 
         [Route("api/ping"), HttpGet]
@@ -44,7 +48,7 @@ namespace EIMSNext.Auth.Host.Controllers
         }
 
         [Route("api/public/challenge"), HttpGet]
-        public IActionResult GetPublicChallenge([FromQuery] string targetId)
+        public async Task<IActionResult> GetPublicChallenge([FromQuery] string targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId))
             {
@@ -55,6 +59,14 @@ namespace EIMSNext.Auth.Host.Controllers
             {
                 _logger.LogError("PublicAccess:SecretKey 未配置");
                 return StatusCode(StatusCodes.Status500InternalServerError, new { errcode = "server_misconfigured", errmsg = "PublicAccess:SecretKey 未配置" });
+            }
+
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            var rate = await _rateLimiter.CheckAsync("challenge", targetId, ip);
+            if (!rate.Allowed)
+            {
+                _logger.LogWarning("公开 challenge 限流命中 ip={Ip} targetId={TargetId} count={Count}", ip, targetId, rate.Count);
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { errcode = "rate_limited", errmsg = "请求过于频繁", limit = rate.Limit, window = (int)rate.Window.TotalSeconds });
             }
 
             if (!_publicSettingLookup.IsAnySectionEnabled(targetId))

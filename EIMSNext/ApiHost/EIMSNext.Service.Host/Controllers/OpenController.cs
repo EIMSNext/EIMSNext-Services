@@ -27,18 +27,21 @@ namespace EIMSNext.Service.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("api/v{version:apiVersion}/Ping")]
+        [AllowAnonymous]
         public IActionResult Ping()
         {
             return ApiResult.Success("API Server is running.").ToActionResult();
         }
 
         [HttpGet("api/Version")]
+        [AllowAnonymous]
         public string Version()
         {
             return Assembly.GetExecutingAssembly().GetName().Version!.ToString();
         }
 
         [HttpGet("api/v{version:apiVersion}/open/appstore")]
+        [AllowAnonymous]
         public IActionResult GetAppStore([FromQuery] AppProfileQueryRequest request)
         {
             var (total, items) = _appStoreApiService.GetAppStore(request);
@@ -46,6 +49,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("api/v{version:apiVersion}/open/appstore/{id}")]
+        [AllowAnonymous]
         public IActionResult GetAppStoreDetail(string id)
         {
             var profile = _appStoreApiService.GetAppStoreDetail(id);

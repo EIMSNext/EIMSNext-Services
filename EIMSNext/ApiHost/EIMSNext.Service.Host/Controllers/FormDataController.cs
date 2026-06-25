@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -34,6 +35,8 @@ namespace EIMSNext.Service.Host.Controllers
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
+        private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
+        private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
 
 
         /// <summary>
@@ -503,6 +506,27 @@ namespace EIMSNext.Service.Host.Controllers
                 {
                     return BadRequest(message);
                 }
+
+                var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rate = await _publicRateLimiter.CheckAsync("submit", entity.FormId, ip);
+                if (!rate.Allowed)
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "rate_limited", limit = rate.Limit, window = (int)rate.Window.TotalSeconds });
+                }
+
+                var setting = validator.GetCurrentSetting();
+                if (setting?.TargetType == PublicTargetType.Form)
+                {
+                    var wxOpenId = TryGetWxOpenId(entity);
+                    try
+                    {
+                        _publicFormLinkGuard.EnsureCanSubmit(setting.Form.FormLink, entity, wxOpenId, ip, setting.CorpId, setting.TargetId);
+                    }
+                    catch (PublicOneSubmitDuplicateException ex)
+                    {
+                        return Conflict(new { error = "already_submitted", message = ex.Message });
+                    }
+                }
             }
 
             //默认草稿
@@ -513,6 +537,18 @@ namespace EIMSNext.Service.Host.Controllers
 
             await ApiService.AddAsync(entity, model.Action);
             return Ok(ToFormDataViewModel(entity));
+        }
+
+        private static string? TryGetWxOpenId(FormData entity)
+        {
+            if (entity.Data is IDictionary<string, object?> data &&
+                data.TryGetValue(PublicFormSystemFieldHelper.WxOpenId, out var value) &&
+                value != null &&
+                !string.IsNullOrWhiteSpace(value.ToString()))
+            {
+                return value.ToString();
+            }
+            return null;
         }
 
         private static bool ValidatePublicWechatOpenId(IPublicAccessValidator validator, FormData entity, DataAction action, out string message)

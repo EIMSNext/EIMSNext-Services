@@ -135,6 +135,9 @@ namespace EIMSNext.Core.Query
                     case FilterOp.Lte:
                         subFilter = Builders<T>.Filter.Lte(field, filterValues[0]);
                         break;
+                    case FilterOp.Gte:
+                        subFilter = Builders<T>.Filter.Gte(field, filterValues[0]);
+                        break;
                     case FilterOp.Between:
                         if (filterValues.Count >= 2)
                         {

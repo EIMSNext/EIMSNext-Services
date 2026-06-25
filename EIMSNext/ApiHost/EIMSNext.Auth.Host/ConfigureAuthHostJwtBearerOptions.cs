@@ -28,13 +28,18 @@ internal sealed class ConfigureAuthHostJwtBearerOptions(IConfiguration configura
             certificatePassword,
             X509KeyStorageFlags.DefaultKeySet);
 
+        var oauthSection = configuration.GetSection("OAuth");
+        var authority = oauthSection["Authority"];
+        var issuer = oauthSection["Issuer"] ?? authority ?? "https://auth.eimsnext.com";
+        var audience = oauthSection["Audience"] ?? "eimsnext.api";
+
         options.Authority = null;
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
-            ValidIssuer = "https://auth.eimsnext.com/",
+            ValidIssuer = issuer,
             ValidateAudience = true,
-            ValidAudience = "eimsnext.api",
+            ValidAudience = audience,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
             IssuerSigningKey = new X509SecurityKey(certificate)

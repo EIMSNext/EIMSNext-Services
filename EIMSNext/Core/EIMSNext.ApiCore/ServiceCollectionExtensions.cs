@@ -1,3 +1,4 @@
+using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.Cache;
 using EIMSNext.Core;
 using EIMSNext.Core.Serialization;
@@ -110,13 +111,29 @@ namespace EIMSNext.ApiCore
                 options.ConfigurationOptions.EndPoints.Add(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
             });
 
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+            {
+                var config = ConfigurationOptions.Parse(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
+                config.AbortOnConnectFail = false;
+                var database = (configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1);
+                config.DefaultDatabase = database;
+                return ConnectionMultiplexer.Connect(config);
+            });
+
             //services.AddSingleton<ICacheClient, DistributedCacheClient>();
             services.AddSingleton<ICacheClient, FakeCacheClient>();
             services.AddScoped<IScopeCache, ScopeCache>();
+            services.AddScoped<PublicRateLimiter>();
         }
 
         public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
+            var oauthSection = configuration.GetSection("OAuth");
+            var authority = oauthSection["Authority"];
+            var issuer = oauthSection["Issuer"] ?? authority ?? "https://auth.eimsnext.com";
+            var audience = oauthSection["Audience"] ?? "eimsnext.api";
+            var requireHttps = oauthSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
+
             services.AddAuthentication(o =>
             {
                 o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -124,16 +141,16 @@ namespace EIMSNext.ApiCore
             }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme,
              opt =>
              {
-                 opt.Authority = configuration.GetSection("OAuth:Authority").Value;
+                 opt.Authority = authority;
                  opt.SaveToken = true;
-                 opt.RequireHttpsMetadata = false;
+                 opt.RequireHttpsMetadata = requireHttps;
 
                  opt.TokenValidationParameters = new TokenValidationParameters
                  {
                      ValidateIssuer = true,
-                     ValidIssuer = "https://auth.eimsnext.com",
+                     ValidIssuer = issuer,
                      ValidateAudience = true,
-                     ValidAudience = "eimsnext.api",
+                     ValidAudience = audience,
                      ValidateLifetime = true,
                      ValidateIssuerSigningKey = true
                  };

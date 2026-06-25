@@ -21,6 +21,9 @@ namespace EIMSNext.Cache
 
         void Remove(string key, CacheScope scope, string scopeId = "");
         Task RemoveAsync(string key, CacheScope scope, string scopeId = "");
+
+        long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
+        Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
     }
     public enum CacheScope
     {

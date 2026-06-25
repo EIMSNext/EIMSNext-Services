@@ -1,17 +1,20 @@
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Caching.Distributed;
+using StackExchange.Redis;
 
 namespace EIMSNext.Cache
 {
     public class DistributedCacheClient : ICacheClient
     {
-        public DistributedCacheClient(IDistributedCache cache)
+        public DistributedCacheClient(IDistributedCache cache, IConnectionMultiplexer? redis = null)
         {
             _cache = cache;
+            _redis = redis;
         }
 
         private readonly IDistributedCache _cache;
+        private readonly IConnectionMultiplexer? _redis;
 
         public void SetString(string key, string value, CacheScope scope, string scopeId = "", DistributedCacheEntryOptions? options = null)
         {
@@ -89,6 +92,45 @@ namespace EIMSNext.Cache
         {
             var cacheKey = GetKey(key, scope, scopeId);
             return _cache.RemoveAsync(cacheKey);
+        }
+
+        public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            var cacheKey = GetKey(key, scope, scopeId);
+            if (_redis != null)
+            {
+                try
+                {
+                    var db = _redis.GetDatabase();
+                    var value = db.StringIncrement(cacheKey, delta);
+                    db.KeyExpire(cacheKey, ttl);
+                    return value;
+                }
+                catch
+                {
+                    // fall through to local
+                }
+            }
+
+            return IncrementLocally(cacheKey, delta, ttl);
+        }
+
+        public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            return Task.FromResult(Increment(key, delta, ttl, scope, scopeId));
+        }
+
+        private long IncrementLocally(string cacheKey, long delta, TimeSpan ttl)
+        {
+            var currentString = _cache.GetString(cacheKey);
+            long current = 0;
+            if (!string.IsNullOrEmpty(currentString) && long.TryParse(currentString, out var parsed))
+            {
+                current = parsed;
+            }
+            current += delta;
+            _cache.SetString(cacheKey, current.ToString(), new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
+            return current;
         }
 
         private string GetKey(string key, CacheScope scope, string scopeId = "")

@@ -17,11 +17,12 @@ namespace EIMSNext.Auth.Services
         private readonly IMongoCollection<DashboardRecord> _dashboards;
         private readonly string _secretKey;
 
-        public PublicTokenService(IOptions<MongoDbConfiguration> settings, IOptions<PublicAccessOptions> accessOptions)
+        public PublicTokenService(
+            IMongoCollection<PublicAccessSetting> publicSettings,
+            IMongoDatabase database,
+            IOptions<PublicAccessOptions> accessOptions)
         {
-            var client = new MongoClient(settings.Value.ConnectionString);
-            var database = client.GetDatabase(settings.Value.Database);
-            _publicSettings = database.GetCollection<PublicAccessSetting>("PublicSetting");
+            _publicSettings = publicSettings;
             _forms = database.GetCollection<FormRecord>("FormDef");
             _dashboards = database.GetCollection<DashboardRecord>("DashboardDef");
             _secretKey = accessOptions.Value.SecretKey;
