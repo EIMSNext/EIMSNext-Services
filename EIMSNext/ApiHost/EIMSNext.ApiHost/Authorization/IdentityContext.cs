@@ -21,6 +21,7 @@ namespace EIMSNext.ApiHost.Authorization
         private IResolver _resolver;
         private User? _user;
         private Employee? _employee;
+        private string _systemObjectName = string.Empty;
 
         /// <summary>
         ///
@@ -34,6 +35,7 @@ namespace EIMSNext.ApiHost.Authorization
             var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Id);
             var corpClaim = httpContextAccessor.HttpContext?.User.FindFirst("corp");
             var identityTypeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.IdentityType);
+            var nameClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Name);
             var dashboardIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.DashboardId);
             var publicTargetIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicTargetId);
             var publicScopeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicScope);
@@ -41,6 +43,7 @@ namespace EIMSNext.ApiHost.Authorization
             CurrentCorpId = corpClaim?.Value ?? string.Empty;
             CurrentDashboardId = publicTargetIdClaim?.Value ?? dashboardIdClaim?.Value ?? string.Empty;
             _publicScope = ParsePublicScope(publicScopeClaim?.Value);
+            _systemObjectName = nameClaim?.Value ?? string.Empty;
 
             if (string.Equals(identityTypeClaim?.Value, "public", StringComparison.OrdinalIgnoreCase) &&
                 !string.IsNullOrWhiteSpace(CurrentDashboardId))
@@ -59,6 +62,13 @@ namespace EIMSNext.ApiHost.Authorization
                     UserBound = true,
                     Status = EmployeeStatus.Active,
                 };
+                _retrieved = true;
+            }
+
+            if (string.Equals(identityTypeClaim?.Value, IdentityType.System.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                _type = IdentityType.System;
+                CurrentUserID = "system";
                 _retrieved = true;
             }
 
@@ -82,7 +92,9 @@ namespace EIMSNext.ApiHost.Authorization
             serviceContext.CorpId = CurrentCorpId;
             serviceContext.User = CurrentUser;
             serviceContext.Employee = CurrentEmployee;
-            serviceContext.Operator = CurrentEmployee?.ToOperator() ?? Operator.Empty;
+            serviceContext.Operator = _type == IdentityType.System
+                ? new Operator("system", _systemObjectName, "System")
+                : CurrentEmployee?.ToOperator() ?? Operator.Empty;
             serviceContext.ClientIp = IpHelper.GetClientIp(httpContextAccessor);
         }
 

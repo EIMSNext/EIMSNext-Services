@@ -42,7 +42,7 @@ var app = builder.Build();
 // Setup Databases
 using (var serviceScope = app.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
 {
-    EnsureSeedData(serviceScope.ServiceProvider.GetService<IAuthDbContext>()!);
+    EnsureSeedData(serviceScope.ServiceProvider.GetService<IAuthDbContext>()!, app.Configuration);
 }
 
 // Configure the HTTP request pipeline.
@@ -63,9 +63,9 @@ app.MapControllers();
 app.Run();
 
 
-void EnsureSeedData(IAuthDbContext context)
+void EnsureSeedData(IAuthDbContext context, IConfiguration configuration)
 {
-    var seedClients = SeedData.GetClients().ToList();
+    var seedClients = SeedData.GetClients(configuration).ToList();
     if (!context.Clients.Any())
     {
         foreach (var client in seedClients)

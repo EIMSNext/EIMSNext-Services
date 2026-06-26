@@ -1,6 +1,7 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
+using EIMSNext.Async.Tasks.SystemTask;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Service.Entities;
@@ -30,8 +31,10 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var flowClient = resolver.Resolve<FlowApiClient>();
+            var tokenProvider = resolver.Resolve<ISystemTaskTokenProvider>();
             try
             {
+                var accessToken = await tokenProvider.GetAccessTokenAsync(args.CorpId, "df", args.DataflowId, ct);
                 var response = await flowClient.RunDataflow(
                     new DfRunRequest
                     {
@@ -42,7 +45,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                         WfNodeId = args.WfNodeId ?? string.Empty,
                         DfCascade = MapCascade(args.Cascade),
                     },
-                    accessToken: string.Empty);
+                    accessToken: accessToken);
 
                 if (response != null && !string.IsNullOrEmpty(response.Error))
                 {

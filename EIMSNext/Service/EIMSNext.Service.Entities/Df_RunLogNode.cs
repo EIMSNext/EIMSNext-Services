@@ -12,10 +12,6 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string RunLogId { get; set; } = string.Empty;
         /// <summary>
-        /// 企业ID
-        /// </summary>
-        public string CorpId { get; set; } = string.Empty;
-        /// <summary>
         /// 数据流定义ID
         /// </summary>
         public string DataflowId { get; set; } = string.Empty;

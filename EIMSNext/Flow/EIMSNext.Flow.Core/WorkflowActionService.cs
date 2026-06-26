@@ -14,6 +14,7 @@ using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Core
@@ -31,6 +32,7 @@ namespace EIMSNext.Flow.Core
         private readonly IRepository<Department> _departmentRepo;
         private readonly IMongoCollection<WorkflowInstance> _workflowCollection;
         private readonly IMongoCollection<EventSubscription> _subscriptionCollection;
+        private readonly IWorkflowHost _workflowHost;
 
         public WorkflowActionService(IResolver resolver)
         {
@@ -43,6 +45,7 @@ namespace EIMSNext.Flow.Core
             _employeeRepo = resolver.GetRepository<Employee>();
             _employeeDepartmentRepo = resolver.GetRepository<EmployeeDepartment>();
             _departmentRepo = resolver.GetRepository<Department>();
+            _workflowHost = resolver.Resolve<IWorkflowHost>();
             var db = resolver.Resolve<IMongoDbContex>().Database;
             _workflowCollection = db.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
             _subscriptionCollection = db.GetCollection<EventSubscription>("Wf_Subscription");
@@ -103,6 +106,7 @@ namespace EIMSNext.Flow.Core
                 throw new InvalidOperationException("转交目标不能是本人");
             }
 
+            await ValidateNodeActionEnabledAsync(workflowInstance, todo, NodeActionType.Transfer);
             await ValidateTargetEmployeeAsync(workflowInstance, todo, NodeActionType.Transfer, targetEmployeeId);
 
             using var scope = _todoRepo.NewTransactionScope();
@@ -126,6 +130,7 @@ namespace EIMSNext.Flow.Core
                 throw new InvalidOperationException("加签目标不能为空");
             }
 
+            await ValidateNodeActionEnabledAsync(workflowInstance, todo, NodeActionType.AddSign);
             await ValidateTargetEmployeeAsync(workflowInstance, todo, NodeActionType.AddSign, targetEmployeeId);
 
             var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
@@ -167,7 +172,7 @@ namespace EIMSNext.Flow.Core
                 session: scope.SessionHandle);
 
             var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
-            _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, todo, WfNodeType.Approve, todo.ApproveNodeId, todo.ApproveNodeName, ApproveAction.Transfer, comment, dataContext.Round), scope.SessionHandle);
+            _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, todo, WfNodeType.Approve, todo.ApproveNodeId, todo.ApproveNodeName, ApproveAction.ChangeApprover, comment, dataContext.Round), scope.SessionHandle);
             scope.CommitTransaction();
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -188,9 +193,19 @@ namespace EIMSNext.Flow.Core
 
         public async Task<WorkflowActionResult> ReturnAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string targetNodeId, string comment)
         {
+            return await ReturnInternalAsync(context, workflowInstance, todo, targetNodeId, comment, ApproveAction.Return);
+        }
+
+        private async Task<WorkflowActionResult> ReturnInternalAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string targetNodeId, string comment, ApproveAction action)
+        {
             if (string.IsNullOrWhiteSpace(targetNodeId))
             {
                 throw new InvalidOperationException("回退节点不能为空");
+            }
+
+            if (action == ApproveAction.Return)
+            {
+                await ValidateNodeActionEnabledAsync(workflowInstance, todo, NodeActionType.Return);
             }
 
             var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
@@ -235,7 +250,7 @@ namespace EIMSNext.Flow.Core
                 UpdateFormStatus(todo.DataId, FlowStatus.Approving, scope.SessionHandle);
             }
 
-            _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, todo, WfNodeType.Approve, todo.ApproveNodeId, todo.ApproveNodeName, ApproveAction.Return, comment, dataContext.Round - 1), scope.SessionHandle);
+            _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, todo, WfNodeType.Approve, todo.ApproveNodeId, todo.ApproveNodeName, action, comment, dataContext.Round - 1), scope.SessionHandle);
             scope.CommitTransaction();
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -294,6 +309,47 @@ namespace EIMSNext.Flow.Core
             return Task.CompletedTask;
         }
 
+        public Task ValidateNodeActionEnabledAsync(WorkflowInstance workflowInstance, Wf_Todo todo, NodeActionType actionType)
+        {
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId);
+            var action = step?.WfNodeSetting?.ApproveSetting?.NodeActions?.FirstOrDefault(x => x.ActionType == actionType && x.Enabled);
+            if (action == null)
+            {
+                throw new InvalidOperationException("当前节点未启用该操作");
+            }
+
+            return Task.CompletedTask;
+        }
+
+        public async Task<WorkflowActionResult> HandleExpiredTodoAsync(WorkflowInstance workflowInstance, Wf_Todo todo)
+        {
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId) ?? throw new InvalidOperationException("审批节点不存在");
+            var expireSetting = step.WfNodeSetting?.ApproveSetting?.ExpireSetting ?? throw new InvalidOperationException("审批节点未配置超时动作");
+
+            if (expireSetting.TimeValue <= 0)
+            {
+                return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
+            }
+
+            var context = new WorkflowActionDataContext
+            {
+                CorpId = todo.CorpId ?? string.Empty,
+                CurrentEmployeeId = "system",
+                CurrentEmployee = _resolver.GetServiceContext().Operator ?? new Operator("system", $"wf_{workflowInstance.Id}", "System")
+            };
+
+            return expireSetting.ActionType switch
+            {
+                WfExpireActionType.AutoApprove => await SubmitExpiredActivityAsync(workflowInstance, todo, ApproveAction.Approve, "审批超时，系统自动通过"),
+                WfExpireActionType.AutoReject => await SubmitExpiredActivityAsync(workflowInstance, todo, ApproveAction.Reject, "审批超时，系统自动驳回"),
+                WfExpireActionType.AutoTransfer => await HandleExpiredTransferAsync(context, workflowInstance, todo, expireSetting),
+                WfExpireActionType.AutoReturn => await HandleExpiredReturnAsync(context, workflowInstance, todo, expireSetting),
+                _ => new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id }
+            };
+        }
+
         private async Task ValidateTargetEmployeeAsync(WorkflowInstance workflowInstance, Wf_Todo todo, NodeActionType actionType, string targetEmployeeId)
         {
             var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
@@ -311,6 +367,80 @@ namespace EIMSNext.Flow.Core
         {
             var dataContext = WfDataContext.FromExpando((ExpandoObject)GetWorkflowInstanceData(dataId));
             return (await PopulateEmpIds(dataContext, candidates)).ToList();
+        }
+
+        private async Task<WorkflowActionResult> SubmitExpiredActivityAsync(WorkflowInstance workflowInstance, Wf_Todo todo, ApproveAction action, string comment)
+        {
+            var activity = await _workflowHost.GetPendingActivity($"{workflowInstance.Id}_{todo.DataId}_{todo.ApproveNodeId}", todo.EmployeeId);
+            if (activity == null)
+            {
+                throw new InvalidOperationException("审批超时自动处理失败：当前节点活动不存在");
+            }
+
+            var approveData = new WfApproveData(
+                todo.CorpId ?? string.Empty,
+                string.Empty,
+                todo.EmployeeId,
+                string.Empty,
+                "系统",
+                action,
+                comment,
+                string.Empty,
+                Guid.NewGuid().ToString());
+
+            await _workflowHost.SubmitActivitySuccess(activity.Token, approveData.ToExpando());
+            return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
+        }
+
+        private async Task<WorkflowActionResult> HandleExpiredTransferAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, ExpireSetting expireSetting)
+        {
+            var targetEmployeeIds = (await PopulateEmpIds(todo.DataId, expireSetting.TransferSetting?.Candidates))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+            if (targetEmployeeIds.Count == 0)
+            {
+                throw new InvalidOperationException("审批超时自动转交失败：未找到目标审批人");
+            }
+
+            var sourceTodos = _todoRepo.Find(x => x.WfInstanceId == workflowInstance.Id && x.ApproveNodeId == todo.ApproveNodeId).ToList();
+            if (sourceTodos.Count == 0)
+            {
+                return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
+            }
+
+            using var scope = _todoRepo.NewTransactionScope();
+            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var replacementTodos = sourceTodos
+                .Select((sourceTodo, index) => CloneTodo(sourceTodo, targetEmployeeIds[Math.Min(index, targetEmployeeIds.Count - 1)]))
+                .ToList();
+            replacementTodos.ForEach(x => x.UpdateTime = now);
+
+            _todoRepo.Delete(new DynamicFilter
+            {
+                Rel = "and",
+                Items =
+                [
+                    new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = workflowInstance.Id },
+                    new DynamicFilter { Field = "ApproveNodeId", Op = FilterOp.Eq, Value = todo.ApproveNodeId }
+                ]
+            }, scope.SessionHandle);
+            _todoRepo.Insert(replacementTodos, scope.SessionHandle);
+
+            foreach (var sourceTodo in sourceTodos)
+            {
+                _approvalLogRepo.Insert(CreateApprovalLog(context, workflowInstance, sourceTodo, WfNodeType.Approve, sourceTodo.ApproveNodeId, sourceTodo.ApproveNodeName, ApproveAction.AutoTransfer, "审批超时，系统自动转交", dataContext.Round), scope.SessionHandle);
+            }
+            scope.CommitTransaction();
+
+            return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
+        }
+
+        private async Task<WorkflowActionResult> HandleExpiredReturnAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, ExpireSetting expireSetting)
+        {
+            var targetNodeId = await ResolveExpireReturnTargetNodeIdAsync(workflowInstance, todo, expireSetting.ReturnSetting);
+            return await ReturnInternalAsync(context, workflowInstance, todo, targetNodeId, "审批超时，系统自动回退", ApproveAction.AutoReturn);
         }
 
         private ExpandoObject GetWorkflowInstanceData(string dataId)
@@ -361,6 +491,29 @@ namespace EIMSNext.Flow.Core
                 Round = 1,
             }, scope.SessionHandle);
             scope.CommitTransaction();
+        }
+
+        private async Task<string> ResolveExpireReturnTargetNodeIdAsync(WorkflowInstance workflowInstance, Wf_Todo todo, ReturnSetting? returnSetting)
+        {
+            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            await EnsureStartApprovalLogAsync(workflowInstance, dataContext);
+
+            var trail = GetReturnTrail(workflowInstance, todo, dataContext.Round)
+                .Where(x => x.NodeId != todo.ApproveNodeId)
+                .ToList();
+            if (trail.Count == 0)
+            {
+                throw new InvalidOperationException("审批超时自动回退失败：没有可回退节点");
+            }
+
+            return (returnSetting?.TargetMode ?? ReturnTargetMode.Previous) switch
+            {
+                ReturnTargetMode.Start => trail.FirstOrDefault(x => x.NodeType == WfNodeType.Start)?.NodeId
+                    ?? throw new InvalidOperationException("审批超时自动回退失败：未找到发起节点"),
+                ReturnTargetMode.Specified => trail.FirstOrDefault(x => x.NodeId == returnSetting?.TargetNodeId)?.NodeId
+                    ?? throw new InvalidOperationException("审批超时自动回退失败：指定回退节点不可达"),
+                _ => trail.Last().NodeId
+            };
         }
 
         private List<Wf_ApprovalLog> GetReturnTrail(WorkflowInstance workflowInstance, Wf_Todo todo, int currentRound)

@@ -15,6 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 using WorkflowCore.Interface;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Flow.Host.Controllers
 {
@@ -98,7 +99,7 @@ namespace EIMSNext.Flow.Host.Controllers
                     request.EventSource,
                     request.EventType,
                     request.WfNodeId,
-                    IdentityContext.CurrentEmployee?.ToOperator(),
+                    ResolveStarter(request),
                     request.DfCascade,
                     request.EventIds)
                 .WithDataflowId(request.DataflowId)
@@ -113,6 +114,17 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id ?? "", Error = "" }).ToActionResult();
+        }
+
+        private Operator? ResolveStarter(DfRunRequest request)
+        {
+            if (IdentityContext.IdentityType == ApiService.IdentityType.System)
+            {
+                var objectName = string.IsNullOrWhiteSpace(request.DataflowId) ? "df_unknown" : $"df_{request.DataflowId}";
+                return new Operator("system", objectName, "System");
+            }
+
+            return IdentityContext.CurrentEmployee?.ToOperator();
         }
 
 #if DEBUG

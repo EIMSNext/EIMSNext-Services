@@ -174,6 +174,11 @@ namespace EIMSNext.Flow.Core.Nodes
 
                 //写入待办记录
                 var todos = await CreateTodos(context.Workflow, dataContext, meta, null);
+                if (meta.WfNodeSetting?.ApproveSetting?.EnableCopyto == true)
+                {
+                    var ccEmpIds = await PopulateEmpIds(dataContext, meta.WfNodeSetting?.ApproveSetting?.CopytoCandidates);
+                    await AddCCLogs(context.Workflow, dataContext, meta, ccEmpIds, null);
+                }
                 if (todos.Count == 0)
                 {
                     if (meta.WfNodeSetting?.ApproveSetting?.NoApproverSetting?.ActionType == NoApproverActionType.AutoSubmit)

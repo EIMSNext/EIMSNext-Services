@@ -67,11 +67,11 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 是否为系统用户
         /// </summary>
-        public bool IsSystem => IsDummy && Id.StartsWith("system_");
+        public bool IsSystem => IsDummy && Id.Equals("system");
         /// <summary>
         /// 是否为匿名用户
         /// </summary>
-        public bool IsAnonymous => IsDummy && Id.StartsWith("anonymous_");
+        public bool IsAnonymous => IsDummy && Id.Equals("public");
     }
 
     /// <summary>
