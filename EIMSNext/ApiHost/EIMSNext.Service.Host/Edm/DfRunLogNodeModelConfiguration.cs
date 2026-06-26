@@ -5,7 +5,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     ///
     /// </summary>
-    public class DfRunLogNodeModelConfiguration : ModelConfigurationBase<DfRunLogNodeViewModel>
+    public class DfRunLogNodeModelConfiguration : CorpModelConfigurationBase<DfRunLogNodeViewModel>
     {
     }
 }

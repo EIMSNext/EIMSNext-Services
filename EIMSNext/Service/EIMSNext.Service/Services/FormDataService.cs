@@ -31,36 +31,56 @@ namespace EIMSNext.Service
             _serialNoSvc = resolver.Resolve<ISerialNoSequenceService>();
         }
 
-        protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
+        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update)
         {
-            base.CreateAuditLog(action, oldData, newData, filter, update, session);
+            var logList = new List<AuditLog>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
 
-            // FormDataChangeLog 是 FormData 详情页右侧的业务变更记录，不在通用审计日志方法里写入。
-            // if (oldData == null || !oldData.Any())
-            // {
-            //     // 新增不写 FormDataChangeLog
-            // }
-            // else if (newData == null || !newData.Any())
-            // {
-            //     // 删除不写 FormDataChangeLog
-            // }
-            // else
-            // {
-            //     // FormDataChangeLog 的更新记录已移动到 AfterReplace 中写入。
-            //     // var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
-            // }
-            //
-            // var dataLog = new FormDataChangeLog();
-            // TODO: 保存变更日志
-            // switch (action)
-            // {
-            //     case DbAction.Insert:
-            //         break;
-            //     case DbAction.Update:
-            //         break;
-            //     default:
-            //         break;
-            // }
+            if (oldData == null || newData == null)
+            {
+                logList.Add(new AuditLog
+                {
+                    Action = DbAction.Update,
+                    EntityType = nameof(FormData),
+                    Detail = $"批量更新数据(无旧对象):{filter?.ToString()}",
+                    DataFilter = filter?.ToString(),
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = corpId,
+                });
+            }
+            else
+            {
+                oldData.ForEach(x =>
+                {
+                    var y = newData.FirstOrDefault(e => e.Id == x.Id);
+                    if (y == null) return;
+                    logList.Add(new AuditLog
+                    {
+                        Action = DbAction.Update,
+                        EntityType = nameof(FormData),
+                        DataId = x.Id,
+                        // FormData 不展开字段差异；详情由 FormDataChangeLog 体现
+                        Detail = "已修改（详情见 FormDataChangeLog）",
+                        OldData = x.SerializeToJson(),
+                        NewData = y.SerializeToJson(),
+                        CreateBy = op,
+                        UpdateBy = op,
+                        CreateTime = now,
+                        UpdateTime = now,
+                        ClientIp = ip,
+                        CorpId = corpId,
+                    });
+                });
+            }
+
+            return logList;
         }
 
         private static Dictionary<string, FieldDef> BuildFieldLookup(FormDef? formDef)

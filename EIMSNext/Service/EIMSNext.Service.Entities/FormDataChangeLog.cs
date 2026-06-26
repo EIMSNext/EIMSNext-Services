@@ -19,7 +19,9 @@ namespace EIMSNext.Service.Entities
         public string FormId { get; set; } = string.Empty;
 
         /// <summary>
-        /// 表单数据ID
+        /// 表单数据ID。
+        /// 该字段是跨表追踪主键，可串联 AuditLog / FormDataChangeLog / Wf_ApprovalLog / Wf_ExecLog / Df_RunLogNode
+        /// 五张表的同一业务记录事件。
         /// </summary>
         public string DataId { get; set; } = string.Empty;
 

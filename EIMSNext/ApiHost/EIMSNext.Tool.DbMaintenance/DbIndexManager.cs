@@ -33,6 +33,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateDataflowScheduleIndexes(background);
             CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
+            CreateDataflowLogIndexes(background);
         }
 
         private void CreateAuthIndexes(CreateIndexOptions options)
@@ -378,6 +379,44 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<AuditLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EntityType).Ascending(x => x.Action).Descending(x => x.CreateTime),
                 options,
                 "ix_auditlog_corp_entity_action_createtime");
+        }
+
+        private void CreateDataflowLogIndexes(CreateIndexOptions options)
+        {
+            // Df_RunLog
+            CreateIndex(GetCollection<Df_RunLog>(),
+                Builders<Df_RunLog>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_dfrunlog_corp_dataflow_delete_triggertime");
+
+            CreateIndex(GetCollection<Df_RunLog>(),
+                Builders<Df_RunLog>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.AppId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_dfrunlog_corp_app_delete_triggertime");
+
+            // Df_RunLogNode
+            CreateIndex(GetCollection<Df_RunLogNode>(),
+                Builders<Df_RunLogNode>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_dfrunlognode_corp_runlog_starttime");
+
+            CreateIndex(GetCollection<Df_RunLogNode>(),
+                Builders<Df_RunLogNode>.IndexKeys
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_dfrunlognode_runlog_starttime");
         }
 
         private void CreateDataflowScheduleIndexes(CreateIndexOptions options)

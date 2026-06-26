@@ -5,7 +5,7 @@ namespace EIMSNext.Service.Entities
     /// <summary>
     /// 数据流单次运行中单个节点的执行记录（隶属于某次 Df_RunLog）。
     /// </summary>
-    public class Df_RunLogNode : MongoEntityBase
+    public class Df_RunLogNode : CorpEntityBase
     {
         /// <summary>
         /// 隶属的运行日志ID。

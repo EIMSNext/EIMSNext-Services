@@ -39,7 +39,6 @@ namespace EIMSNext.ApiService
 			{
 				ExportType = ExportType.AuditLog,
 				request.Format,
-				ActualFormat = actualFormat,
 				request.Columns,
 				request.EntityType,
 				request.Action,
