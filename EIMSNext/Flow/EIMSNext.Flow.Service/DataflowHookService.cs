@@ -66,7 +66,8 @@ namespace EIMSNext.Flow.Service
                 return;
             }
 
-            if (!allowedIps.Contains(clientIp, StringComparer.OrdinalIgnoreCase))
+            // 支持精确 IP、通配符（10.0.0.*）与 CIDR（10.0.0.0/24）
+            if (!EIMSNext.Common.IpMatcher.IsAllowed(clientIp, allowedIps))
             {
                 throw new ForbiddenException("当前IP不在白名单中");
             }

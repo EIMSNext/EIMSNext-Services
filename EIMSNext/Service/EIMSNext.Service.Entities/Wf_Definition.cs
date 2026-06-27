@@ -273,6 +273,7 @@ namespace EIMSNext.Service.Entities
     /// </summary>
     public class ApproveSetting
     {
+        /// <summary>审批人类型：常规或按层级。</summary>
         public ApproverType ApproverType { get; set; } = ApproverType.Normal;
 
         /// <summary>
@@ -284,6 +285,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public IList<ApprovalCandidate>? Candidates { get; set; }
 
+        /// <summary>按层级审批的层级设置（仅当 <see cref="ApproverType"/> = ByLevel 时使用）。</summary>
         public ByLevelApprovalSetting? ByLevelApprovalSetting { get; set; }
 
         /// <summary>
@@ -1042,24 +1044,38 @@ namespace EIMSNext.Service.Entities
         AutoSign
     }
 
+    /// <summary>审批人类型。</summary>
     public enum ApproverType
     {
+        /// <summary>常规审批（直接指定候选人）。</summary>
         Normal = 0,
+
+        /// <summary>按部门层级向上审批。</summary>
         ByLevel = 1
     }
 
+    /// <summary>
+    /// 按层级审批的设置：指定终止部门和起止层级。
+    /// </summary>
     public class ByLevelApprovalSetting
     {
+        /// <summary>层级计算的终止位置：发起人所在部门或整个组织。</summary>
         public ByLevelApprovalTerminal Terminal { get; set; } = ByLevelApprovalTerminal.StarterDepartment;
 
+        /// <summary>起始层级（1 = 直属上级）。</summary>
         public int StartLevel { get; set; } = 1;
 
+        /// <summary>结束层级（包含）。</summary>
         public int EndLevel { get; set; } = 1;
     }
 
+    /// <summary>按层级审批的终止位置。</summary>
     public enum ByLevelApprovalTerminal
     {
+        /// <summary>在发起人所在部门停止。</summary>
         StarterDepartment = 0,
+
+        /// <summary>直到组织根部门。</summary>
         Organization = 1
     }
 

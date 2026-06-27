@@ -17,7 +17,11 @@ namespace EIMSNext.Common
         public static string WebRootPath = "";
         public const string QRCodePath = "qrcode";
 
-        public static readonly Operation Operation_All = Operation.Read | Operation.Write;
+        /// <summary>
+        /// 所有权限操作的合集（Read + Add + Edit + Delete + Import）。
+        /// 已移除 <c>Write</c>，拆分为 4 个细粒度标志。
+        /// </summary>
+        public static readonly Operation Operation_All = Operation.Read | Operation.Add | Operation.Edit | Operation.Delete | Operation.Import;
 
         public const string System = "system";
         public const string Id = "Id";

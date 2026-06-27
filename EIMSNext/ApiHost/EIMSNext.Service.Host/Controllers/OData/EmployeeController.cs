@@ -25,7 +25,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeViewModel, EmployeeRequest>(resolver)
     {
         [HttpGet]
-        [Permission(Operation = Operation.Read)]
+        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
         public override IActionResult Get(ODataQueryOptions<EmployeeViewModel> options)
         {
             var query = ApiService.All();
@@ -53,7 +53,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
         }
 
         [HttpGet]
-        [Permission(Operation = Operation.Read)]
+        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
         public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<EmployeeViewModel> options)
         {
             var employee = ApiService.Query(x => x.Id == key).FirstOrDefault();
@@ -70,7 +70,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
         }
 
         [HttpPost]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Add)]
         public override async Task<ActionResult> Post([FromBody] EmployeeRequest model)
         {
             if (!ModelState.IsValid)
@@ -93,7 +93,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
         }
 
         [HttpPut]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Edit)]
         public override async Task<ActionResult> Put([FromODataUri] string key, [FromBody] EmployeeRequest model)
         {
             if (!ModelState.IsValid)
@@ -122,7 +122,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
         }
 
         [HttpPatch]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Edit)]
         public override async Task<ActionResult> Patch([FromODataUri] string key, [FromBody] Delta<EmployeeRequest> delta)
         {
             if (delta == null)

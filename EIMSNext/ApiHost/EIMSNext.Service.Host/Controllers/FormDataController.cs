@@ -483,7 +483,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Add)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.FormLink)]
         public async Task<IActionResult> Post([FromBody] FormDataRequest model)
@@ -585,7 +585,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key"></param>
         /// <param name="model"></param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Edit)]
         [HttpPut("{key}")]
         public async Task<IActionResult> Put([FromRoute] string key, [FromBody] FormDataRequest model)
         {
@@ -636,7 +636,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key"></param>
         /// <param name="delta"></param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Edit)]
         [HttpPatch("{key}")]
         public async Task<IActionResult> Patch([FromRoute] string key, [FromBody] Delta<FormDataRequest> delta)
         {
@@ -679,7 +679,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key">主键Id</param>
         /// <param name="batch">批量删除</param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Delete)]
         [HttpDelete("{key}")]
         public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {

@@ -19,7 +19,7 @@ namespace EIMSNext.Service.Host.Controllers
 	public class EmployeeController(IResolver resolver) : ApiControllerBase<EmployeeApiService, Employee, EmployeeViewModel>(resolver)
 	{
 	    [HttpPost("ReviewJoinCorporate")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         [IdentityType(IdentityType.Corp_Admins)]
         public async Task<ActionResult> ReviewJoinCorporate([FromBody] ReviewJoinCorporateRequest request)
         {

@@ -25,7 +25,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("Read")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public async Task<ActionResult> Read([FromBody] SystemMessageReadRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Id))
@@ -38,7 +38,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("ReadBatch")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public async Task<ActionResult> ReadBatch([FromBody] DeleteBatch request)
         {
             if (request.Keys?.Count <= 0)

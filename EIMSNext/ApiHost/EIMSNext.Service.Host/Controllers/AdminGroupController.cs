@@ -20,7 +20,7 @@ namespace EIMSNext.Service.Host.Controllers
 	public class AdminGroupController(IResolver resolver) : ApiControllerBase<AdminGroupApiService, AdminGroup, AdminGroupViewModel>(resolver)
 	{
         [HttpPost("Move")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public async Task<ActionResult<AdminGroup>> Move([FromBody] MoveAdminGroupRequest request)
         {
             try

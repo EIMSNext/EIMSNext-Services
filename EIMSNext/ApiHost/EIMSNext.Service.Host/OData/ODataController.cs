@@ -216,7 +216,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Add)]
         public virtual async Task<ActionResult> Post([FromBody] R model)
         {
             if (!ModelState.IsValid)
@@ -240,7 +240,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPut]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public virtual async Task<ActionResult> Put([FromODataUri] string key, [FromBody] R model)
         {
             if (!ModelState.IsValid)
@@ -269,7 +269,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="delta"></param>
         /// <returns></returns>
         [HttpPatch]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public virtual async Task<ActionResult> Patch([FromODataUri] string key, [FromBody] Delta<R> delta)
         {
             if (delta == null)
@@ -311,7 +311,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="deltas"></param>
         /// <returns></returns>
         [HttpPatch]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public virtual async Task<ActionResult> Patch([FromBody] DeltaSet<R> deltas)
         {
             if (deltas == null)
@@ -390,7 +390,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="batch">批量删除</param>
         /// <returns></returns>
         [HttpDelete]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Delete)]
         public virtual async Task<ActionResult> Delete([FromODataUri] string key, [FromBody] DeleteBatch? batch)
         {
             if ("batch".EqualsIgnoreCase(key))

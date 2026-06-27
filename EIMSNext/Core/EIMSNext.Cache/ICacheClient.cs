@@ -27,6 +27,6 @@ namespace EIMSNext.Cache
     }
     public enum CacheScope
     {
-        Corporate, Employee, Global
+        Corporate, Employee, Client, Global
     }
 }
