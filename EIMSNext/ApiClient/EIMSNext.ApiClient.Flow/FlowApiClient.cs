@@ -23,6 +23,11 @@ namespace EIMSNext.ApiClient.Flow
             return HandleResponse(await PostAsync<WfResponse>("Workflow/ChangeApprover", req, accessToken));
         }
 
+        public async Task<WfResponse?> ExpireAction(ExpireActionRequest req, string accessToken)
+        {
+            return HandleResponse(await PostAsync<WfResponse>("Workflow/ExpireAction", req, accessToken));
+        }
+
         public async Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken)
         {
             return HandleResponse(await PostAsync<WfResponse>("Workflow/Definition/Delete", req, accessToken));

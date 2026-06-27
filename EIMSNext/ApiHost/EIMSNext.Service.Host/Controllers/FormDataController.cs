@@ -1,4 +1,5 @@
 using Asp.Versioning;
+using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -8,12 +9,14 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
 using MongoDB.Driver;
@@ -26,10 +29,15 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
+        private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
+        private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
+        private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
+
 
         /// <summary>
         /// 动态查询总数
@@ -37,11 +45,13 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="filter"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.QueryLink)]
         [HttpPost("dynamic/$count")]
         public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
         {
-            //TODO: fill field type
-            return Ok(ApiService.Count(filter));
+            var options = FilterResult(new DynamicFindOptions<FormData> { Filter = filter });
+            return Ok(ApiService.Count(options.Filter ?? DynamicFilter.Empty));
         }
         /// <summary>
         /// 动态查询数据
@@ -49,6 +59,8 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="options"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.QueryLink)]
         [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -63,17 +75,23 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="filter"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.QueryLink)]
         [HttpPost("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {
-            return Ok(ApiService.Count(filter));
+            var options = FilterResult(new DynamicFindOptions<FormData> { Filter = filter });
+            return Ok(ApiService.Count(options.Filter ?? DynamicFilter.Empty));
         }
+
         /// <summary>
         /// 动态查询数据
         /// </summary>
         /// <param name="options"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.QueryLink)]
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -91,6 +109,8 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.QueryLink)]
         [HttpPost("filter/options")]
         public async Task<ActionResult> GetFilterOptions([FromBody] FormDataFilterOptionsRequest request)
         {
@@ -153,47 +173,40 @@ namespace EIMSNext.Service.Host.Controllers
         }
         protected virtual DynamicFindOptions<FormData> FilterByPermission(DynamicFindOptions<FormData> query)
         {
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+                query.Filter = RestrictPublicQueryFilter(validator, formId, query.Filter);
+                query.Filter = string.IsNullOrWhiteSpace(formId)
+                    ? CreateNoMatchFilter()
+                    : validator.ApplyFormDataScope(formId!, query.Filter);
+                query.Scope = null;
+                ApplyPublicProjection(validator, formId, query);
+                query.Take = Math.Clamp(query.Take <= 0 ? 20 : query.Take, 1, 200);
+                query.Skip = Math.Max(0, query.Skip);
+                return query;
+            }
+
             if (query.Scope != null)
             {
+                if (query.Scope.InheritMemberPermissions && !string.IsNullOrWhiteSpace(query.Scope.FormId))
+                {
+                    if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
+                    {
+                        return query;
+                    }
+
+                    query.Filter = AndFilters(query.Filter, BuildInheritedPermissionFilter(query.Scope.FormId!));
+                    return query;
+                }
+
                 if (!string.IsNullOrEmpty(query.Scope.AuthGroupId))
                 {
                     var authGrp = Resolver.GetService<AuthGroup>().Get(query.Scope.AuthGroupId);
                     if (authGrp != null)
                     {
-                        var filter = query.Filter;
-                        if (filter == null) { filter = new DynamicFilter(); }
-
-                        if (authGrp.Type == AuthGroupType.ManageSelfData)
-                        {
-                            if (filter.IsGroup && filter.Rel == FilterRel.And)
-                            {
-                                filter.Items!.Add(new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
-                            }
-                            else
-                            {
-                                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
-                            }
-                        }
-                        else if (authGrp.Type == AuthGroupType.Custom)
-                        {
-                            if (!string.IsNullOrEmpty(authGrp.DataFilter))
-                            {
-                                var condList = authGrp.DataFilter.DeserializeFromJson<ConditionList>();
-                                if (condList != null)
-                                {
-                                    var dataFilter = condList.ToDynamicFilter();
-
-                                    if (filter.IsGroup && filter.Rel == FilterRel.And)
-                                    {
-                                        filter.Items!.Add(dataFilter);
-                                    }
-                                    else
-                                    {
-                                        filter = new DynamicFilter() { Rel = FilterRel.And, Items = [dataFilter, filter] };
-                                    }
-                                }
-                            }
-                        }
+                        query.Filter = AndFilters(query.Filter, BuildAuthGroupDataFilter(authGrp));
                     }
                 }
             }
@@ -203,6 +216,12 @@ namespace EIMSNext.Service.Host.Controllers
 
         protected virtual FormDataExportRequest FilterByPermission(FormDataExportRequest request)
         {
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                request.Filter = CreateNoMatchFilter();
+                return request;
+            }
+
             if (!string.IsNullOrEmpty(request.AuthGroupId))
             {
                 var authGrp = Resolver.GetService<AuthGroup>().Get(request.AuthGroupId);
@@ -329,6 +348,77 @@ namespace EIMSNext.Service.Host.Controllers
             return ApiService.Find(FilterResult(options)).FirstOrDefault() != null;
         }
 
+        [Permission(Operation = Operation.Read)]
+        [HttpGet("{key}/permission-scope")]
+        public ActionResult GetPermissionScope([FromRoute] string key, [FromQuery] string formId)
+        {
+            if (string.IsNullOrWhiteSpace(formId))
+            {
+                return BadRequest();
+            }
+
+            var data = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
+            {
+                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true), DynamicField.Create("formId", true) },
+                Take = 1,
+            })).FirstOrDefault();
+            if (data == null)
+            {
+                return NotFound();
+            }
+
+            if (!string.Equals(data.FormId, formId, StringComparison.OrdinalIgnoreCase))
+            {
+                return BadRequest();
+            }
+
+            if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
+            {
+                return Ok(new FormDataPermissionScopeResponse
+                {
+                    DataPerms = DataPerms.All,
+                    FieldPerms = null,
+                });
+            }
+
+            var matchedGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+                .Where(HasInheritedDataAccess)
+                .ToList();
+            if (matchedGroups.Count == 0)
+            {
+                return Ok(new FormDataPermissionScopeResponse
+                {
+                    DataPerms = DataPerms.None,
+                    FieldPerms = [],
+                });
+            }
+
+            var applicableGroups = matchedGroups
+                .Where(group => AuthGroupAppliesToData(group, key))
+                .ToList();
+            if (applicableGroups.Count == 0)
+            {
+                return Ok(new FormDataPermissionScopeResponse
+                {
+                    DataPerms = DataPerms.None,
+                    FieldPerms = [],
+                });
+            }
+
+            var mergedPerms = applicableGroups
+                .Select(GetEffectiveDataPerms)
+                .Aggregate(DataPerms.None, (current, next) => current | next);
+
+            var mergedFieldPerms = MergeFieldPerms(applicableGroups);
+
+            return Ok(new FormDataPermissionScopeResponse
+            {
+                DataPerms = mergedPerms,
+                FieldPerms = mergedFieldPerms,
+            });
+        }
+
         /// <summary>
         /// 单条查询
         /// </summary>
@@ -336,9 +426,27 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="select"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.DataLink)]
         [HttpGet("{key}")]
         public ActionResult Get([FromRoute] string key, [FromQuery] string? select)
         {
+            FormData? publicData = null;
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                publicData = ApiService.Get(key);
+                if (publicData == null)
+                {
+                    return NotFound();
+                }
+
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanReadFormData(publicData.FormId) && !validator.CanReadDashboardForm(publicData.FormId))
+                {
+                    return NotFound();
+                }
+            }
+
             var fields = new DynamicFieldList();
             if (!string.IsNullOrEmpty(select))
             {
@@ -348,7 +456,18 @@ namespace EIMSNext.Service.Host.Controllers
                 }
             }
 
-            var options = new DynamicFindOptions<FormData>() { Select = fields, Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key } };
+            var queryOptions = new DynamicFindOptions<FormData>()
+            {
+                Select = fields,
+                Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
+            };
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                queryOptions.Scope = new DataScope { FormId = publicData!.FormId };
+                queryOptions.Select = BuildPublicSelectList(ResolvePublicSingleViewFields(publicData.FormId));
+            }
+
+            var options = FilterResult(queryOptions);
             var result = ApiService.Find(options).FirstOrDefault();
             if (result == null)
             {
@@ -365,6 +484,8 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [HttpPost]
         [Permission(Operation = Operation.Write)]
+        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
+        [PublicScope(PublicScope.FormLink)]
         public async Task<IActionResult> Post([FromBody] FormDataRequest model)
         {
             if (!ModelState.IsValid)
@@ -373,6 +494,41 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             FormData entity = model.CastTo<FormDataRequest, FormData>();
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanSubmitForm(entity.FormId))
+                {
+                    return Forbid();
+                }
+
+                if (!ValidatePublicWechatOpenId(validator, entity, model.Action, out var message))
+                {
+                    return BadRequest(message);
+                }
+
+                var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rate = await _publicRateLimiter.CheckAsync("submit", entity.FormId, ip);
+                if (!rate.Allowed)
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new { error = "rate_limited", limit = rate.Limit, window = (int)rate.Window.TotalSeconds });
+                }
+
+                var setting = validator.GetCurrentSetting();
+                if (setting?.TargetType == PublicTargetType.Form)
+                {
+                    var wxOpenId = TryGetWxOpenId(entity);
+                    try
+                    {
+                        _publicFormLinkGuard.EnsureCanSubmit(setting.Form.FormLink, entity, wxOpenId, ip, setting.CorpId, setting.TargetId);
+                    }
+                    catch (PublicOneSubmitDuplicateException ex)
+                    {
+                        return Conflict(new { error = "already_submitted", message = ex.Message });
+                    }
+                }
+            }
+
             //默认草稿
             entity.FlowStatus = FlowStatus.Draft;
 
@@ -381,6 +537,46 @@ namespace EIMSNext.Service.Host.Controllers
 
             await ApiService.AddAsync(entity, model.Action);
             return Ok(ToFormDataViewModel(entity));
+        }
+
+        private static string? TryGetWxOpenId(FormData entity)
+        {
+            if (entity.Data is IDictionary<string, object?> data &&
+                data.TryGetValue(PublicFormSystemFieldHelper.WxOpenId, out var value) &&
+                value != null &&
+                !string.IsNullOrWhiteSpace(value.ToString()))
+            {
+                return value.ToString();
+            }
+            return null;
+        }
+
+        private static bool ValidatePublicWechatOpenId(IPublicAccessValidator validator, FormData entity, DataAction action, out string message)
+        {
+            message = string.Empty;
+            if (action != DataAction.Submit)
+            {
+                return true;
+            }
+
+            var setting = validator.GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form ||
+                setting.Form.FormLink.Wechat.Enabled != true)
+            {
+                return true;
+            }
+
+            var data = entity.Data as IDictionary<string, object?>;
+            if (data != null &&
+                data.TryGetValue(PublicFormSystemFieldHelper.WxOpenId, out var value) &&
+                value != null &&
+                !string.IsNullOrWhiteSpace(value.ToString()))
+            {
+                return true;
+            }
+
+            message = "微信 OpenId 不能为空";
+            return false;
         }
 
         /// <summary>
@@ -503,6 +699,402 @@ namespace EIMSNext.Service.Host.Controllers
                 await ApiService.DeleteAsync(key);
             }
             return NoContent();
+        }
+
+        private DynamicFilter BuildInheritedPermissionFilter(string formId)
+        {
+            var authGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+                .Where(HasInheritedDataAccess)
+                .ToList();
+            if (authGroups.Count == 0)
+            {
+                return CreateNoMatchFilter();
+            }
+
+            var rangeFilters = new List<DynamicFilter>();
+            foreach (var authGroup in authGroups)
+            {
+                var groupFilter = BuildAuthGroupDataFilter(authGroup);
+                if (groupFilter == null || groupFilter.IsEmpty)
+                {
+                    return DynamicFilter.Empty;
+                }
+
+                rangeFilters.Add(groupFilter);
+            }
+
+            return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
+        }
+
+        private static DynamicFilter CreateNoMatchFilter()
+        {
+            return new DynamicFilter
+            {
+                Field = Fields.BsonId,
+                Op = FilterOp.Eq,
+                Value = "__no_permission__",
+            };
+        }
+
+        private DynamicFilter? RestrictPublicQueryFilter(IPublicAccessValidator validator, string? formId, DynamicFilter? filter)
+        {
+            if (string.IsNullOrWhiteSpace(formId) || IsPublicSingleReadRequest())
+            {
+                return filter;
+            }
+
+            var setting = validator.GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return filter;
+            }
+
+            var allowedFields = new HashSet<string>(setting.Form.QueryLink.QueryFields ?? [], StringComparer.OrdinalIgnoreCase);
+            return IsFilterAllowed(filter, allowedFields) ? filter : CreateNoMatchFilter();
+        }
+
+        private static bool IsFilterAllowed(DynamicFilter? filter, IReadOnlySet<string> allowedFields)
+        {
+            if (filter == null || filter.IsEmpty)
+            {
+                return true;
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Field))
+            {
+                return IsPublicFilterFieldAllowed(filter.Field, allowedFields);
+            }
+
+            return filter.Items?.All(item => IsFilterAllowed(item, allowedFields)) != false;
+        }
+
+        private static bool IsPublicFilterFieldAllowed(string field, IReadOnlySet<string> allowedFields)
+        {
+            if (field.Equals(Fields.FormId, StringComparison.OrdinalIgnoreCase) ||
+                field.Equals(Fields.CorpId, StringComparison.OrdinalIgnoreCase) ||
+                field.Equals(Fields.DeleteFlag, StringComparison.OrdinalIgnoreCase) ||
+                field.Equals(Fields.BsonId, StringComparison.OrdinalIgnoreCase) ||
+                field.Equals(Fields.Id, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+
+            if (!field.StartsWith($"{Fields.Data}.", StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var dataField = field[$"{Fields.Data}.".Length..];
+            var root = dataField.Split('.', 2)[0];
+            return allowedFields.Count > 0 && allowedFields.Contains(root);
+        }
+
+        private void ApplyPublicProjection(IPublicAccessValidator validator, string? formId, DynamicFindOptions<FormData> query)
+        {
+            if (string.IsNullOrWhiteSpace(formId) || IsPublicCountRequest())
+            {
+                return;
+            }
+
+            var setting = validator.GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return;
+            }
+
+            query.Select = BuildPublicSelectList(IsPublicSingleReadRequest()
+                ? ResolvePublicSingleViewFields(formId)
+                : ResolvePublicListFields(formId));
+        }
+
+        private IEnumerable<string> ResolvePublicSingleViewFields(string formId)
+        {
+            var validator = Resolver.Resolve<IPublicAccessValidator>();
+            var setting = validator.GetCurrentSetting();
+            var visible = setting?.Form.DataLink.Fields?
+                .Where(x => x.Visible)
+                .Select(x => x.Field)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            return visible?.Count > 0 ? visible : ResolveOrdinaryFields(formId);
+        }
+
+        private IEnumerable<string> ResolvePublicListFields(string formId)
+        {
+            var validator = Resolver.Resolve<IPublicAccessValidator>();
+            var setting = validator.GetCurrentSetting();
+            var display = setting?.Form.QueryLink.DisplayFields?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+
+            return display?.Count > 0 ? display : ResolveOrdinaryFields(formId).Take(5);
+        }
+
+        private IEnumerable<string> ResolveOrdinaryFields(string formId)
+        {
+            var form = _formDefService.Get(formId);
+            return FlattenOrdinaryFields(form?.Content?.Items ?? []);
+        }
+
+        private static IEnumerable<string> FlattenOrdinaryFields(IEnumerable<FieldDef> fields)
+        {
+            foreach (var field in fields)
+            {
+                var publicSystemField = IsPublicSystemField(field);
+                if ((!publicSystemField && field.Hidden) || IsOrgField(field.Type))
+                {
+                    continue;
+                }
+
+                if (field.Type == FieldType.TableForm && field.Columns?.Count > 0)
+                {
+                    foreach (var sub in FlattenOrdinaryFields(field.Columns))
+                    {
+                        yield return $"{field.Field}>{sub}";
+                    }
+                    continue;
+                }
+
+                yield return field.Field;
+            }
+        }
+
+        private static bool IsPublicSystemField(FieldDef field)
+        {
+            return PublicFormSystemFieldHelper.IsPublicSystemField(field.Field) &&
+                   (string.Equals(field.Source, PublicFormSystemFieldHelper.Source, StringComparison.OrdinalIgnoreCase) ||
+                    PublicFormSystemFieldHelper.IsPublicSystemField(field.SystemKind));
+        }
+
+        private static bool IsOrgField(string? type)
+        {
+            return type == FieldType.Department1 ||
+                   type == FieldType.Department2 ||
+                   type == FieldType.Employee1 ||
+                   type == FieldType.Employee2;
+        }
+
+        private static DynamicFieldList BuildPublicSelectList(IEnumerable<string> fields)
+        {
+            var select = new DynamicFieldList
+            {
+                DynamicField.Create(Fields.Id),
+                DynamicField.Create(Fields.AppId),
+                DynamicField.Create(Fields.FormId),
+                DynamicField.Create(Fields.DataTitle),
+                DynamicField.Create(Fields.CreateTime)
+            };
+
+            foreach (var field in fields.Distinct(StringComparer.OrdinalIgnoreCase))
+            {
+                select.Add(DynamicField.Create($"{Fields.Data}.{field}"));
+            }
+
+            return select;
+        }
+
+        private bool IsPublicSingleReadRequest()
+        {
+            return HttpContext.Request.Method.Equals(HttpMethods.Get, StringComparison.OrdinalIgnoreCase) &&
+                   HttpContext.Request.RouteValues.TryGetValue("key", out _);
+        }
+
+        private bool IsPublicCountRequest()
+        {
+            return HttpContext.Request.Path.Value?.Contains("$count", StringComparison.OrdinalIgnoreCase) == true;
+        }
+
+        private static string? FindFormId(DynamicFilter? filter)
+        {
+            if (filter == null || filter.IsEmpty)
+            {
+                return null;
+            }
+
+            if (string.Equals(filter.Field, Fields.FormId, StringComparison.OrdinalIgnoreCase) &&
+                string.Equals(filter.Op, FilterOp.Eq, StringComparison.OrdinalIgnoreCase))
+            {
+                return filter.Value?.ToString();
+            }
+
+            if (filter.Items == null)
+            {
+                return null;
+            }
+
+            foreach (var item in filter.Items)
+            {
+                var formId = FindFormId(item);
+                if (!string.IsNullOrWhiteSpace(formId))
+                {
+                    return formId;
+                }
+            }
+
+            return null;
+        }
+
+        private static DynamicFilter? OrFilters(IEnumerable<DynamicFilter?> filters)
+        {
+            var list = filters
+                .Where(x => x != null && !x.IsEmpty)
+                .Cast<DynamicFilter>()
+                .ToList();
+            if (list.Count == 0)
+            {
+                return null;
+            }
+
+            if (list.Count == 1)
+            {
+                return list[0];
+            }
+
+            return new DynamicFilter
+            {
+                Rel = FilterRel.Or,
+                Items = list,
+            };
+        }
+
+        private static DynamicFilter? AndFilters(DynamicFilter? current, DynamicFilter? additional)
+        {
+            if (current == null || current.IsEmpty)
+            {
+                return additional;
+            }
+
+            if (additional == null || additional.IsEmpty)
+            {
+                return current;
+            }
+
+            return new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items = [current, additional],
+            };
+        }
+
+        private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)
+        {
+            switch (authGroup.Type)
+            {
+                case AuthGroupType.ManageSelfData:
+                    if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
+                    {
+                        return CreateNoMatchFilter();
+                    }
+
+                    return new DynamicFilter
+                    {
+                        Field = $"{Fields.CreateBy}.empId",
+                        Op = FilterOp.Eq,
+                        Value = IdentityContext.CurrentEmployee.Id,
+                    };
+                case AuthGroupType.ViewAllData:
+                case AuthGroupType.ManageAllData:
+                    return null;
+                case AuthGroupType.Custom:
+                    if (string.IsNullOrWhiteSpace(authGroup.DataFilter))
+                    {
+                        return null;
+                    }
+
+                    var condList = authGroup.DataFilter.DeserializeFromJson<ConditionList>();
+                    return condList?.ToDynamicFilter();
+                default:
+                    return null;
+            }
+        }
+
+        private static DataPerms GetEffectiveDataPerms(AuthGroup authGroup)
+        {
+            return authGroup.Type switch
+            {
+                AuthGroupType.ManageSelfData => DataPerms.All,
+                AuthGroupType.ManageAllData => DataPerms.All,
+                AuthGroupType.ViewAllData => DataPerms.View,
+                _ => (DataPerms)authGroup.DataPerms,
+            };
+        }
+
+        private static bool HasInheritedDataAccess(AuthGroup authGroup)
+        {
+            return GetEffectiveDataPerms(authGroup) != DataPerms.None;
+        }
+
+        private bool AuthGroupAppliesToData(AuthGroup authGroup, string dataId)
+        {
+            var rangeFilter = BuildAuthGroupDataFilter(authGroup);
+            if (rangeFilter == null || rangeFilter.IsEmpty)
+            {
+                return true;
+            }
+
+            var filter = AndFilters(
+                new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = dataId },
+                rangeFilter);
+
+            var result = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
+            {
+                Filter = filter,
+                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
+                Take = 1,
+            })).FirstOrDefault();
+
+            return result != null;
+        }
+
+        private static List<FieldPerm>? MergeFieldPerms(IEnumerable<AuthGroup> authGroups)
+        {
+            var groups = authGroups.ToList();
+            if (groups.Any(x => x.FieldPerms == null || x.FieldPerms.Count == 0))
+            {
+                return null;
+            }
+
+            var merged = new Dictionary<string, FieldPerm>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fieldPerm in groups.SelectMany(x => x.FieldPerms))
+            {
+                if (!merged.TryGetValue(fieldPerm.Id, out var current))
+                {
+                    merged[fieldPerm.Id] = new FieldPerm
+                    {
+                        Id = fieldPerm.Id,
+                        Visible = fieldPerm.Visible,
+                        Editable = fieldPerm.Editable,
+                        TableInsert = fieldPerm.TableInsert,
+                        TableEdit = fieldPerm.TableEdit,
+                        TableDelete = fieldPerm.TableDelete,
+                    };
+                    continue;
+                }
+
+                current.Visible |= fieldPerm.Visible;
+                current.Editable |= fieldPerm.Editable;
+                current.TableInsert = MergeNullablePermission(current.TableInsert, fieldPerm.TableInsert);
+                current.TableEdit = MergeNullablePermission(current.TableEdit, fieldPerm.TableEdit);
+                current.TableDelete = MergeNullablePermission(current.TableDelete, fieldPerm.TableDelete);
+            }
+
+            return merged.Values.OrderBy(x => x.Id).ToList();
+        }
+
+        private static bool? MergeNullablePermission(bool? current, bool? next)
+        {
+            if (current == true || next == true)
+            {
+                return true;
+            }
+
+            if (current == false || next == false)
+            {
+                return false;
+            }
+
+            return null;
         }
 
     }

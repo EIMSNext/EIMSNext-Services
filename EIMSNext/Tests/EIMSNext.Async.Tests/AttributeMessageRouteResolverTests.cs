@@ -25,6 +25,14 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
+        public void ResolveQueueName_ReturnsWorkflowExpireQueueName()
+        {
+            var queueName = _resolver.ResolveQueueName(typeof(WorkflowExpireTaskArgs));
+
+            Assert.AreEqual("workflow-expire", queueName);
+        }
+
+        [TestMethod]
         public void ResolveQueueName_ThrowsWhenAttributeMissing()
         {
             Assert.ThrowsExactly<InvalidOperationException>(() => _resolver.ResolveQueueName(typeof(NoQueueMessage)));

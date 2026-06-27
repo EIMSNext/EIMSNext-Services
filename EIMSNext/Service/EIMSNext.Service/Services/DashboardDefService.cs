@@ -10,6 +10,24 @@ namespace EIMSNext.Service
 {
 	public class DashboardDefService(IResolver resolver) : EntityServiceBase<DashboardDef>(resolver), IDashboardDefService
 	{
+        private static readonly HashSet<int> ValidRefreshIntervals = [1, 3, 5, 10, 15, 30, 60, 180];
+
+        protected override Task BeforeAdd(IEnumerable<DashboardDef> entities, IClientSessionHandle? session)
+        {
+            foreach (var entity in entities)
+            {
+                PrepareEntity(entity);
+            }
+
+            return base.BeforeAdd(entities, session);
+        }
+
+        protected override Task BeforeReplace(DashboardDef entity, IClientSessionHandle? session)
+        {
+            PrepareEntity(entity);
+            return base.BeforeReplace(entity, session);
+        }
+
         protected override async Task AfterAdd(IEnumerable<DashboardDef> entities, IClientSessionHandle? session)
         {
             await base.AfterAdd(entities, session);
@@ -52,10 +70,12 @@ namespace EIMSNext.Service
             if (updated.Any())
             {
                 var appRepo = Resolver.GetRepository<AppDef>();
+                var dashboardRepo = Resolver.GetRepository<DashboardDef>();
                 var app = appRepo.Get(updated.First().AppId, session)!;
 
                 updated.ForEach(e =>
                 {
+                    PrepareEntity(e);
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
@@ -94,6 +114,16 @@ namespace EIMSNext.Service
                     appRepo.Replace(app, session);
                 }
             }
+        }
+
+        private static void PrepareEntity(DashboardDef entity)
+        {
+            if (!ValidRefreshIntervals.Contains(entity.AutoRefreshIntervalMinutes))
+            {
+                entity.AutoRefreshIntervalMinutes = 15;
+            }
+
+            entity.PublishMembers ??= [];
         }
     }
 }

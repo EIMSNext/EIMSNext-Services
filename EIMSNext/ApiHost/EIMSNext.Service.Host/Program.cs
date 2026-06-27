@@ -6,8 +6,10 @@ using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
+using EIMSNext.ApiService;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
 using HKH.Mef2.Integration;
@@ -33,7 +35,11 @@ builder.Host.UseSerilog((ctx, cfg) =>
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Application", "EIMSNext.Service.Host"));
 // Add services to the container.
-builder.Services.AddControllers().AddOData(
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<IdentityTypeFilter>();
+    options.Filters.Add<PermissionFilter>();
+}).AddOData(
          options =>
          {
              options.TimeZone = TimeZoneInfo.Utc;
@@ -75,6 +81,7 @@ builder.Services.AddApiVersioning(opt =>
 });
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
+builder.Services.AddScoped<IPublicAccessValidator, PublicAccessValidator>();
 builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddRabbitMqMessaging(builder.Configuration);
 

@@ -91,6 +91,10 @@ namespace EIMSNext.Core.Services
         protected virtual List<AuditLog> CreateInsertLog(IEnumerable<T> newData)
         {
             var logList = new List<AuditLog>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
             newData.ForEach(x => logList.Add(
              new AuditLog
              {
@@ -99,15 +103,22 @@ namespace EIMSNext.Core.Services
                  DataId = x.Id,
                  Detail = $"新增数据:", //TODO:考虑显示一两个主字段？
                  NewData = x.SerializeToJson(),
-                 CreateBy = Context.Operator,
-                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                 ClientIp = Context.ClientIp,
+                 CreateBy = op,
+                 UpdateBy = op,
+                 CreateTime = now,
+                 UpdateTime = now,
+                 ClientIp = ip,
+                 CorpId = corpId,
              }));
             return logList;
         }
         protected virtual List<AuditLog> CreateUpdateLog(IEnumerable<T>? oldData, IEnumerable<T>? newData, FilterDefinition<T>? filter, UpdateDefinition<T>? update)
         {
             var logList = new List<AuditLog>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
 
             if (oldData == null || newData == null)
             {
@@ -115,11 +126,14 @@ namespace EIMSNext.Core.Services
                 {
                     Action = DbAction.Update,
                     EntityType = nameof(T),
-                    Detail = $"批量更新数据:",
+                    Detail = $"批量更新数据(无旧对象):{filter?.ToString()}",
                     DataFilter = filter?.ToString(),
-                    CreateBy = Context.Operator,
-                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                    ClientIp = Context.ClientIp,
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = corpId,
                 });
             }
             else
@@ -137,9 +151,12 @@ namespace EIMSNext.Core.Services
                             Detail = GetChangeDetail(x, y),
                             OldData = x.SerializeToJson(),
                             NewData = y.SerializeToJson(),
-                            CreateBy = Context.Operator,
-                            CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                            ClientIp = Context.ClientIp,
+                            CreateBy = op,
+                            UpdateBy = op,
+                            CreateTime = now,
+                            UpdateTime = now,
+                            ClientIp = ip,
+                            CorpId = corpId,
                         });
                     }
                 });
@@ -150,6 +167,10 @@ namespace EIMSNext.Core.Services
         protected virtual List<AuditLog> CreateDeleteLog(IEnumerable<T>? oldData, FilterDefinition<T>? filter)
         {
             var logList = new List<AuditLog>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
 
             if (oldData == null)
             {
@@ -159,8 +180,12 @@ namespace EIMSNext.Core.Services
                     EntityType = nameof(T),
                     Detail = $"批量删除数据:",
                     DataFilter = filter?.ToString(),
-                    CreateBy = Context.Operator,
-                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = corpId,
                 });
             }
             else
@@ -173,8 +198,12 @@ namespace EIMSNext.Core.Services
                     DataId = x.Id,
                     Detail = $"删除数据:", //TODO:考虑显示一两个主字段？
                     OldData = x.SerializeToJson(),
-                    CreateBy = Context.Operator,
-                    CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = corpId,
                 }));
             }
 
@@ -292,20 +321,38 @@ namespace EIMSNext.Core.Services
 
         private string GetChangeDetail(T oldT, T newT)
         {
-            var builder = new StringBuilder();
+            JsonObject? oldJson = null;
+            JsonObject? newJson = null;
+            try { oldJson = JsonNode.Parse(oldT.SerializeToJson())?.AsObject(); } catch { }
+            try { newJson = JsonNode.Parse(newT.SerializeToJson())?.AsObject(); } catch { }
 
-            var oldJson = JsonNode.Parse(oldT.SerializeToJson())?.AsObject();
-            var newJson = JsonNode.Parse(newT.SerializeToJson())?.AsObject();
-
-            foreach (var kvp in oldJson!)
+            if (oldJson == null || newJson == null)
             {
-                var oldValue = kvp.Value?.ToString() ?? "NULL";
-                var newValue = newJson![kvp.Key]?.ToString() ?? "NULL";
-                builder.Append($"{kvp.Key}:{oldValue}->{newValue},");
+                return string.Empty;
+            }
+
+            var builder = new StringBuilder();
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var kv in oldJson) keys.Add(kv.Key);
+            foreach (var kv in newJson) keys.Add(kv.Key);
+
+            foreach (var key in keys)
+            {
+                bool hasOld = oldJson.TryGetPropertyValue(key, out var oldNode);
+                bool hasNew = newJson.TryGetPropertyValue(key, out var newNode);
+
+                // 双侧存在且 deep-equal → 跳过未变更字段
+                if (hasOld && hasNew && JsonNode.DeepEquals(oldNode, newNode))
+                {
+                    continue;
+                }
+
+                var oldStr = hasOld ? (oldNode?.ToJsonString() ?? "null") : "null";
+                var newStr = hasNew ? (newNode?.ToJsonString() ?? "null") : "null";
+                builder.Append($"{key}:{oldStr}->{newStr},");
             }
 
             if (builder.Length > 0) builder.Remove(builder.Length - 1, 1);
-
             return builder.ToString();
         }
 

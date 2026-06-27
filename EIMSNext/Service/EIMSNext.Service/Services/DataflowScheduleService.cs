@@ -11,6 +11,7 @@ using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
 using EIMSNext.Common;
+using System.Dynamic;
 
 namespace EIMSNext.Service
 {
@@ -21,6 +22,7 @@ namespace EIMSNext.Service
     {
         private readonly IRepository<DataflowScheduleItem> _scheduleRepository = resolver.GetRepository<DataflowScheduleItem>();
         private readonly IRepository<FormData> _formDataRepository = resolver.GetRepository<FormData>();
+        private readonly EIMSNext.Scripting.IScriptEngine _scriptEngine = resolver.Resolve<EIMSNext.Scripting.IScriptEngine>();
 
         /// <inheritdoc />
         public async Task RebuildScheduleAsync(Wf_Definition definition, IClientSessionHandle? session = null)
@@ -67,6 +69,7 @@ namespace EIMSNext.Service
 
         private async Task RebuildFieldSchedulesAsync(Wf_Definition definition, DataflowTimeTriggerSetting timeTrigger, long scheduleVersion, IClientSessionHandle? session)
         {
+            var triggerSetting = definition.Metadata.Steps.FirstOrDefault()?.DfNodeSetting?.TriggerSetting;
             var filters = new List<DynamicFilter>
             {
                 new() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = definition.CorpId },
@@ -78,6 +81,11 @@ namespace EIMSNext.Service
             var items = new List<DataflowScheduleItem>();
             await _formDataRepository.Find(new MongoFindOptions<FormData> { Filter = mongoFilter }).ForEachAsync(data =>
             {
+                if (!IsMeetTriggerCondition(triggerSetting, data))
+                {
+                    return;
+                }
+
                 var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, timeTrigger.TimeField!);
                 if (!rawAnchor.HasValue)
                 {
@@ -129,6 +137,32 @@ namespace EIMSNext.Service
                 FilterOp.Eq => Builders<FormData>.Filter.Eq(filter.Field, MongoDB.Bson.BsonValue.Create(filter.Value)),
                 _ => Builders<FormData>.Filter.Empty
             };
+        }
+
+        private bool IsMeetTriggerCondition(TriggerSetting? triggerSetting, FormData data)
+        {
+            if (string.IsNullOrWhiteSpace(triggerSetting?.Condition))
+            {
+                return true;
+            }
+
+            return _scriptEngine.Evaluate<bool>(triggerSetting.Condition, ToScriptData(data)).Value;
+        }
+
+        private static Dictionary<string, object> ToScriptData(FormData formData)
+        {
+            IDictionary<string, object?> formDataWrapper = new ExpandoObject();
+            formDataWrapper["createBy"] = formData.CreateBy;
+
+            foreach (var item in (IDictionary<string, object?>)formData.Data)
+            {
+                formDataWrapper[item.Key] = item.Value;
+            }
+
+            IDictionary<string, object?> dataWrapper = new ExpandoObject();
+            dataWrapper[$"f_{formData.FormId}"] = formDataWrapper;
+
+            return new Dictionary<string, object> { ["data"] = dataWrapper };
         }
     }
 }

@@ -21,47 +21,87 @@ namespace EIMSNext.ApiService
 
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request)
         {
-            IMongoCollection<BsonDocument> collection;
-            if (request.DataSource!.Type == AgDataSourceType.Form)
+            return await Calucate(request, ServiceContext.CorpId);
+        }
+
+        public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId)
+        {
+            if (request.DataSource?.Type != AgDataSourceType.Form) return null;
+
+            if (IdentityContext.IdentityType == IdentityType.Public)
             {
-                collection = AggregateService.GetCollection("FormData");
-
-                var filter = request.Filter;
-                if (filter == null) { filter = new DynamicFilter(); }
-                if (filter.IsGroup && filter.Rel == FilterRel.And)
-                {
-                    filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId });
-                    filter.Items!.Add(new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id });
-                }
-                else
-                {
-                    filter = new DynamicFilter()
-                    {
-                        Rel = FilterRel.And,
-                        Items = [
-                            new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = ServiceContext.CorpId },
-                            new DynamicFilter() { Field = Fields.FormId, Op = FilterOp.Eq, Value = request.DataSource.Id },
-                            filter
-                        ]
-                    };
-                }
-                request.Filter = filter;
-
-                var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(PipelineBuilder.BuildPipeline(collection, request, ServiceContext));
-                return await collection.AggregateAsync(pipeline);
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanReadDashboardItem(request.ItemId ?? string.Empty))
+                    return null;
+                if (!validator.CanReadDashboardForm(request.DataSource.Id))
+                    return null;
+                corpId = validator.GetCurrentSetting()?.CorpId ?? string.Empty;
             }
-            return null;
+
+            var collection = AggregateService.GetCollection("FormData");
+            var filter = WrapFilter(request.Filter, request.DataSource.Id, corpId);
+            request.Filter = filter;
+
+            var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(
+                PipelineBuilder.BuildPipeline(collection, request, ServiceContext));
+            return await collection.AggregateAsync(pipeline);
+        }
+
+        public async Task<long> Count(AggCalcRequest request)
+        {
+            return await Count(request, ServiceContext.CorpId);
+        }
+
+        public async Task<long> Count(AggCalcRequest request, string corpId)
+        {
+            if (request.DataSource?.Type != AgDataSourceType.Form) return 0;
+
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                var validator = Resolver.Resolve<IPublicAccessValidator>();
+                if (!validator.CanReadDashboardItem(request.ItemId ?? string.Empty))
+                    return 0;
+                if (!validator.CanReadDashboardForm(request.DataSource.Id))
+                    return 0;
+                corpId = validator.GetCurrentSetting()?.CorpId ?? string.Empty;
+            }
+
+            var collection = AggregateService.GetCollection("FormData");
+            var filter = WrapFilter(request.Filter, request.DataSource.Id, corpId);
+            var filterDef = filter.ToFilterDefinition<BsonDocument>();
+            return await collection.CountDocumentsAsync(filterDef);
+        }
+
+        private DynamicFilter WrapFilter(DynamicFilter? filter, string formId, string corpId)
+        {
+            filter ??= new DynamicFilter();
+            var scopeFilter = new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items =
+                [
+                    new DynamicFilter { Field = Fields.CorpId, Op = FilterOp.Eq, Value = corpId },
+                    new DynamicFilter { Field = Fields.FormId, Op = FilterOp.Eq, Value = formId },
+                    new DynamicFilter { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true },
+                ],
+            };
+
+            if (filter.IsGroup && filter.Rel == FilterRel.And)
+            {
+                filter.Items!.Insert(0, scopeFilter);
+                return filter;
+            }
+
+            return new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items = [scopeFilter, filter],
+            };
         }
     }
 
     static class PipelineBuilder
     {
-        /// <summary>
-        /// 根据AggCalcRequest动态构建MongoDB聚合管道
-        /// </summary>
-        /// <param name="request">聚合请求</param>
-        /// <returns>构建好的BsonDocument[]管道</returns>
-        /// <exception cref="ArgumentException">参数校验异常</exception>
         public static BsonDocument[] BuildPipeline(IMongoCollection<BsonDocument> collection, AggCalcRequest request, IServiceContext context)
         {
             var pipelineStages = new List<BsonDocument>();
@@ -73,40 +113,43 @@ namespace EIMSNext.ApiService
                 pipelineStages.Add(matchStage);
             }
 
-            var groupStage = BuildGroupStage(request.Dimensions, request.Metrics!);
-            pipelineStages.Add(groupStage);
-
-            if (request.Dimensions != null && request.Dimensions.Any())
+            if (request.Metrics?.Count > 0)
             {
-                var projectStage = BuildProjectStage(request.Dimensions!, request.Metrics!);
-                pipelineStages.Add(projectStage);
+                pipelineStages.Add(BuildGroupStage(request.Dimensions, request.Metrics));
+                if (request.Dimensions?.Count > 0)
+                {
+                    pipelineStages.Add(BuildProjectStage(request.Dimensions!, request.Metrics!));
+                }
             }
 
-            if (request.Sort != null && request.Sort.Any())
+            if (request.Sort?.Count > 0)
             {
-                var sortStage = BuildSortStage(request.Sort!);
-                pipelineStages.Add(sortStage);
+                pipelineStages.Add(BuildSortStage(request.Sort!));
+            }
+
+            if (request.Skip.HasValue && request.Skip.Value > 0)
+            {
+                pipelineStages.Add(new BsonDocument("$skip", request.Skip.Value));
             }
 
             if (request.Take.HasValue && request.Take.Value > 0)
             {
-                var limitStage = new BsonDocument("$limit", request.Take.Value);
-                pipelineStages.Add(limitStage);
+                pipelineStages.Add(new BsonDocument("$limit", request.Take.Value));
+            }
+
+            // 公开模式：按 displayFields 投影
+            if (request.DisplayFields?.Count > 0)
+            {
+                pipelineStages.Add(BuildDisplayFieldProjectStage(request.DisplayFields));
             }
 
             return pipelineStages.ToArray();
         }
 
-        #region 私有构建方法
-
-        /// <summary>
-        /// 构建$group分组聚合阶段
-        /// </summary>
         private static BsonDocument BuildGroupStage(List<Dimension>? dimensions, List<Metric> metrics)
         {
             var groupDoc = new BsonDocument();
 
-            // 构建分组键（_id）：单维度/多维度
             if (dimensions != null && dimensions.Any())
             {
                 var idDoc = new BsonDocument();
@@ -122,17 +165,14 @@ namespace EIMSNext.ApiService
             }
             else
             {
-                // 无维度：全局聚合（_id固定为null）
                 groupDoc["_id"] = BsonNull.Value;
             }
 
-            // 构建指标聚合（$sum/$avg/$count等）
             foreach (var metric in metrics)
             {
                 if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
                     continue;
 
-                // 处理特殊聚合函数：$count（无需字段名）
                 if (metric.AggFun.Equals("count", StringComparison.OrdinalIgnoreCase))
                 {
                     groupDoc[$"{metric.Id}_count"] = new BsonDocument("$sum", 1);
@@ -140,7 +180,6 @@ namespace EIMSNext.ApiService
                 else
                 {
                     var finalId = GetFinalId(metric.Id);
-                    // 常规聚合函数：$sum/$avg/$max/$min
                     groupDoc[$"{metric.Id}_{metric.AggFun}"] =
                         new BsonDocument($"${metric.AggFun}", $"${finalId}");
                 }
@@ -148,18 +187,11 @@ namespace EIMSNext.ApiService
 
             return new BsonDocument("$group", groupDoc);
         }
-        private static string GetFinalId(string field)
-        {
-            return Fields.IsSystemField(field) ? field : $"data.{field}";
-        }
-        /// <summary>
-        /// 构建$project阶段（将_id中的维度字段平级输出）
-        /// </summary>
+
         private static BsonDocument BuildProjectStage(List<Dimension> dimensions, List<Metric> metrics)
         {
             var projectDoc = new BsonDocument();
 
-            // 1. 平级输出维度字段（从_id中提取）
             foreach (var dimension in dimensions)
             {
                 if (!string.IsNullOrEmpty(dimension.Id))
@@ -168,7 +200,6 @@ namespace EIMSNext.ApiService
                 }
             }
 
-            // 2. 保留聚合指标字段
             foreach (var metric in metrics)
             {
                 if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
@@ -177,36 +208,46 @@ namespace EIMSNext.ApiService
                 projectDoc[$"{metric.Id}_{metric.AggFun}"] = $"${metric.Id}_{metric.AggFun}";
             }
 
-            // 3. 隐藏默认的_id字段
             projectDoc["_id"] = 0;
+            return new BsonDocument("$project", projectDoc);
+        }
+
+        private static BsonDocument BuildDisplayFieldProjectStage(List<string> displayFields)
+        {
+            var projectDoc = new BsonDocument
+            {
+                ["_id"] = 0,
+                [Fields.Id] = 1,
+                [Fields.AppId] = 1,
+                [Fields.FormId] = 1,
+                [Fields.DataTitle] = 1,
+                [Fields.CreateTime] = 1,
+            };
+
+            foreach (var field in displayFields)
+            {
+                if (string.IsNullOrWhiteSpace(field)) continue;
+                var root = field.Split('.', 2)[0];
+                projectDoc[$"{Fields.Data}.{root}"] = 1;
+            }
 
             return new BsonDocument("$project", projectDoc);
         }
 
-        /// <summary>
-        /// 构建$sort阶段
-        /// </summary>
-        /// <param name="sort">多字段排序规则</param>
-        /// <returns>$sort阶段的BsonDocument</returns>
-        private static BsonDocument BuildSortStage(List<SortItem>? sort)
+        private static BsonDocument BuildSortStage(List<SortItem> sort)
         {
             var sortDoc = new BsonDocument();
-
-            if (sort != null)
+            foreach (var rule in sort)
             {
-                foreach (var rule in sort)
-                {
-                    if (string.IsNullOrEmpty(rule.Id))
-                        continue;
-
-                    sortDoc[rule.Id] = (int)rule.Dir;
-                }
+                if (string.IsNullOrEmpty(rule.Id)) continue;
+                sortDoc[rule.Id] = (int)rule.Dir;
             }
-
             return new BsonDocument("$sort", sortDoc);
         }
 
-        #endregion
-
+        private static string GetFinalId(string field)
+        {
+            return Fields.IsSystemField(field) ? field : $"data.{field}";
+        }
     }
 }

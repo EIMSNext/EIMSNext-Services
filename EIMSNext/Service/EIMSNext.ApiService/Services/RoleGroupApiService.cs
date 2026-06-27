@@ -1,5 +1,6 @@
 using HKH.Mef2.Integration;
 using EIMSNext.Common;
+using EIMSNext.Core;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.ApiService.ViewModels;
@@ -22,10 +23,24 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有删除角色组的权限");
-            return base.DeleteAsyncCore(ids);
+            var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            if (idList.Count > 0)
+            {
+                var hasRoles = Resolver.GetService<Role>().All().Any(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    idList.Contains(x.RoleGroupId));
+
+                if (hasRoles)
+                {
+                    throw new BadRequestException("角色组下存在角色，不能删除");
+                }
+            }
+
+            return await base.DeleteAsyncCore(idList);
         }
 	}
 }

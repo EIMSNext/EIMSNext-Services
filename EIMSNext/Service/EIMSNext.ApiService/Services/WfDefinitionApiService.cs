@@ -2,6 +2,7 @@ using HKH.Mef2.Integration;
 
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
+using EIMSNext.Core;
 using EIMSNext.Service.Entities;
 using EIMSNext.ApiClient.Flow;
 
@@ -32,6 +33,40 @@ namespace EIMSNext.ApiService
             return result;
         }
 
+        public async Task<Wf_Definition> CreateVersionAsync(string id)
+        {
+            var source = GetManageableDefinition(id);
+            var result = await Resolver.Resolve<IWfDefinitionService>().CreateVersionAsync(source.Id);
+            await _flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
+            return result;
+        }
+
+        public async Task<Wf_Definition> ActivateAsync(string id)
+        {
+            var source = GetManageableDefinition(id);
+            var result = await Resolver.Resolve<IWfDefinitionService>().ActivateAsync(source.Id);
+            await _flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
+            return result;
+        }
+
+        protected override IQueryable<WfDefinitionViewModel> FilterByPermission()
+        {
+            var query = base.FilterByPermission();
+            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            if (evaluator.HasUnrestrictedManagementIdentity)
+            {
+                return query;
+            }
+
+            if (IdentityContext.IdentityType == IdentityType.AppAdmin)
+            {
+                var appIds = evaluator.GetSnapshot().ManageableAppIds;
+                return query.Where(x => appIds.Contains(x.AppId));
+            }
+
+            return query.Where(x => false);
+        }
+
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
@@ -51,6 +86,23 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private Wf_Definition GetManageableDefinition(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                throw new BadRequestException("流程定义ID不能为空");
+            }
+
+            var definition = CoreService.Get(id);
+            if (definition == null || definition.CorpId != IdentityContext.CurrentCorpId || definition.DeleteFlag)
+            {
+                throw new BadRequestException("流程定义不存在");
+            }
+
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(definition.AppId);
+            return definition;
         }
     }
 }

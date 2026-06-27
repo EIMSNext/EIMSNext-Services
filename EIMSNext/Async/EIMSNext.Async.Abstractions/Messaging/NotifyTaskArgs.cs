@@ -23,6 +23,8 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string? FormId { get; set; }
 
+        public NotifyTargetType TargetType { get; set; } = NotifyTargetType.Form;
+
         public string DataId { get; set; } = string.Empty;
 
         public string? TodoId { get; set; }

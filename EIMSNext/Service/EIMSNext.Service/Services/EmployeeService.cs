@@ -8,6 +8,7 @@ using EIMSNext.Core.Services;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
+using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
 
 namespace EIMSNext.Service
@@ -74,43 +75,97 @@ namespace EIMSNext.Service
             }
 
             var reviewedTime = DateTime.UtcNow.ToTimeStampMs();
-            foreach (var employee in employees)
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var currentCorpId = Context.CorpId;
+
+            // 开一个事务作用域：主操作（Delete/Replace）与审计写入原子提交。
+            // IRepository<T> 的无 session 重载通过 MongoTransactionScope.Transaction（AsyncLocal）自动拾取该事务。
+            using var scope = NewTransactionScope();
+            try
             {
-                var request = requestMap[employee.Id];
-                if (!approved)
+                foreach (var employee in employees)
                 {
-                    await Repository.DeleteAsync(employee.Id);
-                    await EmployeeDepartmentRepository.DeleteAsync(EmployeeDepartmentRepository.FilterBuilder.Eq(x => x.EmployeeId, employee.Id));
-                    await RequestRepository.DeleteAsync(request.Id);
-                    await AuditLogRepository.InsertAsync(new AuditLog
+                    var request = requestMap[employee.Id];
+                    if (!approved)
                     {
-                        Action = DbAction.Delete,
-                        EntityType = nameof(CorpOnboardingRequest),
-                        DataId = request.Id,
-                        Detail = $"拒绝【{request.ApplicantName}】的加入企业申请"
-                    });
-                    continue;
+                        await Repository.DeleteAsync(employee.Id);
+                        await EmployeeDepartmentRepository.DeleteAsync(EmployeeDepartmentRepository.FilterBuilder.Eq(x => x.EmployeeId, employee.Id));
+                        await RequestRepository.DeleteAsync(request.Id);
+
+                        WriteAuditLog(
+                            action: DbAction.Delete,
+                            entityType: nameof(CorpOnboardingRequest),
+                            dataId: request.Id,
+                            detail: $"拒绝【{request.ApplicantName}】的加入企业申请",
+                            now: reviewedTime, op: op, ip: ip, currentCorpId: currentCorpId);
+                        continue;
+                    }
+
+                    var user = users[request.UserId];
+                    AppendUserCorp(user, employee.CorpId ?? string.Empty);
+                    employee.Status = EmployeeStatus.Active;
+                    employee.UserId = user.Id;
+                    employee.UserName = user.Name;
+                    employee.Invite = user.Id;
+                    employee.UpdateBy = op;
+                    employee.UpdateTime = reviewedTime;
+
+                    await Repository.ReplaceAsync(employee);
+                    await UserRepository.ReplaceAsync(user);
+                    await RequestRepository.DeleteAsync(request.Id);
+
+                    WriteAuditLog(
+                        action: DbAction.Update,
+                        entityType: nameof(CorpOnboardingRequest),
+                        dataId: request.Id,
+                        detail: $"审批通过【{request.ApplicantName}】的加入企业申请",
+                        now: reviewedTime, op: op, ip: ip, currentCorpId: currentCorpId);
                 }
 
-                var user = users[request.UserId];
-                AppendUserCorp(user, employee.CorpId ?? string.Empty);
-                employee.Status = EmployeeStatus.Active;
-                employee.UserId = user.Id;
-                employee.UserName = user.Name;
-                employee.Invite = user.Id;
-                employee.UpdateBy = Context.Operator;
-                employee.UpdateTime = reviewedTime;
+                scope.CommitTransaction();
+            }
+            catch
+            {
+                // scope.Dispose() 在未 Commit 时自动 AbortTransaction
+                throw;
+            }
+        }
 
-                await Repository.ReplaceAsync(employee);
-                await UserRepository.ReplaceAsync(user);
-                await RequestRepository.DeleteAsync(request.Id);
-                await AuditLogRepository.InsertAsync(new AuditLog
+        // 私有 helper：补齐系统字段，try/catch 防止审计失败阻断主操作
+        // 调用方在 NewTransactionScope 内时，自动参与该事务
+        private void WriteAuditLog(
+            DbAction action,
+            string entityType,
+            string dataId,
+            string detail,
+            long now,
+            Operator? op,
+            string? ip,
+            string currentCorpId)
+        {
+            try
+            {
+                AuditLogRepository.Insert(new AuditLog
                 {
-                    Action = DbAction.Update,
-                    EntityType = nameof(CorpOnboardingRequest),
-                    DataId = request.Id,
-                    Detail = $"审批通过【{request.ApplicantName}】的加入企业申请"
+                    Action = action,
+                    EntityType = entityType,
+                    DataId = dataId,
+                    Detail = detail,
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = currentCorpId,
                 });
+            }
+            catch (Exception ex)
+            {
+                // Logger 是 ILogger<Employee>，直接调用
+                Logger.LogError(ex,
+                    "写入审计日志失败。EntityType={EntityType} DataId={DataId}",
+                    entityType, dataId);
             }
         }
 

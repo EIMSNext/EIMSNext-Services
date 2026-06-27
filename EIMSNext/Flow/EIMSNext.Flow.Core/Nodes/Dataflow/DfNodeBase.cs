@@ -19,14 +19,14 @@ namespace EIMSNext.Flow.Core.Nodes
     {
         protected DfNodeBase(IResolver resolver) : base(resolver)
         {
-            ExecLogRepository = resolver.GetRepository<Df_ExecLog>();
+            RunLogNodeRepository = resolver.GetRepository<Df_RunLogNode>();
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             ScriptEngine = resolver.Resolve<IScriptEngine>();
             Logger = resolver.GetLogger<T>();
         }
 
-        protected IRepository<Df_ExecLog> ExecLogRepository { get; private set; }
+        protected IRepository<Df_RunLogNode> RunLogNodeRepository { get; private set; }
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IScriptEngine ScriptEngine { get; private set; }
@@ -128,13 +128,13 @@ namespace EIMSNext.Flow.Core.Nodes
             string troubleshootingSuggestion = "",
             string summary = "")
         {
-            Df_ExecLog? execLog = null;
+            Df_RunLogNode? runLogNode = null;
             try
             {
                 var finishedAt = endTime ?? DateTime.UtcNow.ToTimeStampMs();
                 var startedAt = startTime ?? finishedAt;
                 var success = string.IsNullOrEmpty(errMsg);
-                execLog = new Df_ExecLog()
+                runLogNode = new Df_RunLogNode()
                 {
                     Id = string.Empty,
                     RunLogId = dataContext.RunLogId,
@@ -154,11 +154,11 @@ namespace EIMSNext.Flow.Core.Nodes
                     Summary = string.IsNullOrWhiteSpace(summary) ? (success ? "执行成功" : failureReason) : summary,
                     Success = success
                 };
-                ExecLogRepository.Insert(execLog);
+                RunLogNodeRepository.Insert(runLogNode);
             }
             catch (Exception ex)    //写日志失败不影响整个数据流程
             {
-                Logger.LogError(ex, "写入数据流程执行日志失败。ExecLog={ExecLog}", execLog);
+                Logger.LogError(ex, "写入数据流程执行日志失败。RunLogNode={RunLogNode}", runLogNode);
             }
         }
 

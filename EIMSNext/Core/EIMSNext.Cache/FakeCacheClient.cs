@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Cache
@@ -71,6 +71,24 @@ namespace EIMSNext.Cache
         {
             SetString(key, value, scope, scopeId, options);
             return Task.CompletedTask;
+        }
+
+        public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            var fullKey = GetKey(key, scope, scopeId);
+            if (_cache.TryGetValue(fullKey, out long current))
+            {
+                current += delta;
+                _cache.Set(fullKey, current, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
+                return current;
+            }
+            _cache.Set(fullKey, delta, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
+            return delta;
+        }
+
+        public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            return Task.FromResult(Increment(key, delta, ttl, scope, scopeId));
         }
 
         private static string GetKey(string key, CacheScope scope, string scopeId = "")

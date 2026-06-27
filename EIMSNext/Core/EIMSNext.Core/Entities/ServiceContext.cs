@@ -62,6 +62,10 @@ namespace EIMSNext.Core.Entities
         /// <summary>
         /// 流程退回
         /// </summary>
-        Return
+        Return,
+        /// <summary>
+        /// 数据流内部写入
+        /// </summary>
+        Dataflow
     }
 }

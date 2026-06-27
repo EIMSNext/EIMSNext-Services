@@ -1,16 +1,17 @@
+using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Integrations.Abstractions;
 
 namespace EIMSNext.Auth.Host
 {
     public class SeedData
     {
-        public static IEnumerable<Auth.Entities.Client> GetClients()
+        public static IEnumerable<Auth.Entities.Client> GetClients(IConfiguration configuration)
         {
             return
             [
                 new Auth.Entities.Client
                 {
-                    Id = Auth.Constants.ClientId_Web,
+                    Id = Auth.Entities.InternalClients.WebClientId,
                     ClientName = "EIMSNext.Web",
                     RequireClientSecret = false,
                     AllowedGrantTypes =
@@ -18,7 +19,7 @@ namespace EIMSNext.Auth.Host
                         new Auth.Entities.ClientGrantType { GrantType = "password" },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.VerificationCode },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Integration }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Public }
                     ],
                     AllowedScopes =
                     [
@@ -28,6 +29,30 @@ namespace EIMSNext.Auth.Host
                     ],
                     AccessTokenLifetime=Auth.Constants.TokenLifetime_Default,
                     IdentityTokenLifetime=Auth.Constants.TokenLifetime_Default
+                },
+                new Auth.Entities.Client
+                {
+                    Id = Auth.Entities.InternalClients.SystemClientId,
+                    ClientName = "EIMSNext.System",
+                    RequireClientSecret = true,
+                    ClientSecrets =
+                    [
+                        new Auth.Entities.ClientSecret
+                        {
+                            Type = "SharedSecret",
+                            Value = Auth.Entities.InternalClients.SystemClientSecret.Sha256()
+                        }
+                    ],
+                    AllowedGrantTypes =
+                    [
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SystemTask }
+                    ],
+                    AllowedScopes =
+                    [
+                        new Auth.Entities.ClientScope { Scope = "api.readwrite" }
+                    ],
+                    AccessTokenLifetime = Auth.Constants.TokenLifetime_Default,
+                    IdentityTokenLifetime = Auth.Constants.TokenLifetime_Default
                 }
             ];
         }

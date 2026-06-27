@@ -15,6 +15,8 @@ namespace EIMSNext.ApiService
     {
         public async Task<AdminGroup?> Move(MoveAdminGroupRequest request)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有移动管理组的权限");
+
             if (string.IsNullOrWhiteSpace(request.Id))
             {
                 return null;
@@ -88,6 +90,8 @@ namespace EIMSNext.ApiService
 
         protected override async Task AddAsyncCore(AdminGroup entity)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有创建管理组的权限");
+
             entity.EmployeeIds = NormalizeIds(entity.EmployeeIds);
             entity.AppIds = NormalizeIds(entity.AppIds);
             entity.AppDepartmentIds = NormalizeIds(entity.AppDepartmentIds);
@@ -107,6 +111,8 @@ namespace EIMSNext.ApiService
 
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(AdminGroup entity)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有修改管理组的权限");
+
             var original = await CoreService.GetAsync(entity.Id) ?? throw new ArgumentException("管理组不存在");
             if (original.CorpId != IdentityContext.CurrentCorpId || original.DeleteFlag)
             {
@@ -133,6 +139,8 @@ namespace EIMSNext.ApiService
 
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有删除管理组的权限");
+
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             foreach (var id in idList)
             {

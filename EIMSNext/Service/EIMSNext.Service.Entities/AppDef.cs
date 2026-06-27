@@ -38,6 +38,11 @@ namespace EIMSNext.Service.Entities
         public int SortIndex { get; set; }
 
         /// <summary>
+        /// 应用首页入口ID列表，可指向当前应用菜单中的仪表盘。
+        /// </summary>
+        public List<string> HomeEntryIds { get; set; } = [];
+
+        /// <summary>
         /// 应用菜单
         /// </summary>
         public List<AppMenu> AppMenus { get; set; } = new List<AppMenu>();

@@ -9,6 +9,7 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="OpenIddict.Server.AspNetCore" />
+    <PackageReference Include="RestSharp" />
     <PackageReference Include="Serilog.AspNetCore" />
     <PackageReference Include="Serilog.Settings.Configuration" />
     <PackageReference Include="Serilog.Sinks.Console" />
@@ -19,6 +20,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth\EIMSNext.Auth.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.Abstractions\EIMSNext.Auth.Integrations.Abstractions.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.WeChat\EIMSNext.Auth.Integrations.WeChat.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.WxWork\EIMSNext.Auth.Integrations.WxWork.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Integrations.DingTalk\EIMSNext.Auth.Integrations.DingTalk.csproj" />

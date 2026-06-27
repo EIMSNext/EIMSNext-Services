@@ -1,6 +1,7 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
+using EIMSNext.Async.Tasks.SystemTask;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Service.Entities;
@@ -29,27 +30,22 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(args.DataId))
-            {
-                Logger.LogWarning(
-                    "Skip dataflow run: missing DataId. DataflowId={DataflowId}, CorpId={CorpId}",
-                    args.DataflowId, args.CorpId);
-                return;
-            }
-
             var flowClient = resolver.Resolve<FlowApiClient>();
+            var tokenProvider = resolver.Resolve<ISystemTaskTokenProvider>();
             try
             {
+                var accessToken = await tokenProvider.GetAccessTokenAsync(args.CorpId, "df", args.DataflowId, ct);
                 var response = await flowClient.RunDataflow(
                     new DfRunRequest
                     {
-                        DataId = args.DataId!,
+                        DataflowId = args.DataflowId,
+                        DataId = args.DataId ?? string.Empty,
                         EventSource = MapEventSource(args.EventSource),
                         EventType = MapEventType(args.EventType),
+                        WfNodeId = args.WfNodeId ?? string.Empty,
                         DfCascade = MapCascade(args.Cascade),
-                        EventIds = args.WfNodeId,
                     },
-                    accessToken: string.Empty);
+                    accessToken: accessToken);
 
                 if (response != null && !string.IsNullOrEmpty(response.Error))
                 {
@@ -82,9 +78,9 @@ namespace EIMSNext.Async.Tasks.Consumers
         {
             return type switch
             {
-                Service.Entities.EventType.Submitted => ApiClient.Flow.EventType.Submit,
-                Service.Entities.EventType.Modified => ApiClient.Flow.EventType.Update,
-                Service.Entities.EventType.Removed => ApiClient.Flow.EventType.Delete,
+                Service.Entities.EventType.Submitted => ApiClient.Flow.EventType.Submitted,
+                Service.Entities.EventType.Modified => ApiClient.Flow.EventType.Modified,
+                Service.Entities.EventType.Removed => ApiClient.Flow.EventType.Removed,
                 Service.Entities.EventType.Approving => ApiClient.Flow.EventType.Approving,
                 Service.Entities.EventType.Approved => ApiClient.Flow.EventType.Approved,
                 Service.Entities.EventType.Rejected => ApiClient.Flow.EventType.Rejected,
@@ -99,7 +95,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 Service.Entities.CascadeMode.All => ApiClient.Flow.CascadeMode.All,
                 Service.Entities.CascadeMode.Specified => ApiClient.Flow.CascadeMode.Specified,
                 Service.Entities.CascadeMode.Never => ApiClient.Flow.CascadeMode.Never,
-                _ => ApiClient.Flow.CascadeMode.All,
+                _ => ApiClient.Flow.CascadeMode.NotSet,
             };
         }
     }

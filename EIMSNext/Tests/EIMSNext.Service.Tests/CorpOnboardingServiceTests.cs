@@ -298,6 +298,8 @@ namespace EIMSNext.Service.Tests
             public Task RefreshAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public void Remove(string key, CacheScope scope, string scopeId = "") { }
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
+            public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
+            public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
         }
 
         private sealed class FakeScopeCache : IScopeCache

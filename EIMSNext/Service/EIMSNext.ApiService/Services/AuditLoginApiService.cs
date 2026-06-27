@@ -41,7 +41,6 @@ namespace EIMSNext.ApiService
             {
                 ExportType = ExportType.AuditLogin,
                 request.Format,
-                ActualFormat = actualFormat,
                 request.Columns,
                 request.UserName,
                 request.StartTime,

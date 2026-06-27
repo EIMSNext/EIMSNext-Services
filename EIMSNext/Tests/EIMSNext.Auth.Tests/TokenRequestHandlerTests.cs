@@ -3,6 +3,7 @@ using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Services;
+using EIMSNext.ApiService;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Primitives;
 using OpenIddict.Abstractions;
@@ -28,7 +29,7 @@ namespace EIMSNext.Auth.Tests
 
             var client = new Client
             {
-                Id = Constants.ClientId_Web,
+                Id = InternalClients.WebClientId,
                 Enabled = true,
                 RequireClientSecret = false,
                 AllowedGrantTypes =
@@ -49,7 +50,7 @@ namespace EIMSNext.Auth.Tests
 
             var request = new OpenIddictRequest
             {
-                ClientId = Constants.ClientId_Web,
+                ClientId = InternalClients.WebClientId,
                 GrantType = GrantTypes.Password,
                 Username = user.Email,
                 Password = Constants.NoPassword
@@ -78,7 +79,7 @@ namespace EIMSNext.Auth.Tests
 
             var client = new Client
             {
-                Id = Constants.ClientId_Web,
+                Id = InternalClients.WebClientId,
                 Enabled = true,
                 RequireClientSecret = false,
                 AllowedGrantTypes = [new ClientGrantType { GrantType = GrantTypes.Password }],
@@ -91,7 +92,7 @@ namespace EIMSNext.Auth.Tests
 
             var request = new OpenIddictRequest
             {
-                ClientId = Constants.ClientId_Web,
+                ClientId = InternalClients.WebClientId,
                 GrantType = GrantTypes.Password,
                 Username = user.Email,
                 Password = Constants.NoPassword,
@@ -102,6 +103,81 @@ namespace EIMSNext.Auth.Tests
 
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(Errors.InvalidScope, result.Error);
+        }
+
+        [TestMethod]
+        public async Task HandleAsync_SystemTaskGrant_ReturnsSystemClaims()
+        {
+            var client = new Client
+            {
+                Id = InternalClients.SystemClientId,
+                Enabled = true,
+                RequireClientSecret = true,
+                ClientSecrets =
+                [
+                    new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
+                ],
+                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.SystemTask }],
+                AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+            };
+
+            var handler = new TokenRequestHandler(
+                new FakeUserService(new User { Id = "noop", Name = "noop" }, [client]),
+                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }));
+
+            var request = new OpenIddictRequest
+            {
+                ClientId = InternalClients.SystemClientId,
+                ClientSecret = InternalClients.SystemClientSecret,
+                GrantType = CustomGrantType.SystemTask,
+                Scope = "api.readwrite"
+            };
+            request.SetParameter("corp_id", "corp-001");
+            request.SetParameter("object_type", "wf");
+            request.SetParameter("object_id", "wf-inst-001");
+
+            var result = await handler.HandleAsync(request);
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual("system", result.Claims.Single(x => x.Type == AuthClaimTypes.Id).Value);
+            Assert.AreEqual("wf_wf-inst-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Name).Value);
+            Assert.AreEqual("corp-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Corp).Value);
+            Assert.AreEqual(IdentityType.System.ToString(), result.Claims.Single(x => x.Type == AuthClaimTypes.IdentityType).Value);
+        }
+
+        [TestMethod]
+        public async Task HandleAsync_SystemTaskGrant_Fails_WhenObjectInfoMissing()
+        {
+            var client = new Client
+            {
+                Id = InternalClients.SystemClientId,
+                Enabled = true,
+                RequireClientSecret = true,
+                ClientSecrets =
+                [
+                    new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
+                ],
+                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.SystemTask }],
+                AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+            };
+
+            var handler = new TokenRequestHandler(
+                new FakeUserService(new User { Id = "noop", Name = "noop" }, [client]),
+                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }));
+
+            var request = new OpenIddictRequest
+            {
+                ClientId = InternalClients.SystemClientId,
+                ClientSecret = InternalClients.SystemClientSecret,
+                GrantType = CustomGrantType.SystemTask,
+                Scope = "api.readwrite"
+            };
+            request.SetParameter("corp_id", "corp-001");
+
+            var result = await handler.HandleAsync(request);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(Errors.InvalidRequest, result.Error);
         }
 
         private static IHttpContextAccessor CreateHttpContextAccessor()
@@ -120,7 +196,8 @@ namespace EIMSNext.Auth.Tests
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
                 new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
-                new IntegrationTokenGrantHandler(new FakeIntegrationAuthService(), auditLoginService, contextAccessor)
+                new IntegrationTokenGrantHandler(new FakeIntegrationAuthService(), auditLoginService, contextAccessor),
+                new SystemTaskTokenGrantHandler(contextAccessor)
             ];
         }
 

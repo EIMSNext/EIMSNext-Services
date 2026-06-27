@@ -10,6 +10,7 @@ namespace EIMSNext.Auth.Interfaces
         IQueryable<UserIntegrationBinding> UserIntegrationBindings { get; }
 
         Task AddClient(Client entity);
+        Task UpdateClient(Client entity);
 
         Task AddUser(User entity);
         Task UpdateUser(User entity);

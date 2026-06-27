@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Storage
+namespace EIMSNext.Storage
 {
     public class StorageConfiguration
     {

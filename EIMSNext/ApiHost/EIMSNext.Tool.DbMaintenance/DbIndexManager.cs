@@ -31,7 +31,9 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
             CreateDataflowScheduleIndexes(background);
+            CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
+            CreateDataflowLogIndexes(background);
         }
 
         private void CreateAuthIndexes(CreateIndexOptions options)
@@ -129,6 +131,15 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<FormDef>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.AppId).Ascending(x => x.DeleteFlag),
                 options,
                 "ix_formdef_corp_app_delete");
+
+            CreateIndex(GetCollection<CrossBinding>(),
+                Builders<CrossBinding>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.TargetAppId)
+                    .Ascending(x => x.SourceFormId)
+                    .Ascending(x => x.DeleteFlag),
+                CreateUniqueOptions(options),
+                "ix_crossbinding_target_form_delete_unique");
 
             CreateIndex(GetCollection<DashboardDef>(),
                 Builders<DashboardDef>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.AppId).Ascending(x => x.DeleteFlag),
@@ -370,6 +381,44 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_auditlog_corp_entity_action_createtime");
         }
 
+        private void CreateDataflowLogIndexes(CreateIndexOptions options)
+        {
+            // Df_RunLog
+            CreateIndex(GetCollection<Df_RunLog>(),
+                Builders<Df_RunLog>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_dfrunlog_corp_dataflow_delete_triggertime");
+
+            CreateIndex(GetCollection<Df_RunLog>(),
+                Builders<Df_RunLog>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.AppId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_dfrunlog_corp_app_delete_triggertime");
+
+            // Df_RunLogNode
+            CreateIndex(GetCollection<Df_RunLogNode>(),
+                Builders<Df_RunLogNode>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_dfrunlognode_corp_runlog_starttime");
+
+            CreateIndex(GetCollection<Df_RunLogNode>(),
+                Builders<Df_RunLogNode>.IndexKeys
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_dfrunlognode_runlog_starttime");
+        }
+
         private void CreateDataflowScheduleIndexes(CreateIndexOptions options)
         {
             CreateCorpIdIndex<DataflowScheduleItem>(options, "ix_dataflowscheduleitem_corpid");
@@ -397,6 +446,44 @@ namespace EIMSNext.Auth.DbMaintenance
                     .Ascending(x => x.TriggerTime),
                 options,
                 "ix_dataflowscheduleitem_version_triggertime");
+        }
+
+        private void CreateWorkbenchIndexes(CreateIndexOptions options)
+        {
+            CreateIndex(GetCollection<WorkbenchConfig>(),
+                Builders<WorkbenchConfig>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchconfig_corp_employee_delete");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId)
+                    .Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchfavorite_target");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.SortIndex),
+                options,
+                "ix_workbenchfavorite_sort");
+
+            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+                Builders<WorkbenchRecentVisit>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId)
+                    .Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchrecent_target");
+
+            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+                Builders<WorkbenchRecentVisit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Descending(x => x.LastVisitTime),
+                options,
+                "ix_workbenchrecent_lastvisit");
         }
 
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase

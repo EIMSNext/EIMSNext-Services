@@ -32,6 +32,18 @@ namespace EIMSNext.ApiService.RequestModels
         /// 返回数量
         /// </summary>
         public int? Take { get; set; }
+        /// <summary>
+        /// 跳过数量
+        /// </summary>
+        public int? Skip { get; set; }
+        /// <summary>
+        /// 仪表盘项 ID，公开模式下必填
+        /// </summary>
+        public string? ItemId { get; set; }
+        /// <summary>
+        /// 显示字段列表，公开模式下后端按此投影
+        /// </summary>
+        public List<string>? DisplayFields { get; set; }
     }
 
     /// <summary>

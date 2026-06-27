@@ -43,24 +43,37 @@ namespace EIMSNext.Async.Quartz.Jobs
                 var definition = wfDefRepo.Find(x => x.ExternalId == workflow.WorkflowDefinitionId && x.Version == workflow.Version).FirstOrDefault();
                 var step = definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == sample.ApproveNodeId);
                 var expireSetting = step?.WfNodeSetting?.ApproveSetting?.ExpireSetting;
-                if (expireSetting?.ActionType != WfExpireActionType.AutoNotify)
+                if (expireSetting == null || expireSetting.TimeValue <= 0)
                 {
                     await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
                     continue;
                 }
 
-                await publisher.PublishAsync(new NotifyDispatchTaskArgs
+                if (expireSetting.ActionType == WfExpireActionType.AutoNotify)
                 {
-                    CorpId = sample.CorpId,
-                    MessageType = MessageType.WfExpireNotify,
-                    AppId = sample.AppId,
-                    FormId = sample.FormId,
-                    DataId = sample.DataId,
-                    WfInstanceId = sample.WfInstanceId,
-                    ApproveNodeId = sample.ApproveNodeId
-                });
-
-                await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
+                    await publisher.PublishAsync(new NotifyDispatchTaskArgs
+                    {
+                        CorpId = sample.CorpId,
+                        MessageType = MessageType.WfExpireNotify,
+                        AppId = sample.AppId,
+                        FormId = sample.FormId,
+                        DataId = sample.DataId,
+                        WfInstanceId = sample.WfInstanceId,
+                        ApproveNodeId = sample.ApproveNodeId
+                    });
+                }
+                else
+                {
+                    await publisher.PublishAsync(new WorkflowExpireTaskArgs
+                    {
+                        CorpId = sample.CorpId ?? string.Empty,
+                        WfInstanceId = sample.WfInstanceId,
+                        DataId = sample.DataId,
+                        WfNodeId = sample.ApproveNodeId,
+                        TodoIds = group.Select(x => x.Id).Distinct().ToList(),
+                        ActionType = expireSetting.ActionType
+                    });
+                }
             }
         }
 

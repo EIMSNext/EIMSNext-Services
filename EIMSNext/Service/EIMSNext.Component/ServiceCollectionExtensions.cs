@@ -1,4 +1,4 @@
-﻿using EIMSNext.Scripting;
+using EIMSNext.Scripting;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.Component

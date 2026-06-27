@@ -77,8 +77,27 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
         {
+            var targetEmpIds = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            if (targetEmpIds.Count == 0)
+            {
+                return;
+            }
+
+            var existedEmpIds = ApprovalLogRepository.Find(x =>
+                x.DataId == dataContext.DataId
+                && x.NodeId == wfStep.Id
+                && x.Result == ApproveAction.CopyTo
+                && x.Round == dataContext.Round
+                && x.Approver != null
+                && targetEmpIds.Contains(x.Approver.Id))
+                .ToList()
+                .Select(x => x.Approver?.Id ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var logs = new List<Wf_ApprovalLog>();
-            await EmployeeRepository.Find(x => empIds.Contains(x.Id))
+            await EmployeeRepository.Find(x => targetEmpIds.Contains(x.Id))
              .ForEachAsync(emp => logs.Add(new Wf_ApprovalLog()
              {
                  CorpId = dataContext.CorpId,
@@ -96,6 +115,8 @@ namespace EIMSNext.Flow.Core.Nodes
                   WfVersion = wfInst.Version,
                   Round = dataContext.Round
               }));
+
+            logs = logs.Where(x => x.Approver != null && !existedEmpIds.Contains(x.Approver.Id)).ToList();
 
             if (logs.Any())
             {
@@ -216,7 +237,7 @@ namespace EIMSNext.Flow.Core.Nodes
             if (rule == WorkflowAutoProcessRule.FirstNodeOnly)
             {
                 var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
-                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId != wfStep.Id;
+                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId == wfStep.Id;
             }
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)

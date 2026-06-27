@@ -1,6 +1,7 @@
 using System.Security.Cryptography.X509Certificates;
 using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Persistence;
 using EIMSNext.Auth.Services;
 using EIMSNext.DingTalk.Clients;
@@ -21,9 +22,12 @@ namespace EIMSNext.Auth.Extensions
     {
         public static IServiceCollection AddAuthServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
-            services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
+            services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
+            services.AddAuthMongoCollections(configuration);
             services.AddScoped<IAuthDbContext, AuthDbContext>();
             services.AddScoped<IUserService, UserService>();
+            services.AddScoped<IPublicTokenService, PublicTokenService>();
+            services.AddScoped<PublicSettingLookupService>();
             services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             services.AddScoped<ISingleSignOnService, SingleSignOnService>();
             services.AddScoped<IIntegrationAuthService, IntegrationAuthService>();
@@ -37,6 +41,8 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<ITokenGrantHandler, VerificationCodeTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, IntegrationTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, PublicTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, SystemTaskTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
             var certificatePath = Path.Combine(contentRootPath, configuration.GetSection("Certificates:CerPath").Value!);
@@ -49,13 +55,18 @@ namespace EIMSNext.Auth.Extensions
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
-                    options.SetIssuer(new Uri("https://auth.eimsnext.com"));
+                    var issuerValue = configuration.GetSection("OAuth:Issuer").Value
+                        ?? configuration.GetSection("OAuth:Authority").Value
+                        ?? "https://auth.eimsnext.com";
+                    options.SetIssuer(new Uri(issuerValue));
                     options.SetTokenEndpointUris("connect/token");
 
                     options.AllowPasswordFlow();
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SingleSignOn);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Integration);
+                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Public);
+                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SystemTask);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();

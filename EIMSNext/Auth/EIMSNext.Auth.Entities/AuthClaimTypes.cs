@@ -10,5 +10,9 @@ namespace EIMSNext.Auth.Entities
         public const string Scope = "scope";
         public const string Audience = "aud";
         public const string ClientId = "client_id";
+        public const string IdentityType = "identity_type";
+        public const string DashboardId = "dashboard_id";
+        public const string PublicTargetId = "public_target_id";
+        public const string PublicScope = "public_scope";
     }
 }

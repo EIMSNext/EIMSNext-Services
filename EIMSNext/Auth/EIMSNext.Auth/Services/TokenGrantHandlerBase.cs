@@ -38,7 +38,7 @@ namespace EIMSNext.Auth.Services
             return new AuditLogin
             {
                 LoginId = loginId,
-                ClientId = Constants.ClientId_Web,
+                ClientId = InternalClients.WebClientId,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 GrantType = grantType,
@@ -54,7 +54,7 @@ namespace EIMSNext.Auth.Services
                 UserId = user.Id,
                 UserName = user.Name,
                 CorpId = claims.FirstOrDefault(x => x.Type == AuthClaimTypes.Corp)?.Value,
-                ClientId = Constants.ClientId_Web,
+                ClientId = InternalClients.WebClientId,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 GrantType = grantType

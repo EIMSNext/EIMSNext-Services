@@ -161,6 +161,16 @@ namespace EIMSNext.Service.Entities
         /// 是否隐藏
         /// </summary>
         public bool Hidden { get; set; }
+
+        /// <summary>
+        /// 字段来源。public 表示公开发布系统字段。
+        /// </summary>
+        public string? Source { get; set; }
+
+        /// <summary>
+        /// 系统字段分类。
+        /// </summary>
+        public string? SystemKind { get; set; }
     }
 
     /// <summary>

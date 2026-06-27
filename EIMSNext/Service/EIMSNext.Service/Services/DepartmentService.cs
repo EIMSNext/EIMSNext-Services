@@ -43,6 +43,18 @@ namespace EIMSNext.Service
             return base.BeforeAdd(entities, session);
         }
 
+        protected override Task BeforeReplace(Department entity, IClientSessionHandle? session)
+        {
+            NormalizeHierarchy(entity);
+            return base.BeforeReplace(entity, session);
+        }
+
+        protected override async Task AfterReplace(Department entity, IClientSessionHandle? session)
+        {
+            await base.AfterReplace(entity, session);
+            RefreshDescendantHierarchy(entity, session);
+        }
+
         protected override Task BeforeDelete(FilterDefinition<Department> filter, IClientSessionHandle? session)
         {
             var deletingDepartments = Repository.Find(new MongoFindOptions<Department> { Filter = filter }, session).ToList();
@@ -74,6 +86,58 @@ namespace EIMSNext.Service
             }
 
             return base.BeforeDelete(filter, session);
+        }
+
+        private void NormalizeHierarchy(Department entity)
+        {
+            if (string.IsNullOrWhiteSpace(entity.ParentId))
+            {
+                entity.ParentId = string.Empty;
+                entity.ParentName = string.Empty;
+                entity.HeriarchyId = $"|{entity.Id}|";
+                entity.HeriarchyName = entity.Name;
+                return;
+            }
+
+            if (entity.ParentId == entity.Id)
+            {
+                throw new BadRequestException("部门不能设置自身为上级部门");
+            }
+
+            var parent = Repository.Get(entity.ParentId);
+            if (parent == null || parent.DeleteFlag)
+            {
+                entity.ParentId = string.Empty;
+                entity.ParentName = string.Empty;
+                entity.HeriarchyId = $"|{entity.Id}|";
+                entity.HeriarchyName = entity.Name;
+                return;
+            }
+
+            if (parent.HeriarchyId.Contains($"|{entity.Id}|"))
+            {
+                throw new BadRequestException("部门不能移动到自己的下级部门下");
+            }
+
+            entity.ParentName = parent.Name;
+            entity.HeriarchyId = $"{parent.HeriarchyId}{entity.Id}|";
+            entity.HeriarchyName = $"{entity.Name}/{parent.HeriarchyName}";
+        }
+
+        private void RefreshDescendantHierarchy(Department parent, IClientSessionHandle? session)
+        {
+            var children = Repository.Queryable
+                .Where(x => x.CorpId == parent.CorpId && !x.DeleteFlag && x.ParentId == parent.Id)
+                .ToList();
+
+            foreach (var child in children)
+            {
+                child.ParentName = parent.Name;
+                child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
+                child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
+                Repository.Replace(child, session);
+                RefreshDescendantHierarchy(child, session);
+            }
         }
     }
 }

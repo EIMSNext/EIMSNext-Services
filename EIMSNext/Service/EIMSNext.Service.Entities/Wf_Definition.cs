@@ -401,6 +401,10 @@ namespace EIMSNext.Service.Entities
         /// 超时转交设置
         /// </summary>
         public TransferSetting? TransferSetting { get; set; }
+        /// <summary>
+        /// 超时回退设置
+        /// </summary>
+        public ReturnSetting? ReturnSetting { get; set; }
     }
 
     /// <summary>
@@ -427,6 +431,40 @@ namespace EIMSNext.Service.Entities
         /// 转交目标候选人
         /// </summary>
         public List<ApprovalCandidate>? Candidates { get; set; }
+    }
+
+    /// <summary>
+    /// 回退设置
+    /// </summary>
+    public class ReturnSetting
+    {
+        /// <summary>
+        /// 回退目标模式
+        /// </summary>
+        public ReturnTargetMode TargetMode { get; set; } = ReturnTargetMode.Previous;
+        /// <summary>
+        /// 指定节点ID
+        /// </summary>
+        public string? TargetNodeId { get; set; }
+    }
+
+    /// <summary>
+    /// 回退目标模式
+    /// </summary>
+    public enum ReturnTargetMode
+    {
+        /// <summary>
+        /// 回退到上一个可回退节点
+        /// </summary>
+        Previous = 0,
+        /// <summary>
+        /// 回退到发起节点
+        /// </summary>
+        Start = 1,
+        /// <summary>
+        /// 回退到指定节点
+        /// </summary>
+        Specified = 2,
     }
 
     /// <summary>
@@ -1267,6 +1305,26 @@ namespace EIMSNext.Service.Entities
         /// 转交
         /// </summary>
         Transfer = 9,
+
+        /// <summary>
+        /// 自动驳回
+        /// </summary>
+        AutoReject = 10,
+
+        /// <summary>
+        /// 自动回退
+        /// </summary>
+        AutoReturn = 11,
+
+        /// <summary>
+        /// 自动转交
+        /// </summary>
+        AutoTransfer = 12,
+
+        /// <summary>
+        /// 变更审批人
+        /// </summary>
+        ChangeApprover = 13,
 
     }
 }

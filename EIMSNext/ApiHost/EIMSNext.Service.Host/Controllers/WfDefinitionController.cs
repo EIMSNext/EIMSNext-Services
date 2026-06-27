@@ -22,19 +22,13 @@ namespace EIMSNext.Service.Host.Controllers
 	    [HttpPost("CreateVersion")]
 	    public async Task<IActionResult> CreateVersion([FromBody] WfDefinitionVersionActionRequest request)
 	    {
-	        var result = await Resolver.Resolve<IWfDefinitionService>().CreateVersionAsync(request.Id);
-	        var flowClient = Resolver.Resolve<FlowApiClient>();
-	        await flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
-	        return Ok(result);
+	        return Ok(await ApiService.CreateVersionAsync(request.Id));
 	    }
 
 	    [HttpPost("Activate")]
 	    public async Task<IActionResult> Activate([FromBody] WfDefinitionVersionActionRequest request)
 	    {
-	        var result = await Resolver.Resolve<IWfDefinitionService>().ActivateAsync(request.Id);
-	        var flowClient = Resolver.Resolve<FlowApiClient>();
-	        await flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
-	        return Ok(result);
+	        return Ok(await ApiService.ActivateAsync(request.Id));
 	    }
 
 	    /// <summary>
@@ -53,6 +47,8 @@ namespace EIMSNext.Service.Host.Controllers
 	        {
 	            return NotFound("智能助手不存在");
 	        }
+
+	        Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(def.AppId);
 
 	        var hookApi = Resolver.Resolve<DataflowHookApiService>();
 	        var sample = await hookApi.GetLatestSampleAsync(corpId, dataflowId);

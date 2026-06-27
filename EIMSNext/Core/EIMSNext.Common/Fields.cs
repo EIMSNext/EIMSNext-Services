@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Common
+namespace EIMSNext.Common
 {
     public static class Fields
     {
@@ -40,7 +40,7 @@
         //public const string Location = "location";
         public const string ImageUpload = "imageupload";
         public const string FileUpload = "fileupload";
-        //public const string Signature = "signature";
+        public const string Signature = "signature";
         public const string TableForm = "tableform";
         public const string Employee1 = "employee1";
         public const string Employee2 = "employee2";
@@ -51,7 +51,7 @@
         /// </summary>
         public const string SerialNo = "serialno";
 
-        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, Signature, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
         public static bool IsInputField(string type)
         {
             return AllFieldTypes.Contains(type);

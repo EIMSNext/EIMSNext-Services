@@ -1,4 +1,4 @@
-﻿using CloudNative.CloudEvents.Core;
+using CloudNative.CloudEvents.Core;
 using CloudNative.CloudEvents;
 using Microsoft.AspNetCore.Mvc.Formatters;
 using System.Text;

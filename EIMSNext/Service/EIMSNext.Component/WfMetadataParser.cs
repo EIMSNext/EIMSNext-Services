@@ -141,6 +141,11 @@ namespace EIMSNext.Component
                             TransferSetting = approveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
                             {
                                 Candidates = approveMeta.ExpireSetting.TransferSetting.Candidates
+                            },
+                            ReturnSetting = approveMeta.ExpireSetting.ReturnSetting == null ? null : new ReturnSetting
+                            {
+                                TargetMode = approveMeta.ExpireSetting.ReturnSetting.TargetMode,
+                                TargetNodeId = approveMeta.ExpireSetting.ReturnSetting.TargetNodeId
                             }
                         },
                         SubmitCondition = ParseSubmitCondition(approveMeta?.SubmitCondition),
@@ -660,6 +665,7 @@ namespace EIMSNext.Component
             public TimeUnit TimeUnit { get; set; } = TimeUnit.Minute;
             public NotifyMeta? NotifySetting { get; set; }
             public TransferMeta? TransferSetting { get; set; }
+            public ReturnMeta? ReturnSetting { get; set; }
         }
 
         private class NotifyMeta
@@ -671,6 +677,12 @@ namespace EIMSNext.Component
         private class TransferMeta
         {
             public List<ApprovalCandidate>? Candidates { get; set; }
+        }
+
+        private class ReturnMeta
+        {
+            public ReturnTargetMode TargetMode { get; set; } = ReturnTargetMode.Previous;
+            public string? TargetNodeId { get; set; }
         }
         private class CopytoMeta
         {

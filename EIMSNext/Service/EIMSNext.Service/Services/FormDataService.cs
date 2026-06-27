@@ -31,36 +31,56 @@ namespace EIMSNext.Service
             _serialNoSvc = resolver.Resolve<ISerialNoSequenceService>();
         }
 
-        protected override void CreateAuditLog(DbAction action, IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update, IClientSessionHandle? session)
+        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update)
         {
-            base.CreateAuditLog(action, oldData, newData, filter, update, session);
+            var logList = new List<AuditLog>();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
 
-            // FormDataChangeLog 是 FormData 详情页右侧的业务变更记录，不在通用审计日志方法里写入。
-            // if (oldData == null || !oldData.Any())
-            // {
-            //     // 新增不写 FormDataChangeLog
-            // }
-            // else if (newData == null || !newData.Any())
-            // {
-            //     // 删除不写 FormDataChangeLog
-            // }
-            // else
-            // {
-            //     // FormDataChangeLog 的更新记录已移动到 AfterReplace 中写入。
-            //     // var changeLogs = ExpandoComparer.Compare(oldData.First().Data, newData.First().Data);
-            // }
-            //
-            // var dataLog = new FormDataChangeLog();
-            // TODO: 保存变更日志
-            // switch (action)
-            // {
-            //     case DbAction.Insert:
-            //         break;
-            //     case DbAction.Update:
-            //         break;
-            //     default:
-            //         break;
-            // }
+            if (oldData == null || newData == null)
+            {
+                logList.Add(new AuditLog
+                {
+                    Action = DbAction.Update,
+                    EntityType = nameof(FormData),
+                    Detail = $"批量更新数据(无旧对象):{filter?.ToString()}",
+                    DataFilter = filter?.ToString(),
+                    CreateBy = op,
+                    UpdateBy = op,
+                    CreateTime = now,
+                    UpdateTime = now,
+                    ClientIp = ip,
+                    CorpId = corpId,
+                });
+            }
+            else
+            {
+                oldData.ForEach(x =>
+                {
+                    var y = newData.FirstOrDefault(e => e.Id == x.Id);
+                    if (y == null) return;
+                    logList.Add(new AuditLog
+                    {
+                        Action = DbAction.Update,
+                        EntityType = nameof(FormData),
+                        DataId = x.Id,
+                        // FormData 不展开字段差异；详情由 FormDataChangeLog 体现
+                        Detail = "已修改（详情见 FormDataChangeLog）",
+                        OldData = x.SerializeToJson(),
+                        NewData = y.SerializeToJson(),
+                        CreateBy = op,
+                        UpdateBy = op,
+                        CreateTime = now,
+                        UpdateTime = now,
+                        ClientIp = ip,
+                        CorpId = corpId,
+                    });
+                });
+            }
+
+            return logList;
         }
 
         private static Dictionary<string, FieldDef> BuildFieldLookup(FormDef? formDef)
@@ -130,6 +150,11 @@ namespace EIMSNext.Service
             await SubmitAsync(entities, null, EIMSNext.Service.Entities.CascadeMode.NotSet, null);
         }
 
+        public void Add(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        {
+            AddCore(entities, session);
+        }
+
         protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
@@ -143,8 +168,83 @@ namespace EIMSNext.Service
 
         public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
         {
+            var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
+            if (old == null && ShouldTriggerFormDataChangeDataflow())
+            {
+                old = Get(entity.Id);
+                if (old != null)
+                {
+                    ScopeCache.Set(entity.Id, old.DeepClone(), DataVersion.Old);
+                }
+            }
+
+            var changeFields = old == null
+                ? []
+                : ExpandoComparer.Compare(old.Data, entity.Data)
+                    .Select(x => x.FieldId)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
             var result = await base.ReplaceAsync(entity);
             await SubmitAsync([entity], null, EIMSNext.Service.Entities.CascadeMode.NotSet, null);
+
+            if (ShouldTriggerFormDataChangeDataflow() && changeFields.Count > 0)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Modified, EIMSNext.Service.Entities.CascadeMode.NotSet, null, changeFields);
+            }
+
+            return result;
+        }
+
+        public ReplaceOneResult Replace(FormData entity, IClientSessionHandle? session)
+        {
+            return ReplaceCore(entity, session);
+        }
+
+        public object Delete(IEnumerable<string> ids, IClientSessionHandle? session)
+        {
+            return DeleteCore(FilterBuilder.In(x => x.Id, ids), session);
+        }
+
+        public override Task<object> DeleteAsync(string id)
+        {
+            return DeleteAsync([id]);
+        }
+
+        public override async Task<object> DeleteAsync(IEnumerable<string> ids)
+        {
+            var idList = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var deleting = ShouldTriggerFormDataChangeDataflow() && idList.Count > 0
+                ? Find(x => idList.Contains(x.Id)).ToList()
+                : [];
+
+            var result = await base.DeleteAsync(idList);
+
+            foreach (var entity in deleting)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+            }
+
+            return result;
+        }
+
+        public override async Task<object> DeleteAsync(DynamicFilter filter)
+        {
+            var deleting = ShouldTriggerFormDataChangeDataflow()
+                ? Repository.Collection.Find(filter.ToFilterDefinition<FormData>()).ToList()
+                : [];
+
+            var result = await base.DeleteAsync(filter);
+
+            foreach (var entity in deleting)
+            {
+                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+            }
+
             return result;
         }
 
@@ -231,16 +331,43 @@ namespace EIMSNext.Service
                 }
                 else
                 {
-                    if (cascade != EIMSNext.Service.Entities.CascadeMode.Never)
-                    {
-                        //非流程单据直接提交
-                        var dfResp = await _flowClient.RunDataflow(new DfRunRequest { DataId = entity.Id, EventSource = ApiClient.Flow.EventSourceType.Form, EventType = ApiClient.Flow.EventType.Submit }, Context.AccessToken);
-                        if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
-                        {
-                            throw new UnLogException(dfResp.Error);
-                        }
-                    }
+                    await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
                 }
+            }
+        }
+
+        private bool ShouldTriggerFormDataChangeDataflow()
+        {
+            return Context.Action == DataAction.None || Context.Action == DataAction.Save;
+        }
+
+        private async Task RunFormDataflowAsync(
+            FormData entity,
+            ApiClient.Flow.EventType eventType,
+            EIMSNext.Service.Entities.CascadeMode cascade,
+            string? eventIds,
+            IEnumerable<string>? changeFields)
+        {
+            if (cascade == EIMSNext.Service.Entities.CascadeMode.Never)
+            {
+                return;
+            }
+
+            var dfResp = await _flowClient.RunDataflow(new DfRunRequest
+            {
+                DataId = entity.Id,
+                EventSource = ApiClient.Flow.EventSourceType.Form,
+                EventType = eventType,
+                DfCascade = (ApiClient.Flow.CascadeMode)cascade,
+                EventIds = eventIds,
+                ChangeFields = changeFields?
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList()
+            }, Context.AccessToken);
+            if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
+            {
+                throw new UnLogException(dfResp.Error);
             }
         }
 
@@ -488,6 +615,7 @@ namespace EIMSNext.Service
                 MessageType = MessageType.FormNotify,
                 AppId = newData.AppId,
                 FormId = newData.FormId,
+                TargetType = NotifyTargetType.Form,
                 DataId = newData.Id,
                 FormTriggerMode = triggerMode,
                 Operator = Context.Operator,
@@ -522,6 +650,7 @@ namespace EIMSNext.Service
                 x.CorpId == entity.CorpId &&
                 x.AppId == entity.AppId &&
                 x.FormId == entity.FormId &&
+                x.TargetType == NotifyTargetType.Form &&
                 !x.Disabled &&
                 x.TriggerMode == FormNotifyTriggerMode.TimeFieldScheduled).ToList();
 
@@ -542,6 +671,7 @@ namespace EIMSNext.Service
                     DataId = entity.Id,
                     AppId = entity.AppId,
                     FormId = entity.FormId,
+                    TargetType = NotifyTargetType.Form,
                     FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     NewData = entity
                 });
@@ -569,6 +699,7 @@ namespace EIMSNext.Service
                     DataId = entity.Id,
                     AppId = notify.AppId,
                     FormId = notify.FormId,
+                    TargetType = NotifyTargetType.Form,
                     CorpId = notify.CorpId,
                     TriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                     ScheduleVersion = notify.ScheduleVersion,

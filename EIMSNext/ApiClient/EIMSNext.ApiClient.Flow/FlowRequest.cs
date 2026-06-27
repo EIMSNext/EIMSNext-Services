@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.ApiClient.Flow
+namespace EIMSNext.ApiClient.Flow
 {
     public interface IFlowClient
     {
@@ -18,6 +18,7 @@
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
         Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken);
         Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken);
+        Task<WfResponse?> ExpireAction(ExpireActionRequest req, string accessToken);
 
         Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken);
     }
@@ -106,11 +107,15 @@
     }
     public class DfRunRequest
     {
+        public string DataflowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
+        public string WfNodeId { get; set; } = string.Empty;
+        public string? NodeAction { get; set; }
         public CascadeMode DfCascade { get; set; }
         public string? EventIds { get; set; }
+        public List<string>? ChangeFields { get; set; }
     }
     /// <summary>
     /// 事件来源类型枚举
@@ -141,9 +146,9 @@
     public enum EventType
     {
         None = 0,
-        Submit = 1,
-        Update = 2,
-        Delete = 4,
+        Submitted = 1,
+        Modified = 2,
+        Removed = 4,
         Approving = 8,
         Approved = 16,
         Rejected = 32,
@@ -163,9 +168,10 @@
     }
     public enum CascadeMode
     {
-        All,
-        Specified,
-        Never
+        NotSet = 0,
+        All = 1,
+        Specified = 2,
+        Never = 3
     }
     public enum WorkflowStatus
     {
@@ -195,6 +201,23 @@
         public string WfNodeId { get; set; } = string.Empty;
         public string TargetEmployeeId { get; set; } = string.Empty;
         public string Comment { get; set; } = string.Empty;
+    }
+
+    public class ExpireActionRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public WfExpireActionType ActionType { get; set; }
+    }
+
+    public enum WfExpireActionType
+    {
+        AutoNotify = 0,
+        AutoApprove = 1,
+        AutoTransfer = 2,
+        AutoReject = 3,
+        AutoReturn = 4
     }
 
     public class DeleteRequest()

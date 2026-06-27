@@ -3,18 +3,14 @@ using EIMSNext.Core.Entities;
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
-    /// 执行日志实体，用于记录工作流节点执行情况
+    /// 数据流单次运行中单个节点的执行记录（隶属于某次 Df_RunLog）。
     /// </summary>
-    public class Df_ExecLog : MongoEntityBase
+    public class Df_RunLogNode : CorpEntityBase
     {
         /// <summary>
-        /// 单次运行日志ID，新页面只读取带该字段的新日志。
+        /// 隶属的运行日志ID。
         /// </summary>
         public string RunLogId { get; set; } = string.Empty;
-        /// <summary>
-        /// 企业ID
-        /// </summary>
-        public string CorpId { get; set; } = string.Empty;
         /// <summary>
         /// 数据流定义ID
         /// </summary>

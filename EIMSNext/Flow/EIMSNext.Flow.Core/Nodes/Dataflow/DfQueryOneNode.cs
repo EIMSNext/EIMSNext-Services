@@ -23,7 +23,8 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             return ExecuteWithLog(context, dataContext =>
             {
-                var findOpt = Metadata!.DfNodeSetting!.QueryOneSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
+                var querySetting = Metadata!.DfNodeSetting!.QueryOneSetting!;
+                var findOpt = querySetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
                 BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
 
                 var queryData = FormDataRepository.Find(findOpt).FirstOrDefault();
@@ -34,7 +35,7 @@ namespace EIMSNext.Flow.Core.Nodes
                     {
                         NodeId = Metadata.Id,
                         SingleResult = Metadata.DfNodeSetting!.SingleResult,
-                        FormId = dataContext.FormId,
+                        FormId = querySetting.FormId,
                         ActionDatas = new List<ActionFormData>() { new ActionFormData { State = DataState.Unchanged, FormData = queryData } }
                     });
                 }

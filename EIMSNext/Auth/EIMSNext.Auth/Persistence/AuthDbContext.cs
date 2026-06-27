@@ -36,6 +36,11 @@ namespace EIMSNext.Auth.Persistence
             await _clients.InsertOneAsync(entity);
         }
 
+        public Task UpdateClient(Client entity)
+        {
+            return _clients.ReplaceOneAsync(x => x.Id == entity.Id, entity);
+        }
+
         public async Task AddUser(User entity)
         {
             await this._users.InsertOneAsync(entity);

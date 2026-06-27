@@ -131,6 +131,8 @@ namespace EIMSNext.Auth.Tests
                 return Task.CompletedTask;
             }
 
+            public Task UpdateClient(Client entity) => Task.CompletedTask;
+
             public Task AddUser(User entity)
             {
                 entity.Id = string.IsNullOrWhiteSpace(entity.Id) ? $"user-{AddedUsers.Count + 1}" : entity.Id;

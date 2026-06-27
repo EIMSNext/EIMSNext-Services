@@ -77,13 +77,9 @@ namespace EIMSNext.Service
 
             user!.Crops.Add(new UserCorp { CorpId = entity.Id, CorpType = "internal", IsCorpOwner = true, IsDefault = true });
 
-            var emp_system = new Employee { CorpId = entity.Id, Id = $"system_{entity.Id}", Code = "system", EmpName = "System", UserId = "system", UserName = "System", IsDummy = true };
-            var emp_anonymous = new Employee { CorpId = entity.Id, Id = $"anonymous_{entity.Id}", Code = "anonymous", EmpName = "Anonymous", UserId = "anonymous", UserName = "Anonymous", IsDummy = true };
             var empDepartments = new List<EmployeeDepartment>
             {
                 new() { CorpId = entity.Id, EmployeeId = emp.Id, DepartmentId = dept.Id, SortValue = 0 },
-                new() { CorpId = entity.Id, EmployeeId = emp_system.Id, DepartmentId = dept.Id, SortValue = 0 },
-                new() { CorpId = entity.Id, EmployeeId = emp_anonymous.Id, DepartmentId = dept.Id, SortValue = 0 }
             };
             empDeptRepo.EnsureId(empDepartments);
             var systemAdminGroup = new AdminGroup
@@ -102,7 +98,7 @@ namespace EIMSNext.Service
                 base.AddCoreAsync(entities, session),
                 clientRepo.InsertAsync(serviceClient,session),
                 deptRepo.InsertAsync(dept, session),
-                empRepo.InsertAsync(new List<Employee>{emp, emp_system,emp_anonymous}, session),
+                empRepo.InsertAsync(new List<Employee>{emp}, session),
                 empDeptRepo.InsertAsync(empDepartments, session),
                 adminGroupRepo.InsertAsync(systemAdminGroup, session),
                 userRepo.ReplaceAsync(user, session)

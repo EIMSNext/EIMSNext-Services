@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Core.Query
+namespace EIMSNext.Core.Query
 {
     public class DynamicFindOptions<T>
     {
@@ -14,5 +14,9 @@
     public class DataScope
     {
         public string? AuthGroupId { get; set; }
+
+        public string? FormId { get; set; }
+
+        public bool InheritMemberPermissions { get; set; }
     }
 }

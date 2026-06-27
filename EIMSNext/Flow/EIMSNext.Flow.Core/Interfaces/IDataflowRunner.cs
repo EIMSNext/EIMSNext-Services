@@ -26,15 +26,39 @@ namespace EIMSNext.Flow.Core.Interfaces
             EventIds = eventIds;
         }
 
+        public DfRunParamter WithDataflowId(string dataflowId)
+        {
+            DataflowId = dataflowId;
+            return this;
+        }
+
+        public DfRunParamter WithNodeAction(string? nodeAction)
+        {
+            NodeAction = nodeAction;
+            return this;
+        }
+
+        public DfRunParamter WithChangeFields(IEnumerable<string>? changeFields)
+        {
+            ChangeFields = changeFields?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            return this;
+        }
+
         public string UserId { get; private set; }
         public string AccessToken { get; private set; }
         public FormData Data { get; private set; }
+        public string DataflowId { get; private set; } = string.Empty;
         public EventSourceType EventSource { get; private set; }
         public EventType EventType { get; private set; }
         public string WfNodeId { get; private set; }
+        public string? NodeAction { get; private set; }
         public Operator? Starter { get; private set; }
         public CascadeMode Cascade { get; private set; }
         public string? EventIds { get; private set; }
+        public IReadOnlyCollection<string>? ChangeFields { get; private set; }
     }
 
     public class DfExecResult

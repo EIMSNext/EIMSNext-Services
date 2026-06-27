@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Dynamic;
 
 namespace EIMSNext.Core.Extensions

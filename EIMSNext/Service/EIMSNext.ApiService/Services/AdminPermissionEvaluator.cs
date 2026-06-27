@@ -11,6 +11,9 @@ namespace EIMSNext.ApiService
 {
     public class AdminPermissionEvaluator(IResolver resolver) : ApiServiceBase(resolver)
     {
+        // 注意：此类的实例生命周期必须是 Scoped (per-request)，由 MEF2 容器保证。
+        // 下方的 _normalGroups / _snapshot 缓存在单次 HTTP 请求内复用，
+        // 以减少对 AdminGroup 的重复查询；切勿改为 Singleton，否则会跨请求泄漏用户权限数据。
         private IReadOnlyList<AdminGroup>? _normalGroups;
         private AdminPermissionSnapshot? _snapshot;
 
@@ -40,7 +43,7 @@ namespace EIMSNext.ApiService
 
             ApplyScope(
                 snapshot,
-                CombineScope(groups, x => x.AppDepartmentScopeMode, x => x.AppDepartmentIds),
+                ExpandDepartmentScope(CombineScope(groups, x => x.AppDepartmentScopeMode, x => x.AppDepartmentIds)),
                 static (x, mode) => x.AppDepartmentScopeMode = mode,
                 static (x, ids) => x.AppDepartmentIds = ids);
 
@@ -52,13 +55,13 @@ namespace EIMSNext.ApiService
 
             ApplyScope(
                 snapshot,
-                CombineScope(groups.Where(x => x.ContactDepartmentPermission >= PermissionLevel.View), x => x.ContactDepartmentScopeMode, x => x.ContactDepartmentIds),
+                ExpandDepartmentScope(CombineScope(groups.Where(x => x.ContactDepartmentPermission >= PermissionLevel.View), x => x.ContactDepartmentScopeMode, x => x.ContactDepartmentIds)),
                 static (x, mode) => x.ContactViewDepartmentScopeMode = mode,
                 static (x, ids) => x.ContactViewDepartmentIds = ids);
 
             ApplyScope(
                 snapshot,
-                CombineScope(groups.Where(x => x.ContactDepartmentPermission >= PermissionLevel.Manage), x => x.ContactDepartmentScopeMode, x => x.ContactDepartmentIds),
+                ExpandDepartmentScope(CombineScope(groups.Where(x => x.ContactDepartmentPermission >= PermissionLevel.Manage), x => x.ContactDepartmentScopeMode, x => x.ContactDepartmentIds)),
                 static (x, mode) => x.ContactManageDepartmentScopeMode = mode,
                 static (x, ids) => x.ContactManageDepartmentIds = ids);
 
@@ -80,16 +83,12 @@ namespace EIMSNext.ApiService
 
         public List<string> GetUsageAppIdsForCurrentEmployee()
         {
-            var employee = IdentityContext.CurrentEmployee as Employee;
-            if (employee == null)
-            {
-                return [];
-            }
-
-            var empId = employee.Id;
-            var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
-            var deptIds = GetCurrentEmployeeDeptIds();
-            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var ancestorDeptIds = memberScope.AncestorDepartmentIds.ToList();
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
@@ -98,13 +97,75 @@ namespace EIMSNext.ApiService
                     x.Members.Any(m =>
                         (m.Type == MemberType.Employee && m.Id == empId) ||
                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.AppId)
+                .Distinct()
+                .Concat(GetPublishedDashboardAppIds(memberScope))
                 .Distinct()
                 .ToList();
         }
 
         public List<string> GetUsageFormIdsForCurrentEmployee(string? appId)
+        {
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var ancestorDeptIds = memberScope.AncestorDepartmentIds.ToList();
+
+            return Resolver.GetService<AuthGroup>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
+                    x.Members.Any(m =>
+                        (m.Type == MemberType.Employee && m.Id == empId) ||
+                        (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                .Select(x => x.FormId)
+                .Distinct()
+                .ToList();
+        }
+
+        public List<string> GetUsageDashboardIdsForCurrentEmployee(string? appId)
+        {
+            if (HasUnrestrictedManagementIdentity)
+            {
+                return Resolver.GetService<DashboardDef>()
+                    .Query(x =>
+                        x.CorpId == IdentityContext.CurrentCorpId &&
+                        !x.DeleteFlag &&
+                        (string.IsNullOrEmpty(appId) || x.AppId == appId))
+                    .Select(x => x.Id)
+                    .Distinct()
+                    .ToList();
+            }
+
+            var memberScope = GetCurrentEmployeeMemberScope();
+            if (memberScope == null) return [];
+
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var ancestorDeptIds = memberScope.AncestorDepartmentIds.ToList();
+            var manageableAppIds = ShouldApplyNormalAdminRules ? GetSnapshot().ManageableAppIds : new List<string>();
+            return Resolver.GetService<DashboardDef>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
+                    (manageableAppIds.Contains(x.AppId) ||
+                     (x.MemberPublishEnabled && x.PublishMembers.Any(m =>
+                         (m.Type == MemberType.Employee && m.Id == empId) ||
+                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                         (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))))
+                .Select(x => x.Id)
+                .Distinct()
+                .ToList();
+        }
+
+        public List<AuthGroup> GetUsageAuthGroupsForCurrentEmployee(string? formId)
         {
             var employee = IdentityContext.CurrentEmployee as Employee;
             if (employee == null)
@@ -115,19 +176,18 @@ namespace EIMSNext.ApiService
             var empId = employee.Id;
             var roleIds = employee.Roles.Select(x => x.RoleId).ToList();
             var deptIds = GetCurrentEmployeeDeptIds();
-            var childDeptIds = GetCurrentEmployeeChildDepartmentIds(deptIds);
+            var ancestorDeptIds = GetCurrentEmployeeAncestorDepartmentIds(deptIds);
 
             return Resolver.GetService<AuthGroup>()
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
+                    !x.Disabled &&
+                    (string.IsNullOrEmpty(formId) || x.FormId == formId) &&
                     x.Members.Any(m =>
                         (m.Type == MemberType.Employee && m.Id == empId) ||
                         (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && childDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
-                .Select(x => x.FormId)
-                .Distinct()
+                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .ToList();
         }
 
@@ -151,19 +211,7 @@ namespace EIMSNext.ApiService
                         .ToList();
                 }
 
-                var usageAppIds = GetUsageAppIdsForCurrentEmployee();
-                var dashQuery = Resolver.GetService<DashboardDef>()
-                    .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.AppId == appId);
-
-                if (!isManagedApp)
-                {
-                    dashQuery = dashQuery.Where(x => usageAppIds.Contains(x.AppId));
-                }
-
-                var dashIds = dashQuery
-                    .Select(x => x.Id)
-                    .Distinct()
-                    .ToList();
+                var dashIds = GetUsageDashboardIdsForCurrentEmployee(appId);
 
                 return BuildAppMenuPermissions(formIds, dashIds);
             }
@@ -171,12 +219,7 @@ namespace EIMSNext.ApiService
             if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
             {
                 var formIds = GetUsageFormIdsForCurrentEmployee(appId);
-                var usageAppIds = GetUsageAppIdsForCurrentEmployee();
-                var dashIds = Resolver.GetService<DashboardDef>()
-                    .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.AppId == appId && usageAppIds.Contains(x.AppId))
-                    .Select(x => x.Id)
-                    .Distinct()
-                    .ToList();
+                var dashIds = GetUsageDashboardIdsForCurrentEmployee(appId);
 
                 return BuildAppMenuPermissions(formIds, dashIds);
             }
@@ -270,6 +313,11 @@ namespace EIMSNext.ApiService
 
         public void EnsureCanManageEmployee(Employee entity, Employee? original = null)
         {
+            EnsureCanManageEmployee(entity, original, null);
+        }
+
+        public void EnsureCanManageEmployee(Employee entity, Employee? original, IEnumerable<string>? targetDepartmentIds)
+        {
             if (HasUnrestrictedManagementIdentity)
             {
                 return;
@@ -296,11 +344,15 @@ namespace EIMSNext.ApiService
                 }
             }
 
-            var entityDeptIds = employeeDeptRepo.Queryable
-                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == entity.Id)
-                .Select(x => x.DepartmentId)
+            var entityDeptIds = targetDepartmentIds?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct()
-                .ToList();
+                .ToList()
+                ?? employeeDeptRepo.Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == entity.Id)
+                    .Select(x => x.DepartmentId)
+                    .Distinct()
+                    .ToList();
             foreach (var deptId in entityDeptIds)
             {
                 EnsureDepartmentInScope(deptId, snapshot.ContactManageDepartmentScopeMode, snapshot.ContactManageDepartmentIds, "没有管理该员工的权限");
@@ -486,7 +538,7 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
-        private List<string> GetCurrentEmployeeChildDepartmentIds(IEnumerable<string> deptIds)
+        private List<string> GetCurrentEmployeeAncestorDepartmentIds(IEnumerable<string> deptIds)
         {
             var idList = deptIds.ToList();
             if (idList.Count == 0)
@@ -498,10 +550,53 @@ namespace EIMSNext.ApiService
                 .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
                 .Select(x => new { x.Id, x.HeriarchyId })
                 .ToList();
+            var hierarchyIds = allDepts
+                .Where(x => idList.Contains(x.Id))
+                .Select(x => x.HeriarchyId)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
 
             return allDepts
-                .Where(x => idList.Any(d => x.HeriarchyId.Contains($"|{d}|")))
+                .Where(x => hierarchyIds.Any(h => h.Contains($"|{x.Id}|")))
                 .Select(x => x.Id)
+                .Distinct()
+                .ToList();
+        }
+
+        private EmployeeMemberScope? GetCurrentEmployeeMemberScope()
+        {
+            var employee = IdentityContext.CurrentEmployee as Employee;
+            if (employee == null)
+            {
+                return null;
+            }
+
+            var deptIds = GetCurrentEmployeeDeptIds();
+            return new EmployeeMemberScope(
+                employee.Id,
+                employee.Roles.Select(x => x.RoleId).ToHashSet(),
+                deptIds.ToHashSet(),
+                GetCurrentEmployeeAncestorDepartmentIds(deptIds).ToHashSet());
+        }
+
+        private List<string> GetPublishedDashboardAppIds(EmployeeMemberScope memberScope)
+        {
+            var empId = memberScope.EmployeeId;
+            var roleIds = memberScope.RoleIds.ToList();
+            var deptIds = memberScope.DepartmentIds.ToList();
+            var ancestorDeptIds = memberScope.AncestorDepartmentIds.ToList();
+
+            return Resolver.GetService<DashboardDef>()
+                .Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.MemberPublishEnabled &&
+                    x.PublishMembers.Any(m =>
+                        (m.Type == MemberType.Employee && m.Id == empId) ||
+                        (m.Type == MemberType.Role && roleIds.Contains(m.Id)) ||
+                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                .Select(x => x.AppId)
+                .Distinct()
                 .ToList();
         }
 
@@ -630,6 +725,17 @@ namespace EIMSNext.ApiService
             return new PermissionScope(false, Normalize(list.SelectMany(idsSelector)));
         }
 
+        private PermissionScope ExpandDepartmentScope(PermissionScope scope)
+        {
+            if (scope.All || scope.Ids.Count == 0)
+            {
+                return scope;
+            }
+
+            var expandedIds = GetDepartmentAndDescendantIds(scope.Ids);
+            return new PermissionScope(false, expandedIds.Count == 0 ? scope.Ids : expandedIds);
+        }
+
         private static void ApplyScope(
             AdminPermissionSnapshot snapshot,
             PermissionScope scope,
@@ -649,6 +755,27 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        private List<string> GetDepartmentAndDescendantIds(IEnumerable<string> departmentIds)
+        {
+            var idList = Normalize(departmentIds);
+            if (idList.Count == 0)
+            {
+                return [];
+            }
+
+            var allDepts = Resolver.GetService<Department>()
+                .Query(x => x.CorpId == IdentityContext.CurrentCorpId
+                    && !x.DeleteFlag)
+                .Select(x => new { x.Id, x.HeriarchyId })
+                .ToList();
+
+            return allDepts
+                .Where(x => idList.Any(id => x.Id == id || x.HeriarchyId.Contains($"|{id}|")))
+                .Select(x => x.Id)
+                .Distinct()
+                .ToList();
+        }
+
         private static List<AppMenuPermissionItem> BuildAppMenuPermissions(IEnumerable<string> formIds, IEnumerable<string> dashIds)
         {
             return formIds
@@ -659,5 +786,20 @@ namespace EIMSNext.ApiService
         }
 
         private sealed record PermissionScope(bool All, List<string> Ids);
+
+        private sealed record EmployeeMemberScope(
+            string EmployeeId,
+            HashSet<string> RoleIds,
+            HashSet<string> DepartmentIds,
+            HashSet<string> AncestorDepartmentIds)
+        {
+            public bool Matches(Member member)
+            {
+                return (member.Type == MemberType.Employee && member.Id == EmployeeId) ||
+                       (member.Type == MemberType.Role && RoleIds.Contains(member.Id)) ||
+                       (member.Type == MemberType.Department &&
+                        ((member.CascadedDept && AncestorDepartmentIds.Contains(member.Id)) || DepartmentIds.Contains(member.Id)));
+            }
+        }
     }
 }

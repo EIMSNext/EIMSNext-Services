@@ -1,13 +1,19 @@
-using System.Globalization;
-using System.Security.Claims;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
-using Microsoft.AspNetCore.Authentication;
+
 using Microsoft.AspNetCore;
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
+
 using OpenIddict.Abstractions;
 using OpenIddict.Server.AspNetCore;
+
+using System.Globalization;
+using System.Security.Claims;
+using System.Text;
+using System.Text.Json;
+
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace EIMSNext.Auth.Host.Controllers
@@ -37,6 +43,131 @@ namespace EIMSNext.Auth.Host.Controllers
                 });
             }
 
+            return await HandleTokenRequestAsync(request, cancellationToken);
+        }
+
+        [Route("~/auth/login"), HttpPost]
+        [Consumes("application/x-www-form-urlencoded")]
+        [Produces("application/json")]
+        public async Task<IActionResult> Login([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
+        {
+            var fieldsResult = ParseEncryptedFields(body);
+            if (fieldsResult.Result != null)
+            {
+                return fieldsResult.Result;
+            }
+
+            var fields = fieldsResult.Fields!;
+            if (!fields.TryGetValue("username", out var username) || string.IsNullOrWhiteSpace(username) ||
+                !fields.TryGetValue("password", out var password))
+            {
+                return BadRequest(new OpenIddictResponse
+                {
+                    Error = Errors.InvalidRequest,
+                    ErrorDescription = "The username and password fields are required."
+                });
+            }
+
+            var request = new OpenIddictRequest
+            {
+                GrantType = fields.TryGetValue("grant_type", out var grantType) && !string.IsNullOrWhiteSpace(grantType) ? grantType : "password",
+                Username = username,
+                Password = password,
+                ClientId = fields.TryGetValue("client_id", out var clientId) ? clientId : null,
+                Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
+            };
+
+            return await HandleTokenRequestAsync(request, cancellationToken);
+        }
+
+        [Route("~/public/token"), HttpPost]
+        [Consumes("application/x-www-form-urlencoded")]
+        [Produces("application/json")]
+        public async Task<IActionResult> PublicToken([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
+        {
+            var fieldsResult = ParseEncryptedFields(body);
+            if (fieldsResult.Result != null)
+            {
+                return fieldsResult.Result;
+            }
+
+            var fields = fieldsResult.Fields!;
+            if (!fields.TryGetValue("username", out var username) || string.IsNullOrWhiteSpace(username) ||
+                !fields.TryGetValue("password", out var password))
+            {
+                return BadRequest(new OpenIddictResponse
+                {
+                    Error = Errors.InvalidRequest,
+                    ErrorDescription = "The username and password fields are required."
+                });
+            }
+
+            var request = new OpenIddictRequest
+            {
+                GrantType = CustomGrantType.Public,
+                Username = username,
+                Password = password,
+                ClientId = fields.TryGetValue("client_id", out var clientId) ? clientId : null,
+                Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
+            };
+
+            return await HandleTokenRequestAsync(request, cancellationToken);
+        }
+
+        private static EncryptedFieldsResult ParseEncryptedFields(EncryptedLoginRequest body)
+        {
+            if (body == null || string.IsNullOrWhiteSpace(body.Encrypted))
+            {
+                return new EncryptedFieldsResult
+                {
+                    Result = new BadRequestObjectResult(new OpenIddictResponse
+                    {
+                        Error = Errors.InvalidRequest,
+                        ErrorDescription = "The encrypted field is required."
+                    })
+                };
+            }
+
+            string json;
+            try
+            {
+                var bytes = Convert.FromBase64String(body.Encrypted);
+                json = Encoding.UTF8.GetString(bytes);
+            }
+            catch (FormatException)
+            {
+                return new EncryptedFieldsResult
+                {
+                    Result = new BadRequestObjectResult(new OpenIddictResponse
+                    {
+                        Error = Errors.InvalidRequest,
+                        ErrorDescription = "The encrypted value is not a valid Base64 string."
+                    })
+                };
+            }
+
+            try
+            {
+                return new EncryptedFieldsResult
+                {
+                    Fields = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>()
+                };
+            }
+            catch (JsonException)
+            {
+                return new EncryptedFieldsResult
+                {
+                    Result = new BadRequestObjectResult(new OpenIddictResponse
+                    {
+                        Error = Errors.InvalidRequest,
+                        ErrorDescription = "The encrypted payload is not a valid JSON object."
+                    })
+                };
+            }
+        }
+
+        private async Task<IActionResult> HandleTokenRequestAsync(OpenIddictRequest request, CancellationToken cancellationToken)
+        {
             var result = await _tokenRequestHandler.HandleAsync(request, cancellationToken);
             if (!result.Succeeded)
             {
@@ -82,5 +213,17 @@ namespace EIMSNext.Auth.Host.Controllers
                 }),
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
         }
+    }
+
+    public sealed class EncryptedLoginRequest
+    {
+        public string Encrypted { get; set; } = string.Empty;
+    }
+
+    internal sealed class EncryptedFieldsResult
+    {
+        public Dictionary<string, string>? Fields { get; set; }
+
+        public IActionResult? Result { get; set; }
     }
 }

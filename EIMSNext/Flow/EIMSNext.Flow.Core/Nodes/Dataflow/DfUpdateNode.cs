@@ -118,7 +118,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                                 {
                                                     //如果子表单不存在
                                                     toUpdateSubData = new List<ExpandoObject>();
-                                                    toUpdate.FormData.Data.AddOrUpdate(subField.Field, toUpdateSubData);
+                                                    toUpdate.FormData.Data.AddOrUpdate(subFormField, toUpdateSubData);
                                                 }
 
                                                 var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);
@@ -186,7 +186,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                         {
                                             //如果子表单不存在
                                             toUpdateSubData = new List<ExpandoObject>();
-                                            toUpdate.FormData.Data.AddOrUpdate(subField.Field, toUpdateSubData);
+                                            toUpdate.FormData.Data.AddOrUpdate(subFormField, toUpdateSubData);
                                         }
 
                                         var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);

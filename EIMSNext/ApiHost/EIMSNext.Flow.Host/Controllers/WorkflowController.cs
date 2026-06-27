@@ -1,20 +1,15 @@
 using Asp.Versioning;
-using ChangeApproverRequest = EIMSNext.ApiClient.Flow.ChangeApproverRequest;
-
-using System.Dynamic;
-using System.Linq;
 
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
-using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Service.Contracts;
+using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -22,8 +17,11 @@ using Microsoft.AspNetCore.Mvc;
 
 using MongoDB.Driver;
 
+using System.Dynamic;
+
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+
 namespace EIMSNext.Flow.Host.Controllers
 {
     [ApiVersion(1.0)]
@@ -75,7 +73,8 @@ namespace EIMSNext.Flow.Host.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), CascadeMode.All, null);
+                var cascade = request.DfCascade == CascadeMode.NotSet ? CascadeMode.All : request.DfCascade;
+                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), cascade, request.EventIds);
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
@@ -132,7 +131,12 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (request.Action == ApproveAction.Approve)
             {
+                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, todo, NodeActionType.Submit);
                 await _workflowActionService.ValidateSubmitConditionAsync(wfInst, todo);
+            }
+            else if (request.Action == ApproveAction.Reject)
+            {
+                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, todo, NodeActionType.Reject);
             }
 
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
@@ -472,6 +476,30 @@ namespace EIMSNext.Flow.Host.Controllers
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
 
+        [HttpPost, Route("ExpireAction")]
+        public async Task<IActionResult> ExpireActionAsync(ExpireActionRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.WfInstanceId) || string.IsNullOrWhiteSpace(request.DataId) || string.IsNullOrWhiteSpace(request.WfNodeId))
+            {
+                return BadRequest("流程实例Id、数据Id和节点Id不能为空");
+            }
+
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (wfInst == null)
+            {
+                return BadRequest("当前流程实例不可执行超时动作");
+            }
+
+            var todo = _todoservice.Find(x => x.WfInstanceId == request.WfInstanceId && x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId).FirstOrDefault();
+            if (todo == null)
+            {
+                return BadRequest("当前节点待办不存在");
+            }
+
+            var result = await _workflowActionService.HandleExpiredTodoAsync(wfInst, todo);
+            return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
+        }
+
         [HttpGet, Route("Status")]
         public async Task<IActionResult> GetStatusAsync([FromQuery] StatusRequest request)
         {
@@ -562,7 +590,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
 
         [HttpPost, Route("Definition/Delete")]
-        public IActionResult DeleteDef(DeleteRequest request)
+        public async Task<IActionResult> DeleteDef(DeleteRequest request)
         {
             List<string>? defIds = null;
             if (!string.IsNullOrEmpty(request.AppId))
@@ -572,8 +600,18 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (defIds?.Count > 0)
             {
-                var wfInsts = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id);
-                wfInsts.ForEach(x => _wfHost.TerminateWorkflow(x));
+                var wfInstIds = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id).ToList();
+                var terminateResults = await Task.WhenAll(wfInstIds.Select(async id => new
+                {
+                    Id = id,
+                    Success = await _wfHost.TerminateWorkflow(id)
+                }));
+
+                var failedIds = terminateResults.Where(x => !x.Success).Select(x => x.Id).ToList();
+                if (failedIds.Count > 0)
+                {
+                    return ApiResult.Fail(-1, "审批流程实例中止失败", new { ids = failedIds }).ToActionResult();
+                }
             }
 
             if (request.DeleteDef.HasValue && request.DeleteDef.Value)
@@ -750,5 +788,21 @@ namespace EIMSNext.Flow.Host.Controllers
         public string? AppId { get; set; }
         public List<string>? FormIds { get; set; }
         public bool? DeleteDef { get; set; }
+    }
+    public class ChangeApproverRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string TargetEmployeeId { get; set; } = string.Empty;
+        public string Comment { get; set; } = string.Empty;
+    }
+
+    public class ExpireActionRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public WfExpireActionType ActionType { get; set; }
     }
 }

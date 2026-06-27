@@ -25,5 +25,10 @@ namespace EIMSNext.ApiService.RequestModels
         /// 排序索引
         /// </summary>
         public int SortIndex { get; set; }
+
+        /// <summary>
+        /// 应用首页入口ID列表，可指向当前应用菜单中的仪表盘。
+        /// </summary>
+        public List<string> HomeEntryIds { get; set; } = [];
     }
 }

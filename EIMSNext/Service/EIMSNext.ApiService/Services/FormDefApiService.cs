@@ -12,6 +12,57 @@ namespace EIMSNext.ApiService
 {
     public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, FormDefViewModel, IFormDefService>(resolver)
 	{
+        public List<FormDefViewModel> GetFormsIncludeCross(string appId)
+        {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(appId);
+
+            var ownForms = CoreService.All()
+                .Where(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.AppId == appId)
+                .OrderBy(x => x.Name)
+                .ToList()
+                .Select(x => BuildView(x, external: false))
+                .ToList();
+
+            var bindings = Resolver.Resolve<ICrossBindingService>()
+                .All()
+                .Where(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.TargetAppId == appId &&
+                    x.SourceAppId != appId)
+                .ToList();
+
+            if (bindings.Count == 0)
+            {
+                return ownForms;
+            }
+
+            var sourceFormIds = bindings.Select(x => x.SourceFormId).Distinct().ToList();
+            var sourceAppIds = bindings.Select(x => x.SourceAppId).Distinct().ToList();
+
+            var apps = Resolver.Resolve<IAppDefService>().All()
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && sourceAppIds.Contains(x.Id))
+                .ToDictionary(x => x.Id);
+
+            var externalForms = CoreService.All()
+                .Where(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    sourceFormIds.Contains(x.Id))
+                .ToList()
+                .Where(x => apps.ContainsKey(x.AppId))
+                .Select(x => BuildView(x, external: true))
+                .OrderBy(x => x.AppId)
+                .ThenBy(x => x.Name)
+                .ToList();
+
+            ownForms.AddRange(externalForms);
+            return ownForms;
+        }
+
         public override Task AddAsync(FormDef entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
@@ -22,6 +73,8 @@ namespace EIMSNext.ApiService
         public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            var existing = CoreService.Get(entity.Id);
+            PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 
@@ -47,6 +100,28 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private static FormDefViewModel BuildView(FormDef form, bool external)
+        {
+            return new FormDefViewModel
+            {
+                Id = form.Id,
+                CorpId = form.CorpId,
+                CreateBy = form.CreateBy,
+                CreateTime = form.CreateTime,
+                UpdateBy = form.UpdateBy,
+                UpdateTime = form.UpdateTime,
+                DeleteFlag = form.DeleteFlag,
+                AppId = form.AppId,
+                TemplateId = form.TemplateId,
+                Name = form.Name,
+                Content = form.Content,
+                IsLedger = form.IsLedger,
+                UsingWorkflow = form.UsingWorkflow,
+                FormSettings = form.FormSettings,
+                External = external,
+            };
         }
     }
 }

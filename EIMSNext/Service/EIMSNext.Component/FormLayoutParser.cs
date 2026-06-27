@@ -11,11 +11,28 @@ namespace EIMSNext.Component
     {
         public IList<FieldDef> Parse(string layout)
         {
-            var fieldArr = layout.DeserializeFromJson<JsonArray>();
+            var fieldArr = ParseLayout(layout);
             var fieldList = ParseChildren(fieldArr);
             PopulateDepends(fieldList);
 
             return fieldList;
+        }
+
+        private static JsonArray? ParseLayout(string layout)
+        {
+            if (string.IsNullOrWhiteSpace(layout))
+            {
+                return null;
+            }
+
+            try
+            {
+                return JsonNode.Parse(layout) as JsonArray;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private IList<FieldDef> ParseChildren(JsonArray? fieldArr)
@@ -34,7 +51,8 @@ namespace EIMSNext.Component
                 }
 
                 var field = node.AsObject();
-                if (field.ContainsKey("type") && FieldType.IsInputField(field["type"]!.GetValue<string>()))
+                var type = GetStringValue(field, "type");
+                if (!string.IsNullOrWhiteSpace(type) && FieldType.IsInputField(type))
                 {
                     var fieldDef = ParseField(field);
                     if (fieldDef != null)
@@ -42,9 +60,9 @@ namespace EIMSNext.Component
                         fieldList.Add(fieldDef);
                     }
                 }
-                else if (field.ContainsKey("children"))
+                else if (field.TryGetPropertyValue("children", out var childrenNode) && childrenNode is JsonArray children)
                 {
-                    fieldList.AddRange(ParseChildren(field["children"]!.AsArray()));
+                    fieldList.AddRange(ParseChildren(children));
                 }
             }
 
@@ -60,26 +78,34 @@ namespace EIMSNext.Component
 
             var fieldDef = new FieldDef
             {
-                Type = field["type"]!.GetValue<string>(),
-                Field = field["field"]!.GetValue<string>(),
-                Title = field["title"]!.GetValue<string>(),
+                Type = GetStringValue(field, "type") ?? string.Empty,
+                Field = GetStringValue(field, "field") ?? string.Empty,
+                Title = GetStringValue(field, "title") ?? string.Empty,
                 Hidden = field["hidden"]?.GetValue<bool>() ?? false,
+                Source = GetStringValue(field, "source"),
+                SystemKind = GetStringValue(field, "systemKind"),
             };
 
             var fieldType = fieldDef.Type;
-            if (field.ContainsKey("props"))
+            if (field.TryGetPropertyValue("props", out var propsNode) && propsNode is JsonObject props)
             {
-                var props = field["props"]!.AsObject();
                 switch (fieldType)
                 {
                     case FieldType.TableForm:
-                        if (props.ContainsKey("columns"))
+                        if (props.TryGetPropertyValue("columns", out var columnsNode) && columnsNode is JsonArray columns)
                         {
                             fieldDef.Columns = new List<FieldDef>();
-                            var columns = props["columns"]!.AsArray();
                             foreach (var column in columns)
                             {
-                                var subDef = ParseField(column?["rule"]?.AsArray()?.FirstOrDefault()?.AsObject());
+                                if (column is not JsonObject columnObj ||
+                                    !columnObj.TryGetPropertyValue("rule", out var ruleNode) ||
+                                    ruleNode is not JsonArray ruleArray ||
+                                    ruleArray.FirstOrDefault() is not JsonObject rule)
+                                {
+                                    continue;
+                                }
+
+                                var subDef = ParseField(rule);
                                 if (subDef != null)
                                 {
                                     fieldDef.Columns.Add(subDef);
@@ -93,17 +119,12 @@ namespace EIMSNext.Component
                 }
             }
 
-            if (field.ContainsKey("options"))
+            if (field.TryGetPropertyValue("options", out var optionsNode) && optionsNode is JsonArray options)
             {
-                var options = field["options"]?.AsArray();
-                if (options != null)
-                {
-                    fieldDef.Props.Options = options.SerializeToJson().DeserializeFromJson<List<ValueOption>>();
-                }
+                fieldDef.Props.Options = options.SerializeToJson().DeserializeFromJson<List<ValueOption>>();
             }
 
-            var computed = field["computed"]?.AsObject();
-            if (computed != null)
+            if (field.TryGetPropertyValue("computed", out var computedNode) && computedNode is JsonObject computed)
             {
                 var valueNode = computed["value"];
                 string? formula = null;
@@ -118,6 +139,23 @@ namespace EIMSNext.Component
             }
 
             return fieldDef;
+        }
+
+        private static string? GetStringValue(JsonObject field, string propertyName)
+        {
+            if (!field.TryGetPropertyValue(propertyName, out var node) || node is not JsonValue value)
+            {
+                return null;
+            }
+
+            try
+            {
+                return value.GetValue<string>();
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private void PopulateDepends(IList<FieldDef> fields)

@@ -18,5 +18,6 @@
     <ProjectReference Include="..\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
     <ProjectReference Include="..\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
     <ProjectReference Include="..\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
   </ItemGroup>
 </Project>

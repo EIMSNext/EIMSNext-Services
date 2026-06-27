@@ -3,6 +3,7 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
+using EIMSNext.Core;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -25,6 +26,16 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("Test")]
         public async Task<IActionResult> TestAsync([FromBody]WebhookRequest request)
         {
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(request.AppId);
+            if (!string.IsNullOrWhiteSpace(request.FormId))
+            {
+                var form = Resolver.GetService<FormDef>().Get(request.FormId);
+                if (form == null || form.CorpId != IdentityContext.CurrentCorpId || form.DeleteFlag || form.AppId != request.AppId)
+                {
+                    return ApiResult.Fail(400, "推送表单不存在").ToActionResult();
+                }
+            }
+
             if (string.IsNullOrWhiteSpace(request.Url))
                 return ApiResult.Fail(400, "服务器地址不能为空").ToActionResult();
 
