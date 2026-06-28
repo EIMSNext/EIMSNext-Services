@@ -237,7 +237,7 @@ namespace EIMSNext.ApiService
                 !x.DeleteFlag);
             if (duplicated)
             {
-                throw new BadRequestException("该目标已收藏");
+                return Task.CompletedTask;
             }
 
             ApplyTarget(entity, target);
