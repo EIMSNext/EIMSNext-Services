@@ -34,9 +34,28 @@ namespace EIMSNext.Service.Host.OpenPlatform
         public static async Task RefreshAsync(ICacheClient cache, ClientGrantApiService grantApi, string corpId, string clientId)
         {
             var grant = await grantApi.GetActiveByClientIdAsync(clientId);
-            // 默认 Client 自身是启用的（grantApi.GetActiveByClientIdAsync 内部已判断 corpId 匹配）；
-            // 如未来要更精确可再查 Client.Enabled。
             Apply(cache, grant, clientId, clientEnabled: true);
+        }
+
+        /// <summary>
+        /// 同时读取 <see cref="Client"/> 和 <see cref="ClientGrant"/>，以 Client 的启用/删除状态为准刷新缓存。
+        /// </summary>
+        public static async Task RefreshAsync(
+            ICacheClient cache,
+            ClientGrantApiService grantApi,
+            ClientApiService clientApi,
+            string corpId,
+            string clientId)
+        {
+            var client = await clientApi.GetAsync(clientId);
+            if (client == null || client.CorpId != corpId || client.DeleteFlag || !client.Enabled)
+            {
+                Apply(cache, null, clientId, clientEnabled: false);
+                return;
+            }
+
+            var grant = await grantApi.GetActiveByClientIdAsync(clientId);
+            Apply(cache, grant, clientId, client.Enabled);
         }
 
         /// <summary>

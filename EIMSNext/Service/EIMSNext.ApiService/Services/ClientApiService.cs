@@ -1,8 +1,8 @@
-using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
+using EIMSNext.Core;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
     /// <list type="bullet">
     /// <item>明文 ClientSecret 只在 Create / GenerateSecret 时返回，存 DB 前 SHA-256 哈希。</item>
     /// <item>明文凭证额外缓存到 <c>IScopeCache</c> 5 分钟，<c>Reveal</c> 端点用它取回。</item>
-    /// <item><c>UpdateAsync</c> 用 read-modify-write 保护 ClientSecrets/ClientId/ApiKey 永不被请求体改写。</item>
+    /// <item><c>ReplaceAsyncCore</c> 用 read-modify-write 保护 ClientSecrets/Id/ApiKey 永不被请求体改写。</item>
     /// </list>
     /// </summary>
     public class ClientApiService(IResolver resolver)
@@ -25,108 +25,96 @@ namespace EIMSNext.ApiService
     {
         private const string PlainCacheKeyPrefix = "clientSecret:plain:";
 
-        // 32 字符 a-z + 数字 + 几个安全符号，作为 ClientId/Secret 的字符表
+        // 32 字符 a-z + 数字，作为 Secret 的字符表
         private const string SecretAlphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
         private const string ApiKeyAlphabet =
             "_+-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()~`.,?=";
 
-        // ===== 写操作 =====
-        public async Task<ClientCredentials> CreateAsync(ClientRequest input)
+        protected override async Task AddAsyncCore(Client entity)
         {
-            var clientId = GenerateClientId();
             var plainSecret = GeneratePlainSecret();
-            var apiKey = Nanoid.Generate(ApiKeyAlphabet, 36);
 
-            var entity = new Client
-            {
-                ClientId = clientId,
-                ClientSecrets = new List<ClientSecret>
-                {
-                    new() { Value = plainSecret.Sha256(), Type = "SharedSecret" }
-                },
-                ApiKey = apiKey,
-                Enabled = input.Enabled,
-                RequireClientSecret = input.RequireClientSecret,
-                ClientName = input.ClientName,
-                AllowedGrantTypes = input.AllowedGrantTypes,
-                AllowedScopes = input.AllowedScopes,
-                IdentityTokenLifetime = input.IdentityTokenLifetime,
-                AccessTokenLifetime = input.AccessTokenLifetime,
-                CorpId = IdentityContext.CurrentCorpId,
-            };
+            entity.CorpId = IdentityContext.CurrentCorpId;
+            entity.Id = string.Empty;
+            Resolver.GetRepository<Client>().EnsureId(entity);
+            entity.ClientSecrets =
+            [
+                new ClientSecret { Value = plainSecret.Sha256(), Type = "SharedSecret" }
+            ];
+            entity.ApiKey = Nanoid.Generate(ApiKeyAlphabet, 36);
+            entity.RequireClientSecret = true;
+            entity.AllowedGrantTypes =
+            [
+                new ClientGrantType { GrantType = "client_credentials" }
+            ];
+            entity.AllowedScopes =
+            [
+                new ClientScope { Scope = "api.readwrite" }
+            ];
+            entity.IdentityTokenLifetime = 7200;
+            entity.AccessTokenLifetime = 7200;
 
-            await AddAsync(entity);
+            NormalizeEditableFields(entity);
 
-            // 缓存明文 5 分钟（供 Reveal 端点使用）
+            await base.AddAsyncCore(entity);
+
             CachePlainSecret(entity.Id, plainSecret);
-
-            return new ClientCredentials
-            {
-                ClientId = clientId,
-                ClientSecret = plainSecret,
-                ApiKey = apiKey,
-            };
         }
 
-        public async Task<Client> UpdateAsync(string id, ClientRequest input)
+        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Client entity)
         {
-            // read-modify-write：忽略输入中的 ClientSecrets/ClientId/ApiKey
-            var existing = await CoreService.GetAsync(id);
-            if (existing == null)
+            var existing = await CoreService.GetAsync(entity.Id);
+            if (existing == null || existing.CorpId != IdentityContext.CurrentCorpId || existing.DeleteFlag)
             {
                 throw new BadRequestException("Client 不存在");
             }
-            if (existing.CorpId != IdentityContext.CurrentCorpId)
-            {
-                throw new BadRequestException("无权访问该 Client");
-            }
 
-            // 只更新可写字段；ClientId/ApiKey/ClientSecrets/CorpId 永不动
-            existing.Enabled = input.Enabled;
-            existing.RequireClientSecret = input.RequireClientSecret;
-            existing.ClientName = input.ClientName;
-            existing.AllowedGrantTypes = input.AllowedGrantTypes;
-            existing.AllowedScopes = input.AllowedScopes;
-            existing.IdentityTokenLifetime = input.IdentityTokenLifetime;
-            existing.AccessTokenLifetime = input.AccessTokenLifetime;
+            entity.CorpId = existing.CorpId;
+            entity.Id = existing.Id;
+            entity.ClientSecrets = existing.ClientSecrets;
+            entity.ApiKey = existing.ApiKey;
+            entity.RequireClientSecret = existing.RequireClientSecret;
+            entity.AllowedGrantTypes = existing.AllowedGrantTypes;
+            entity.AllowedScopes = existing.AllowedScopes;
+            entity.IdentityTokenLifetime = existing.IdentityTokenLifetime;
+            entity.AccessTokenLifetime = existing.AccessTokenLifetime;
+            entity.CreateBy = existing.CreateBy;
+            entity.CreateTime = existing.CreateTime;
 
-            await CoreService.ReplaceAsync(existing);
-            return existing;
+            NormalizeEditableFields(entity);
+
+            return await base.ReplaceAsyncCore(entity);
         }
 
-        /// <summary>
-        /// OData PATCH 直接走来的更新：保留 ClientSecrets/ClientId/ApiKey 不变。
-        /// （用于前端 el-switch 启停等场景；input 中可只包含要改的字段。）
-        /// </summary>
-        public async Task PatchAsync(string id, Client patch)
+        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
-            var existing = await CoreService.GetAsync(id);
-            if (existing == null)
+            var idList = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+            if (idList.Count == 0)
+            {
+                return new object();
+            }
+
+            var deleting = CoreService.All()
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && idList.Contains(x.Id))
+                .Select(x => x.Id)
+                .ToList();
+
+            if (deleting.Count != idList.Count)
             {
                 throw new BadRequestException("Client 不存在");
             }
-            if (existing.CorpId != IdentityContext.CurrentCorpId)
-            {
-                throw new BadRequestException("无权访问该 Client");
-            }
 
-            // 仅可改可写字段；不可改的字段保持 existing 原值
-            if (patch.Enabled != existing.Enabled) existing.Enabled = patch.Enabled;
-            if (patch.RequireClientSecret != existing.RequireClientSecret) existing.RequireClientSecret = patch.RequireClientSecret;
-            if (patch.ClientName != null) existing.ClientName = patch.ClientName;
-            if (patch.AllowedGrantTypes != null && patch.AllowedGrantTypes.Count > 0) existing.AllowedGrantTypes = patch.AllowedGrantTypes;
-            if (patch.AllowedScopes != null && patch.AllowedScopes.Count > 0) existing.AllowedScopes = patch.AllowedScopes;
-            if (patch.IdentityTokenLifetime > 0) existing.IdentityTokenLifetime = patch.IdentityTokenLifetime;
-            if (patch.AccessTokenLifetime > 0) existing.AccessTokenLifetime = patch.AccessTokenLifetime;
-
-            // ClientSecrets/ClientId/ApiKey/CorpId 永不被覆盖
-            await CoreService.ReplaceAsync(existing);
+            return await base.DeleteAsyncCore(deleting);
         }
 
+        // ===== 写操作 =====
         public async Task<ClientCredentials> GenerateSecretAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);
-            if (existing == null)
+            if (existing == null || existing.DeleteFlag)
             {
                 throw new BadRequestException("Client 不存在");
             }
@@ -147,32 +135,8 @@ namespace EIMSNext.ApiService
 
             return new ClientCredentials
             {
-                ClientId = existing.ClientId,
-                ClientSecret = plainSecret,
-                ApiKey = existing.ApiKey,
-            };
-        }
-
-        public async Task<ClientCredentials> GenerateApiKeyAsync(string id)
-        {
-            var existing = await CoreService.GetAsync(id);
-            if (existing == null)
-            {
-                throw new BadRequestException("Client 不存在");
-            }
-            if (existing.CorpId != IdentityContext.CurrentCorpId)
-            {
-                throw new BadRequestException("无权访问该 Client");
-            }
-
-            existing.ApiKey = Nanoid.Generate(ApiKeyAlphabet, 36);
-            await CoreService.ReplaceAsync(existing);
-
-            return new ClientCredentials
-            {
-                ClientId = existing.ClientId,
-                ClientSecret = "",       // 不变
-                ApiKey = existing.ApiKey,
+                ClientId = existing.Id,
+                ClientSecret = plainSecret
             };
         }
 
@@ -180,7 +144,7 @@ namespace EIMSNext.ApiService
         public async Task<ClientCredentials> RevealAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);
-            if (existing == null)
+            if (existing == null || existing.DeleteFlag)
             {
                 throw new BadRequestException("Client 不存在");
             }
@@ -192,20 +156,19 @@ namespace EIMSNext.ApiService
             var plainSecret = TryGetPlainSecret(id);
             return new ClientCredentials
             {
-                ClientId = existing.ClientId,
-                ClientSecret = plainSecret ?? string.Empty,
-                ApiKey = existing.ApiKey,
+                ClientId = existing.Id,
+                ClientSecret = plainSecret ?? string.Empty
             };
         }
 
-        public async Task<List<Client>> ListByCorpAsync()
+        private static void NormalizeEditableFields(Client entity)
         {
-            var all = await CoreService.FindAsync(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
-            return await all.ToListAsync();
+            entity.Name = string.IsNullOrWhiteSpace(entity.Name)
+                ? null
+                : entity.Name.Trim();
         }
 
         // ===== helpers =====
-        private static string GenerateClientId() => Nanoid.Generate(SecretAlphabet, 16);
         private static string GeneratePlainSecret() => Nanoid.Generate(SecretAlphabet, 40);
 
         private void CachePlainSecret(string clientId, string plain)

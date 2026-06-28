@@ -289,13 +289,15 @@ namespace EIMSNext.Service.Host.Authorization
             {
                 var grantApi = (EIMSNext.ApiService.ClientGrantApiService?)
                     context.HttpContext.RequestServices.GetService(typeof(EIMSNext.ApiService.ClientGrantApiService));
-                if (grantApi == null) return null;
+                var clientApi = (EIMSNext.ApiService.ClientApiService?)
+                    context.HttpContext.RequestServices.GetService(typeof(EIMSNext.ApiService.ClientApiService));
+                if (grantApi == null || clientApi == null) return null;
 
                 // 同步等待（这里在 IAsyncAuthorizationFilter.OnAuthorizationAsync 内，本身就是异步上下文）
-                var grant = grantApi.GetActiveByClientIdAsync(clientId).GetAwaiter().GetResult();
-                if (grant == null) return null;
-
-                EIMSNext.Service.Host.OpenPlatform.ClientPermissionCache.Apply(_cache, grant, clientId);
+                EIMSNext.Service.Host.OpenPlatform.ClientPermissionCache
+                    .RefreshAsync(_cache, grantApi, clientApi, _identity.CurrentCorpId, clientId)
+                    .GetAwaiter()
+                    .GetResult();
                 return _cache.Get<EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo>(
                     "clientGrant", CacheScope.Client, clientId);
             }

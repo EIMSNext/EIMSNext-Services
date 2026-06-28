@@ -1,4 +1,5 @@
 using EIMSNext.Core.Entities;
+using MongoDB.Bson.Serialization.Attributes;
 
 namespace EIMSNext.Auth.Entities
 {
@@ -6,12 +7,12 @@ namespace EIMSNext.Auth.Entities
     /// OAuth 客户端。
     ///
     /// 用于 client_credentials 等开放平台授权流程。
-    /// <see cref="ClientSecrets"/> 仅在创建/生成时设置明文；
+    /// <see cref="ClientSecrets"/> 仅在创建/重新生成时由服务端设置；
     /// 存储的永远是 SHA-256 哈希（见 <see cref="StringExtensions.Sha256"/>）。
     ///
     /// 客户端的"开放平台资源授权"信息（应用范围、API 范围、IP 白名单）
     /// 存储在独立的 <c>EIMSNext.Service.Entities.ClientGrant</c> 实体中，通过
-    /// <c>ClientId</c> 关联。
+    /// <c>Id</c> 关联。
     /// </summary>
     public class Client : CorpEntityBase
     {
@@ -20,18 +21,15 @@ namespace EIMSNext.Auth.Entities
 
         /// <summary>
         /// 客户端密钥列表（哈希后存储）。OData 不会序列化此字段；
-        /// 明文只能在 create / generate-secret 端点取得一次。
+        /// 明文只能在创建后的短期缓存或 generate-secret 端点取得。
         /// </summary>
         public List<ClientSecret> ClientSecrets { get; set; } = [];
 
         /// <summary>调用 token 端点时是否校验 ClientSecret。false 表示匿名 client（公开流程）。</summary>
         public bool RequireClientSecret { get; set; } = true;
 
-        /// <summary>对外公开的 ClientId（注册时生成，不可改）。OData 上为只读。</summary>
-        public string ClientId { get; set; } = string.Empty;
-
         /// <summary>客户端可读的显示名（仅用于 UI，不参与鉴权）。</summary>
-        public string? ClientName { get; set; }
+        public string? Name { get; set; }
 
         /// <summary>允许的 grant_type 列表，例如 <c>client_credentials</c>、<c>password</c>。</summary>
         public List<ClientGrantType> AllowedGrantTypes { get; set; } = new();
@@ -45,7 +43,7 @@ namespace EIMSNext.Auth.Entities
         /// <summary>access_token 有效期（秒），默认 8 小时。</summary>
         public int AccessTokenLifetime { get; set; } = 28800;
 
-        /// <summary>API Key（nanoid 36）。仅在 generate-api-key 端点可改。OData 上为只读。</summary>
+        /// <summary>内部 API Key（nanoid 36），由服务端生成并维护。OData 上为只读。</summary>
         public string ApiKey { get; set; } = string.Empty;
     }
 }

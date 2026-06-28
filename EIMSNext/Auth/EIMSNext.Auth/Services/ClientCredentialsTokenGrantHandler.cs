@@ -63,16 +63,16 @@ namespace EIMSNext.Auth.Services
             var authenticationTime = DateTimeOffset.UtcNow;
             var claims = new List<Claim>
             {
-                new(AuthClaimTypes.Subject, client.ClientId),
-                new(AuthClaimTypes.Name, client.ClientName ?? client.ClientId),
+                new(AuthClaimTypes.Subject, client.Id),
+                new(AuthClaimTypes.Name, client.Name ?? client.Id),
                 new(AuthClaimTypes.Id, "client"),  // 标识无 user 上下文
                 new(AuthClaimTypes.Corp, client.CorpId),
-                new(AuthClaimTypes.ClientId, client.ClientId),
+                new(AuthClaimTypes.ClientId, client.Id),
                 new(AuthClaimTypes.IdentityType, IdentityType.Client.ToString()),
                 new(AuthClaimTypes.AuthTime, authenticationTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             };
 
-            return Task.FromResult(TokenRequestResult.Success(client.ClientId, GrantType, client.AccessTokenLifetime, scopes, claims));
+            return Task.FromResult(TokenRequestResult.Success(client.Id, GrantType, client.AccessTokenLifetime, scopes, claims));
         }
     }
 }

@@ -11,7 +11,7 @@ namespace EIMSNext.Auth.Host
                 new Auth.Entities.Client
                 {
                     Id = Auth.Entities.InternalClients.WebClientId,
-                    ClientName = "EIMSNext.Web",
+                    Name = "EIMSNext.Web",
                     RequireClientSecret = false,
                     AllowedGrantTypes =
                     [
@@ -32,7 +32,7 @@ namespace EIMSNext.Auth.Host
                 new Auth.Entities.Client
                 {
                     Id = Auth.Entities.InternalClients.SystemClientId,
-                    ClientName = "EIMSNext.System",
+                    Name = "EIMSNext.System",
                     RequireClientSecret = true,
                     ClientSecrets =
                     [

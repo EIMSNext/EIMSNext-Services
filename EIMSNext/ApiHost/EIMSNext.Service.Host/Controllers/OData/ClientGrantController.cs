@@ -1,11 +1,18 @@
 using Asp.Versioning;
 
 using HKH.Mef2.Integration;
+using EIMSNext.Common;
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.OpenPlatform;
+using EIMSNext.Service.Host.Requests;
+
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.OData.Deltas;
+using Microsoft.AspNetCore.OData.Formatter;
 
 namespace EIMSNext.Service.Host.Controllers.OData
 {
@@ -18,5 +25,102 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class ClientGrantController(IResolver resolver)
         : ODataController<ClientGrantApiService, ClientGrant, ClientGrantViewModel, ClientGrantRequest>(resolver)
     {
+        private ClientApiService ClientApi => Resolver.Resolve<ClientApiService>();
+        private ClientGrantApiService ClientGrantApi => Resolver.Resolve<ClientGrantApiService>();
+
+        public override async Task<ActionResult> Post([FromBody] ClientGrantRequest model)
+        {
+            var result = await base.Post(model);
+            await RefreshClientCacheAsync(model?.ClientId ?? string.Empty);
+            return result;
+        }
+
+        public override async Task<ActionResult> Put([FromODataUri] string key, [FromBody] ClientGrantRequest model)
+        {
+            var previousClientId = await GetClientIdAsync(key);
+            var result = await base.Put(key, model);
+            await RefreshClientCacheAsync(previousClientId);
+            await RefreshClientCacheAsync(model.ClientId);
+            return result;
+        }
+
+        public override async Task<ActionResult> Patch([FromODataUri] string key, [FromBody] Delta<ClientGrantRequest> delta)
+        {
+            var previousClientId = await GetClientIdAsync(key);
+            var result = await base.Patch(key, delta);
+            var currentClientId = await GetClientIdAsync(key);
+            await RefreshClientCacheAsync(previousClientId);
+            await RefreshClientCacheAsync(currentClientId);
+            return result;
+        }
+
+        public override async Task<ActionResult> Patch([FromBody] DeltaSet<ClientGrantRequest> deltas)
+        {
+            if (deltas == null)
+            {
+                return BadRequest("数据解析失败，请检查数据格式, 确认正确的字段名和数据类型");
+            }
+
+            var keys = deltas
+                .OfType<Delta<ClientGrantRequest>>()
+                .Select(delta => TryGetId(delta, out var id) ? id : string.Empty)
+                .Where(id => !string.IsNullOrWhiteSpace(id))
+                .Distinct()
+                .ToList();
+            var previousClientIds = await GetClientIdsAsync(keys);
+
+            var result = await base.Patch(deltas);
+            var currentClientIds = await GetClientIdsAsync(keys);
+            foreach (var clientId in previousClientIds.Concat(currentClientIds).Distinct())
+            {
+                await RefreshClientCacheAsync(clientId);
+            }
+            return result;
+        }
+
+        public override async Task<ActionResult> Delete([FromODataUri] string key, [FromBody] DeleteBatch? batch)
+        {
+            var keys = "batch".EqualsIgnoreCase(key)
+                ? batch?.Keys?.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList() ?? []
+                : [key];
+            var clientIds = await GetClientIdsAsync(keys);
+
+            var result = await base.Delete(key, batch);
+            foreach (var clientId in clientIds)
+            {
+                ClientPermissionCache.Evict(CacheClient, clientId);
+            }
+            return result;
+        }
+
+        private async Task<string> GetClientIdAsync(string grantId)
+        {
+            var grant = string.IsNullOrWhiteSpace(grantId) ? null : await ApiService.GetAsync(grantId);
+            return grant?.ClientId ?? string.Empty;
+        }
+
+        private async Task<List<string>> GetClientIdsAsync(IEnumerable<string> grantIds)
+        {
+            var clientIds = new List<string>();
+            foreach (var grantId in grantIds)
+            {
+                var clientId = await GetClientIdAsync(grantId);
+                if (!string.IsNullOrWhiteSpace(clientId))
+                {
+                    clientIds.Add(clientId);
+                }
+            }
+            return clientIds;
+        }
+
+        private async Task RefreshClientCacheAsync(string clientId)
+        {
+            if (string.IsNullOrWhiteSpace(clientId))
+            {
+                return;
+            }
+
+            await ClientPermissionCache.RefreshAsync(CacheClient, ClientGrantApi, ClientApi, IdentityContext.CurrentCorpId, clientId);
+        }
     }
 }
