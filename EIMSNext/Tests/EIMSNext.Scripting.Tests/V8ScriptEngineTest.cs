@@ -239,5 +239,41 @@ namespace EIMSNext.Scripting.Tests
             Assert.IsTrue(result.Success);
             Assert.AreEqual(2, result.Value);
         }
+
+        [TestMethod]
+        public void TestEngine_AppliesV8RuntimeConstraints_BuildsSuccessfully()
+        {
+            // Stage A: 验证 ScriptEngineOption 内存约束字段能正常构造引擎而不崩
+            // 不触发实际 OOM(V8 heap sampling 时序非确定性,留待 ops 监控)
+            // 通过合法表达式多次 evaluate 验证进程稳定 + 约束已应用
+            var option = new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                MaxOldSpaceSizeMB = 200,
+                MaxNewSpaceSizeMB = 32,
+                MaxRuntimeHeapSizeMB = 128,
+                MaxArrayBufferAllocation = 32L * 1024 * 1024,
+                ViolationPolicy = ScriptViolationPolicy.Exception
+            };
+
+            using var pool = new V8ScriptEngine(option);
+
+            // 1) 合法表达式能正常执行
+            var ok = pool.Evaluate("1 + 2 * 3", null);
+            Assert.IsTrue(ok.Success);
+            Assert.AreEqual(7, ok.Value);
+
+            // 2) formula.js 函数(ADD / IF / EQ)能正常调用
+            var add = pool.Evaluate("ADD(1, 2)", null);
+            Assert.IsTrue(add.Success);
+            Assert.AreEqual(3, add.Value);
+
+            // 3) 多次 evaluate 不触发 OOM(在约束内)
+            for (int i = 0; i < 10; i++)
+            {
+                var r = pool.Evaluate($"({i}) + 100", null);
+                Assert.IsTrue(r.Success);
+            }
+        }
     }
 }

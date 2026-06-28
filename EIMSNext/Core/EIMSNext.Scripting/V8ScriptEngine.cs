@@ -62,7 +62,27 @@ namespace EIMSNext.Scripting
 
         private Microsoft.ClearScript.V8.V8ScriptEngine CreateEngine()
         {
-            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine();
+            // Stage A: 7.5.1 上 V8RuntimeConstraints 真正生效(老生代/新生代/ArrayBuffer 上限)
+            var constraints = new Microsoft.ClearScript.V8.V8RuntimeConstraints
+            {
+                MaxNewSpaceSize = _option.MaxNewSpaceSizeMB,
+                MaxOldSpaceSize = _option.MaxOldSpaceSizeMB,
+            };
+            if (_option.MaxArrayBufferAllocation > 0)
+            {
+                constraints.MaxArrayBufferAllocation = (ulong)_option.MaxArrayBufferAllocation;
+            }
+
+            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine(constraints);
+
+            // Stage A: 软堆上限(V8 周期性采样)。超过时 V8 按 ViolationPolicy 抛 ScriptEngineException
+            // → catch (Exception) 转 Error → engine.IsBroken = true → ReturnEngine 不回池
+            // 软上限应显著小于硬上限 MaxOldSpaceSize,确保在 V8 触发 abort 之前先被软上限接住。
+            if (_option.MaxRuntimeHeapSizeMB > 0)
+            {
+                engine.MaxRuntimeHeapSize = (UIntPtr)((long)_option.MaxRuntimeHeapSizeMB * 1024 * 1024);
+            }
+            engine.RuntimeHeapSizeViolationPolicy = MapViolationPolicy(_option.ViolationPolicy);
 
             // 预加载公共函数库
             var jsFiles = LoadJsFiles();
@@ -75,6 +95,19 @@ namespace EIMSNext.Scripting
             }
 
             return engine;
+        }
+
+        /// <summary>
+        /// 将 <see cref="Scripting.ScriptViolationPolicy"/> 映射到 ClearScript 的 V8 策略。
+        /// </summary>
+        private static Microsoft.ClearScript.V8.V8RuntimeViolationPolicy MapViolationPolicy(ScriptViolationPolicy policy)
+        {
+            return policy switch
+            {
+                ScriptViolationPolicy.Exception => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Exception,
+                ScriptViolationPolicy.Interrupt => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Interrupt,
+                _ => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Exception,
+            };
         }
 
         private List<string> LoadJsFiles()
