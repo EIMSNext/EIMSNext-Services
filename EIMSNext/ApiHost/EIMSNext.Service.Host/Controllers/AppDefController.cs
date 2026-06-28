@@ -5,6 +5,8 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
+using EIMSNext.Service.Host.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -41,5 +43,21 @@ namespace EIMSNext.Service.Host.Controllers
         {
             return Ok(await ApiService.SaveMenus(request));
         }
+
+        /// <summary>
+        /// 将已存在的 <see cref="AppDef"/> 升级为可被应用商店浏览/安装的 <see cref="AppProfile"/>。
+        /// 仅 <c>PlatAdmin</c> 可调用。
+        /// </summary>
+        /// <param name="id">应用定义 Id。</param>
+        /// <returns>新创建或已更新的 <see cref="AppProfile"/> Id。</returns>
+        [HttpPost("{id}/publish")]
+        [Authorize]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<ActionResult<string>> Publish([FromRoute] string id)
+        {
+            var apiService = Resolver.Resolve<AppPublishApiService>();
+            return Ok(await apiService.PublishAsync(id));
+        }
     }
 }
+

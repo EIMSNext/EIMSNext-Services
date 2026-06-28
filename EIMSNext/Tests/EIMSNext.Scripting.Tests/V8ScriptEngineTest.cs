@@ -1,5 +1,7 @@
+using System;
 using System.Dynamic;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace EIMSNext.Scripting.Tests
 {
@@ -171,6 +173,71 @@ namespace EIMSNext.Scripting.Tests
             var parameters = new Dictionary<string, object> { { "data", host } };
             var result = pool.Evaluate<int>("data.A + 1", parameters);
             Assert.AreEqual(6, result.Value);
+        }
+
+        [TestMethod]
+        public void TestNin_Behaves_As_NotIn()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption() { MinPoolSize = 1 });
+            // 在合集中 → false；不在 → true
+            Assert.AreEqual(false, pool.Evaluate("NIN([1,2,3], 2)", null).Value);
+            Assert.AreEqual(true, pool.Evaluate("NIN([1,2,3], 4)", null).Value);
+            // 与 IN 互为否定
+            Assert.AreEqual(true, pool.Evaluate("NIN([1,2,3], 4) === !IN([1,2,3], 4)", null).Value);
+        }
+
+        [TestMethod]
+        public void TestEvaluate_TimesOut_OnInfiniteLoop()
+        {
+            // DefaultEvaluationTimeout = 200ms 用来验证默认超时生效
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                DefaultEvaluationTimeout = TimeSpan.FromMilliseconds(200)
+            });
+
+            // IIFE 形式让死循环成为合法表达式;V8 引擎会包装成 `(() => { return (expr) })()`。
+            var result = pool.Evaluate("(() => { while(true){} })()", null);
+
+            Assert.IsFalse(result.Success);
+            Assert.IsTrue(result.Error?.Contains("timed out") == true,
+                $"expected 'timed out' in error, got: {result.Error}");
+        }
+
+        [TestMethod]
+        public void TestEvaluate_Honours_ExplicitCancellationToken()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                // 显式 CT 模式下,默认超时被覆盖;这里把默认设很大,
+                // 验证显式 CT 能在 100ms 内打断死循环。
+                DefaultEvaluationTimeout = TimeSpan.FromSeconds(30)
+            });
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            var result = pool.Evaluate("(() => { while(true){} })()", null, cts.Token);
+
+            Assert.IsFalse(result.Success);
+            // 显式 CT 触发时,IsCancellationRequested=true,Error 是 "cancelled" 而非 "timed out"
+            Assert.IsTrue(result.Error?.Contains("cancelled") == true,
+                $"expected 'cancelled' in error, got: {result.Error}");
+        }
+
+        [TestMethod]
+        public void TestEvaluate_DefaultTimeout_Zero_Disables_AutoCancel()
+        {
+            // DefaultEvaluationTimeout = Zero 时,只有显式 CT 才生效。
+            // 短任务不应被错误打断。
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                DefaultEvaluationTimeout = TimeSpan.Zero
+            });
+
+            var result = pool.Evaluate("1+1", null);
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(2, result.Value);
         }
     }
 }

@@ -48,7 +48,7 @@ namespace EIMSNext.Flow.Tests
                 CreateFakeRuntime(new PluginRuntimeManager.PluginAssemblyCandidate
                 {
                     PluginId = "sampleplugin",
-                    Version = new Version(1, 0),
+                    Version = ParseVersion("1.0"),
                     VersionText = "1.0",
                     AssemblyPath = Path.Combine("Plugins", "sampleplugin", "1.0", "SamplePlugin.dll")
                 })
@@ -70,7 +70,7 @@ namespace EIMSNext.Flow.Tests
                 CreateFakeRuntime(new PluginRuntimeManager.PluginAssemblyCandidate
                 {
                     PluginId = "sampleplugin",
-                    Version = new Version(1, 0),
+                    Version = ParseVersion("1.0"),
                     VersionText = "1.0",
                     AssemblyPath = Path.Combine(root, "Plugins", "sampleplugin", "1.0", "SamplePlugin.dll")
                 })
@@ -95,6 +95,12 @@ namespace EIMSNext.Flow.Tests
                 binder: null,
                 args: [services, NullLogger.Instance, candidate.PluginId, candidate.Version, candidate.AssemblyPath, typeof(FakePlugin), fakeDesc, loadContext],
                 culture: null)!;
+        }
+
+        private static PluginVersion ParseVersion(string text)
+        {
+            Assert.IsTrue(PluginVersion.TryParse(text, out var version), $"Failed to parse version '{text}' in test");
+            return version;
         }
 
         private sealed class FakePlugin : IPlugin

@@ -168,7 +168,7 @@ namespace EIMSNext.Service
             profile.Description = appDef.Description;
             profile.Icon = appDef.Icon;
             profile.ThemeColor = appDef.IconColor;
-            profile.Status = "Published";
+            profile.Status = AppProfileStatus.Published;
             profile.PublishedAt = DateTime.UtcNow;
             if (string.IsNullOrWhiteSpace(profile.Author))
             {

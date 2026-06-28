@@ -96,6 +96,17 @@ namespace EIMSNext.ApiService
             entity.Status = PluginInstallStatus.Uninstalled;
             entity.UninstalledAt = DateTime.UtcNow.ToTimeStampMs();
             await PluginInstallRepository.ReplaceAsync(entity);
+
+            // 反向扣减 PluginProfile.InstallCount，仅在确实之前有有效安装时减一。
+            // 避免出现负数；通过 Inc(-1) 让 Mongo 端在多副本并发时按文档版本走，
+            // 而不是 read-modify-write。
+            var profile = PluginProfileRepository.Get(entity.PluginProfileId);
+            if (profile != null && !profile.DeleteFlag && profile.InstallCount > 0)
+            {
+                profile.InstallCount -= 1;
+                await PluginProfileRepository.ReplaceAsync(profile);
+            }
+
             return entity;
         }
 

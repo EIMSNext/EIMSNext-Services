@@ -62,7 +62,7 @@ namespace EIMSNext.Scripting
 
         private Microsoft.ClearScript.V8.V8ScriptEngine CreateEngine()
         {
-            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine(V8ScriptEngineFlags.EnableDynamicModuleImports);
+            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine();
 
             // 预加载公共函数库
             var jsFiles = LoadJsFiles();
@@ -121,7 +121,7 @@ namespace EIMSNext.Scripting
             return files;
         }
 
-        public EvaluationResult<dynamic> Evaluate(string script, IDictionary<string, object>? parameters = null)
+        public EvaluationResult<dynamic> Evaluate(string script, IDictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
             var result = new EvaluationResult<dynamic>();
             if (string.IsNullOrEmpty(script) || script == ScriptExpression.TRUE)
@@ -135,9 +135,36 @@ namespace EIMSNext.Scripting
                 return result;
             }
 
+            // 调用方未传可取消的 CT 时,按 ScriptEngineOption.DefaultEvaluationTimeout 应用默认上限。
+            // 设为 Zero 时不创建(等价于"仅在调用方显式传 CT 时才超时")。
+            CancellationTokenSource? defaultCts = null;
+            var isDefaultTimeout = false;
+            if (!ct.CanBeCanceled)
+            {
+                var timeout = _option.DefaultEvaluationTimeout;
+                if (timeout > TimeSpan.Zero)
+                {
+                    defaultCts = new CancellationTokenSource(timeout);
+                    ct = defaultCts.Token;
+                    isDefaultTimeout = true;
+                }
+            }
+
             var engine = RentEngine();
+            CancellationTokenRegistration registration = default;
             try
             {
+                if (ct.CanBeCanceled)
+                {
+                    // CT 触发时由 ClearScript 抛 ScriptInterruptedException 打断脚本。
+                    // 注意:Interrupt 之后的引擎状态不可靠,后续会强制标记 IsBroken,不再回池。
+                    registration = ct.Register(() =>
+                    {
+                        try { engine.Engine.Interrupt(); }
+                        catch { /* 引擎可能已被 dispose,忽略 */ }
+                    });
+                }
+
                 // 注入参数
                 if (parameters != null)
                 {
@@ -153,6 +180,15 @@ namespace EIMSNext.Scripting
                 // 执行脚本
                 result.Value = engine.Engine.Evaluate($"(() => {{ return {script} }})()");
             }
+            catch (Microsoft.ClearScript.ScriptInterruptedException)
+            {
+                result.Error = isDefaultTimeout
+                    ? "Script execution timed out"
+                    : "Script execution cancelled";
+                Logger.Warning("V8 script interrupted. Script={Script}, Reason={Reason}",
+                    script, isDefaultTimeout ? "timeout" : "cancelled");
+                engine.IsBroken = true;
+            }
             catch (Exception ex)
             {
                 result.Error = ex.Message;
@@ -162,6 +198,8 @@ namespace EIMSNext.Scripting
             }
             finally
             {
+                registration.Dispose();
+
                 // 清理参数
                 if (parameters != null)
                 {
@@ -172,16 +210,17 @@ namespace EIMSNext.Scripting
                 }
 
                 ReturnEngine(engine);
+                defaultCts?.Dispose();
             }
 
             return result;
         }
-        public EvaluationResult<T> Evaluate<T>(string script, IDictionary<string, object>? parameters = null)
+        public EvaluationResult<T> Evaluate<T>(string script, IDictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
             var result = new EvaluationResult<T>();
             try
             {
-                var temp = Evaluate(script, parameters);
+                var temp = Evaluate(script, parameters, ct);
                 result.Error = temp.Error;
                 if (string.IsNullOrEmpty(result.Error))
                     result.Value = (T)Convert.ChangeType(temp.Value, typeof(T));

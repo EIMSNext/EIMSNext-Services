@@ -1,5 +1,8 @@
 using EIMSNext.Core.Entities;
 
+using MongoDB.Bson;
+using MongoDB.Bson.Serialization.Attributes;
+
 namespace EIMSNext.Service.Entities
 {
     /// <summary>
@@ -99,8 +102,11 @@ namespace EIMSNext.Service.Entities
 
         /// <summary>
         /// 发布状态。
+        /// <para>BSON 仍以字符串形式持久化（<c>BsonRepresentation(BsonType.String)</c>），
+        /// 兼容历史数据 <c>"Published"</c>，无需数据迁移。</para>
         /// </summary>
-        public string Status { get; set; } = string.Empty;
+        [BsonRepresentation(BsonType.String)]
+        public AppProfileStatus Status { get; set; } = AppProfileStatus.Draft;
 
         /// <summary>
         /// 发布时间。

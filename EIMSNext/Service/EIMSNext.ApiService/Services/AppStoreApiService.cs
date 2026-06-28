@@ -12,7 +12,9 @@ namespace EIMSNext.ApiService
 
         public (long Total, IReadOnlyList<AppProfile> Items) GetAppStore(AppProfileQueryRequest request)
         {
-            var query = _appProfileRepository.Queryable.Where(x => !x.DeleteFlag);
+            var query = _appProfileRepository.Queryable
+                .Where(x => !x.DeleteFlag)
+                .Where(x => x.Status == AppProfileStatus.Published);
 
             if (!string.IsNullOrWhiteSpace(request.Keyword))
             {
@@ -48,7 +50,11 @@ namespace EIMSNext.ApiService
         public AppProfile? GetAppStoreDetail(string id)
         {
             var profile = _appProfileRepository.Get(id);
-            return profile == null || profile.DeleteFlag ? null : profile;
+            if (profile == null || profile.DeleteFlag)
+                return null;
+            if (profile.Status != AppProfileStatus.Published)
+                return null;
+            return profile;
         }
     }
 }

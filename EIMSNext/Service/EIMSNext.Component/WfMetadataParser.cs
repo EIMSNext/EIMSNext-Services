@@ -400,12 +400,55 @@ namespace EIMSNext.Component
             }
 
             var exp = formulaValue.Expression ?? string.Empty;
-            foreach (var formulaRef in formulaValue.Refs)
+            exp = SubstituteFormulaTokens(exp, formulaValue.Refs);
+            return exp;
+        }
+
+        /// <summary>
+        /// 把 <c>$F1</c>/<c>$F2</c>/… 占位符替换为 <c>data.{formId|nodeId}.field</c>。
+        /// <para>
+        /// 关键保护：
+        ///  1) 长度降序处理避免 <c>$F1</c> 先替换后吞掉 <c>$F10</c> 的前缀；
+        ///  2) 字面量保护：表达式体里形如 <c>"$F1"</c>/<c>'$F1'</c> 的字符串字面量先被
+        ///     控制字符占位符挪走，替换完再还原，避免误改用户字符串。
+        /// </para>
+        /// </summary>
+        private static string SubstituteFormulaTokens(string expression, List<FormulaRef> refs)
+        {
+            if (string.IsNullOrEmpty(expression) || refs == null || refs.Count == 0)
             {
-                exp = exp.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+                return expression;
             }
 
-            return exp;
+            // 1) 把字面量里的 $F\d+ 暂时挪走（用 ASCII 控制字符做占位符，源码中几乎不可能出现）
+            var literals = new List<string>();
+            var masked = System.Text.RegularExpressions.Regex.Replace(
+                expression,
+                @"\$F\d+",
+                match =>
+                {
+                    var idx = literals.Count;
+                    literals.Add(match.Value);
+                    return $"\u0001FMLIT{idx}\u0002";
+                });
+
+            // 2) 按 token 长度降序，避免 $F1 抢先覆盖 $F10
+            foreach (var formulaRef in refs.OrderByDescending(r => r.Key.Length))
+            {
+                if (string.IsNullOrEmpty(formulaRef.Key))
+                {
+                    continue;
+                }
+                masked = masked.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+            }
+
+            // 3) 还原字面量
+            for (var i = 0; i < literals.Count; i++)
+            {
+                masked = masked.Replace($"\u0001FMLIT{i}\u0002", literals[i]);
+            }
+
+            return masked;
         }
         #endregion
 

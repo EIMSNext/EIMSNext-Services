@@ -668,7 +668,9 @@ namespace EIMSNext.Service.Host.Controllers
             //if (!ValidateData(entity, delta, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await ApiService.ReplaceAsync(entity);
+            // 透传 body 中的 action：缺省视为 Save。流水号、提交流程等仅在 Submit 时触发，
+            // 旧实现漏传 action 导致 PATCH 永远走 Save，流水号不会生成。
+            await ApiService.ReplaceAsync(entity, model.Action);
 
             return Ok(entity.CastTo<FormData, FormData>());
         }

@@ -149,7 +149,7 @@ namespace EIMSNext.ApiCore.Plugin
                 return null;
             }
 
-            if (!Version.TryParse(versionDirectory.Name, out var version))
+            if (!PluginVersion.TryParse(versionDirectory.Name, out var version))
             {
                 _logger.LogWarning("Skip plugin [{AssemblyPath}] because version directory is invalid.", assemblyPath);
                 return null;
@@ -168,17 +168,45 @@ namespace EIMSNext.ApiCore.Plugin
         {
             var loadContext = new PluginLoadContext(candidate.AssemblyPath);
             var assembly = loadContext.LoadFromAssemblyPath(candidate.AssemblyPath);
-            var pluginType = assembly.GetTypes().First(x => !x.IsAbstract && typeof(IPlugin).IsAssignableFrom(x));
-            using var instance = (IPlugin)Activator.CreateInstance(pluginType)!;
+
+            // 精确选择"非抽象、可实例化、实现了 IPlugin"的类型。
+            // 旧实现用 .First() 在多/零匹配时分别产生 InvalidOperationException / 静默取错类型。
+            var pluginType = assembly.GetTypes()
+                .Where(t => !t.IsAbstract
+                            && !t.IsInterface
+                            && typeof(IPlugin).IsAssignableFrom(t)
+                            && t.GetConstructor(Type.EmptyTypes) != null)
+                .ToList();
+
+            if (pluginType.Count == 0)
+            {
+                _logger.LogWarning(
+                    "Skip plugin [{PluginId}] [{AssemblyPath}]: no concrete IPlugin implementation found.",
+                    candidate.PluginId, candidate.AssemblyPath);
+                throw new InvalidOperationException(
+                    $"插件程序集 [{candidate.AssemblyPath}] 中没有可实例化的 IPlugin 实现");
+            }
+
+            if (pluginType.Count > 1)
+            {
+                _logger.LogWarning(
+                    "Plugin assembly [{AssemblyPath}] declares {Count} IPlugin implementations; refusing to load. PluginId={PluginId}",
+                    candidate.AssemblyPath, pluginType.Count, candidate.PluginId);
+                throw new InvalidOperationException(
+                    $"插件程序集 [{candidate.AssemblyPath}] 中包含 {pluginType.Count} 个 IPlugin 实现，无法确定加载哪一个");
+            }
+
+            var concrete = pluginType[0];
+            using var instance = (IPlugin)Activator.CreateInstance(concrete)!;
             var desc = instance.Description;
 
-            return new PluginRuntime(_serviceProvider, _logger, candidate.PluginId, candidate.Version, candidate.AssemblyPath, pluginType, desc, loadContext);
+            return new PluginRuntime(_serviceProvider, _logger, candidate.PluginId, candidate.Version, candidate.AssemblyPath, concrete, desc, loadContext);
         }
 
         internal sealed class PluginAssemblyCandidate
         {
             public required string PluginId { get; init; }
-            public required Version Version { get; init; }
+            public required PluginVersion Version { get; init; }
             public required string VersionText { get; init; }
             public required string AssemblyPath { get; init; }
         }
@@ -225,7 +253,7 @@ namespace EIMSNext.ApiCore.Plugin
             private int _activeCalls;
             private int _retired;
 
-            public PluginRuntime(IServiceProvider serviceProvider, ILogger logger, string pluginId, Version version, string assemblyPath, Type pluginType, PluginDesc description, PluginLoadContext loadContext)
+            public PluginRuntime(IServiceProvider serviceProvider, ILogger logger, string pluginId, PluginVersion version, string assemblyPath, Type pluginType, PluginDesc description, PluginLoadContext loadContext)
             {
                 _serviceProvider = serviceProvider;
                 _logger = logger;
@@ -239,7 +267,7 @@ namespace EIMSNext.ApiCore.Plugin
             }
 
             public string PluginId { get; }
-            public Version Version { get; }
+            public PluginVersion Version { get; }
             public string AssemblyPath { get; }
             public PluginDesc Description { get; }
 
