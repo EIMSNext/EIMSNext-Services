@@ -2,6 +2,7 @@ using Asp.Versioning;
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Auth.Entities;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core;
@@ -95,7 +96,7 @@ var app = builder.Build();
 // Setup Databases
 using (var serviceScope = app.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
 {
-    EnsureSeedData(serviceScope.ServiceProvider.GetService<IResolver>()!);
+    await EnsureSeedData(serviceScope.ServiceProvider.GetRequiredService<IResolver>());
 }
 
 // Configure the HTTP request pipeline.
@@ -140,13 +141,38 @@ app.MapControllers();
 
 app.Run();
 
-async void EnsureSeedData(IResolver resolver)
+async Task EnsureSeedData(IResolver resolver)
 {
-    resolver.GetServiceContext().Operator = new Operator("", "", "");
+    var serviceContext = resolver.GetServiceContext();
+    serviceContext.UserId = "admin";
+    serviceContext.Operator = new Operator("", "admin", "Admin");
+
     var corpService = resolver.GetService<Corporate>();
     var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
     if (!corpService!.All().Any())
     {
+        var userRepo = resolver.GetRepository<User>();
+        var adminUser = userRepo.Queryable.FirstOrDefault(x => x.Id == "admin");
+        if (adminUser == null && !userRepo.Queryable.Any())
+        {
+            adminUser = new User
+            {
+                Id = "admin",
+                Name = "Admin",
+                Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
+                Email = "admin@eimsnext.com",
+                Phone = "12345678901"
+            };
+            await userRepo.InsertAsync(adminUser);
+        }
+
+        if (adminUser == null)
+        {
+            throw new InvalidOperationException("初始化企业需要 admin 用户，请先初始化 Auth 数据。");
+        }
+
+        serviceContext.User = adminUser;
+
         await corpService.AddAsync(
               new Corporate
               {
