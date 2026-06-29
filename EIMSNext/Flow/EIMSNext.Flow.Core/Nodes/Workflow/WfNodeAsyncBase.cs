@@ -243,7 +243,11 @@ namespace EIMSNext.Flow.Core.Nodes
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)
             {
                 var lastApproval = ApprovalLogRepository
-                    .Find(x => x.DataId == dataContext.DataId)
+                    .Find(x => x.DataId == dataContext.DataId
+                        && x.Result != ApproveAction.CopyTo
+                        && x.Result != ApproveAction.Transfer
+                        && x.Result != ApproveAction.AutoTransfer
+                        && x.Result != ApproveAction.ChangeApprover)
                     .SortByDescending(x => x.ApprovalTime)
                     .FirstOrDefault();
                 return lastApproval?.Approver?.Id == dataContext.WfStarter?.Id;

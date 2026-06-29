@@ -1037,11 +1037,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 会签（所有人都需审批通过）
         /// </summary>
-        CounterSign,
-        /// <summary>
-        /// 自动签（系统自动审批）
-        /// </summary>
-        AutoSign
+        CounterSign
     }
 
     /// <summary>审批人类型。</summary>
