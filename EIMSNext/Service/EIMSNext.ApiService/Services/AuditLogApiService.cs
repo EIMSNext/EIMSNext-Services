@@ -116,7 +116,7 @@ namespace EIMSNext.ApiService
 
 			if (!string.IsNullOrWhiteSpace(request.OperatorName))
 			{
-				filters.Add(builder.Regex("CreateBy.Label", new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
+				filters.Add(builder.Regex(x => x.CreateBy!.Label, new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
 			}
 
 			if (request.StartTime.HasValue)
