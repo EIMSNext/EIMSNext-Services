@@ -1,4 +1,5 @@
 using EIMSNext.Common;
+using EIMSNext.Core.Entities;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.ViewModels

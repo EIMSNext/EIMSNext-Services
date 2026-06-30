@@ -232,6 +232,39 @@ namespace EIMSNext.Service
             return result;
         }
 
+        public async Task RestoreAsync(IEnumerable<string> ids)
+        {
+            var idList = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (idList.Count == 0) return;
+
+            using var scope = NewTransactionScope();
+            var filter = FilterBuilder.And(
+                FilterBuilder.In(x => x.Id, idList),
+                FilterBuilder.Eq(x => x.DeleteFlag, true));
+            var update = UpdateBuilder.Set(x => x.DeleteFlag, false);
+            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
+            scope.CommitTransaction();
+        }
+
+        public async Task PurgeAsync(IEnumerable<string> ids)
+        {
+            var idList = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (idList.Count == 0) return;
+
+            using var scope = NewTransactionScope();
+            var filter = FilterBuilder.And(
+                FilterBuilder.In(x => x.Id, idList),
+                FilterBuilder.Eq(x => x.DeleteFlag, true));
+            await Repository.DeleteAsync(filter, scope.SessionHandle);
+            scope.CommitTransaction();
+        }
+
         public override async Task<object> DeleteAsync(DynamicFilter filter)
         {
             var deleting = ShouldTriggerFormDataChangeDataflow()

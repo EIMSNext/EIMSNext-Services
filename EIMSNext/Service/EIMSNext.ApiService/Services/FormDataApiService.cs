@@ -1,12 +1,12 @@
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
-using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Entities;
+using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
@@ -17,15 +17,11 @@ namespace EIMSNext.ApiService
 {
     public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
     {
-        private FlowApiClient _flowClient;
         private IFormDefService _formDefService;
-        private IWfDefinitionService _wfDefinitionService;
         private IFormDataChangeLogService _formDataChangeLogService;
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
-            _flowClient = resolver.Resolve<FlowApiClient>();
             _formDefService = resolver.Resolve<IFormDefService>();
-            _wfDefinitionService = resolver.Resolve<IWfDefinitionService>();
             _formDataChangeLogService = resolver.Resolve<IFormDataChangeLogService>();
         }
 

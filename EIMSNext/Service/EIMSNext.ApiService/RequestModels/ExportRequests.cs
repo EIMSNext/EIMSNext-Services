@@ -53,6 +53,12 @@ namespace EIMSNext.ApiService.RequestModels
         public DynamicFilter? Filter { get; set; }
 
         public string? AuthGroupId { get; set; }
+
+        public string? Keyword { get; set; }
+
+        public List<string>? SearchFields { get; set; }
+
+        public bool IncludeDeleted { get; set; }
     }
 
     public class ExportResponse
