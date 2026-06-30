@@ -32,11 +32,6 @@ namespace EIMSNext.Service.Entities
         public FormContent Content { get; set; } = new FormContent();
 
         /// <summary>
-        /// 是否台账
-        /// </summary>
-        public bool IsLedger { get; set; }
-
-        /// <summary>
         /// 是否流程表单
         /// </summary>
         public bool UsingWorkflow { get; set; }

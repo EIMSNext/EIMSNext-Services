@@ -68,7 +68,6 @@ namespace EIMSNext.Service
                     Type = FormType.Form,
                     Icon = string.Empty,
                     Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap),
-                    IsLedger = formDef.IsLedger,
                     UsingWorkflow = formDef.UsingWorkflow,
                     FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap)
                 });

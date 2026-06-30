@@ -117,7 +117,6 @@ namespace EIMSNext.ApiService
                 TemplateId = form.TemplateId,
                 Name = form.Name,
                 Content = form.Content,
-                IsLedger = form.IsLedger,
                 UsingWorkflow = form.UsingWorkflow,
                 FormSettings = form.FormSettings,
                 External = external,
