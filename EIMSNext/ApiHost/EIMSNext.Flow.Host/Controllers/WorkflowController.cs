@@ -15,8 +15,6 @@ using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Mvc;
 
-using MongoDB.Driver;
-
 using System.Dynamic;
 
 using WorkflowCore.Interface;
@@ -35,6 +33,7 @@ namespace EIMSNext.Flow.Host.Controllers
         private readonly IWfExecLogService _execlogservice;
         private readonly IWfTodoService _todoservice;
         private readonly IWorkflowActionService _workflowActionService;
+        private readonly IWorkflowInstancePurger _workflowPurger;
         private readonly IMongoPersistenceProvider _store;
 
         public WorkflowController(IResolver resolver) : base(resolver)
@@ -47,13 +46,14 @@ namespace EIMSNext.Flow.Host.Controllers
             _execlogservice = resolver.Resolve<IWfExecLogService>();
             _todoservice = resolver.Resolve<IWfTodoService>();
             _workflowActionService = resolver.Resolve<IWorkflowActionService>();
+            _workflowPurger = resolver.Resolve<IWorkflowInstancePurger>();
             _store = (IMongoPersistenceProvider)_wfHost.PersistenceStore;
         }
 
         [HttpPost, Route("Load")]
         public IActionResult Load(LoadRequest request)
         {
-            var def = _defservice.Find(x => x.ExternalId == request.WfDefinitionId && x.Version == request.Version).FirstOrDefault();
+            var def = _defservice.Query(x => x.ExternalId == request.WfDefinitionId && x.Version == request.Version).FirstOrDefault();
             if (def == null)
                 return BadRequest($"审批流程定义({request.WfDefinitionId}:{request.Version})不存在");
 
@@ -112,7 +112,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var workerId = IdentityContext.CurrentEmployee.Id;
-            var todo = _todoservice.Find(x => x.DataId == request.DataId && x.EmployeeId == workerId)
+            var todo = _todoservice.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
             if (todo == null)
@@ -271,13 +271,13 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可撤回");
             }
 
-            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
             if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可撤回");
             }
 
-            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            var definition = _defservice.Query(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
             var withdrawRule = definition?.Metadata?.WorkflowSetting?.WithdrawRule ?? WorkflowWithdrawRule.Disabled;
             if (withdrawRule == WorkflowWithdrawRule.Disabled)
             {
@@ -323,13 +323,13 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可催办");
             }
 
-            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
             if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可催办");
             }
 
-            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            var definition = _defservice.Query(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
             if (definition?.Metadata?.WorkflowSetting?.AllowUrge != true)
             {
                 return BadRequest("当前流程不允许催办");
@@ -363,8 +363,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return Ok(new WorkflowActionStatusResponse());
             }
 
-            var todo = _todoservice.Find(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
-            var definition = _defservice.Find(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
+            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var definition = _defservice.Query(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
             var status = _workflowActionService.GetActionStatus(IdentityContext.CurrentEmployee.Id, todo, definition);
 
             return Ok(new WorkflowActionStatusResponse
@@ -439,6 +439,21 @@ namespace EIMSNext.Flow.Host.Controllers
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
         }
 
+        [HttpPost, Route("Instance/Delete")]
+        public async Task<IActionResult> DeleteInstancesAsync(DeleteWorkflowInstancesRequest? request, CancellationToken cancellationToken)
+        {
+            var workflowInstanceIds = await _workflowPurger.DeleteWorkflowInstancesAsync(
+                request?.DataIds,
+                request?.WfInstanceIds,
+                cancellationToken);
+
+            return ApiResult.Success(new
+            {
+                id = string.Join(",", workflowInstanceIds),
+                error = string.Empty
+            }).ToActionResult();
+        }
+
         [HttpPost, Route("ChangeApprover")]
         public async Task<IActionResult> ChangeApproverAsync(ChangeApproverRequest request)
         {
@@ -458,7 +473,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可变更审批人");
             }
 
-            var todo = _todoservice.Find(x => x.DataId == request.DataId)
+            var todo = _todoservice.Query(x => x.DataId == request.DataId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
             if (todo == null)
@@ -490,7 +505,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可执行超时动作");
             }
 
-            var todo = _todoservice.Find(x => x.WfInstanceId == request.WfInstanceId && x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId).FirstOrDefault();
+            var todo = _todoservice.Query(x => x.WfInstanceId == request.WfInstanceId && x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId).FirstOrDefault();
             if (todo == null)
             {
                 return BadRequest("当前节点待办不存在");
@@ -549,7 +564,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 return null;
             }
 
-            return _todoservice.Find(x => x.DataId == dataId && x.EmployeeId == workerId)
+            return _todoservice.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }
@@ -638,7 +653,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 ExternalId = request.WfDefinitionId,
             };
 
-            var exist = _defservice.Find(x => x.ExternalId == def.ExternalId && x.Version == def.Version).FirstOrDefault();
+            var exist = _defservice.Query(x => x.ExternalId == def.ExternalId && x.Version == def.Version).FirstOrDefault();
             if (exist != null)
             {
                 def.Id = exist.Id;
@@ -659,7 +674,7 @@ namespace EIMSNext.Flow.Host.Controllers
         [HttpGet, Route("Definition")]
         public IActionResult GetDefinition([FromQuery] CreateRequest request)
         {
-            return Ok(_defservice.Find(x => x.ExternalId == request.WfDefinitionId).ToList());
+            return Ok(_defservice.Query(x => x.ExternalId == request.WfDefinitionId).ToList());
         }
 
         [HttpGet, Route("Instance")]
@@ -788,6 +803,11 @@ namespace EIMSNext.Flow.Host.Controllers
         public string? AppId { get; set; }
         public List<string>? FormIds { get; set; }
         public bool? DeleteDef { get; set; }
+    }
+    public class DeleteWorkflowInstancesRequest
+    {
+        public IEnumerable<string>? DataIds { get; set; }
+        public IEnumerable<string>? WfInstanceIds { get; set; }
     }
     public class ChangeApproverRequest
     {

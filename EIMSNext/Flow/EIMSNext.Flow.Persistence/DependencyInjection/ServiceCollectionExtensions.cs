@@ -21,11 +21,12 @@ namespace EIMSNext.Flow.Persistence
                 var db = createDatabase(sp);
                 return new MongoPersistenceProvider(db);
             });
-            options.Services.AddTransient<IWorkflowPurger>(sp =>
+            options.Services.AddTransient<IWorkflowInstancePurger>(sp =>
             {
                 var db = createDatabase(sp);
                 return new WorkflowPurger(db);
             });
+            options.Services.AddTransient<IWorkflowPurger>(sp => sp.GetRequiredService<IWorkflowInstancePurger>());
 
             return options;
         }

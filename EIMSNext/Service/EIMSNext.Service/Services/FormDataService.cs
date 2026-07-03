@@ -207,6 +207,76 @@ namespace EIMSNext.Service
             return DeleteCore(FilterBuilder.In(x => x.Id, ids), session);
         }
 
+        protected override object DeleteCore(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        {
+            BeforeDelete(filter, session).Wait();
+
+            var targets = FindDeleteTargets(filter, session);
+            var physicalIds = targets
+                .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
+                .Select(x => x.Id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var physicalIdSet = physicalIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var logicIds = targets
+                .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x) && !physicalIdSet.Contains(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var logicDeleted = DeleteFormDataByIds(logicIds, physical: false, session);
+            if (logicIds.Count > 0)
+            {
+                CreateAuditLog(DbAction.Delete, null, null, FilterBuilder.In(x => x.Id, logicIds), null, session);
+            }
+
+            DeleteStronglyRelatedData(physicalIds, session);
+            var physicalDeleted = DeleteFormDataByIds(physicalIds, physical: true, session);
+            if (physicalIds.Count > 0)
+            {
+                DeleteWorkflowInstancesByDataIdsAsync(physicalIds).GetAwaiter().GetResult();
+                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+            }
+            AfterDelete(filter, session).Wait();
+
+            return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+        }
+
+        protected override async Task<object> DeleteCoreAsync(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        {
+            await BeforeDelete(filter, session);
+
+            var targets = await FindDeleteTargetsAsync(filter, session);
+            var physicalIds = targets
+                .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
+                .Select(x => x.Id)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var physicalIdSet = physicalIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var logicIds = targets
+                .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x) && !physicalIdSet.Contains(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false, session);
+            if (logicIds.Count > 0)
+            {
+                CreateAuditLog(DbAction.Delete, null, null, FilterBuilder.In(x => x.Id, logicIds), null, session);
+            }
+
+            await DeleteStronglyRelatedDataAsync(physicalIds, session);
+            var physicalDeleted = await DeleteFormDataByIdsAsync(physicalIds, physical: true, session);
+            if (physicalIds.Count > 0)
+            {
+                await DeleteWorkflowInstancesByDataIdsAsync(physicalIds);
+                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+            }
+            await AfterDelete(filter, session);
+
+            return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+        }
+
         public override Task<object> DeleteAsync(string id)
         {
             return DeleteAsync([id]);
@@ -258,10 +328,7 @@ namespace EIMSNext.Service
             if (idList.Count == 0) return;
 
             using var scope = NewTransactionScope();
-            var filter = FilterBuilder.And(
-                FilterBuilder.In(x => x.Id, idList),
-                FilterBuilder.Eq(x => x.DeleteFlag, true));
-            await Repository.DeleteAsync(filter, scope.SessionHandle);
+            await PurgeCoreAsync(idList, scope.SessionHandle);
             scope.CommitTransaction();
         }
 
@@ -279,6 +346,132 @@ namespace EIMSNext.Service
             }
 
             return result;
+        }
+
+        protected virtual async Task PurgeCoreAsync(IReadOnlyCollection<string> ids, IClientSessionHandle? session)
+        {
+            if (ids.Count == 0) return;
+
+            var filter = FilterBuilder.And(
+                FilterBuilder.In(x => x.Id, ids),
+                FilterBuilder.Eq(x => x.DeleteFlag, true));
+            var targets = await FindDeleteTargetsAsync(filter, session);
+            var dataIds = targets
+                .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (dataIds.Count == 0) return;
+
+            await DeleteStronglyRelatedDataAsync(dataIds, session);
+            await DeleteFormDataByIdsAsync(dataIds, physical: true, session);
+            await DeleteWorkflowInstancesByDataIdsAsync(dataIds);
+        }
+
+        protected virtual IReadOnlyList<FormData> FindDeleteTargets(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        {
+            return session == null
+                ? Repository.Collection.Find(filter).ToList()
+                : Repository.Collection.Find(session, filter).ToList();
+        }
+
+        protected virtual async Task<IReadOnlyList<FormData>> FindDeleteTargetsAsync(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        {
+            return session == null
+                ? await Repository.Collection.Find(filter).ToListAsync()
+                : await Repository.Collection.Find(session, filter).ToListAsync();
+        }
+
+        private void CreatePhysicalDeleteAuditLog(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        {
+            if (!LogAudit) return;
+
+            var list = entities.ToList();
+            if (list.Count == 0) return;
+
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
+            var logs = list.Select(x => new AuditLog
+            {
+                Action = DbAction.PhysicalDelete,
+                EntityType = nameof(FormData),
+                DataId = x.Id,
+                Detail = "物理删除草稿数据",
+                OldData = x.SerializeToJson(),
+                CreateBy = op,
+                UpdateBy = op,
+                CreateTime = now,
+                UpdateTime = now,
+                ClientIp = ip,
+                CorpId = string.IsNullOrWhiteSpace(x.CorpId) ? corpId : x.CorpId,
+            }).ToList();
+
+            Resolver.GetRepository<AuditLog>().Insert(logs, session);
+        }
+
+        protected virtual long DeleteFormDataByIds(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+        {
+            if (ids.Count == 0) return 0;
+
+            if (physical)
+            {
+                return Repository.Delete(ids, session).DeletedCount;
+            }
+
+            var filter = FilterBuilder.In(x => x.Id, ids);
+            var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
+            return Repository.UpdateMany(filter, update, session: session).ModifiedCount;
+        }
+
+        protected virtual async Task<long> DeleteFormDataByIdsAsync(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+        {
+            if (ids.Count == 0) return 0;
+
+            if (physical)
+            {
+                return (await Repository.DeleteAsync(ids, session)).DeletedCount;
+            }
+
+            var filter = FilterBuilder.In(x => x.Id, ids);
+            var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
+            return (await Repository.UpdateManyAsync(filter, update, session: session)).ModifiedCount;
+        }
+
+        protected virtual Task<WfResponse?> DeleteWorkflowInstancesByDataIdsAsync(IReadOnlyCollection<string> dataIds)
+        {
+            return dataIds.Count == 0
+                ? Task.FromResult<WfResponse?>(null)
+                : _flowClient.DeleteWorkflowInstances(new DeleteWorkflowInstancesRequest { DataIds = dataIds }, Context.AccessToken);
+        }
+
+        protected virtual void DeleteStronglyRelatedData(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+        {
+            if (dataIds.Count == 0) return;
+
+            var todoRepo = Resolver.GetRepository<Wf_Todo>();
+            todoRepo.Delete(todoRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+
+            var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
+            dataflowScheduleRepo.Delete(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+
+            var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
+            notifyScheduleRepo.Delete(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+        }
+
+        protected virtual async Task DeleteStronglyRelatedDataAsync(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+        {
+            if (dataIds.Count == 0) return;
+
+            var todoRepo = Resolver.GetRepository<Wf_Todo>();
+            await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+
+            var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
+            await dataflowScheduleRepo.DeleteAsync(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+
+            var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
+            await notifyScheduleRepo.DeleteAsync(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
         }
 
         protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
