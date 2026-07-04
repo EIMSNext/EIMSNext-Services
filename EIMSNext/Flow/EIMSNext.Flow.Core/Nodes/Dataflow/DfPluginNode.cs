@@ -4,6 +4,7 @@ using System.Collections;
 
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -33,6 +34,12 @@ namespace EIMSNext.Flow.Core.Nodes
 
             try
             {
+                if (!IsPluginEnabled(dataContext.CorpId, setting.PluginId))
+                {
+                    CreateFailureExecLog(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    return ExecutionResult.Next();
+                }
+
                 var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
                 var payload = BuildPayload(dataContext, setting);
                 var invocationContext = new PluginInvocationContext
@@ -51,7 +58,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 var result = runtimeManager.ExecuteAsync(
                         setting.PluginId,
                         setting,
-                        new PluginExecArgs { FunName = setting.FunctionId, FunArgs = JsonSerializer.Serialize(payload) },
+                        new PluginExecArgs { FunName = setting.FunctionId, FunArgs = payload.SerializeToJson() },
                         invocationContext,
                         context.CancellationToken)
                     .GetAwaiter()
@@ -87,6 +94,23 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.Next();
         }
 
+        private bool IsPluginEnabled(string corpId, string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(corpId) || string.IsNullOrWhiteSpace(pluginId))
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            return Resolver.Resolve<IRepository<PluginInstall>>().Queryable.Any(x =>
+                x.CorpId == corpId
+                && x.PluginId == pluginId
+                && !x.DeleteFlag
+                && x.Status == PluginInstallStatus.Installed
+                && x.Enabled
+                && (x.ExpireAt == null || x.ExpireAt > now));
+        }
+
         private Dictionary<string, object?> BuildPayload(DfDataContext dataContext, Plugin.Contracts.PluginSetting setting)
         {
             var scriptData = GetNodeScriptData(dataContext);
@@ -114,7 +138,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var value = ScriptEngine.Evaluate(BuildFieldExpression(field), scriptData).Value;
             if (!field.IsSubField)
             {
-                return NormalizeComplexValue(field.FieldType, value);
+                return value;
             }
 
             if (value is not string && value is IEnumerable enumerable)
@@ -122,49 +146,10 @@ namespace EIMSNext.Flow.Core.Nodes
                 var list = new List<object?>();
                 foreach (var item in enumerable)
                 {
-                    list.Add(NormalizeComplexValue(field.FieldType, item));
+                    list.Add(item);
                 }
 
                 return list;
-            }
-
-            return NormalizeComplexValue(field.FieldType, value);
-        }
-
-        private object? NormalizeComplexValue(string fieldType, object? value)
-        {
-            if (value == null)
-            {
-                return null;
-            }
-
-            if (string.Equals(fieldType, EIMSNext.Common.FieldType.FileUpload, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(fieldType, EIMSNext.Common.FieldType.ImageUpload, StringComparison.OrdinalIgnoreCase))
-            {
-                return NormalizeUploadValue(value);
-            }
-
-            return value;
-        }
-
-        private static object? NormalizeUploadValue(object value)
-        {
-            if (value is string)
-            {
-                return value;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return new
-                {
-                    id = dict.TryGetValue("id", out var id) ? id : null,
-                    fileName = dict.TryGetValue("fileName", out var fileName) ? fileName : null,
-                    savePath = dict.TryGetValue("savePath", out var savePath) ? savePath : null,
-                    thumbPath = dict.TryGetValue("thumbPath", out var thumbPath) ? thumbPath : null,
-                    fileExt = dict.TryGetValue("fileExt", out var fileExt) ? fileExt : null,
-                    fileSize = dict.TryGetValue("fileSize", out var fileSize) ? fileSize : null,
-                };
             }
 
             return value;
@@ -244,8 +229,8 @@ namespace EIMSNext.Flow.Core.Nodes
                 return result;
             }
 
-            var json = JsonSerializer.Serialize(value);
-            return JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+            var json = value.SerializeToJson();
+            return json.DeserializeFromJson<Dictionary<string, object?>>()
                 ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         }
 

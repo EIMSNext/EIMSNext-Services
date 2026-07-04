@@ -6,6 +6,8 @@ namespace EIMSNext.ApiCore.Plugin
     {
         IReadOnlyList<PluginRuntimeInfo> GetPlugins();
 
+        PluginRuntimeInfo? GetPlugin(string pluginId);
+
         Task<PluginExecResult> ExecuteAsync(
             string pluginId,
             PluginSetting setting,

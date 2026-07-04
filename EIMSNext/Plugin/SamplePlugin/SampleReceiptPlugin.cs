@@ -1,123 +1,44 @@
 using System.Composition;
 
-using EIMSNext.Common;
 using EIMSNext.Plugin.Contracts;
 
 namespace SamplePlugin
 {
     [Export(typeof(IPlugin))]
+    [Plugin("sampleplugin", "示例插件", Version = "1.0", Description = "示例插件，用于验证插件节点输入输出配置")]
     public sealed class SampleReceiptPlugin : PluginBase<SampleReceiptPluginSetting>
     {
-        protected override PluginDesc BuildPluginDesc()
+        [PluginFunction("EchoReceipt", "收款单回显", Description = "演示插件字段映射、执行结果开放字段与下游节点联动")]
+        private ReceiptEchoResult EchoReceipt(SampleReceiptArgs args)
         {
-            var desc = new PluginDesc
+            return new ReceiptEchoResult
             {
-                Id = "sampleplugin",
-                Name = "示例插件",
-                Version = "1.0",
-                Description = "示例插件，用于验证插件节点输入输出配置"
-            };
-
-            var receiptFunction = new FunctionDesc
-            {
-                Id = "EchoReceipt",
-                Name = "收款单回显",
-                Description = "演示插件字段映射、执行结果开放字段与下游节点联动"
-            };
-            receiptFunction.InputFields.Add(CreateField("bizNo", "单据编号", FieldType.Input, required: true));
-            receiptFunction.InputFields.Add(CreateField("amount", "金额", FieldType.Number, required: true));
-            receiptFunction.InputFields.Add(CreateField("bizDate", "业务日期", FieldType.TimeStamp));
-            receiptFunction.InputFields.Add(CreateField("remark", "备注", FieldType.TextArea));
-            receiptFunction.InputFields.Add(CreateField("status", "状态", FieldType.Select1, compatibleFieldTypes: [FieldType.Radio]));
-            receiptFunction.InputFields.Add(CreateField("receiver", "经办人", FieldType.Employee1));
-            receiptFunction.InputFields.Add(CreateField("dept", "部门", FieldType.Department1));
-            receiptFunction.InputFields.Add(CreateField("attachments", "附件", FieldType.FileUpload));
-            receiptFunction.InputFields.Add(CreateField("images", "图片", FieldType.ImageUpload));
-            receiptFunction.InputFields.Add(CreateField("items", "明细子表", FieldType.TableForm));
-            receiptFunction.ResultFields.Add(CreateResultField("message", "返回信息", FieldType.Input));
-            receiptFunction.ResultFields.Add(CreateResultField("code", "返回代码", FieldType.Number));
-            receiptFunction.ResultFields.Add(CreateResultField("workflowId", "流程ID", FieldType.Input));
-            receiptFunction.ResultFields.Add(CreateResultField("echoBizNo", "回显单号", FieldType.Input));
-            receiptFunction.ResultFields.Add(CreateResultField("echoAmount", "回显金额", FieldType.Number));
-            desc.Functions.Add(receiptFunction);
-
-            var mixedFunction = new FunctionDesc
-            {
-                Id = "EchoMixedData",
-                Name = "通用字段回显",
-                Description = "用于验证插件切换方法、字段重置和结果字段选择"
-            };
-            mixedFunction.InputFields.Add(CreateField("title", "标题", FieldType.Input, required: true));
-            mixedFunction.InputFields.Add(CreateField("description", "描述", FieldType.TextArea));
-            mixedFunction.InputFields.Add(CreateField("owner", "负责人", FieldType.Employee1));
-            mixedFunction.InputFields.Add(CreateField("ownerDept", "归属部门", FieldType.Department1));
-            mixedFunction.ResultFields.Add(CreateResultField("message", "返回信息", FieldType.Input));
-            mixedFunction.ResultFields.Add(CreateResultField("echoTitle", "回显标题", FieldType.Input));
-            mixedFunction.ResultFields.Add(CreateResultField("echoOwner", "回显负责人", FieldType.Employee1));
-            desc.Functions.Add(mixedFunction);
-
-            return desc;
-        }
-
-        private static PluginFieldDesc CreateField(string key, string name, string fieldType, bool required = false, params string[] compatibleFieldTypes)
-        {
-            var field = new PluginFieldDesc
-            {
-                Key = key,
-                Name = name,
-                FieldType = fieldType,
-                Required = required,
-                AllowCustomValue = true,
-                AllowFieldMapping = true,
-            };
-
-            foreach (var compatibleType in compatibleFieldTypes)
-            {
-                field.CompatibleFieldTypes.Add(compatibleType);
-            }
-
-            return field;
-        }
-
-        private static PluginResultFieldDesc CreateResultField(string key, string name, string fieldType)
-        {
-            return new PluginResultFieldDesc
-            {
-                Key = key,
-                Name = name,
-                FieldType = fieldType,
+                Message = "sample receipt plugin executed",
+                Code = 0,
+                WorkflowId = Context?.Items.TryGetValue("workflowId", out var workflowId) == true ? workflowId?.ToString() : null,
+                EchoBizNo = args.BizNo,
+                EchoAmount = args.Amount,
+                EchoBizDate = args.BizDate,
+                EchoRemark = args.Remark,
+                EchoStatus = args.Status,
+                EchoReceiver = args.Receiver,
+                EchoDept = args.Dept,
+                EchoAttachments = args.Attachments,
+                EchoImages = args.Images,
+                EchoItems = args.Items,
             };
         }
 
-        private object EchoReceipt(SampleReceiptArgs args)
+        [PluginFunction("EchoMixedData", "通用字段回显", Description = "用于验证插件切换方法、字段重置和结果字段选择")]
+        private MixedEchoResult EchoMixedData(MixedEchoArgs args)
         {
-            return new
+            return new MixedEchoResult
             {
-                message = "sample receipt plugin executed",
-                code = 0,
-                workflowId = Context?.Items.TryGetValue("workflowId", out var workflowId) == true ? workflowId : null,
-                echoBizNo = args.BizNo,
-                echoAmount = args.Amount,
-                echoBizDate = args.BizDate,
-                echoRemark = args.Remark,
-                echoStatus = args.Status,
-                echoReceiver = args.Receiver,
-                echoDept = args.Dept,
-                echoAttachments = args.Attachments,
-                echoImages = args.Images,
-                echoItems = args.Items,
-            };
-        }
-
-        private object EchoMixedData(MixedEchoArgs args)
-        {
-            return new
-            {
-                message = "sample mixed plugin executed",
-                echoTitle = args.Title,
-                echoDescription = args.Description,
-                echoOwner = args.Owner,
-                echoOwnerDept = args.OwnerDept,
+                Message = "sample mixed plugin executed",
+                EchoTitle = args.Title,
+                EchoDescription = args.Description,
+                EchoOwner = args.Owner,
+                EchoOwnerDept = args.OwnerDept,
             };
         }
     }
@@ -128,16 +49,35 @@ namespace SamplePlugin
 
     public sealed class SampleReceiptArgs
     {
+        [PluginInput("单据编号", PluginFieldKind.Text, Key = "bizNo", Required = true)]
         public string? BizNo { get; set; }
+
+        [PluginInput("金额", PluginFieldKind.Number, Key = "amount", Required = true)]
         public decimal Amount { get; set; }
-        public DateTime? BizDate { get; set; }
+
+        [PluginInput("业务日期", PluginFieldKind.Timestamp, Key = "bizDate")]
+        public long? BizDate { get; set; }
+
+        [PluginInput("备注", PluginFieldKind.TextArea, Key = "remark")]
         public string? Remark { get; set; }
-        public object? Status { get; set; }
-        public object? Receiver { get; set; }
-        public object? Dept { get; set; }
-        public object? Attachments { get; set; }
-        public object? Images { get; set; }
-        public List<SampleReceiptItemArgs> Items { get; set; } = new();
+
+        [PluginInput("状态", PluginFieldKind.SingleSelect, Key = "status", CompatibleFieldTypes = [PluginFieldKind.Radio])]
+        public string? Status { get; set; }
+
+        [PluginInput("经办人", PluginFieldKind.SingleEmployee, Key = "receiver")]
+        public EmployeeRef? Receiver { get; set; }
+
+        [PluginInput("部门", PluginFieldKind.SingleDepartment, Key = "dept")]
+        public DepartmentRef? Dept { get; set; }
+
+        [PluginInput("附件", PluginFieldKind.FileUpload, Key = "attachments")]
+        public List<string> Attachments { get; set; } = [];
+
+        [PluginInput("图片", PluginFieldKind.ImageUpload, Key = "images")]
+        public List<string> Images { get; set; } = [];
+
+        [PluginInput("明细子表", PluginFieldKind.TableForm, Key = "items")]
+        public List<SampleReceiptItemArgs> Items { get; set; } = [];
     }
 
     public sealed class SampleReceiptItemArgs
@@ -150,9 +90,76 @@ namespace SamplePlugin
 
     public sealed class MixedEchoArgs
     {
+        [PluginInput("标题", PluginFieldKind.Text, Key = "title", Required = true)]
         public string? Title { get; set; }
+
+        [PluginInput("描述", PluginFieldKind.TextArea, Key = "description")]
         public string? Description { get; set; }
-        public object? Owner { get; set; }
-        public object? OwnerDept { get; set; }
+
+        [PluginInput("负责人", PluginFieldKind.SingleEmployee, Key = "owner")]
+        public EmployeeRef? Owner { get; set; }
+
+        [PluginInput("归属部门", PluginFieldKind.SingleDepartment, Key = "ownerDept")]
+        public DepartmentRef? OwnerDept { get; set; }
+    }
+
+    public sealed class ReceiptEchoResult
+    {
+        [PluginOutput("返回信息", PluginFieldKind.Text, Key = "message")]
+        public string? Message { get; set; }
+
+        [PluginOutput("返回代码", PluginFieldKind.Number, Key = "code")]
+        public int Code { get; set; }
+
+        [PluginOutput("流程ID", PluginFieldKind.Text, Key = "workflowId")]
+        public string? WorkflowId { get; set; }
+
+        [PluginOutput("回显单号", PluginFieldKind.Text, Key = "echoBizNo")]
+        public string? EchoBizNo { get; set; }
+
+        [PluginOutput("回显金额", PluginFieldKind.Number, Key = "echoAmount")]
+        public decimal EchoAmount { get; set; }
+
+        [PluginOutput("回显日期", PluginFieldKind.Timestamp, Key = "echoBizDate")]
+        public long? EchoBizDate { get; set; }
+
+        [PluginOutput("回显备注", PluginFieldKind.TextArea, Key = "echoRemark")]
+        public string? EchoRemark { get; set; }
+
+        [PluginOutput("回显状态", PluginFieldKind.SingleSelect, Key = "echoStatus")]
+        public string? EchoStatus { get; set; }
+
+        [PluginOutput("回显经办人", PluginFieldKind.SingleEmployee, Key = "echoReceiver")]
+        public EmployeeRef? EchoReceiver { get; set; }
+
+        [PluginOutput("回显部门", PluginFieldKind.SingleDepartment, Key = "echoDept")]
+        public DepartmentRef? EchoDept { get; set; }
+
+        [PluginOutput("回显附件", PluginFieldKind.FileUpload, Key = "echoAttachments")]
+        public List<string> EchoAttachments { get; set; } = [];
+
+        [PluginOutput("回显图片", PluginFieldKind.ImageUpload, Key = "echoImages")]
+        public List<string> EchoImages { get; set; } = [];
+
+        [PluginOutput("回显明细", PluginFieldKind.TableForm, Key = "echoItems")]
+        public List<SampleReceiptItemArgs> EchoItems { get; set; } = [];
+    }
+
+    public sealed class MixedEchoResult
+    {
+        [PluginOutput("返回信息", PluginFieldKind.Text, Key = "message")]
+        public string? Message { get; set; }
+
+        [PluginOutput("回显标题", PluginFieldKind.Text, Key = "echoTitle")]
+        public string? EchoTitle { get; set; }
+
+        [PluginOutput("回显描述", PluginFieldKind.TextArea, Key = "echoDescription")]
+        public string? EchoDescription { get; set; }
+
+        [PluginOutput("回显负责人", PluginFieldKind.SingleEmployee, Key = "echoOwner")]
+        public EmployeeRef? EchoOwner { get; set; }
+
+        [PluginOutput("回显归属部门", PluginFieldKind.SingleDepartment, Key = "echoOwnerDept")]
+        public DepartmentRef? EchoOwnerDept { get; set; }
     }
 }

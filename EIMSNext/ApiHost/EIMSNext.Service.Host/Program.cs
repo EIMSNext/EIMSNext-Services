@@ -224,11 +224,32 @@ async Task EnsureSeedData(IResolver resolver)
                     Description = "演示插件字段映射、执行结果开放字段与下游节点联动",
                     InputFields =
                     [
-                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = "Input", Required = true },
-                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = "Number", Required = true },
-                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = "TimeStamp" },
-                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = "TextArea" },
-                        new PluginFieldDesc { Key = "items", Name = "明细子表", FieldType = "TableForm" }
+                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = PluginFieldKind.Text, Required = true },
+                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = PluginFieldKind.Number, Required = true },
+                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = PluginFieldKind.Timestamp },
+                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = PluginFieldKind.TextArea },
+                        new PluginFieldDesc { Key = "status", Name = "状态", FieldType = PluginFieldKind.SingleSelect, CompatibleFieldTypes = { PluginFieldKind.Radio } },
+                        new PluginFieldDesc { Key = "receiver", Name = "经办人", FieldType = PluginFieldKind.SingleEmployee },
+                        new PluginFieldDesc { Key = "dept", Name = "部门", FieldType = PluginFieldKind.SingleDepartment },
+                        new PluginFieldDesc { Key = "attachments", Name = "附件", FieldType = PluginFieldKind.FileUpload, Multiple = true },
+                        new PluginFieldDesc { Key = "images", Name = "图片", FieldType = PluginFieldKind.ImageUpload, Multiple = true },
+                        new PluginFieldDesc { Key = "items", Name = "明细子表", FieldType = PluginFieldKind.TableForm, Multiple = true }
+                    ],
+                    ResultFields =
+                    [
+                        new PluginResultFieldDesc { Key = "message", Name = "返回信息", FieldType = PluginFieldKind.Text },
+                        new PluginResultFieldDesc { Key = "code", Name = "返回代码", FieldType = PluginFieldKind.Number },
+                        new PluginResultFieldDesc { Key = "workflowId", Name = "流程ID", FieldType = PluginFieldKind.Text },
+                        new PluginResultFieldDesc { Key = "echoBizNo", Name = "回显单号", FieldType = PluginFieldKind.Text },
+                        new PluginResultFieldDesc { Key = "echoAmount", Name = "回显金额", FieldType = PluginFieldKind.Number },
+                        new PluginResultFieldDesc { Key = "echoBizDate", Name = "回显日期", FieldType = PluginFieldKind.Timestamp },
+                        new PluginResultFieldDesc { Key = "echoRemark", Name = "回显备注", FieldType = PluginFieldKind.TextArea },
+                        new PluginResultFieldDesc { Key = "echoStatus", Name = "回显状态", FieldType = PluginFieldKind.SingleSelect },
+                        new PluginResultFieldDesc { Key = "echoReceiver", Name = "回显经办人", FieldType = PluginFieldKind.SingleEmployee },
+                        new PluginResultFieldDesc { Key = "echoDept", Name = "回显部门", FieldType = PluginFieldKind.SingleDepartment },
+                        new PluginResultFieldDesc { Key = "echoAttachments", Name = "回显附件", FieldType = PluginFieldKind.FileUpload, Multiple = true },
+                        new PluginResultFieldDesc { Key = "echoImages", Name = "回显图片", FieldType = PluginFieldKind.ImageUpload, Multiple = true },
+                        new PluginResultFieldDesc { Key = "echoItems", Name = "回显明细", FieldType = PluginFieldKind.TableForm, Multiple = true }
                     ]
                 },
                 new PluginFunctionSnapshot
@@ -238,10 +259,18 @@ async Task EnsureSeedData(IResolver resolver)
                     Description = "用于验证插件切换方法、字段重置和结果字段选择",
                     InputFields =
                     [
-                        new PluginFieldDesc { Key = "title", Name = "标题", FieldType = "Input", Required = true },
-                        new PluginFieldDesc { Key = "description", Name = "描述", FieldType = "TextArea" },
-                        new PluginFieldDesc { Key = "owner", Name = "负责人", FieldType = "Employee1" },
-                        new PluginFieldDesc { Key = "ownerDept", Name = "归属部门", FieldType = "Department1" }
+                        new PluginFieldDesc { Key = "title", Name = "标题", FieldType = PluginFieldKind.Text, Required = true },
+                        new PluginFieldDesc { Key = "description", Name = "描述", FieldType = PluginFieldKind.TextArea },
+                        new PluginFieldDesc { Key = "owner", Name = "负责人", FieldType = PluginFieldKind.SingleEmployee },
+                        new PluginFieldDesc { Key = "ownerDept", Name = "归属部门", FieldType = PluginFieldKind.SingleDepartment }
+                    ],
+                    ResultFields =
+                    [
+                        new PluginResultFieldDesc { Key = "message", Name = "返回信息", FieldType = PluginFieldKind.Text },
+                        new PluginResultFieldDesc { Key = "echoTitle", Name = "回显标题", FieldType = PluginFieldKind.Text },
+                        new PluginResultFieldDesc { Key = "echoDescription", Name = "回显描述", FieldType = PluginFieldKind.TextArea },
+                        new PluginResultFieldDesc { Key = "echoOwner", Name = "回显负责人", FieldType = PluginFieldKind.SingleEmployee },
+                        new PluginResultFieldDesc { Key = "echoOwnerDept", Name = "回显归属部门", FieldType = PluginFieldKind.SingleDepartment }
                     ]
                 }
             ]

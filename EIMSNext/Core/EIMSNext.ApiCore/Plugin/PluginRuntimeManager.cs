@@ -44,9 +44,15 @@ namespace EIMSNext.ApiCore.Plugin
                 .ToList();
         }
 
+        public PluginRuntimeInfo? GetPlugin(string pluginId)
+        {
+            return ResolveRuntime(pluginId)?.ToRuntimeInfo();
+        }
+
         public async Task<PluginExecResult> ExecuteAsync(string pluginId, PluginSetting setting, PluginExecArgs args, PluginInvocationContext? context = null, CancellationToken cancellationToken = default)
         {
-            if (!_activeRuntimes.TryGetValue(pluginId, out var runtime))
+            var runtime = ResolveRuntime(pluginId);
+            if (runtime == null)
             {
                 return new PluginExecResult { Code = -404, Message = $"Plugin [{pluginId}] not found." };
             }
@@ -94,7 +100,7 @@ namespace EIMSNext.ApiCore.Plugin
                         PreviousVersion = currentRuntime?.Version.ToString(),
                         CurrentVersion = runtime.Version.ToString(),
                         Updated = true,
-                        UnloadedOldVersion = false,
+                        UnloadedOldVersion = currentRuntime == null,
                         Message = "Reloaded latest version."
                     });
                 }
@@ -138,6 +144,11 @@ namespace EIMSNext.ApiCore.Plugin
                 .GroupBy(x => x!.PluginId, StringComparer.OrdinalIgnoreCase)
                 .Select(x => x.OrderByDescending(y => y!.Version).First()!)
                 .ToList();
+        }
+
+        private PluginRuntime? ResolveRuntime(string pluginId)
+        {
+            return string.IsNullOrWhiteSpace(pluginId) ? null : _activeRuntimes.GetValueOrDefault(pluginId);
         }
 
         internal PluginAssemblyCandidate? CreateCandidate(string assemblyPath)

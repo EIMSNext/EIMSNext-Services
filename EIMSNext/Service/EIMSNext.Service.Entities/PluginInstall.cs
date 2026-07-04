@@ -4,18 +4,12 @@ namespace EIMSNext.Service.Entities
 {
     /// <summary>
     /// 企业插件安装记录。
-    /// 每条记录代表一个 corp 在某个 <see cref="PluginProfile"/> 版本下的安装实例。
+    /// 每条记录代表一个 corp 对某个插件的安装实例。
     /// </summary>
     public class PluginInstall : CorpEntityBase
     {
-        /// <summary>对应的插件 Profile ID（指向 <see cref="PluginProfile"/>）。</summary>
-        public string PluginProfileId { get; set; } = string.Empty;
-
         /// <summary>插件标识（与 PluginProfile.PluginId 一致，便于直接检索）。</summary>
         public string PluginId { get; set; } = string.Empty;
-
-        /// <summary>当前安装的版本号（语义化版本字符串）。</summary>
-        public string Version { get; set; } = string.Empty;
 
         /// <summary>插件名称（冗余字段，UI 直接展示，避免每次 join Profile）。</summary>
         public string Name { get; set; } = string.Empty;

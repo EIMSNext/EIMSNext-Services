@@ -81,7 +81,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>可选的定价方案（多个价格档位）。</summary>
         public List<PluginPricingPlan> PricingPlans { get; set; } = [];
 
-        /// <summary>插件对外暴露的函数清单（含输入字段定义）。</summary>
+        /// <summary>插件对外暴露的函数清单（含输入/输出字段定义）。</summary>
         public List<PluginFunctionSnapshot> Functions { get; set; } = [];
     }
 
@@ -110,7 +110,7 @@ namespace EIMSNext.Service.Entities
     }
 
     /// <summary>
-    /// 插件函数快照：描述一个可被工作流/Dataflow 调用的函数及其入参定义。
+    /// 插件函数快照：描述一个可被工作流/Dataflow 调用的函数及其输入/输出字段定义。
     /// </summary>
     public class PluginFunctionSnapshot
     {
@@ -125,5 +125,8 @@ namespace EIMSNext.Service.Entities
 
         /// <summary>函数入参字段定义列表。</summary>
         public List<PluginFieldDesc> InputFields { get; set; } = [];
+
+        /// <summary>函数结果字段定义列表。</summary>
+        public List<PluginResultFieldDesc> ResultFields { get; set; } = [];
     }
 }

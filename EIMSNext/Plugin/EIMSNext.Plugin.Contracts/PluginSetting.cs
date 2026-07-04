@@ -13,7 +13,6 @@ namespace EIMSNext.Plugin.Contracts
     public class PluginSetting
     {
         public string PluginId { get; set; } = string.Empty;
-        public string? PluginVersion { get; set; }
         public string FunctionId { get; set; } = string.Empty;
         public string? Settings { get; set; }
         public List<PluginFieldSetting> FieldSettings { get; set; } = new List<PluginFieldSetting>();

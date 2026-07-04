@@ -289,7 +289,6 @@ namespace EIMSNext.Component
                     dfNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
                     {
                         PluginId = flowNode.Metadata.PluginMeta.PluginId,
-                        PluginVersion = flowNode.Metadata.PluginMeta.PluginVersion,
                         FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
                         FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings),
                         ResultFields = ParsePluginResultFieldList(flowNode.Metadata.PluginMeta.ResultFields)
@@ -558,14 +557,14 @@ namespace EIMSNext.Component
             };
         }
 
-        private List<PluginFieldSetting> ParsePluginFieldList(PluginFieldList? fieldList)
+        private List<PluginFieldSetting> ParsePluginFieldList(List<PluginFieldItem>? fieldList)
         {
-            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return new List<PluginFieldSetting>();
             }
 
-            return fieldList.Items.Select(item =>
+            return fieldList.Select(item =>
             {
                 var fieldSetting = new PluginFieldSetting
                 {
@@ -592,14 +591,14 @@ namespace EIMSNext.Component
             }).ToList();
         }
 
-        private List<PluginResultFieldSetting> ParsePluginResultFieldList(PluginResultFieldList? fieldList)
+        private List<PluginResultFieldSetting> ParsePluginResultFieldList(List<PluginResultFieldItem>? fieldList)
         {
-            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return new List<PluginResultFieldSetting>();
             }
 
-            return fieldList.Items
+            return fieldList
                 .Where(item => !string.IsNullOrWhiteSpace(item.FieldKey))
                 .Select(item => new PluginResultFieldSetting
                 {
@@ -833,15 +832,9 @@ namespace EIMSNext.Component
         {
             public bool SingleResult { get; set; }
             public string PluginId { get; set; } = string.Empty;
-            public string? PluginVersion { get; set; }
             public string FunctionId { get; set; } = string.Empty;
-            public PluginFieldList FieldSettings { get; set; } = new PluginFieldList();
-            public PluginResultFieldList ResultFields { get; set; } = new PluginResultFieldList();
-        }
-
-        private class PluginFieldList
-        {
-            public List<PluginFieldItem> Items { get; set; } = new List<PluginFieldItem>();
+            public List<PluginFieldItem> FieldSettings { get; set; } = new List<PluginFieldItem>();
+            public List<PluginResultFieldItem> ResultFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
         private class PluginFieldItem
@@ -849,11 +842,6 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string FieldType { get; set; } = string.Empty;
             public FormFieldValue? Value { get; set; }
-        }
-
-        private class PluginResultFieldList
-        {
-            public List<PluginResultFieldItem> Items { get; set; } = new List<PluginResultFieldItem>();
         }
 
         private class PluginResultFieldItem
