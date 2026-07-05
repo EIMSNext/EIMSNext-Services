@@ -49,6 +49,20 @@ namespace EIMSNext.Plugin.Contracts
     }
 
     [AttributeUsage(AttributeTargets.Property, Inherited = true)]
+    public sealed class PluginSubListAttribute : Attribute
+    {
+        public PluginSubListAttribute(string name)
+        {
+            Name = name;
+        }
+
+        public string Name { get; }
+        public string? Key { get; init; }
+        public bool Required { get; init; }
+        public string? Description { get; init; }
+    }
+
+    [AttributeUsage(AttributeTargets.Property, Inherited = true)]
     public sealed class PluginOutputAttribute : Attribute
     {
         public PluginOutputAttribute(string name, string fieldType)

@@ -191,6 +191,9 @@ namespace EIMSNext.Component
                         FormId = flowNode.Metadata.InsertMeta!.FormId,
                         FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.InsertMeta!.FormFieldList)
                     };
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.InsertSetting.FieldSettings,
+                        $"Insert node [{flowNode.Id}]");
                     otherFormIds.TryAdd(dfNodeSetting.InsertSetting.FormId);
                     break;
                 case WfNodeType.QueryOne:
@@ -282,6 +285,12 @@ namespace EIMSNext.Component
                     if (dfNodeSetting.UpdateSetting.InsertIfNoData)
                         dfNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList);
 
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.UpdateSetting.FieldSettings,
+                        $"Update node [{flowNode.Id}]");
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.UpdateSetting.InsertFieldSettings,
+                        $"Update node [{flowNode.Id}] insert-if-no-data");
                     otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
                     break;
                 case WfNodeType.Plugin:
@@ -557,7 +566,7 @@ namespace EIMSNext.Component
             };
         }
 
-        private List<PluginFieldSetting> ParsePluginFieldList(List<PluginFieldItem>? fieldList)
+        private List<PluginFieldSetting> ParsePluginFieldList(List<PluginFieldItem>? fieldList, bool isSubFieldSetting = false)
         {
             if (fieldList == null || fieldList.Count == 0)
             {
@@ -565,30 +574,37 @@ namespace EIMSNext.Component
             }
 
             return fieldList.Select(item =>
+                ParsePluginFieldItem(item, isSubFieldSetting)).ToList();
+        }
+
+        private PluginFieldSetting ParsePluginFieldItem(PluginFieldItem item, bool isSubFieldSetting)
+        {
+            var fieldSetting = new PluginFieldSetting
             {
-                var fieldSetting = new PluginFieldSetting
+                FieldKey = item.FieldKey,
+                FieldType = item.FieldType,
+                ValueType = Enum.TryParse<PluginValueType>(item.Value?.Type, true, out var valueType)
+                    ? valueType
+                    : PluginValueType.Empty,
+                Value = item.Value?.Value,
+                SubFieldSettings = ParsePluginFieldList(item.SubFieldSettings, isSubFieldSetting: true),
+            };
+
+            if (item.Value?.FieldValue != null)
+            {
+                fieldSetting.ValueField = new PluginFieldReference
                 {
-                    FieldKey = item.FieldKey,
-                    FieldType = item.FieldType,
-                    ValueType = Enum.Parse<PluginValueType>(item.Value!.Type, true),
-                    Value = item.Value.Value,
+                    NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
+                    FormId = item.Value.FieldValue.FormId,
+                    Field = item.Value.FieldValue.Field,
+                    FieldType = item.Value.FieldValue.Type,
+                    IsSubField = item.Value.FieldValue.IsSubField || item.Value.FieldValue.Field.Contains('>'),
+                    SingleResultNode = item.Value.FieldValue.SingleResultNode,
                 };
+            }
 
-                if (item.Value.FieldValue != null)
-                {
-                    fieldSetting.ValueField = new PluginFieldReference
-                    {
-                        NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
-                        FormId = item.Value.FieldValue.FormId,
-                        Field = item.Value.FieldValue.Field,
-                        FieldType = item.Value.FieldValue.Type,
-                        IsSubField = item.Value.FieldValue.IsSubField,
-                        SingleResultNode = item.Value.FieldValue.SingleResultNode,
-                    };
-                }
-
-                return fieldSetting;
-            }).ToList();
+            DataflowFieldMappingValidator.ValidatePluginFieldSetting(fieldSetting, isSubFieldSetting);
+            return fieldSetting;
         }
 
         private List<PluginResultFieldSetting> ParsePluginResultFieldList(List<PluginResultFieldItem>? fieldList)
@@ -605,6 +621,7 @@ namespace EIMSNext.Component
                     FieldKey = item.FieldKey,
                     FieldName = string.IsNullOrWhiteSpace(item.FieldName) ? item.FieldKey : item.FieldName,
                     FieldType = item.FieldType,
+                    SubFields = ParsePluginResultFieldList(item.SubFields),
                 })
                 .ToList();
         }
@@ -842,6 +859,7 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string FieldType { get; set; } = string.Empty;
             public FormFieldValue? Value { get; set; }
+            public List<PluginFieldItem> SubFieldSettings { get; set; } = new List<PluginFieldItem>();
         }
 
         private class PluginResultFieldItem
@@ -849,6 +867,7 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string? FieldName { get; set; }
             public string FieldType { get; set; } = string.Empty;
+            public List<PluginResultFieldItem> SubFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
 

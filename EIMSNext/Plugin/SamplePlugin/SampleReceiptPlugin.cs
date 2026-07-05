@@ -47,7 +47,7 @@ namespace SamplePlugin
     {
     }
 
-    public sealed class SampleReceiptArgs
+    public sealed class SampleReceiptArgs : PluginSubList<SampleReceiptItemArgs>
     {
         [PluginInput("单据编号", PluginFieldKind.Text, Key = "bizNo", Required = true)]
         public string? BizNo { get; set; }
@@ -76,19 +76,46 @@ namespace SamplePlugin
         [PluginInput("图片", PluginFieldKind.ImageUpload, Key = "images")]
         public List<string> Images { get; set; } = [];
 
-        [PluginInput("明细子表", PluginFieldKind.TableForm, Key = "items")]
+        [PluginSubList("明细子表", Key = "items")]
         public List<SampleReceiptItemArgs> Items { get; set; } = [];
     }
 
-    public sealed class SampleReceiptItemArgs
+    public sealed class SampleReceiptItemArgs : PluginField
     {
+        [PluginInput("项目名称", PluginFieldKind.Text, Key = "itemName")]
+        [PluginOutput("项目名称", PluginFieldKind.Text, Key = "itemName")]
         public string? ItemName { get; set; }
+
+        [PluginInput("数量", PluginFieldKind.Number, Key = "qty")]
+        [PluginOutput("数量", PluginFieldKind.Number, Key = "qty")]
         public decimal Qty { get; set; }
+
+        [PluginInput("单价", PluginFieldKind.Number, Key = "price")]
+        [PluginOutput("单价", PluginFieldKind.Number, Key = "price")]
         public decimal Price { get; set; }
+
+        [PluginInput("费用类别", PluginFieldKind.SingleSelect, Key = "category", CompatibleFieldTypes = [PluginFieldKind.Radio])]
+        [PluginOutput("费用类别", PluginFieldKind.SingleSelect, Key = "category")]
+        public string? Category { get; set; }
+
+        [PluginInput("费用负责人", PluginFieldKind.SingleEmployee, Key = "costOwner")]
+        [PluginOutput("费用负责人", PluginFieldKind.SingleEmployee, Key = "costOwner")]
+        public EmployeeRef? CostOwner { get; set; }
+
+        [PluginInput("费用部门", PluginFieldKind.SingleDepartment, Key = "costDept")]
+        [PluginOutput("费用部门", PluginFieldKind.SingleDepartment, Key = "costDept")]
+        public DepartmentRef? CostDept { get; set; }
+
+        [PluginInput("凭证附件", PluginFieldKind.FileUpload, Key = "evidenceFiles")]
+        [PluginOutput("凭证附件", PluginFieldKind.FileUpload, Key = "evidenceFiles")]
+        public List<string> EvidenceFiles { get; set; } = [];
+
+        [PluginInput("备注", PluginFieldKind.TextArea, Key = "remark")]
+        [PluginOutput("备注", PluginFieldKind.TextArea, Key = "remark")]
         public string? Remark { get; set; }
     }
 
-    public sealed class MixedEchoArgs
+    public sealed class MixedEchoArgs : PluginField
     {
         [PluginInput("标题", PluginFieldKind.Text, Key = "title", Required = true)]
         public string? Title { get; set; }
@@ -103,7 +130,7 @@ namespace SamplePlugin
         public DepartmentRef? OwnerDept { get; set; }
     }
 
-    public sealed class ReceiptEchoResult
+    public sealed class ReceiptEchoResult : PluginSubList<SampleReceiptItemArgs>
     {
         [PluginOutput("返回信息", PluginFieldKind.Text, Key = "message")]
         public string? Message { get; set; }
@@ -141,11 +168,11 @@ namespace SamplePlugin
         [PluginOutput("回显图片", PluginFieldKind.ImageUpload, Key = "echoImages")]
         public List<string> EchoImages { get; set; } = [];
 
-        [PluginOutput("回显明细", PluginFieldKind.TableForm, Key = "echoItems")]
+        [PluginSubList("回显明细", Key = "echoItems")]
         public List<SampleReceiptItemArgs> EchoItems { get; set; } = [];
     }
 
-    public sealed class MixedEchoResult
+    public sealed class MixedEchoResult : PluginField
     {
         [PluginOutput("返回信息", PluginFieldKind.Text, Key = "message")]
         public string? Message { get; set; }

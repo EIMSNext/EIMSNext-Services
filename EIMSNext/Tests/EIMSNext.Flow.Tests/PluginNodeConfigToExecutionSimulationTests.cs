@@ -8,6 +8,7 @@ using EIMSNext.Flow.Core.Nodes;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Scripting;
 using EIMSNext.Service.Entities;
+using SamplePlugin;
 
 namespace EIMSNext.Flow.Tests
 {
@@ -20,7 +21,7 @@ namespace EIMSNext.Flow.Tests
             TestJsonOptions.UseProjectDefaults();
             var pluginSetting = ParsePluginSetting(BuildWorkflowContent(useNumericStrings: false));
 
-            var payload = InvokeBuildPayload(pluginSetting);
+            var payload = InvokeBuildPayload(pluginSetting, CreateSimulationScriptEngine());
             using var plugin = new SimulationPlugin();
             var execResult = plugin.Execute(
                 pluginSetting,
@@ -49,7 +50,7 @@ namespace EIMSNext.Flow.Tests
             var outputData = (IDictionary<string, object?>)dataContext.NodeDatas["plugin"].ActionDatas.Single().FormData.Data;
             Assert.IsTrue(outputData.ContainsKey("result"));
             Assert.AreEqual("paid", outputData["echoStatus"]);
-            Assert.AreEqual("u1", ((EmployeeRef)outputData["echoOwner"]!).Id);
+            Assert.AreEqual("u1", ((IDictionary<string, object?>)outputData["echoOwner"]!)["id"]);
             Assert.AreEqual("/files/receipt.pdf", outputData["echoAttachment"]);
 
             var restoredNodeData = new DfNodeData
@@ -69,7 +70,7 @@ namespace EIMSNext.Flow.Tests
             TestJsonOptions.UseProjectDefaults();
             var pluginSetting = ParsePluginSetting(BuildWorkflowContent(useNumericStrings: true));
 
-            var payload = InvokeBuildPayload(pluginSetting);
+            var payload = InvokeBuildPayload(pluginSetting, CreateSimulationScriptEngine());
             using var plugin = new SimulationPlugin();
             var execResult = plugin.Execute(
                 pluginSetting,
@@ -111,18 +112,42 @@ namespace EIMSNext.Flow.Tests
                     },
                     new PluginFieldSetting
                     {
-                        FieldKey = "itemNames",
+                        FieldKey = "items",
                         FieldType = PluginFieldKind.TableForm,
-                        ValueType = PluginValueType.Field,
-                        ValueField = new PluginFieldReference
-                        {
-                            NodeId = "start",
-                            FormId = "source-form",
-                            Field = "items>itemName",
-                            FieldType = PluginFieldKind.Text,
-                            IsSubField = true,
-                            SingleResultNode = true,
-                        }
+                        ValueType = PluginValueType.Empty,
+                        SubFieldSettings =
+                        [
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "itemName",
+                                FieldType = PluginFieldKind.Text,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "start",
+                                    FormId = "source-form",
+                                    Field = "items>itemName",
+                                    FieldType = PluginFieldKind.Text,
+                                    IsSubField = true,
+                                    SingleResultNode = true,
+                                }
+                            },
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "qty",
+                                FieldType = PluginFieldKind.Number,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "start",
+                                    FormId = "source-form",
+                                    Field = "items>qty",
+                                    FieldType = PluginFieldKind.Number,
+                                    IsSubField = true,
+                                    SingleResultNode = true,
+                                }
+                            }
+                        ]
                     }
                 ]
             };
@@ -133,11 +158,236 @@ namespace EIMSNext.Flow.Tests
                 {
                     ["data.n_start.owner"] = OrgRef("u1", "E001", "Alice", 2),
                     ["MAP(data.n_start.items,'itemName')"] = new[] { "A", "B" },
+                    ["MAP(data.n_start.items,'qty')"] = new object[] { 1m, 2m },
                 }));
 
             var owner = (Dictionary<string, object?>)payload["owner"]!;
             Assert.AreEqual("u1", owner["id"]);
-            CollectionAssert.AreEqual(new object?[] { "A", "B" }, ((List<object?>)payload["itemNames"]!).ToArray());
+            var items = (List<Dictionary<string, object?>>)payload["items"]!;
+            Assert.AreEqual(2, items.Count);
+            Assert.AreEqual("A", items[0]["itemName"]);
+            Assert.AreEqual(2m, items[1]["qty"]);
+        }
+
+        [TestMethod]
+        public void PluginNode_SubListMapping_BroadcastsMainFieldsAcrossSourceRows()
+        {
+            var pluginSetting = new PluginSetting
+            {
+                PluginId = "simulation-plugin",
+                FunctionId = "Echo",
+                FieldSettings =
+                [
+                    new PluginFieldSetting
+                    {
+                        FieldKey = "items",
+                        FieldType = PluginFieldKind.TableForm,
+                        ValueType = PluginValueType.Empty,
+                        SubFieldSettings =
+                        [
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "itemName",
+                                FieldType = PluginFieldKind.Text,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "start",
+                                    FormId = "source-form",
+                                    Field = "items>itemName",
+                                    FieldType = PluginFieldKind.Text,
+                                    IsSubField = true,
+                                    SingleResultNode = true,
+                                }
+                            },
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "price",
+                                FieldType = PluginFieldKind.Number,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "start",
+                                    FormId = "source-form",
+                                    Field = "defaultPrice",
+                                    FieldType = PluginFieldKind.Number,
+                                    IsSubField = false,
+                                    SingleResultNode = true,
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            var payload = InvokeBuildPayload(
+                pluginSetting,
+                new FakeScriptEngine(new Dictionary<string, object?>
+                {
+                    ["MAP(data.n_start.items,'itemName')"] = new[] { "A", "B" },
+                    ["data.n_start.defaultPrice"] = 9m,
+                }));
+
+            var items = (List<Dictionary<string, object?>>)payload["items"]!;
+            Assert.AreEqual(2, items.Count);
+            Assert.AreEqual(9m, items[0]["price"]);
+            Assert.AreEqual(9m, items[1]["price"]);
+        }
+
+        [TestMethod]
+        public void PluginNode_SubListMapping_ExpandsMultiResultMainFieldsIntoRows()
+        {
+            var pluginSetting = new PluginSetting
+            {
+                PluginId = "simulation-plugin",
+                FunctionId = "Echo",
+                FieldSettings =
+                [
+                    new PluginFieldSetting
+                    {
+                        FieldKey = "items",
+                        FieldType = PluginFieldKind.TableForm,
+                        ValueType = PluginValueType.Empty,
+                        SubFieldSettings =
+                        [
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "itemName",
+                                FieldType = PluginFieldKind.Text,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "queryMany",
+                                    FormId = "source-form",
+                                    Field = "itemName",
+                                    FieldType = PluginFieldKind.Text,
+                                    IsSubField = false,
+                                    SingleResultNode = false,
+                                }
+                            },
+                            new PluginFieldSetting
+                            {
+                                FieldKey = "qty",
+                                FieldType = PluginFieldKind.Number,
+                                ValueType = PluginValueType.Field,
+                                ValueField = new PluginFieldReference
+                                {
+                                    NodeId = "queryMany",
+                                    FormId = "source-form",
+                                    Field = "qty",
+                                    FieldType = PluginFieldKind.Number,
+                                    IsSubField = false,
+                                    SingleResultNode = false,
+                                }
+                            }
+                        ]
+                    }
+                ]
+            };
+
+            var payload = InvokeBuildPayload(
+                pluginSetting,
+                new FakeScriptEngine(new Dictionary<string, object?>
+                {
+                    ["MAP(data.n_queryMany,'itemName')"] = "[\"A\",\"B\"]",
+                    ["MAP(data.n_queryMany,'qty')"] = new object[] { 1m, 2m },
+                }));
+
+            var items = (List<Dictionary<string, object?>>)payload["items"]!;
+            Assert.AreEqual(2, items.Count);
+            Assert.AreEqual("A", items[0]["itemName"]);
+            Assert.AreEqual("B", items[1]["itemName"]);
+            Assert.AreEqual(1m, items[0]["qty"]);
+            Assert.AreEqual(2m, items[1]["qty"]);
+        }
+
+        [TestMethod]
+        public void PluginNode_MainFieldMapping_KeepsMultiResultMainFieldExpressionScalar()
+        {
+            var pluginSetting = new PluginSetting
+            {
+                PluginId = "simulation-plugin",
+                FunctionId = "Echo",
+                FieldSettings =
+                [
+                    new PluginFieldSetting
+                    {
+                        FieldKey = "bizNo",
+                        FieldType = PluginFieldKind.Text,
+                        ValueType = PluginValueType.Field,
+                        ValueField = new PluginFieldReference
+                        {
+                            NodeId = "queryMany",
+                            FormId = "source-form",
+                            Field = "bizNo",
+                            FieldType = PluginFieldKind.Text,
+                            IsSubField = false,
+                            SingleResultNode = false,
+                        }
+                    }
+                ]
+            };
+
+            var payload = InvokeBuildPayload(
+                pluginSetting,
+                new FakeScriptEngine(new Dictionary<string, object?>
+                {
+                    ["data.n_queryMany.bizNo"] = "BIZ-MAIN",
+                }));
+
+            Assert.AreEqual("BIZ-MAIN", payload["bizNo"]);
+        }
+
+        [TestMethod]
+        public void SamplePlugin_ConfigToExecution_BindsSubListComplexFields()
+        {
+            TestJsonOptions.UseProjectDefaults();
+            var pluginSetting = ParsePluginSetting(BuildSamplePluginWorkflowContent());
+
+            using var plugin = new SampleReceiptPlugin();
+            var receiptFunction = plugin.Description.Functions.Single(x => x.Id == "EchoReceipt");
+            var itemField = receiptFunction.InputFields.Single(x => x.Key == "items");
+            Assert.AreEqual(PluginFieldKind.TableForm, itemField.FieldType);
+            Assert.AreEqual(8, itemField.SubFields.Count);
+            Assert.AreEqual(PluginFieldKind.SingleEmployee, itemField.SubFields.Single(x => x.Key == "costOwner").FieldType);
+            Assert.AreEqual(PluginFieldKind.SingleDepartment, itemField.SubFields.Single(x => x.Key == "costDept").FieldType);
+            Assert.AreEqual(PluginFieldKind.FileUpload, itemField.SubFields.Single(x => x.Key == "evidenceFiles").FieldType);
+
+            var payload = InvokeBuildPayload(pluginSetting, CreateSamplePluginScriptEngine());
+            var payloadItems = (List<Dictionary<string, object?>>)payload["items"]!;
+            Assert.AreEqual(2, payloadItems.Count);
+            Assert.AreEqual("sample shared remark", payloadItems[0]["remark"]);
+            Assert.AreEqual("travel", payloadItems[0]["category"]);
+            Assert.AreEqual("u2", ((Dictionary<string, object?>)payloadItems[1]["costOwner"]!)["id"]);
+            CollectionAssert.AreEqual(
+                new[] { "/files/b.pdf", "/files/c.pdf" },
+                ((IEnumerable<object?>)payloadItems[1]["evidenceFiles"]!).Select(x => x?.ToString()).ToArray());
+
+            var execResult = plugin.Execute(
+                pluginSetting,
+                new PluginExecArgs
+                {
+                    FunName = "EchoReceipt",
+                    FunArgs = payload.SerializeToJson()
+                });
+
+            Assert.AreEqual(0, execResult.Code, execResult.Message);
+            var result = (IDictionary<string, object?>)execResult.Result!;
+            Assert.AreEqual("SAMPLE-001", result["echoBizNo"]);
+            var echoItems = (List<SampleReceiptItemArgs>)result["echoItems"]!;
+            Assert.AreEqual(2, echoItems.Count);
+            Assert.AreEqual("travel", echoItems[0].Category);
+            Assert.AreEqual("u2", echoItems[1].CostOwner!.Id);
+            Assert.AreEqual("D002", echoItems[1].CostDept!.Value);
+            CollectionAssert.AreEqual(new[] { "/files/b.pdf", "/files/c.pdf" }, echoItems[1].EvidenceFiles);
+            Assert.AreEqual("sample shared remark", echoItems[1].Remark);
+
+            var dataContext = InvokeSavePluginNodeResult(execResult.Result, pluginSetting);
+            var outputData = (IDictionary<string, object?>)dataContext.NodeDatas["plugin"].ActionDatas.Single().FormData.Data;
+            var savedItems = (IEnumerable<object?>)outputData["echoItems"]!;
+            var savedSecondItem = (IDictionary<string, object?>)savedItems.ElementAt(1)!;
+            Assert.AreEqual("office", savedSecondItem["category"]);
+            Assert.AreEqual("u2", ((IDictionary<string, object?>)savedSecondItem["costOwner"]!)["id"]);
         }
 
         private static PluginSetting ParsePluginSetting(string content)
@@ -218,11 +468,10 @@ namespace EIMSNext.Flow.Tests
                                     }),
                                     Custom("attachment", PluginFieldKind.FileUpload, "/files/receipt.pdf"),
                                     Custom("attachments", PluginFieldKind.FileUpload, new[] { "/files/a.pdf", "/files/b.pdf" }),
-                                    Custom("items", PluginFieldKind.TableForm, new[]
-                                    {
-                                        new Dictionary<string, object?> { ["itemName"] = "A", ["qty"] = 1m, ["price"] = 10m },
-                                        new Dictionary<string, object?> { ["itemName"] = "B", ["qty"] = 2m, ["price"] = 20m },
-                                    }),
+                                    SubList("items",
+                                        Field("itemName", PluginFieldKind.Text, "items>itemName", PluginFieldKind.Text),
+                                        Field("qty", PluginFieldKind.Number, "items>qty", PluginFieldKind.Number),
+                                        Field("price", PluginFieldKind.Number, "items>price", PluginFieldKind.Number)),
                                 },
                                 ResultFields = new object[]
                                 {
@@ -253,6 +502,97 @@ namespace EIMSNext.Flow.Tests
             }.SerializeToJson();
         }
 
+        private static string BuildSamplePluginWorkflowContent()
+        {
+            return new
+            {
+                StartNode = new
+                {
+                    Id = "start",
+                    Name = "start",
+                    NodeType = WfNodeType.Start,
+                    NextId = "plugin",
+                    Metadata = new
+                    {
+                        TriggerMeta = new
+                        {
+                            EventType = EventType.Submitted,
+                            FormId = "source-form",
+                            WfNodeId = "submit-node",
+                            NodeAction = "submit",
+                            SingleResult = true,
+                        }
+                    }
+                },
+                Nodes = new[]
+                {
+                    new
+                    {
+                        Id = "plugin",
+                        Name = "plugin",
+                        NodeType = WfNodeType.Plugin,
+                        NextId = "end",
+                        Metadata = new
+                        {
+                            PluginMeta = new
+                            {
+                                SingleResult = true,
+                                PluginId = "sampleplugin",
+                                FunctionId = "EchoReceipt",
+                                FieldSettings = new object[]
+                                {
+                                    Custom("bizNo", PluginFieldKind.Text, "SAMPLE-001"),
+                                    Custom("amount", PluginFieldKind.Number, 88.6m),
+                                    Custom("bizDate", PluginFieldKind.Timestamp, 1710000000000L),
+                                    Custom("remark", PluginFieldKind.TextArea, "sample receipt"),
+                                    Custom("status", PluginFieldKind.SingleSelect, "paid"),
+                                    Custom("receiver", PluginFieldKind.SingleEmployee, OrgRef("u1", "E001", "Alice", 2)),
+                                    Custom("dept", PluginFieldKind.SingleDepartment, OrgRef("d1", "D001", "Finance", 1)),
+                                    Custom("attachments", PluginFieldKind.FileUpload, new[] { "/files/receipt.pdf" }),
+                                    Custom("images", PluginFieldKind.ImageUpload, new[] { "/files/receipt.png" }),
+                                    SubList("items",
+                                        Field("itemName", PluginFieldKind.Text, "details>itemName", PluginFieldKind.Text),
+                                        Field("qty", PluginFieldKind.Number, "details>qty", PluginFieldKind.Number),
+                                        Field("price", PluginFieldKind.Number, "details>price", PluginFieldKind.Number),
+                                        Field("category", PluginFieldKind.SingleSelect, "details>category", PluginFieldKind.SingleSelect),
+                                        Field("costOwner", PluginFieldKind.SingleEmployee, "details>costOwner", PluginFieldKind.SingleEmployee),
+                                        Field("costDept", PluginFieldKind.SingleDepartment, "details>costDept", PluginFieldKind.SingleDepartment),
+                                        Field("evidenceFiles", PluginFieldKind.FileUpload, "details>evidenceFiles", PluginFieldKind.FileUpload),
+                                        Field("remark", PluginFieldKind.TextArea, "lineRemark", PluginFieldKind.TextArea)),
+                                },
+                                ResultFields = new object[]
+                                {
+                                    Result("echoBizNo", PluginFieldKind.Text),
+                                    Result("echoAmount", PluginFieldKind.Number),
+                                    Result("echoStatus", PluginFieldKind.SingleSelect),
+                                    Result("echoReceiver", PluginFieldKind.SingleEmployee),
+                                    Result("echoDept", PluginFieldKind.SingleDepartment),
+                                    Result(
+                                        "echoItems",
+                                        PluginFieldKind.TableForm,
+                                        Result("itemName", PluginFieldKind.Text),
+                                        Result("qty", PluginFieldKind.Number),
+                                        Result("price", PluginFieldKind.Number),
+                                        Result("category", PluginFieldKind.SingleSelect),
+                                        Result("costOwner", PluginFieldKind.SingleEmployee),
+                                        Result("costDept", PluginFieldKind.SingleDepartment),
+                                        Result("evidenceFiles", PluginFieldKind.FileUpload),
+                                        Result("remark", PluginFieldKind.TextArea)),
+                                }
+                            }
+                        }
+                    }
+                },
+                EndNode = new
+                {
+                    Id = "end",
+                    Name = "end",
+                    NodeType = WfNodeType.End,
+                    Metadata = new { }
+                }
+            }.SerializeToJson();
+        }
+
         private static object Custom(string key, string fieldType, object? value)
         {
             return new
@@ -267,6 +607,79 @@ namespace EIMSNext.Flow.Tests
             };
         }
 
+        private static object SubList(string key, params object[] subFieldSettings)
+        {
+            return new
+            {
+                FieldKey = key,
+                FieldType = PluginFieldKind.TableForm,
+                Value = new
+                {
+                    Type = PluginValueType.Empty.ToString(),
+                },
+                SubFieldSettings = subFieldSettings,
+            };
+        }
+
+        private static object Field(string key, string fieldType, string sourceField, string sourceFieldType)
+        {
+            return new
+            {
+                FieldKey = key,
+                FieldType = fieldType,
+                Value = new
+                {
+                    Type = PluginValueType.Field.ToString(),
+                    FieldValue = new
+                    {
+                        NodeId = "start",
+                        FormId = "source-form",
+                        Field = sourceField,
+                        Type = sourceFieldType,
+                        IsSubField = sourceField.Contains('>'),
+                        SingleResultNode = true,
+                    }
+                }
+            };
+        }
+
+        private static FakeScriptEngine CreateSimulationScriptEngine()
+        {
+            return new FakeScriptEngine(new Dictionary<string, object?>
+            {
+                ["MAP(data.n_start.items,'itemName')"] = new[] { "A", "B" },
+                ["MAP(data.n_start.items,'qty')"] = new object[] { 1m, 2m },
+                ["MAP(data.n_start.items,'price')"] = new object[] { 10m, 20m },
+            });
+        }
+
+        private static FakeScriptEngine CreateSamplePluginScriptEngine()
+        {
+            return new FakeScriptEngine(new Dictionary<string, object?>
+            {
+                ["MAP(data.n_start.details,'itemName')"] = new[] { "交通费", "办公用品" },
+                ["MAP(data.n_start.details,'qty')"] = new object[] { 1m, 2m },
+                ["MAP(data.n_start.details,'price')"] = new object[] { 30m, 29.3m },
+                ["MAP(data.n_start.details,'category')"] = new[] { "travel", "office" },
+                ["MAP(data.n_start.details,'costOwner')"] = new object[]
+                {
+                    OrgRef("u1", "E001", "Alice", 2),
+                    OrgRef("u2", "E002", "Bob", 2),
+                },
+                ["MAP(data.n_start.details,'costDept')"] = new object[]
+                {
+                    OrgRef("d1", "D001", "Finance", 1),
+                    OrgRef("d2", "D002", "Ops", 1),
+                },
+                ["MAP(data.n_start.details,'evidenceFiles')"] = new object[]
+                {
+                    new[] { "/files/a.pdf" },
+                    new[] { "/files/b.pdf", "/files/c.pdf" },
+                },
+                ["data.n_start.lineRemark"] = "sample shared remark",
+            });
+        }
+
         private static Dictionary<string, object?> OrgRef(string id, string value, string label, int type)
         {
             return new Dictionary<string, object?>
@@ -278,13 +691,14 @@ namespace EIMSNext.Flow.Tests
             };
         }
 
-        private static object Result(string key, string fieldType)
+        private static object Result(string key, string fieldType, params object[] subFields)
         {
             return new
             {
                 FieldKey = key,
                 FieldName = key,
                 FieldType = fieldType,
+                SubFields = subFields,
             };
         }
 
@@ -351,7 +765,7 @@ namespace EIMSNext.Flow.Tests
         {
         }
 
-        private sealed class SimulationArgs
+        private sealed class SimulationArgs : PluginSubList<SimulationLineItem>
         {
             [PluginInput("BizNo", PluginFieldKind.Text, Key = "bizNo")]
             public string? BizNo { get; set; }
@@ -389,11 +803,11 @@ namespace EIMSNext.Flow.Tests
             [PluginInput("Attachments", PluginFieldKind.FileUpload, Key = "attachments")]
             public List<string> Attachments { get; set; } = [];
 
-            [PluginInput("Items", PluginFieldKind.TableForm, Key = "items")]
+            [PluginSubList("Items", Key = "items")]
             public List<SimulationLineItem> Items { get; set; } = [];
         }
 
-        private sealed class SimulationResult
+        private sealed class SimulationResult : PluginSubList<SimulationLineItem>
         {
             [PluginOutput("EchoBizNo", PluginFieldKind.Text, Key = "echoBizNo")]
             public string? EchoBizNo { get; set; }
@@ -428,14 +842,22 @@ namespace EIMSNext.Flow.Tests
             [PluginOutput("EchoAttachments", PluginFieldKind.FileUpload, Key = "echoAttachments")]
             public List<string> EchoAttachments { get; set; } = [];
 
-            [PluginOutput("EchoItems", PluginFieldKind.TableForm, Key = "echoItems")]
+            [PluginSubList("EchoItems", Key = "echoItems")]
             public List<SimulationLineItem> EchoItems { get; set; } = [];
         }
 
-        private sealed class SimulationLineItem
+        private sealed class SimulationLineItem : PluginField
         {
+            [PluginInput("ItemName", PluginFieldKind.Text, Key = "itemName")]
+            [PluginOutput("ItemName", PluginFieldKind.Text, Key = "itemName")]
             public string? ItemName { get; set; }
+
+            [PluginInput("Qty", PluginFieldKind.Number, Key = "qty")]
+            [PluginOutput("Qty", PluginFieldKind.Number, Key = "qty")]
             public decimal Qty { get; set; }
+
+            [PluginInput("Price", PluginFieldKind.Number, Key = "price")]
+            [PluginOutput("Price", PluginFieldKind.Number, Key = "price")]
             public decimal Price { get; set; }
         }
 

@@ -15,6 +15,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Core\EIMSNext.Flow.Core.csproj" />
+    <ProjectReference Include="..\..\Plugin\SamplePlugin\SamplePlugin.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
   </ItemGroup>
   <ItemGroup>

@@ -125,6 +125,12 @@ namespace EIMSNext.Flow.Core.Nodes
 
         private object? ResolveFieldValue(PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
+            if (string.Equals(field.FieldType, PluginFieldKind.TableForm, StringComparison.OrdinalIgnoreCase)
+                && field.SubFieldSettings.Count > 0)
+            {
+                return BuildSubListPayload(field, scriptData);
+            }
+
             return field.ValueType switch
             {
                 PluginValueType.Empty => null,
@@ -133,9 +139,135 @@ namespace EIMSNext.Flow.Core.Nodes
             };
         }
 
-        private object? ResolveMappedFieldValue(PluginFieldReference field, Dictionary<string, object> scriptData)
+        private List<Dictionary<string, object?>> BuildSubListPayload(PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
-            var value = ScriptEngine.Evaluate(BuildFieldExpression(field), scriptData).Value;
+            var columns = field.SubFieldSettings
+                .Select(subField => BuildSubListColumn(subField, scriptData))
+                .ToList();
+            var rowCount = columns
+                .Where(x => x.RowValues != null)
+                .Select(x => x.RowValues!.Count)
+                .DefaultIfEmpty(columns.Any(x => x.CreatesRowWhenNoRowValues) ? 1 : 0)
+                .Max();
+            var rows = new List<Dictionary<string, object?>>();
+
+            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var column in columns)
+                {
+                    row[column.Setting.FieldKey] = column.RowValues != null
+                        ? rowIndex < column.RowValues.Count ? column.RowValues[rowIndex] : null
+                        : column.ScalarValue;
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private SubListColumn BuildSubListColumn(PluginFieldSetting field, Dictionary<string, object> scriptData)
+        {
+            if (field.ValueType == PluginValueType.Field && field.ValueField != null)
+            {
+                var usesRowValues = UsesRowValues(field.ValueField);
+                var value = ResolveMappedFieldValue(field.ValueField, scriptData, usesRowValues);
+                return usesRowValues
+                    ? new SubListColumn(field, ToValueList(value), null, false)
+                    : new SubListColumn(field, null, value, true);
+            }
+
+            if (field.ValueType == PluginValueType.Empty)
+            {
+                return new SubListColumn(field, null, null, false);
+            }
+
+            return new SubListColumn(field, null, field.Value, true);
+        }
+
+        private static bool UsesRowValues(PluginFieldReference field)
+        {
+            return field.IsSubField || field.SingleResultNode == false;
+        }
+
+        private static List<object?>? ToValueList(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value is JsonElement jsonElement)
+            {
+                value = ConvertJsonElement(jsonElement);
+            }
+
+            if (value is string text)
+            {
+                var trimmed = text.Trim();
+                if (trimmed.StartsWith("[", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        var list = trimmed.DeserializeFromJson<List<object?>>();
+                        if (list != null)
+                        {
+                            return NormalizeValueList(list);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                    }
+                }
+
+                return [text];
+            }
+
+            if (value is IDictionary)
+            {
+                return [value];
+            }
+
+            if (value is IEnumerable enumerable and not string)
+            {
+                var list = new List<object?>();
+                foreach (var item in enumerable)
+                {
+                    list.Add(NormalizeValueListItem(item));
+                }
+
+                return list;
+            }
+
+            return [value];
+        }
+
+        private static List<object?> NormalizeValueList(IEnumerable<object?> values)
+        {
+            var list = new List<object?>();
+            foreach (var value in values)
+            {
+                list.Add(NormalizeValueListItem(value));
+            }
+
+            return list;
+        }
+
+        private static object? NormalizeValueListItem(object? value)
+        {
+            return value is JsonElement jsonElement ? ConvertJsonElement(jsonElement) : value;
+        }
+
+        private sealed record SubListColumn(
+            PluginFieldSetting Setting,
+            List<object?>? RowValues,
+            object? ScalarValue,
+            bool CreatesRowWhenNoRowValues);
+
+        private object? ResolveMappedFieldValue(PluginFieldReference field, Dictionary<string, object> scriptData, bool asRowValues = false)
+        {
+            var value = ScriptEngine.Evaluate(BuildFieldExpression(field, asRowValues), scriptData).Value;
             if (!field.IsSubField)
             {
                 return value;
@@ -155,10 +287,15 @@ namespace EIMSNext.Flow.Core.Nodes
             return value;
         }
 
-        private static string BuildFieldExpression(PluginFieldReference field)
+        private static string BuildFieldExpression(PluginFieldReference field, bool asRowValues = false)
         {
             if (!field.IsSubField)
             {
+                if (asRowValues && field.SingleResultNode == false)
+                {
+                    return $"MAP(data.n_{field.NodeId},'{field.Field}')";
+                }
+
                 return $"data.n_{field.NodeId}.{field.Field}";
             }
 
@@ -281,6 +418,18 @@ namespace EIMSNext.Flow.Core.Nodes
                 }
 
                 return list;
+            }
+
+            var type = value.GetType();
+            if (!type.IsPrimitive
+                && type != typeof(string)
+                && type != typeof(decimal)
+                && type != typeof(DateTime)
+                && type != typeof(DateTimeOffset)
+                && type != typeof(Guid)
+                && !type.IsEnum)
+            {
+                return ToScriptValue(ToDictionary(value));
             }
 
             return value;

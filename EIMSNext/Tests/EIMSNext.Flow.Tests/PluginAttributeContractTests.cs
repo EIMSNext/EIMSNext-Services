@@ -31,6 +31,61 @@ namespace EIMSNext.Flow.Tests
         }
 
         [TestMethod]
+        public void Description_Builds_SubList_Fields()
+        {
+            using var plugin = new SubListPlugin();
+
+            var desc = plugin.Description;
+            var function = desc.Functions.Single();
+
+            Assert.AreEqual(2, function.InputFields.Count);
+            var detail = function.InputFields.Single(x => x.Key == "paymentDetails");
+            Assert.AreEqual(PluginFieldKind.TableForm, detail.FieldType);
+            Assert.IsTrue(detail.Multiple);
+            Assert.IsFalse(detail.AllowCustomValue);
+            Assert.AreEqual(3, detail.SubFields.Count);
+            Assert.AreEqual("payeeName", detail.SubFields[0].Key);
+            Assert.AreEqual(PluginFieldKind.Text, detail.SubFields[0].FieldType);
+
+            var resultDetail = function.ResultFields.Single(x => x.Key == "echoDetails");
+            Assert.AreEqual(PluginFieldKind.TableForm, resultDetail.FieldType);
+            Assert.AreEqual(3, resultDetail.SubFields.Count);
+        }
+
+        [TestMethod]
+        public void Description_Rejects_Legacy_TableForm_Input()
+        {
+            using var plugin = new LegacyTableFormPlugin();
+
+            var exception = Assert.ThrowsExactly<InvalidOperationException>(() => _ = plugin.Description);
+            StringAssert.Contains(exception.Message, "PluginSubList");
+        }
+
+        [TestMethod]
+        public void Description_Builds_Four_SubLists()
+        {
+            using var plugin = new FourSubListPlugin();
+
+            var inputFields = plugin.Description.Functions.Single().InputFields;
+
+            Assert.AreEqual(4, inputFields.Count(x => x.FieldType == PluginFieldKind.TableForm));
+            CollectionAssert.AreEqual(
+                new[] { "lines1", "lines2", "lines3", "lines4" },
+                inputFields.Where(x => x.FieldType == PluginFieldKind.TableForm).Select(x => x.Key).ToArray());
+        }
+
+        [TestMethod]
+        public void Description_Allows_Unused_SubList_GenericArgument()
+        {
+            using var plugin = new MissingSubListPropertyPlugin();
+
+            var inputFields = plugin.Description.Functions.Single().InputFields;
+
+            Assert.AreEqual(1, inputFields.Count(x => x.FieldType == PluginFieldKind.TableForm));
+            Assert.AreEqual("lines1", inputFields.Single(x => x.FieldType == PluginFieldKind.TableForm).Key);
+        }
+
+        [TestMethod]
         public void Execute_Binds_Strong_Value_Types_And_Projects_Result_Keys()
         {
             TestJsonOptions.UseProjectDefaults();
@@ -96,7 +151,7 @@ namespace EIMSNext.Flow.Tests
         {
         }
 
-        private sealed class EchoArgs
+        private sealed class EchoArgs : PluginField
         {
             [PluginInput("Status", PluginFieldKind.SingleSelect, Key = "status")]
             public string? Status { get; set; }
@@ -114,7 +169,7 @@ namespace EIMSNext.Flow.Tests
             public string? Attachment { get; set; }
         }
 
-        private sealed class EchoResult
+        private sealed class EchoResult : PluginField
         {
             [PluginOutput("Status Value", PluginFieldKind.Text, Key = "statusValue")]
             public string? StatusValue { get; set; }
@@ -133,6 +188,127 @@ namespace EIMSNext.Flow.Tests
 
             [PluginOutput("Tag Count", PluginFieldKind.Number, Key = "tagCount")]
             public int TagCount { get; set; }
+        }
+
+        [Plugin("sub-list-plugin", "Sub List Plugin")]
+        private sealed class SubListPlugin : PluginBase<AttributePluginSetting>
+        {
+            [PluginFunction("Echo", "Echo")]
+            private SubListResult Echo(SubListArgs args)
+            {
+                return new SubListResult { EchoDetails = args.PaymentDetails };
+            }
+        }
+
+        private sealed class SubListArgs : PluginSubList<PaymentDetail>
+        {
+            [PluginInput("Title", PluginFieldKind.Text, Key = "title")]
+            public string? Title { get; set; }
+
+            [PluginSubList("付款详情", Key = "paymentDetails")]
+            public List<PaymentDetail> PaymentDetails { get; set; } = [];
+        }
+
+        private sealed class SubListResult : PluginSubList<PaymentDetail>
+        {
+            [PluginSubList("回显详情", Key = "echoDetails")]
+            public List<PaymentDetail> EchoDetails { get; set; } = [];
+        }
+
+        private sealed class PaymentDetail : PluginField
+        {
+            [PluginInput("收方户名", PluginFieldKind.Text, Key = "payeeName")]
+            [PluginOutput("收方户名", PluginFieldKind.Text, Key = "payeeName")]
+            public string? PayeeName { get; set; }
+
+            [PluginInput("收方账号", PluginFieldKind.Text, Key = "accountNo")]
+            [PluginOutput("收方账号", PluginFieldKind.Text, Key = "accountNo")]
+            public string? AccountNo { get; set; }
+
+            [PluginInput("款项用途", PluginFieldKind.Text, Key = "purpose")]
+            [PluginOutput("款项用途", PluginFieldKind.Text, Key = "purpose")]
+            public string? Purpose { get; set; }
+        }
+
+        [Plugin("legacy-tableform-plugin", "Legacy TableForm Plugin")]
+        private sealed class LegacyTableFormPlugin : PluginBase<AttributePluginSetting>
+        {
+            [PluginFunction("Echo", "Echo")]
+            private EchoResult Echo(LegacyTableFormArgs args)
+            {
+                return new EchoResult();
+            }
+        }
+
+        private sealed class LegacyTableFormArgs : PluginField
+        {
+            [PluginInput("Items", PluginFieldKind.TableForm, Key = "items")]
+            public List<PaymentDetail> Items { get; set; } = [];
+        }
+
+        [Plugin("four-sub-list-plugin", "Four Sub List Plugin")]
+        private sealed class FourSubListPlugin : PluginBase<AttributePluginSetting>
+        {
+            [PluginFunction("Echo", "Echo")]
+            private EchoResult Echo(FourSubListArgs args)
+            {
+                return new EchoResult();
+            }
+        }
+
+        private sealed class FourSubListArgs : PluginSubList<Line1, Line2, Line3, Line4>
+        {
+            [PluginSubList("Lines1", Key = "lines1")]
+            public List<Line1> Lines1 { get; set; } = [];
+
+            [PluginSubList("Lines2", Key = "lines2")]
+            public List<Line2> Lines2 { get; set; } = [];
+
+            [PluginSubList("Lines3", Key = "lines3")]
+            public List<Line3> Lines3 { get; set; } = [];
+
+            [PluginSubList("Lines4", Key = "lines4")]
+            public List<Line4> Lines4 { get; set; } = [];
+        }
+
+        [Plugin("missing-sub-list-property-plugin", "Missing Sub List Property Plugin")]
+        private sealed class MissingSubListPropertyPlugin : PluginBase<AttributePluginSetting>
+        {
+            [PluginFunction("Echo", "Echo")]
+            private EchoResult Echo(MissingSubListPropertyArgs args)
+            {
+                return new EchoResult();
+            }
+        }
+
+        private sealed class MissingSubListPropertyArgs : PluginSubList<Line1, Line2>
+        {
+            [PluginSubList("Lines1", Key = "lines1")]
+            public List<Line1> Lines1 { get; set; } = [];
+        }
+
+        private sealed class Line1 : PluginField
+        {
+            [PluginInput("Value", PluginFieldKind.Text, Key = "value")]
+            public string? Value { get; set; }
+        }
+
+        private sealed class Line2 : PluginField
+        {
+            [PluginInput("Value", PluginFieldKind.Text, Key = "value")]
+            public string? Value { get; set; }
+        }
+
+        private sealed class Line3 : PluginField
+        {
+            [PluginInput("Value", PluginFieldKind.Text, Key = "value")]
+            public string? Value { get; set; }
+        }
+
+        private sealed class Line4 : PluginField
+        {
+            [PluginInput("Value", PluginFieldKind.Text, Key = "value")]
+            public string? Value { get; set; }
         }
     }
 }
