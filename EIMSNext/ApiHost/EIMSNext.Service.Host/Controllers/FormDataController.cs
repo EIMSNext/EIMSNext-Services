@@ -141,6 +141,59 @@ namespace EIMSNext.Service.Host.Controllers
             return Ok(ApiResult.Success(await ApiService.ExportAsync(FilterResult(request))));
         }
 
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import/Preview")]
+        public ActionResult PreviewImport([FromForm] IFormFile file, [FromForm] string formId)
+        {
+            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(formId))
+            {
+                return BadRequest();
+            }
+
+            using var stream = file.OpenReadStream();
+            return Ok(ApiResult.Success(ApiService.PreviewImport(formId, stream, file.FileName, file.Length)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import")]
+        public async Task<ActionResult> Import([FromForm] IFormFile file, [FromForm] string options)
+        {
+            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(options))
+            {
+                return BadRequest();
+            }
+
+            var request = options.DeserializeFromJson<FormDataImportStartRequest>();
+            if (request == null)
+            {
+                return BadRequest();
+            }
+
+            await using var stream = file.OpenReadStream();
+            return Ok(ApiResult.Success(await ApiService.StartImportAsync(request, stream, file.FileName, file.Length)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpGet("Import/{id}")]
+        public ActionResult GetImportStatus([FromRoute] string id)
+        {
+            return Ok(ApiResult.Success(ApiService.GetImportStatus(id)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpGet("Import/{id}/Errors")]
+        public ActionResult GetImportErrors([FromRoute] string id)
+        {
+            return Ok(ApiResult.Success(ApiService.GetEditableImportErrors(id)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import/{id}/Retry")]
+        public async Task<ActionResult> RetryImport([FromRoute] string id, [FromBody] FormDataImportRetryRequest request)
+        {
+            return Ok(ApiResult.Success(await ApiService.RetryImportAsync(id, request)));
+        }
+
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Delete)]
         [HttpPost("manage/restore")]
         public async Task<ActionResult> Restore([FromBody] FormDataManageRequest request)

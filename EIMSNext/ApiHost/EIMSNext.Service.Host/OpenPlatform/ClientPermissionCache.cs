@@ -115,6 +115,7 @@ namespace EIMSNext.Service.Host.OpenPlatform
                             continue;
                         }
                         var op = (Operation)ra.Actions;
+                        // ResourceActionGrant.Actions 的位定义与前端 EIMSNext.Websites packages/models/dto/clientGrant.ts 的 Operation 常量保持同步。
                         if (op.HasFlag(Operation.Read))   codes.Add($"{ra.Resource}:read");
                         if (op.HasFlag(Operation.Add))    codes.Add($"{ra.Resource}:add");
                         if (op.HasFlag(Operation.Edit))   codes.Add($"{ra.Resource}:edit");

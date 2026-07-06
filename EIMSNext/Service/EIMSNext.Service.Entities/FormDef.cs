@@ -148,6 +148,12 @@ namespace EIMSNext.Service.Entities
         public FieldProp Props { get; set; } = new FieldProp();
 
         /// <summary>
+        /// 是否必填。兼容前端 form-create 的 $required 配置。
+        /// </summary>
+        [JsonPropertyName("$required")]
+        public bool Required { get; set; }
+
+        /// <summary>
         /// 子表单中的列
         /// </summary>
         public IList<FieldDef>? Columns { get; set; }
@@ -181,6 +187,10 @@ namespace EIMSNext.Service.Entities
         /// Number/Timestamp的格式
         /// </summary>
         public string? Format { get; set; }
+        /// <summary>
+        /// 兼容部分子表单列把必填配置存放在 props.required 的情况。
+        /// </summary>
+        public bool? Required { get; set; }
         /// <summary>
         /// 值配置
         /// </summary>

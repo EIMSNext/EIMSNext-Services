@@ -234,6 +234,10 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 导出提醒
         /// </summary>
-        ExportNotify
+        ExportNotify,
+        /// <summary>
+        /// 导入提醒
+        /// </summary>
+        ImportNotify
     }
 }

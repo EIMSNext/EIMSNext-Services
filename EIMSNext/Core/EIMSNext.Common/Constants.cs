@@ -25,5 +25,11 @@ namespace EIMSNext.Common
 
         public const string System = "system";
         public const string Id = "Id";
+
+        /// <summary>
+        /// 表单数据导入中可在线编辑失败数据的最大条数。
+        /// 超出此上限后只生成错误报告 Excel，不再提供重试时的内联编辑。
+        /// </summary>
+        public const int FormDataImportMaxEditableErrors = 30;
     }
 }

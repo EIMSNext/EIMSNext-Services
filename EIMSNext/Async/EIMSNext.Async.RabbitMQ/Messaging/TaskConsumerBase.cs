@@ -93,6 +93,16 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
                     await ExecuteInScopeAsync(message, stoppingToken);
                     await channel.BasicAckAsync(ea.DeliveryTag, false, stoppingToken);
                 }
+                catch (TaskRequeueException ex)
+                {
+                    if (ex.Delay > TimeSpan.Zero)
+                    {
+                        await Task.Delay(ex.Delay, stoppingToken);
+                    }
+
+                    Logger.LogInformation(ex, "Task processing deferred for queue {QueueName} on worker {WorkerIndex}", QueueName, workerIndex);
+                    await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, cancellationToken: stoppingToken);
+                }
                 catch (Exception ex)
                 {
                     Logger.LogError(ex, "Task processing failed for queue {QueueName} on worker {WorkerIndex}", QueueName, workerIndex);
