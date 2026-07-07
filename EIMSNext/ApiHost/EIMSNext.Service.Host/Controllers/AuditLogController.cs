@@ -21,7 +21,7 @@ namespace EIMSNext.Service.Host.Controllers
 		[Permission(Operation = Operation.Read)]
 		public async Task<ActionResult> Export([FromBody] AuditLogExportRequest request)
 		{
-			return Ok(ApiResult.Success(await ApiService.ExportAsync(request)));
+			return Ok(await ApiService.ExportAsync(request));
 		}
 	}
 }

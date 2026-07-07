@@ -138,7 +138,7 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("Export")]
         public async Task<ActionResult> Export([FromBody] FormDataExportRequest request)
         {
-            return Ok(ApiResult.Success(await ApiService.ExportAsync(FilterResult(request))));
+            return Ok(await ApiService.ExportAsync(FilterResult(request)));
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
@@ -729,13 +729,21 @@ namespace EIMSNext.Service.Host.Controllers
 
             //保存原始实体的重要字段
             var originalCorpId = entity.CorpId;
+            var originalAppId = entity.AppId;
+            var originalFormId = entity.FormId;
             var originalDeleteFlag = entity.DeleteFlag;
+            if (!ValidateFormDataScope(entity, model, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
 
             //将请求的数据直接复制到原始实体，而不是通过中间转换
             model.CopyTo(entity);
 
             //恢复重要字段，确保不会丢失
             entity.CorpId = originalCorpId;
+            entity.AppId = originalAppId;
+            entity.FormId = originalFormId;
             entity.DeleteFlag = originalDeleteFlag;
 
 
@@ -783,6 +791,10 @@ namespace EIMSNext.Service.Host.Controllers
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 
             delta.Patch(model);
+            if (!ValidateFormDataScope(entity, model, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
 
             model.CopyTo(entity);
 
@@ -794,6 +806,19 @@ namespace EIMSNext.Service.Host.Controllers
             await ApiService.ReplaceAsync(entity, model.Action);
 
             return Ok(ToViewModel(entity));
+        }
+
+        private static bool ValidateFormDataScope(FormData entity, FormDataRequest model, out string message)
+        {
+            message = string.Empty;
+            if (!string.Equals(entity.AppId, model.AppId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(entity.FormId, model.FormId, StringComparison.OrdinalIgnoreCase))
+            {
+                message = "请求修改对象的应用或表单不一致";
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>

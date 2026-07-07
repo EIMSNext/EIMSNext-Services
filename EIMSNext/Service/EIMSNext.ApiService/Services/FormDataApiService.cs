@@ -292,6 +292,10 @@ namespace EIMSNext.ApiService
 
                 filter = validator.ApplyFormDataScope(request.FormId, request.Filter);
             }
+            else
+            {
+                filter = ApplyFilterOptionsPermission(request, filter);
+            }
 
             var field = DynamicField.FormatFieldForFilter($"data.{request.Field}", request.FieldType);
             var limit = request.Limit <= 0 ? 50 : Math.Min(request.Limit, 200);
@@ -350,6 +354,27 @@ namespace EIMSNext.ApiService
             }
 
             return baseFilter;
+        }
+
+        private DynamicFilter ApplyFilterOptionsPermission(FormDataFilterOptionsRequest request, DynamicFilter filter)
+        {
+            if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
+            {
+                return filter;
+            }
+
+            var authGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(request.FormId)
+                .Where(HasInheritedDataAccess)
+                .Where(group => string.IsNullOrWhiteSpace(request.AuthGroupId) ||
+                    string.Equals(group.Id, request.AuthGroupId, StringComparison.OrdinalIgnoreCase))
+                .Where(group => GetEffectiveDataPerms(group).HasFlag(DataPerms.View))
+                .ToList();
+            if (authGroups.Count == 0)
+            {
+                return AndFilters(filter, CreateNoMatchFilter());
+            }
+
+            return AndFilters(filter, BuildDataScopeFilter(authGroups));
         }
 
         private Task<long> CountExportAsync(FormDataExportRequest request)
@@ -497,10 +522,10 @@ namespace EIMSNext.ApiService
 
             return new FormImportPermissionContext(
                 MergeFieldPerms(groups),
-                BuildImportDataScopeFilter(groups));
+                BuildDataScopeFilter(groups));
         }
 
-        private DynamicFilter? BuildImportDataScopeFilter(IEnumerable<AuthGroup> authGroups)
+        private DynamicFilter? BuildDataScopeFilter(IEnumerable<AuthGroup> authGroups)
         {
             var rangeFilters = new List<DynamicFilter>();
             foreach (var authGroup in authGroups)
@@ -515,6 +540,26 @@ namespace EIMSNext.ApiService
             }
 
             return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
+        }
+
+        private static DynamicFilter AndFilters(DynamicFilter current, DynamicFilter? additional)
+        {
+            if (additional == null || additional.IsEmpty)
+            {
+                return current;
+            }
+
+            if (current.IsGroup && current.Rel == FilterRel.And)
+            {
+                current.Items!.Add(additional);
+                return current;
+            }
+
+            return new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items = [current, additional],
+            };
         }
 
         private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)
