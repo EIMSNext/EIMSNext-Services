@@ -1,4 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
+using EIMSNext.ApiCore;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
@@ -34,6 +35,7 @@ internal sealed class ConfigureAuthHostJwtBearerOptions(IConfiguration configura
         var audience = oauthSection["Audience"] ?? "eimsnext.api";
 
         options.Authority = null;
+        options.Events = JwtBearerLogoutTokenEvents.Create();
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
