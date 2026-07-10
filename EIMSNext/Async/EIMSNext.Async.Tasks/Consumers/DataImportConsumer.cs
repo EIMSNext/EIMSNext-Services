@@ -44,6 +44,15 @@ namespace EIMSNext.Async.Tasks.Consumers
                 throw new TaskRequeueException("Import task is already processing.", ProcessingRequeueDelay);
             }
 
+            if (importLog.Status == FormDataImportStatus.Processing)
+            {
+                var message = "导入任务处理超时，请重新发起导入";
+                await importLogService.MarkFailedAsync(importLog.Id, message);
+                importLog.ErrorMessage = message;
+                await PublishMessageAsync(importLog, false, message, resolver, ct);
+                return;
+            }
+
             if (importLog.Status != FormDataImportStatus.Pending &&
                 importLog.Status != FormDataImportStatus.Processing)
             {
@@ -63,6 +72,10 @@ namespace EIMSNext.Async.Tasks.Consumers
                 await processor.ExecuteAsync();
             }
             catch (TaskRequeueException)
+            {
+                throw;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
                 throw;
             }
@@ -236,9 +249,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             public async Task ExecuteAsync()
             {
-                var rows = _importLog.RetryCount > 0 && !string.IsNullOrWhiteSpace(_importLog.EditableErrorRowsJson)
-                    ? BuildRecordsFromEditableRows()
-                    : BuildRecordsFromWorkbook();
+                var rows = BuildRecordsFromWorkbook();
 
                 await _importLogService.MarkProcessingAsync(_importLog.Id, rows.Count);
                 EnforceRowLimit(rows.Count);
@@ -535,27 +546,6 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return string.IsNullOrWhiteSpace(_importLog.DataScopeFilterJson)
                     ? null
                     : _importLog.DataScopeFilterJson.DeserializeFromJson<DynamicFilter>();
-            }
-
-            private List<ImportRecord> BuildRecordsFromEditableRows()
-            {
-                var json = _importLog.EditableErrorRowsJson ?? "[]";
-                var rows = json.DeserializeFromJson<List<FormDataImportEditableErrorRow>>() ?? [];
-                return rows.Select(row =>
-                {
-                    var data = NormalizeEditableData(row.Data, out var errors);
-                    return new ImportRecord
-                    {
-                        RecordIndex = row.RecordIndex,
-                        StartRowNumber = row.StartRowNumber,
-                        EndRowNumber = row.EndRowNumber,
-                        RowAction = row.RowAction,
-                        MatchedDataId = row.MatchedDataId,
-                        MatchValue = row.MatchValue,
-                        Data = data,
-                        Errors = errors,
-                    };
-                }).ToList();
             }
 
             private List<ImportRecord> BuildRecordsFromWorkbook()
@@ -1086,9 +1076,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                     RecordIndex = RecordIndex,
                     StartRowNumber = StartRowNumber,
                     EndRowNumber = EndRowNumber,
-                    RowAction = RowAction,
-                    MatchedDataId = MatchedDataId,
-                    MatchValue = MatchValue,
+                    DataId = MatchedDataId,
                     Data = Data,
                     Errors = Errors,
                 };

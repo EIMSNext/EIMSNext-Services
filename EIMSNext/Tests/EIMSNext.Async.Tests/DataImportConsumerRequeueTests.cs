@@ -3,6 +3,7 @@ using System.Linq.Expressions;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -58,12 +59,98 @@ namespace EIMSNext.Async.Tests
             Assert.AreEqual(0, importLogService.MarkFailedCalls);
         }
 
+        [TestMethod]
+        public async Task HandleAsync_WhenCancellationRequested_RethrowsWithoutMarkingFailed()
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var importLogService = new FakeImportLogService
+            {
+                ImportLog = new FormDataImportLog
+                {
+                    Id = "log-1",
+                    CorpId = "corp-1",
+                    RetryCount = 0,
+                    Status = FormDataImportStatus.Pending,
+                },
+                MarkProcessingResult = true,
+                MarkProcessingException = new OperationCanceledException(cts.Token),
+            };
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<IConnectionFactory, ConnectionFactory>();
+            services.AddSingleton<IMessageRouteResolver, FakeMessageRouteResolver>();
+            services.AddSingleton<IFormDataImportLogService>(importLogService);
+            services.AddScoped<IResolver, TestResolver>();
+
+            await using var provider = services.BuildServiceProvider();
+            var consumer = new TestableDataImportConsumer(provider.GetRequiredService<IServiceScopeFactory>());
+
+            try
+            {
+                await consumer.InvokeAsync(new DataImportTaskArgs
+                {
+                    ImportLogId = "log-1",
+                    CorpId = "corp-1",
+                    RetryCount = 0,
+                }, provider.GetRequiredService<IResolver>(), cts.Token);
+                Assert.Fail("Expected OperationCanceledException.");
+            }
+            catch (OperationCanceledException)
+            {
+            }
+
+            Assert.AreEqual(0, importLogService.MarkFailedCalls);
+        }
+
+        [TestMethod]
+        public async Task HandleAsync_WhenProcessingExpired_MarksFailedWithoutReplayingImport()
+        {
+            var importLogService = new FakeImportLogService
+            {
+                ImportLog = new FormDataImportLog
+                {
+                    Id = "log-1",
+                    CorpId = "corp-1",
+                    RetryCount = 0,
+                    Status = FormDataImportStatus.Processing,
+                    ProcessingExpireTime = DateTime.UtcNow.AddMinutes(-1).ToTimeStampMs(),
+                },
+            };
+
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<IConnectionFactory, ConnectionFactory>();
+            services.AddSingleton<IMessageRouteResolver, FakeMessageRouteResolver>();
+            services.AddSingleton<IFormDataImportLogService>(importLogService);
+            services.AddScoped<IResolver, TestResolver>();
+
+            await using var provider = services.BuildServiceProvider();
+            var consumer = new TestableDataImportConsumer(provider.GetRequiredService<IServiceScopeFactory>());
+
+            await consumer.InvokeAsync(new DataImportTaskArgs
+            {
+                ImportLogId = "log-1",
+                CorpId = "corp-1",
+                RetryCount = 0,
+            }, provider.GetRequiredService<IResolver>());
+
+            Assert.AreEqual(1, importLogService.MarkFailedCalls);
+            Assert.AreEqual(0, importLogService.TryMarkProcessingCalls);
+        }
+
         private sealed class TestableDataImportConsumer(IServiceScopeFactory scopeFactory)
             : DataImportConsumer(scopeFactory)
         {
             public Task InvokeAsync(DataImportTaskArgs args, IResolver resolver)
             {
                 return HandleAsync(args, CancellationToken.None, resolver);
+            }
+
+            public Task InvokeAsync(DataImportTaskArgs args, IResolver resolver, CancellationToken cancellationToken)
+            {
+                return HandleAsync(args, cancellationToken, resolver);
             }
         }
 
@@ -73,6 +160,10 @@ namespace EIMSNext.Async.Tests
 
             public bool MarkProcessingResult { get; set; }
 
+            public Exception? MarkProcessingException { get; set; }
+
+            public int TryMarkProcessingCalls { get; private set; }
+
             public int MarkFailedCalls { get; private set; }
 
             public IMongoCollection<FormDataImportLog> Collection => throw new NotSupportedException();
@@ -81,6 +172,12 @@ namespace EIMSNext.Async.Tests
 
             public Task<bool> TryMarkProcessingAsync(string id, int retryCount)
             {
+                TryMarkProcessingCalls++;
+                if (MarkProcessingException != null)
+                {
+                    throw MarkProcessingException;
+                }
+
                 return Task.FromResult(MarkProcessingResult);
             }
 
@@ -99,9 +196,8 @@ namespace EIMSNext.Async.Tests
             public Task UpdateProgressAsync(string id, long processedCount, long addCount, long updateCount, long failedCount) => throw new NotSupportedException();
             public Task MarkSucceededAsync(string id, long totalCount, long addCount, long updateCount) => throw new NotSupportedException();
             public Task MarkCompletedWithErrorsAsync(string id, long totalCount, long addCount, long updateCount, long failedCount, string errorReportFileName, string errorReportObjectKey, string errorReportDownloadUrl, string? editableErrorRowsJson, string? editableErrorRowsObjectKey, int editableErrorRowCount) => throw new NotSupportedException();
+            public Task MarkCorrectionResultAsync(string id, long totalCount, long addCount, long updateCount, long failedCount, string? editableErrorRowsJson, string? editableErrorRowsObjectKey, int editableErrorRowCount) => throw new NotSupportedException();
             public Task UpdateEditableErrorsAsync(string id, string? editableErrorRowsJson, string? editableErrorRowsObjectKey, int editableErrorRowCount) => throw new NotSupportedException();
-            public Task PrepareRetryAsync(string id, string editableErrorRowsJson, int editableErrorRowCount) => throw new NotSupportedException();
-            public Task<int?> TryPrepareRetryAsync(string id, int expectedRetryCount, string editableErrorRowsJson, int editableErrorRowCount) => throw new NotSupportedException();
             public Task IncrementRetryAsync(string id) => throw new NotSupportedException();
             public IQueryable<FormDataImportLog> All() => throw new NotSupportedException();
             public IQueryable<FormDataImportLog> Query(Expression<Func<FormDataImportLog, bool>> where) => throw new NotSupportedException();

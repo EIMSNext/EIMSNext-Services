@@ -14,17 +14,10 @@ namespace EIMSNext.Service
         public Task<bool> TryMarkProcessingAsync(string id, int retryCount)
         {
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var pending = FilterBuilder.Eq(x => x.Status, FormDataImportStatus.Pending);
-            var expiredLease = FilterBuilder.Or(
-                FilterBuilder.Lt(x => x.ProcessingExpireTime, now),
-                FilterBuilder.Eq(x => x.ProcessingExpireTime, null));
-            var expiredProcessing = FilterBuilder.And(
-                FilterBuilder.Eq(x => x.Status, FormDataImportStatus.Processing),
-                expiredLease);
             var filter = FilterBuilder.And(
                 FilterBuilder.Eq(x => x.Id, id),
                 FilterBuilder.Eq(x => x.RetryCount, retryCount),
-                FilterBuilder.Or(pending, expiredProcessing));
+                FilterBuilder.Eq(x => x.Status, FormDataImportStatus.Pending));
             var update = UpdateBuilder
                 .Set(x => x.Status, FormDataImportStatus.Processing)
                 .Set(x => x.TotalCount, 0)
@@ -146,6 +139,37 @@ namespace EIMSNext.Service
             return Repository.UpdateAsync(id, update, upsert: false);
         }
 
+        public Task MarkCorrectionResultAsync(
+            string id,
+            long totalCount,
+            long addCount,
+            long updateCount,
+            long failedCount,
+            string? editableErrorRowsJson,
+            string? editableErrorRowsObjectKey,
+            int editableErrorRowCount)
+        {
+            var hasErrors = failedCount > 0;
+            var update = UpdateBuilder
+                .Set(x => x.Status, hasErrors ? FormDataImportStatus.CompletedWithErrors : FormDataImportStatus.Succeeded)
+                .Set(x => x.TotalCount, totalCount)
+                .Set(x => x.ProcessedCount, totalCount)
+                .Set(x => x.AddCount, addCount)
+                .Set(x => x.UpdateCount, updateCount)
+                .Set(x => x.FailedCount, failedCount)
+                .Set(x => x.EditableErrorRowsJson, editableErrorRowsJson)
+                .Set(x => x.EditableErrorRowsObjectKey, editableErrorRowsObjectKey)
+                .Set(x => x.EditableErrorRowCount, editableErrorRowCount)
+                .Set(x => x.ErrorMessage, (string?)null)
+                .Set(x => x.ErrorReportFileName, (string?)null)
+                .Set(x => x.ErrorReportObjectKey, (string?)null)
+                .Set(x => x.ErrorReportDownloadUrl, (string?)null)
+                .Set(x => x.ProcessingExpireTime, (long?)null)
+                .Set(x => x.FinishTime, DateTime.UtcNow.ToTimeStampMs());
+
+            return Repository.UpdateAsync(id, update, upsert: false);
+        }
+
         public Task UpdateEditableErrorsAsync(string id, string? editableErrorRowsJson, string? editableErrorRowsObjectKey, int editableErrorRowCount)
         {
             var update = UpdateBuilder
@@ -154,53 +178,6 @@ namespace EIMSNext.Service
                 .Set(x => x.EditableErrorRowCount, editableErrorRowCount);
 
             return Repository.UpdateAsync(id, update, upsert: false);
-        }
-
-        public Task PrepareRetryAsync(string id, string editableErrorRowsJson, int editableErrorRowCount)
-        {
-            var update = UpdateBuilder
-                .Set(x => x.Status, FormDataImportStatus.Pending)
-                .Set(x => x.TotalCount, editableErrorRowCount)
-                .Set(x => x.ProcessedCount, 0)
-                .Set(x => x.AddCount, 0)
-                .Set(x => x.UpdateCount, 0)
-                .Set(x => x.FailedCount, 0)
-                .Set(x => x.EditableErrorRowsJson, editableErrorRowsJson)
-                .Set(x => x.EditableErrorRowsObjectKey, (string?)null)
-                .Set(x => x.EditableErrorRowCount, editableErrorRowCount)
-                .Set(x => x.ErrorMessage, (string?)null)
-                .Set(x => x.StartTime, (long?)null)
-                .Set(x => x.FinishTime, (long?)null)
-                .Set(x => x.ProcessingExpireTime, (long?)null)
-                .Inc(x => x.RetryCount, 1);
-
-            return Repository.UpdateAsync(id, update, upsert: false);
-        }
-
-        public Task<int?> TryPrepareRetryAsync(string id, int expectedRetryCount, string editableErrorRowsJson, int editableErrorRowCount)
-        {
-            var filter = FilterBuilder.And(
-                FilterBuilder.Eq(x => x.Id, id),
-                FilterBuilder.Eq(x => x.Status, FormDataImportStatus.CompletedWithErrors),
-                FilterBuilder.Eq(x => x.RetryCount, expectedRetryCount));
-            var update = UpdateBuilder
-                .Set(x => x.Status, FormDataImportStatus.Pending)
-                .Set(x => x.TotalCount, editableErrorRowCount)
-                .Set(x => x.ProcessedCount, 0)
-                .Set(x => x.AddCount, 0)
-                .Set(x => x.UpdateCount, 0)
-                .Set(x => x.FailedCount, 0)
-                .Set(x => x.EditableErrorRowsJson, editableErrorRowsJson)
-                .Set(x => x.EditableErrorRowsObjectKey, (string?)null)
-                .Set(x => x.EditableErrorRowCount, editableErrorRowCount)
-                .Set(x => x.ErrorMessage, (string?)null)
-                .Set(x => x.StartTime, (long?)null)
-                .Set(x => x.FinishTime, (long?)null)
-                .Set(x => x.ProcessingExpireTime, (long?)null)
-                .Inc(x => x.RetryCount, 1);
-
-            var result = Repository.UpdateMany(filter, update, upsert: false);
-            return Task.FromResult(result.ModifiedCount == 1 ? expectedRetryCount + 1 : (int?)null);
         }
 
         public Task IncrementRetryAsync(string id)

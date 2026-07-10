@@ -1,3 +1,5 @@
+using System.Collections;
+using System.Dynamic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -232,7 +234,10 @@ namespace EIMSNext.ApiService
                 FailedCount = importLog.FailedCount,
                 ErrorMessage = importLog.ErrorMessage,
                 ErrorReportDownloadUrl = importLog.ErrorReportDownloadUrl,
-                CanEditErrors = importLog.EditableErrorRowCount > 0,
+                CanEditErrors =
+                    importLog.Status == FormDataImportStatus.CompletedWithErrors &&
+                    importLog.EditableErrorRowCount > 0 &&
+                    importLog.EditableErrorRowCount <= EIMSNext.Common.Constants.FormDataImportMaxEditableErrors,
                 EditableErrorRowCount = importLog.EditableErrorRowCount,
             };
         }
@@ -240,6 +245,7 @@ namespace EIMSNext.ApiService
         public FormDataImportEditableErrorsResponse GetEditableImportErrors(string id)
         {
             var importLog = GetAccessibleImportLog(id);
+            EnsureImportErrorsEditable(importLog);
             return new FormDataImportEditableErrorsResponse
             {
                 Rows = ReadEditableErrorRows(importLog),
@@ -249,34 +255,125 @@ namespace EIMSNext.ApiService
         public async Task<FormDataImportRetryResponse> RetryImportAsync(string id, FormDataImportRetryRequest request)
         {
             var importLog = GetAccessibleImportLog(id);
-            if (importLog.EditableErrorRowCount <= 0)
-            {
-                throw new InvalidOperationException("当前导入任务没有可在线修改的失败数据");
-            }
-            if (importLog.Status != FormDataImportStatus.CompletedWithErrors)
-            {
-                throw new InvalidOperationException("当前导入任务状态不允许重试");
-            }
-
-            BuildImportPermissionContext(importLog.FormId, importLog.AuthGroupId);
-
+            EnsureImportErrorsEditable(importLog);
+            var permission = BuildImportPermissionContext(importLog.FormId, importLog.AuthGroupId);
             var rows = request.Rows ?? [];
             if (rows.Count == 0 || rows.Count > EIMSNext.Common.Constants.FormDataImportMaxEditableErrors)
             {
-                throw new ArgumentException($"重试数据不能超过 {EIMSNext.Common.Constants.FormDataImportMaxEditableErrors} 条");
+                throw new ArgumentException($"修正数据不能为空且不能超过 {EIMSNext.Common.Constants.FormDataImportMaxEditableErrors} 条");
             }
 
-            var importLogService = Resolver.Resolve<IFormDataImportLogService>();
-            var nextRetryCount = await importLogService.TryPrepareRetryAsync(importLog.Id, importLog.RetryCount, rows.SerializeToJson(), rows.Count)
-                ?? throw new InvalidOperationException("当前导入任务状态已变化，请刷新后重试");
-            await Resolver.Resolve<IMessagePublisher>().PublishAsync(new DataImportTaskArgs
-            {
-                ImportLogId = importLog.Id,
-                CorpId = importLog.CorpId ?? string.Empty,
-                RetryCount = nextRetryCount,
-            });
+            var formDef = _formDefService.Get(importLog.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
+            var fieldMap = BuildImportFieldMap(importLog.FieldSnapshotJson, formDef);
+            var dataScopeFilter = string.IsNullOrWhiteSpace(importLog.DataScopeFilterJson)
+                ? permission.DataScopeFilter
+                : importLog.DataScopeFilterJson.DeserializeFromJson<DynamicFilter>();
+            var result = new FormDataImportRetryResponse { TaskId = importLog.Id };
 
-            return new FormDataImportRetryResponse { TaskId = importLog.Id };
+            foreach (var (row, index) in rows.Select((row, index) => (row, index)))
+            {
+                var correctionDataId = importLog.Mode == FormDataImportMode.AddOnly ? null : row.DataId;
+                var editableRow = new FormDataImportEditableErrorRow
+                {
+                    RecordIndex = index,
+                    StartRowNumber = index + 1,
+                    DataId = correctionDataId,
+                };
+
+                try
+                {
+                    var data = NormalizeImportCorrectionData(row.Data, importLog.MappingJson, fieldMap, out var conversionErrors);
+                    editableRow.Data = data;
+                    if (conversionErrors.Count > 0)
+                    {
+                        editableRow.Errors = conversionErrors;
+                        result.Rows.Add(editableRow);
+                        result.FailedCount++;
+                        continue;
+                    }
+
+                    var shapeErrors = ValidateCorrectionRecordShape(importLog, data, fieldMap);
+                    if (shapeErrors.Count > 0)
+                    {
+                        editableRow.Errors = shapeErrors;
+                        result.Rows.Add(editableRow);
+                        result.FailedCount++;
+                        continue;
+                    }
+
+                    var matched = ResolveCorrectionTarget(importLog, correctionDataId, data, dataScopeFilter);
+                    if (matched == null)
+                    {
+                        var validationErrors = ValidateCorrectionData(importLog, data, fieldMap);
+                        if (validationErrors.Count > 0)
+                        {
+                            editableRow.Errors = validationErrors;
+                            result.Rows.Add(editableRow);
+                            result.FailedCount++;
+                            continue;
+                        }
+
+                        await AddAsync(new FormData
+                        {
+                            CorpId = importLog.CorpId,
+                            AppId = importLog.AppId,
+                            FormId = importLog.FormId,
+                            FlowStatus = FlowStatus.Draft,
+                            Data = data,
+                        }, importLog.ImportAction);
+                        result.AddCount++;
+                        continue;
+                    }
+
+                    var mergedData = CloneImportData(matched.Data);
+                    MergeImportData(mergedData, data);
+                    var mergedValidationErrors = ValidateCorrectionData(importLog, mergedData, fieldMap);
+                    if (mergedValidationErrors.Count > 0)
+                    {
+                        editableRow.DataId = matched.Id;
+                        editableRow.Data = data;
+                        editableRow.Errors = mergedValidationErrors;
+                        result.Rows.Add(editableRow);
+                        result.FailedCount++;
+                        continue;
+                    }
+
+                    MergeImportData(matched.Data, data);
+                    await ReplaceAsync(matched, importLog.ImportAction);
+                    result.UpdateCount++;
+                }
+                catch (Exception ex)
+                {
+                    editableRow.Errors = [new FormDataImportCellError { Message = ex.Message }];
+                    result.Rows.Add(editableRow);
+                    result.FailedCount++;
+                }
+            }
+
+            var cumulativeAddCount = importLog.AddCount + result.AddCount;
+            var cumulativeUpdateCount = importLog.UpdateCount + result.UpdateCount;
+            var remainingFailedCount = Math.Max(0, importLog.FailedCount - (result.AddCount + result.UpdateCount));
+            await Resolver.Resolve<IFormDataImportLogService>().MarkCorrectionResultAsync(
+                importLog.Id,
+                importLog.TotalCount,
+                cumulativeAddCount,
+                cumulativeUpdateCount,
+                remainingFailedCount,
+                result.Rows.Count > 0 ? result.Rows.SerializeToJson() : null,
+                null,
+                result.Rows.Count);
+
+            return result;
+        }
+
+        private void EnsureImportErrorsEditable(FormDataImportLog importLog)
+        {
+            if (importLog.Status != FormDataImportStatus.CompletedWithErrors ||
+                importLog.EditableErrorRowCount <= 0 ||
+                importLog.EditableErrorRowCount > EIMSNext.Common.Constants.FormDataImportMaxEditableErrors)
+            {
+                throw new InvalidOperationException("当前导入任务没有可在线修改的失败数据");
+            }
         }
 
         public async Task<FormDataFilterOptionsResponse> GetFilterOptionsAsync(FormDataFilterOptionsRequest request)
@@ -746,6 +843,620 @@ namespace EIMSNext.ApiService
             }
 
             return json.DeserializeFromJson<List<FormDataImportEditableErrorRow>>() ?? [];
+        }
+
+        private static Dictionary<string, FieldDef> BuildImportFieldMap(string? fieldSnapshotJson, FormDef formDef)
+        {
+            var map = new Dictionary<string, FieldDef>(StringComparer.OrdinalIgnoreCase);
+            var snapshot = string.IsNullOrWhiteSpace(fieldSnapshotJson)
+                ? []
+                : fieldSnapshotJson.DeserializeFromJson<List<FormDataImportFieldSnapshot>>() ?? [];
+            if (snapshot.Count > 0)
+            {
+                foreach (var item in snapshot)
+                {
+                    map[item.Field] = new FieldDef
+                    {
+                        Field = item.Field,
+                        Title = item.Title,
+                        Type = item.Type,
+                        Required = item.Required,
+                        Props = new FieldProp { Options = item.Options },
+                    };
+                }
+
+                return map;
+            }
+
+            foreach (var field in formDef.Content?.Items ?? [])
+            {
+                if (field.Type == FieldType.TableForm)
+                {
+                    foreach (var sub in field.Columns ?? [])
+                    {
+                        map[$"{field.Field}>{sub.Field}"] = sub;
+                    }
+                }
+                else
+                {
+                    map[field.Field] = field;
+                }
+            }
+
+            return map;
+        }
+
+        private static ExpandoObject NormalizeImportCorrectionData(
+            ExpandoObject source,
+            string? mappingJson,
+            IReadOnlyDictionary<string, FieldDef> fieldMap,
+            out List<FormDataImportCellError> errors)
+        {
+            errors = [];
+            var result = new ExpandoObject();
+            var resultDict = (IDictionary<string, object?>)result;
+            var sourceDict = (IDictionary<string, object?>)source;
+            var mappings = string.IsNullOrWhiteSpace(mappingJson)
+                ? []
+                : mappingJson.DeserializeFromJson<List<FormDataImportMappingItem>>() ?? [];
+            var childRowsByParent = new Dictionary<string, List<Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var mapping in mappings)
+            {
+                if (!fieldMap.TryGetValue(mapping.Field, out var field))
+                {
+                    continue;
+                }
+
+                if (!mapping.Field.Contains('>'))
+                {
+                    var raw = GetDictionaryValue(sourceDict, mapping.Field);
+                    var value = ConvertImportCorrectionValue(raw, field, mapping.Field, errors);
+                    if (!IsImportValueEmpty(value))
+                    {
+                        resultDict[mapping.Field] = value;
+                    }
+
+                    continue;
+                }
+
+                var parts = mapping.Field.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length != 2)
+                {
+                    continue;
+                }
+
+                var sourceRows = GetImportChildRows(source, parts[0]);
+                if (!childRowsByParent.TryGetValue(parts[0], out var targetRows))
+                {
+                    targetRows = [];
+                    childRowsByParent[parts[0]] = targetRows;
+                }
+
+                for (var index = 0; index < sourceRows.Count; index++)
+                {
+                    while (targetRows.Count <= index)
+                    {
+                        targetRows.Add(new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase));
+                    }
+
+                    var raw = GetDictionaryValue(sourceRows[index], parts[1]);
+                    var value = ConvertImportCorrectionValue(raw, field, mapping.Field, errors);
+                    if (!IsImportValueEmpty(value))
+                    {
+                        targetRows[index][parts[1]] = value;
+                    }
+                }
+            }
+
+            foreach (var (parent, rows) in childRowsByParent)
+            {
+                var notEmptyRows = rows
+                    .Where(row => row.Values.Any(value => !IsImportValueEmpty(value)))
+                    .ToList();
+                if (notEmptyRows.Count > 0)
+                {
+                    resultDict[parent] = notEmptyRows;
+                }
+            }
+
+            return result;
+        }
+
+        private static object? ConvertImportCorrectionValue(object? raw, FieldDef field, string fieldKey, List<FormDataImportCellError> errors)
+        {
+            raw = UnwrapImportJsonValue(raw);
+            if (IsImportValueEmpty(raw))
+            {
+                return null;
+            }
+
+            try
+            {
+                return field.Type switch
+                {
+                    FieldType.Number => ConvertImportNumber(raw!),
+                    FieldType.TimeStamp => ConvertImportTimestamp(raw!),
+                    FieldType.Radio or FieldType.Select1 => ConvertImportSingleOption(ToImportCellText(raw), field),
+                    FieldType.CheckBox or FieldType.Select2 => ConvertImportMultiOption(raw!, field),
+                    FieldType.ImageUpload or FieldType.FileUpload => ConvertImportUrlList(raw!),
+                    _ => raw is string text ? ConvertImportTextOrJson(text) : raw,
+                };
+            }
+            catch (Exception ex)
+            {
+                errors.Add(new FormDataImportCellError
+                {
+                    Field = fieldKey,
+                    FieldTitle = ResolveImportFieldTitle(fieldKey, fieldMap: null),
+                    Message = ex.Message,
+                });
+                return null;
+            }
+        }
+
+        private static List<FormDataImportCellError> ValidateCorrectionRecordShape(
+            FormDataImportLog importLog,
+            ExpandoObject data,
+            IReadOnlyDictionary<string, FieldDef> fieldMap)
+        {
+            var errors = new List<FormDataImportCellError>();
+            if (importLog.Mode == FormDataImportMode.AddOnly)
+            {
+                return errors;
+            }
+
+            var value = GetImportValue(data, importLog.MatchField);
+            if (IsImportValueEmpty(value))
+            {
+                errors.Add(new FormDataImportCellError
+                {
+                    Field = importLog.MatchField,
+                    FieldTitle = ResolveImportFieldTitle(importLog.MatchField, fieldMap),
+                    Message = "匹配字段不能为空",
+                });
+            }
+
+            return errors;
+        }
+
+        private static List<FormDataImportCellError> ValidateCorrectionData(
+            FormDataImportLog importLog,
+            ExpandoObject data,
+            IReadOnlyDictionary<string, FieldDef> fieldMap)
+        {
+            if (!importLog.TriggerValidation)
+            {
+                return [];
+            }
+
+            var errors = new List<FormDataImportCellError>();
+            foreach (var (fieldKey, field) in fieldMap)
+            {
+                if (!IsImportFieldRequired(field))
+                {
+                    continue;
+                }
+
+                if (!fieldKey.Contains('>'))
+                {
+                    if (IsImportValueEmpty(GetImportTopLevelValue(data, fieldKey)))
+                    {
+                        errors.Add(new FormDataImportCellError
+                        {
+                            Field = fieldKey,
+                            FieldTitle = ResolveImportFieldTitle(fieldKey, fieldMap),
+                            Message = "必填字段不能为空",
+                        });
+                    }
+
+                    continue;
+                }
+
+                var parts = fieldKey.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+                var rows = GetImportChildRows(data, parts[0]);
+                if (rows.Count == 0)
+                {
+                    errors.Add(new FormDataImportCellError
+                    {
+                        Field = fieldKey,
+                        FieldTitle = ResolveImportFieldTitle(fieldKey, fieldMap),
+                        Message = "必填字段不能为空",
+                    });
+                    continue;
+                }
+
+                for (var index = 0; index < rows.Count; index++)
+                {
+                    if (IsImportValueEmpty(GetDictionaryValue(rows[index], parts[1])))
+                    {
+                        errors.Add(new FormDataImportCellError
+                        {
+                            Field = fieldKey,
+                            FieldTitle = ResolveImportFieldTitle(fieldKey, fieldMap),
+                            Message = $"第 {index + 1} 条明细不能为空",
+                        });
+                    }
+                }
+            }
+
+            return errors;
+        }
+
+        private FormData? ResolveCorrectionTarget(FormDataImportLog importLog, string? dataId, ExpandoObject data, DynamicFilter? dataScopeFilter)
+        {
+            if (!string.IsNullOrWhiteSpace(dataId))
+            {
+                var existing = CoreService.Get(dataId);
+                if (existing == null ||
+                    existing.DeleteFlag ||
+                    !string.Equals(existing.CorpId, importLog.CorpId, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(existing.FormId, importLog.FormId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("修正数据关联的原始数据不存在或无权访问");
+                }
+                if (dataScopeFilter != null && !dataScopeFilter.IsEmpty &&
+                    !FindCorrectionDataById(importLog, dataId, dataScopeFilter).Any())
+                {
+                    throw new InvalidOperationException("修正数据关联的原始数据不存在或无权访问");
+                }
+
+                return existing;
+            }
+
+            if (importLog.Mode == FormDataImportMode.AddOnly)
+            {
+                return null;
+            }
+
+            var matchValue = GetImportValue(data, importLog.MatchField);
+            if (IsImportValueEmpty(matchValue))
+            {
+                return null;
+            }
+
+            var found = FindCorrectionMatchedData(importLog, importLog.MatchField!, matchValue!, dataScopeFilter).ToList();
+            if (found.Count > 1)
+            {
+                throw new InvalidOperationException($"匹配字段存在多条数据：{ToImportCellText(matchValue)}");
+            }
+            if (found.Count == 0 && importLog.Mode == FormDataImportMode.UpdateOnly)
+            {
+                throw new InvalidOperationException($"未找到匹配数据：{ToImportCellText(matchValue)}");
+            }
+
+            return found.FirstOrDefault();
+        }
+
+        private IEnumerable<FormData> FindCorrectionMatchedData(FormDataImportLog importLog, string field, object value, DynamicFilter? dataScopeFilter)
+        {
+            var filter = new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items =
+                [
+                    new DynamicFilter { Field = Fields.CorpId, Op = FilterOp.Eq, Value = importLog.CorpId },
+                    new DynamicFilter { Field = Fields.FormId, Op = FilterOp.Eq, Value = importLog.FormId },
+                    new DynamicFilter { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true },
+                    new DynamicFilter { Field = $"{Fields.Data}.{field}", Op = FilterOp.Eq, Value = value },
+                ]
+            };
+            if (dataScopeFilter != null && !dataScopeFilter.IsEmpty)
+            {
+                filter.Items!.Add(dataScopeFilter);
+            }
+
+            var found = CoreService.Find(new DynamicFindOptions<FormData>
+            {
+                Filter = filter,
+                Take = 2,
+            });
+            return ((IEnumerable<FormData>)found).ToList();
+        }
+
+        private IEnumerable<FormData> FindCorrectionDataById(FormDataImportLog importLog, string dataId, DynamicFilter dataScopeFilter)
+        {
+            var filter = new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items =
+                [
+                    new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = dataId },
+                    new DynamicFilter { Field = Fields.CorpId, Op = FilterOp.Eq, Value = importLog.CorpId },
+                    new DynamicFilter { Field = Fields.FormId, Op = FilterOp.Eq, Value = importLog.FormId },
+                    new DynamicFilter { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true },
+                    dataScopeFilter,
+                ]
+            };
+
+            var found = CoreService.Find(new DynamicFindOptions<FormData>
+            {
+                Filter = filter,
+                Take = 1,
+            });
+            return ((IEnumerable<FormData>)found).ToList();
+        }
+
+        private static object ConvertImportNumber(object raw)
+        {
+            return raw switch
+            {
+                byte value => value,
+                short value => value,
+                int value => value,
+                long value => value,
+                float value => value,
+                double value => value,
+                decimal value => value,
+                _ => double.TryParse(ToImportCellText(raw), System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var invariantValue)
+                    ? invariantValue
+                    : double.TryParse(ToImportCellText(raw), out var localValue)
+                        ? localValue
+                        : throw new FormatException("数字格式无效"),
+            };
+        }
+
+        private static object ConvertImportTimestamp(object raw)
+        {
+            if (raw is long longValue)
+            {
+                return longValue;
+            }
+            if (raw is int intValue)
+            {
+                return intValue;
+            }
+            if (raw is double doubleValue)
+            {
+                return doubleValue > 10000000000
+                    ? (long)doubleValue
+                    : new DateTimeOffset(DateTime.FromOADate(doubleValue)).ToUnixTimeMilliseconds();
+            }
+
+            var text = ToImportCellText(raw);
+            if (long.TryParse(text, out var timestamp))
+            {
+                return timestamp;
+            }
+            if (!DateTime.TryParse(text, out var date))
+            {
+                throw new FormatException("日期格式无效");
+            }
+
+            return new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Local)).ToUnixTimeMilliseconds();
+        }
+
+        private static object ConvertImportSingleOption(string text, FieldDef field)
+        {
+            var option = field.Props.Options?.FirstOrDefault(x =>
+                string.Equals(x.Value, text, StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(x.Label, text, StringComparison.OrdinalIgnoreCase));
+            if (option == null && field.Props.Options?.Count > 0)
+            {
+                throw new FormatException($"选项不存在：{text}");
+            }
+
+            return option?.Value ?? text;
+        }
+
+        private static object ConvertImportMultiOption(object raw, FieldDef field)
+        {
+            if (raw is IEnumerable enumerable && raw is not string)
+            {
+                var parts = enumerable
+                    .Cast<object?>()
+                    .Select(ToImportCellText)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+                return ConvertImportMultiOption(string.Join(",", parts), field);
+            }
+
+            var items = ToImportCellText(raw)
+                .Split([',', '，', ';', '；', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            if (field.Props.Options == null || field.Props.Options.Count == 0)
+            {
+                return items;
+            }
+
+            return items.Select(item =>
+            {
+                var option = field.Props.Options.FirstOrDefault(x =>
+                    string.Equals(x.Value, item, StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(x.Label, item, StringComparison.OrdinalIgnoreCase));
+                return option?.Value ?? throw new FormatException($"选项不存在：{item}");
+            }).ToList();
+        }
+
+        private static object ConvertImportUrlList(object raw)
+        {
+            if (raw is IEnumerable enumerable && raw is not string)
+            {
+                var parts = enumerable
+                    .Cast<object?>()
+                    .Select(ToImportCellText)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+                return parts.Count <= 1 ? parts.FirstOrDefault() ?? string.Empty : parts;
+            }
+
+            var values = ToImportCellText(raw)
+                .Split([',', '，', ';', '；', '\n', '\r'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .ToList();
+            return values.Count <= 1 ? values.FirstOrDefault() ?? string.Empty : values;
+        }
+
+        private static object ConvertImportTextOrJson(string text)
+        {
+            if ((text.StartsWith('{') && text.EndsWith('}')) || (text.StartsWith('[') && text.EndsWith(']')))
+            {
+                try
+                {
+                    return text.DeserializeFromJson<object>() ?? text;
+                }
+                catch
+                {
+                    return text;
+                }
+            }
+
+            return text;
+        }
+
+        private static object? GetImportValue(ExpandoObject data, string? field)
+        {
+            if (string.IsNullOrWhiteSpace(field) || field.Contains('>'))
+            {
+                return null;
+            }
+
+            return GetImportTopLevelValue(data, field);
+        }
+
+        private static object? GetImportTopLevelValue(ExpandoObject data, string field)
+        {
+            return GetDictionaryValue((IDictionary<string, object?>)data, field);
+        }
+
+        private static object? GetDictionaryValue(IDictionary<string, object?> data, string field)
+        {
+            return data.TryGetValue(field, out var value) ? UnwrapImportJsonValue(value) : null;
+        }
+
+        private static List<IDictionary<string, object?>> GetImportChildRows(ExpandoObject data, string parentField)
+        {
+            var raw = GetImportTopLevelValue(data, parentField);
+            raw = UnwrapImportJsonValue(raw);
+            if (raw is not IEnumerable rows || raw is string)
+            {
+                return [];
+            }
+
+            return rows
+                .Cast<object?>()
+                .Select(AsImportDictionary)
+                .Where(x => x != null)
+                .Cast<IDictionary<string, object?>>()
+                .ToList();
+        }
+
+        private static IDictionary<string, object?>? AsImportDictionary(object? value)
+        {
+            value = UnwrapImportJsonValue(value);
+            if (value is ExpandoObject expando)
+            {
+                return (IDictionary<string, object?>)expando;
+            }
+            if (value is IDictionary<string, object?> typed)
+            {
+                return typed;
+            }
+            if (value is IDictionary dictionary)
+            {
+                var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    if (entry.Key is string key)
+                    {
+                        result[key] = UnwrapImportJsonValue(entry.Value);
+                    }
+                }
+
+                return result;
+            }
+
+            return null;
+        }
+
+        private static ExpandoObject CloneImportData(ExpandoObject source)
+        {
+            var clone = new ExpandoObject();
+            var cloneDict = (IDictionary<string, object?>)clone;
+            foreach (var (key, value) in (IDictionary<string, object?>)source)
+            {
+                cloneDict[key] = UnwrapImportJsonValue(value);
+            }
+
+            return clone;
+        }
+
+        private static void MergeImportData(ExpandoObject target, ExpandoObject source)
+        {
+            var targetDict = (IDictionary<string, object?>)target;
+            foreach (var (key, value) in (IDictionary<string, object?>)source)
+            {
+                targetDict[key] = value;
+            }
+        }
+
+        private static bool IsImportFieldRequired(FieldDef field)
+        {
+            return field.Required || field.Props.Required == true;
+        }
+
+        private static bool IsImportValueEmpty(object? value)
+        {
+            value = UnwrapImportJsonValue(value);
+            if (value == null)
+            {
+                return true;
+            }
+            if (value is string s)
+            {
+                return string.IsNullOrWhiteSpace(s);
+            }
+            if (value is IEnumerable enumerable)
+            {
+                return !enumerable.Cast<object?>().Any(item => !IsImportValueEmpty(item));
+            }
+
+            return false;
+        }
+
+        private static string ToImportCellText(object? value)
+        {
+            value = UnwrapImportJsonValue(value);
+            return value switch
+            {
+                null => string.Empty,
+                DateTime date => date.ToString("yyyy-MM-dd HH:mm:ss"),
+                IEnumerable enumerable when value is not string => string.Join(",", enumerable.Cast<object?>().Select(ToImportCellText)),
+                _ => value.ToString()?.Trim() ?? string.Empty,
+            };
+        }
+
+        private static object? UnwrapImportJsonValue(object? value)
+        {
+            if (value is not JsonElement element)
+            {
+                return value;
+            }
+
+            return element.ValueKind switch
+            {
+                JsonValueKind.Null or JsonValueKind.Undefined => null,
+                JsonValueKind.String => element.GetString(),
+                JsonValueKind.Number => element.TryGetInt64(out var longValue) ? longValue : element.GetDouble(),
+                JsonValueKind.True => true,
+                JsonValueKind.False => false,
+                JsonValueKind.Array => element.EnumerateArray().Select(item => UnwrapImportJsonValue(item)).ToList(),
+                JsonValueKind.Object => element.Deserialize<ExpandoObject>(),
+                _ => element.ToString(),
+            };
+        }
+
+        private static string ResolveImportFieldTitle(string? field, IReadOnlyDictionary<string, FieldDef>? fieldMap)
+        {
+            if (string.IsNullOrWhiteSpace(field))
+            {
+                return string.Empty;
+            }
+
+            return fieldMap != null && fieldMap.TryGetValue(field, out var fieldDef)
+                ? fieldDef.Title
+                : field;
         }
 
         internal static List<FormDataImportFieldSnapshot> BuildImportFieldSnapshot(FormDef formDef, IReadOnlyCollection<FieldPerm>? fieldPerms = null)

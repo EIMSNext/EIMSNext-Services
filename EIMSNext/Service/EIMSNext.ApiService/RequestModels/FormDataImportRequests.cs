@@ -95,12 +95,20 @@ namespace EIMSNext.ApiService.RequestModels
 
     public class FormDataImportRetryRequest
     {
-        public List<FormDataImportEditableErrorRow> Rows { get; set; } = [];
+        public List<FormDataImportCorrectionRow> Rows { get; set; } = [];
     }
 
     public class FormDataImportRetryResponse
     {
         public string TaskId { get; set; } = string.Empty;
+
+        public long AddCount { get; set; }
+
+        public long UpdateCount { get; set; }
+
+        public long FailedCount { get; set; }
+
+        public List<FormDataImportEditableErrorRow> Rows { get; set; } = [];
     }
 
     public class FormDataImportEditableErrorRow
@@ -111,15 +119,18 @@ namespace EIMSNext.ApiService.RequestModels
 
         public int? EndRowNumber { get; set; }
 
-        public FormDataImportRowAction RowAction { get; set; }
-
-        public string? MatchedDataId { get; set; }
-
-        public string? MatchValue { get; set; }
+        public string? DataId { get; set; }
 
         public ExpandoObject Data { get; set; } = new();
 
         public List<FormDataImportCellError> Errors { get; set; } = [];
+    }
+
+    public class FormDataImportCorrectionRow
+    {
+        public string? DataId { get; set; }
+
+        public ExpandoObject Data { get; set; } = new();
     }
 
     public class FormDataImportCellError

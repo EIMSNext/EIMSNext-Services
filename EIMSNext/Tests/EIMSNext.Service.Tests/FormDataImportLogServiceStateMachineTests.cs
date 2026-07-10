@@ -53,8 +53,9 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(LogId, idValue.AsString);
             var filterJson = filter.ToJson();
             StringAssert.Contains(filterJson, "RetryCount");
-            StringAssert.Contains(filterJson, "$or");
-            StringAssert.Contains(filterJson, "ProcessingExpireTime");
+            StringAssert.Contains(filterJson, "Status");
+            Assert.IsFalse(filterJson.Contains("$or"));
+            Assert.IsFalse(filterJson.Contains("ProcessingExpireTime"));
             Assert.AreEqual((int)FormDataImportStatus.Processing, update["$set"]["Status"].ToInt32());
             Assert.AreEqual(0L, update["$set"]["TotalCount"].ToInt64());
             Assert.IsTrue(update["$set"].AsBsonDocument.Contains("ProcessingExpireTime"));
@@ -183,6 +184,46 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public async Task MarkCorrectionResultAsync_WithErrors_PersistsRemainingEditableRowsAndClearsReport()
+        {
+            var repo = new RecordingRepository<FormDataImportLog>();
+            var service = NewService(repo);
+
+            await service.MarkCorrectionResultAsync(LogId, totalCount: 5, addCount: 2, updateCount: 1, failedCount: 2, editableErrorRowsJson: "[1,2]", editableErrorRowsObjectKey: null, editableErrorRowCount: 2);
+
+            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
+            Assert.AreEqual((int)FormDataImportStatus.CompletedWithErrors, set["Status"].ToInt32());
+            Assert.AreEqual(5L, set["TotalCount"].ToInt64());
+            Assert.AreEqual(5L, set["ProcessedCount"].ToInt64());
+            Assert.AreEqual(2L, set["AddCount"].ToInt64());
+            Assert.AreEqual(1L, set["UpdateCount"].ToInt64());
+            Assert.AreEqual(2L, set["FailedCount"].ToInt64());
+            Assert.AreEqual("[1,2]", set["EditableErrorRowsJson"].AsString);
+            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
+            Assert.AreEqual(2, set["EditableErrorRowCount"].ToInt32());
+            Assert.IsTrue(set["ErrorReportFileName"].IsBsonNull);
+            Assert.IsTrue(set["ErrorReportObjectKey"].IsBsonNull);
+            Assert.IsTrue(set["ErrorReportDownloadUrl"].IsBsonNull);
+            Assert.IsTrue(set["ErrorMessage"].IsBsonNull);
+            Assert.IsTrue(set.Contains("FinishTime"));
+        }
+
+        [TestMethod]
+        public async Task MarkCorrectionResultAsync_WithoutErrors_SetsSucceededAndClearsEditableRows()
+        {
+            var repo = new RecordingRepository<FormDataImportLog>();
+            var service = NewService(repo);
+
+            await service.MarkCorrectionResultAsync(LogId, totalCount: 3, addCount: 1, updateCount: 2, failedCount: 0, editableErrorRowsJson: null, editableErrorRowsObjectKey: null, editableErrorRowCount: 0);
+
+            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
+            Assert.AreEqual((int)FormDataImportStatus.Succeeded, set["Status"].ToInt32());
+            Assert.AreEqual(0, set["EditableErrorRowCount"].ToInt32());
+            Assert.IsTrue(set["EditableErrorRowsJson"].IsBsonNull);
+            Assert.IsTrue(set["ErrorReportDownloadUrl"].IsBsonNull);
+        }
+
+        [TestMethod]
         public async Task UpdateEditableErrorsAsync_OnlyUpdatesEditableFields()
         {
             var repo = new RecordingRepository<FormDataImportLog>();
@@ -195,64 +236,6 @@ namespace EIMSNext.Service.Tests
             Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
             Assert.AreEqual(3, set["EditableErrorRowCount"].ToInt32());
             Assert.IsFalse(set.Contains("status"));
-        }
-
-        [TestMethod]
-        public async Task PrepareRetryAsync_ResetsToPendingIncrementsRetryCount()
-        {
-            var repo = new RecordingRepository<FormDataImportLog>();
-            var service = NewService(repo);
-
-            await service.PrepareRetryAsync(LogId, "[1,2]", 2);
-
-            var doc = Render(repo.LastUpdate!);
-            var set = doc["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Pending, set["Status"].ToInt32());
-            Assert.AreEqual(2L, set["TotalCount"].ToInt64());
-            Assert.AreEqual(0L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(0L, set["AddCount"].ToInt64());
-            Assert.AreEqual(0L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(0L, set["FailedCount"].ToInt64());
-            Assert.AreEqual("[1,2]", set["EditableErrorRowsJson"].AsString);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(2, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsTrue(set["ErrorMessage"].IsBsonNull);
-            Assert.IsTrue(set["StartTime"].IsBsonNull);
-            Assert.IsTrue(set["FinishTime"].IsBsonNull);
-            var inc = doc["$inc"].AsBsonDocument;
-            Assert.AreEqual(1, inc["RetryCount"].ToInt32());
-        }
-
-        [TestMethod]
-        public async Task TryPrepareRetryAsync_RequiresCompletedWithErrorsAndRetryCount()
-        {
-            var repo = new RecordingRepository<FormDataImportLog>();
-            var service = NewService(repo);
-
-            var nextRetryCount = await service.TryPrepareRetryAsync(LogId, expectedRetryCount: 3, "[1,2]", 2);
-
-            Assert.AreEqual(4, nextRetryCount);
-            var filter = Render(repo.LastFilter!);
-            var filterJson = filter.ToJson();
-            StringAssert.Contains(filterJson, "Status");
-            StringAssert.Contains(filterJson, "RetryCount");
-            var doc = Render(repo.LastUpdate!);
-            var set = doc["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Pending, set["Status"].ToInt32());
-            Assert.IsTrue(set["ProcessingExpireTime"].IsBsonNull);
-            Assert.AreEqual(1, doc["$inc"].AsBsonDocument["RetryCount"].ToInt32());
-            Assert.IsFalse(repo.LastUpsert);
-        }
-
-        [TestMethod]
-        public async Task TryPrepareRetryAsync_ReturnsNullWhenStateNotChanged()
-        {
-            var repo = new RecordingRepository<FormDataImportLog> { ModifiedCount = 0 };
-            var service = NewService(repo);
-
-            var nextRetryCount = await service.TryPrepareRetryAsync(LogId, expectedRetryCount: 3, "[1,2]", 2);
-
-            Assert.IsNull(nextRetryCount);
         }
 
         [TestMethod]

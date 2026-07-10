@@ -95,13 +95,18 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
                 }
                 catch (TaskRequeueException ex)
                 {
-                    if (ex.Delay > TimeSpan.Zero)
+                    if (ex.Delay > TimeSpan.Zero && !stoppingToken.IsCancellationRequested)
                     {
                         await Task.Delay(ex.Delay, stoppingToken);
                     }
 
                     Logger.LogInformation(ex, "Task processing deferred for queue {QueueName} on worker {WorkerIndex}", QueueName, workerIndex);
-                    await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, cancellationToken: stoppingToken);
+                    await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, cancellationToken: CancellationToken.None);
+                }
+                catch (OperationCanceledException ex) when (stoppingToken.IsCancellationRequested)
+                {
+                    Logger.LogInformation(ex, "Task processing cancelled for queue {QueueName} on worker {WorkerIndex}", QueueName, workerIndex);
+                    await channel.BasicNackAsync(ea.DeliveryTag, false, requeue: true, cancellationToken: CancellationToken.None);
                 }
                 catch (Exception ex)
                 {

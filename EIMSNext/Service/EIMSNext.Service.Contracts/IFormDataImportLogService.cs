@@ -33,11 +33,17 @@ namespace EIMSNext.Service.Contracts
             string? errorReportObjectKey = null,
             string? errorReportDownloadUrl = null);
 
+        Task MarkCorrectionResultAsync(
+            string id,
+            long totalCount,
+            long addCount,
+            long updateCount,
+            long failedCount,
+            string? editableErrorRowsJson,
+            string? editableErrorRowsObjectKey,
+            int editableErrorRowCount);
+
         Task UpdateEditableErrorsAsync(string id, string? editableErrorRowsJson, string? editableErrorRowsObjectKey, int editableErrorRowCount);
-
-        Task PrepareRetryAsync(string id, string editableErrorRowsJson, int editableErrorRowCount);
-
-        Task<int?> TryPrepareRetryAsync(string id, int expectedRetryCount, string editableErrorRowsJson, int editableErrorRowCount);
 
         Task IncrementRetryAsync(string id);
     }
