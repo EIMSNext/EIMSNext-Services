@@ -33,9 +33,9 @@ namespace EIMSNext.Common
         /// </summary>
         public string? OAuth_Authority => _config.GetSection("OAuth:Authority").Value;
         /// <summary>
-        /// OAuth的TokenBaseUrl
+        /// OAuth的BaseUrl
         /// </summary>
-        public string? OAuth_TokenBaseUrl => _config.GetSection("OAuth:TokenBaseUrl").Value;
+        public string? OAuth_BaseUrl => _config.GetSection("OAuth:BaseUrl").Value;
         /// <summary>
         /// OAuth的TokenEndPoint
         /// </summary>
@@ -47,7 +47,7 @@ namespace EIMSNext.Common
 
         private string? BuildOAuthEndpoint(string relativePath)
         {
-            var baseUrl = OAuth_TokenBaseUrl ?? OAuth_Authority;
+            var baseUrl = OAuth_BaseUrl ?? OAuth_Authority;
             if (string.IsNullOrWhiteSpace(baseUrl))
             {
                 return null;

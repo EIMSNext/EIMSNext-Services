@@ -30,8 +30,8 @@ namespace EIMSNext.Core.Tests
 
             _dbContext = DbContext.Create();
             _scope = new MongoTransactionScope(_dbContext);
-            _dbContext.Database.GetCollection<FormData>(nameof(FormData)).DeleteMany(FilterDefinition<FormData>.Empty);
-            _dbContext.Database.GetCollection<EntityData>(nameof(EntityData)).DeleteMany(FilterDefinition<EntityData>.Empty);
+            _dbContext.GetCollection<FormData>().DeleteMany(FilterDefinition<FormData>.Empty);
+            _dbContext.GetCollection<EntityData>().DeleteMany(FilterDefinition<EntityData>.Empty);
         }
 
         [TestCleanup]

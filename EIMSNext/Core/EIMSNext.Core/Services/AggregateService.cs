@@ -15,7 +15,7 @@ namespace EIMSNext.Core.Services
 
         public IMongoCollection<BsonDocument> GetCollection(string name)
         {
-            return DbContext.Database.GetCollection<BsonDocument>("FormData");
+            return DbContext.GetCollection<BsonDocument>("FormData");
         }
     }
 }

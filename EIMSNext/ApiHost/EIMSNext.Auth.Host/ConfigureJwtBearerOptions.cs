@@ -8,7 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace EIMSNext.Auth.Host;
 
-internal sealed class ConfigureAuthHostJwtBearerOptions(IConfiguration configuration, IWebHostEnvironment environment) : IConfigureNamedOptions<JwtBearerOptions>
+internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IWebHostEnvironment environment) : IConfigureNamedOptions<JwtBearerOptions>
 {
     public void Configure(JwtBearerOptions options)
     {
@@ -31,7 +31,7 @@ internal sealed class ConfigureAuthHostJwtBearerOptions(IConfiguration configura
 
         var oauthSection = configuration.GetSection("OAuth");
         var authority = oauthSection["Authority"];
-        var issuer = oauthSection["Issuer"] ?? authority ?? "https://auth.eimsnext.com";
+        var issuer = oauthSection["Issuer"] ?? "https://auth.eimsnext.com";
         var audience = oauthSection["Audience"] ?? "eimsnext.api";
 
         options.Authority = null;

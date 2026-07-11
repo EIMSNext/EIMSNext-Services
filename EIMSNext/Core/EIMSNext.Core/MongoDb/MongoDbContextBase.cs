@@ -5,7 +5,10 @@ namespace EIMSNext.MongoDb
 {
     public interface IMongoDbContex : IDisposable
     {
-        IMongoDatabase Database { get; }
+        IMongoCollection<T> GetCollection<T>();
+        IMongoCollection<T> GetCollection<T>(string name);
+        IClientSessionHandle StartSession();
+        Task<IClientSessionHandle> StartSessionAsync(CancellationToken cancellationToken = default);
     }
 
     public abstract class MongoDbContextBase : IMongoDbContex, IDisposable
@@ -39,6 +42,26 @@ namespace EIMSNext.MongoDb
         }
 
         public IMongoDatabase Database { get; private set; }
+
+        public IMongoCollection<T> GetCollection<T>()
+        {
+            return Database.GetCollection<T>(typeof(T).Name);
+        }
+
+        public IMongoCollection<T> GetCollection<T>(string name)
+        {
+            return Database.GetCollection<T>(name);
+        }
+
+        public Task<IClientSessionHandle> StartSessionAsync(CancellationToken cancellationToken = default)
+        {
+            return _client.StartSessionAsync(cancellationToken: cancellationToken);
+        }
+
+        public IClientSessionHandle StartSession()
+        {
+            return _client.StartSession();
+        }
 
         public void Dispose()
         {

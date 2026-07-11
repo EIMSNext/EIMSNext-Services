@@ -2,6 +2,7 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Repositories;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.MongoDb;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -30,7 +31,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 return;
             }
 
-            var workflowCollection = Resolver.Resolve<IMongoDbContex>().Database.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
+            var workflowCollection = Resolver.Resolve<IWfDbContext>().WorkflowInstances;
             foreach (var group in expiredTodos.GroupBy(x => new { x.WfInstanceId, x.ApproveNodeId }))
             {
                 var sample = group.First();

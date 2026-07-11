@@ -103,8 +103,17 @@ namespace EIMSNext.ApiHost.Authorization
         private static PublicScope ParsePublicScope(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return PublicScope.None;
-            if (int.TryParse(value, out var num)) return (PublicScope)num;
-            return PublicScope.None;
+            return Enum.TryParse<PublicScope>(value.Trim(), ignoreCase: true, out var parsed)
+                && parsed is not PublicScope.None
+                && IsSingleScope(parsed)
+                ? parsed
+                : PublicScope.None;
+        }
+
+        private static bool IsSingleScope(PublicScope scope)
+        {
+            var value = (int)scope;
+            return value > 0 && (value & (value - 1)) == 0;
         }
 
         /// <summary>

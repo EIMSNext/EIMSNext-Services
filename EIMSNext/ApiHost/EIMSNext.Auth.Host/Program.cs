@@ -22,7 +22,7 @@ builder.Host.UseSerilog((ctx, cfg) =>
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();
 builder.Services.Configure<BuiltInClientsOptions>(builder.Configuration.GetSection(BuiltInClientsOptions.SectionName));
-builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
+builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJwtBearerOptions>();
 builder.Services.AddSingleton<IBuiltInClientRequestPolicy, BuiltInClientRequestPolicy>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
 builder.Services.AddAuthServices(builder.Configuration, builder.Environment.ContentRootPath);

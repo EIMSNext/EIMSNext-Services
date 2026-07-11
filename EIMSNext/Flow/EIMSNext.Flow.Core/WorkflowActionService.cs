@@ -7,6 +7,7 @@ using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.MongoDb;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -46,9 +47,9 @@ namespace EIMSNext.Flow.Core
             _employeeDepartmentRepo = resolver.GetRepository<EmployeeDepartment>();
             _departmentRepo = resolver.GetRepository<Department>();
             _workflowHost = resolver.Resolve<IWorkflowHost>();
-            var db = resolver.Resolve<IMongoDbContex>().Database;
-            _workflowCollection = db.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
-            _subscriptionCollection = db.GetCollection<EventSubscription>("Wf_Subscription");
+            var dbContext = resolver.Resolve<IWfDbContext>();
+            _workflowCollection = dbContext.WorkflowInstances;
+            _subscriptionCollection = dbContext.EventSubscriptions;
         }
 
         public async Task<WorkflowActionResult> WithdrawAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Todo todo, string formName, string comment)

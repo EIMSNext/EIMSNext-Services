@@ -66,7 +66,7 @@ namespace EIMSNext.Auth.Services
                 new(AuthClaimTypes.Corp, subject.CorpId),
                 new(AuthClaimTypes.IdentityType, "Public"),
                 new(AuthClaimTypes.PublicTargetId, subject.TargetId),
-                new(AuthClaimTypes.PublicScope, ((int)publicScope).ToString(), ClaimValueTypes.Integer32),
+                new(AuthClaimTypes.PublicScope, publicScope.ToString().ToLowerInvariant()),
                 new(AuthClaimTypes.AuthTime, authenticationTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
 
@@ -78,15 +78,23 @@ namespace EIMSNext.Auth.Services
             var raw = request.GetParameter("scope")?.ToString();
             if (string.IsNullOrWhiteSpace(raw)) return PublicScope.None;
 
-            var flags = PublicScope.None;
-            foreach (var token in raw.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries))
+            var tokens = raw.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tokens.Length != 1)
             {
-                if (Enum.TryParse<PublicScope>(token, ignoreCase: true, out var parsed))
-                {
-                    flags |= parsed;
-                }
+                return PublicScope.None;
             }
-            return flags;
+
+            return Enum.TryParse<PublicScope>(tokens[0], ignoreCase: true, out var parsed)
+                && parsed is not PublicScope.None
+                && IsSingleScope(parsed)
+                ? parsed
+                : PublicScope.None;
+        }
+
+        private static bool IsSingleScope(PublicScope scope)
+        {
+            var value = (int)scope;
+            return value > 0 && (value & (value - 1)) == 0;
         }
     }
 }

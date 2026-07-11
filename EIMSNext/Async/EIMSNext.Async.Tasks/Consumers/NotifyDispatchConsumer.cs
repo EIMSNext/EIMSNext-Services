@@ -4,6 +4,7 @@ using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.MongoDb;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -323,25 +324,21 @@ namespace EIMSNext.Async.Tasks.Consumers
 
         private static Wf_Definition? GetWorkflowDefinition(IResolver resolver, string wfInstanceId)
         {
-            var raw = resolver.Resolve<IMongoDbContex>().Database.GetCollection<BsonDocument>("Wf_WorkflowInstance")
-                .Find(Builders<BsonDocument>.Filter.Eq("Id", wfInstanceId))
+            var workflowInstance = resolver.Resolve<IWfDbContext>().WorkflowInstances
+                .Find(x => x.Id == wfInstanceId)
                 .FirstOrDefault();
-            if (raw == null)
+            if (workflowInstance == null)
             {
                 return null;
             }
 
-            if (!raw.TryGetValue("WorkflowDefinitionId", out var workflowDefinitionIdValue) ||
-                !raw.TryGetValue("Version", out var versionValue))
+            if (string.IsNullOrWhiteSpace(workflowInstance.WorkflowDefinitionId))
             {
                 return null;
             }
-
-            var workflowDefinitionId = workflowDefinitionIdValue.AsString;
-            var version = versionValue.ToInt32();
 
             return resolver.GetRepository<Wf_Definition>()
-                .Find(x => x.ExternalId == workflowDefinitionId && x.Version == version)
+                .Find(x => x.ExternalId == workflowInstance.WorkflowDefinitionId && x.Version == workflowInstance.Version)
                 .FirstOrDefault();
         }
 

@@ -15,7 +15,7 @@ namespace EIMSNext.Core.MongoDb
             if (_currentSession.Value == null)
             {
                 var options = transOptions ?? new TransactionOptions(readConcern: ReadConcern.Majority, writeConcern: WriteConcern.WMajority);
-                SessionHandle = dbContex.Database.Client.StartSession();
+                SessionHandle = dbContex.StartSession();
                 SessionHandle.StartTransaction(options);
 
                 _currentSession.Value = SessionHandle;

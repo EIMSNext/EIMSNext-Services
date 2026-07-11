@@ -1,5 +1,6 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.Utilities;
 
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -11,8 +12,6 @@ using OpenIddict.Server.AspNetCore;
 
 using System.Globalization;
 using System.Security.Claims;
-using System.Text;
-using System.Text.Json;
 
 using static OpenIddict.Abstractions.OpenIddictConstants;
 
@@ -53,6 +52,15 @@ namespace EIMSNext.Auth.Host.Controllers
                 return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
             }
 
+            if (Request.HasFormContentType)
+            {
+                var fields = await Request.ReadFormAsync(cancellationToken);
+                if (!string.IsNullOrWhiteSpace(fields["client_secret"].ToString()))
+                {
+                    request.ClientSecret = fields["client_secret"].ToString();
+                }
+            }
+
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
 
@@ -61,10 +69,10 @@ namespace EIMSNext.Auth.Host.Controllers
         [Produces("application/json")]
         public async Task<IActionResult> Login([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
         {
-            var fieldsResult = ParseEncryptedFields(body);
-            if (fieldsResult.Result != null)
+            var fieldsResult = TokenRequestHelper.ParseEncryptedFields(body?.Encrypted);
+            if (!fieldsResult.Succeeded)
             {
-                return fieldsResult.Result;
+                return CreateErrorResult(fieldsResult.Error!, fieldsResult.ErrorDescription!);
             }
 
             var fields = fieldsResult.Fields!;
@@ -85,14 +93,12 @@ namespace EIMSNext.Auth.Host.Controllers
                 return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
             }
 
-            var request = new OpenIddictRequest
-            {
-                GrantType = fields.TryGetValue("grant_type", out var grantType) && !string.IsNullOrWhiteSpace(grantType) ? grantType : "password",
-                Username = username,
-                Password = password,
-                ClientId = clientId,
-                Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
-            };
+            var request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)));
+            request.GrantType = fields.TryGetValue("grant_type", out var grantType) && !string.IsNullOrWhiteSpace(grantType) ? grantType : GrantTypes.Password;
+            request.Username = username;
+            request.Password = password;
+            request.ClientId = clientId;
+            request.Scope = fields.TryGetValue("scope", out var scope) ? scope : null;
 
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
@@ -102,10 +108,10 @@ namespace EIMSNext.Auth.Host.Controllers
         [Produces("application/json")]
         public async Task<IActionResult> PublicToken([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
         {
-            var fieldsResult = ParseEncryptedFields(body);
-            if (fieldsResult.Result != null)
+            var fieldsResult = TokenRequestHelper.ParseEncryptedFields(body?.Encrypted);
+            if (!fieldsResult.Succeeded)
             {
-                return fieldsResult.Result;
+                return CreateErrorResult(fieldsResult.Error!, fieldsResult.ErrorDescription!);
             }
 
             var fields = fieldsResult.Fields!;
@@ -127,14 +133,12 @@ namespace EIMSNext.Auth.Host.Controllers
                 return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
             }
 
-            var request = new OpenIddictRequest
-            {
-                GrantType = CustomGrantType.Public,
-                Username = username,
-                Password = password,
-                ClientId = clientId,
-                Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
-            };
+            var request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)));
+            request.GrantType = CustomGrantType.Public;
+            request.Username = username;
+            request.Password = password;
+            request.ClientId = clientId;
+            request.Scope = fields.TryGetValue("scope", out var scope) ? scope : null;
 
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
@@ -163,70 +167,16 @@ namespace EIMSNext.Auth.Host.Controllers
                 return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
             }
 
-            var request = new OpenIddictRequest
-            {
-                GrantType = grantType,
-                ClientId = clientId,
-                ClientSecret = fields["client_secret"].ToString(),
-                Scope = fields["scope"].ToString()
-            };
+            var request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value.ToString())));
+            request.GrantType = grantType;
+            request.ClientId = clientId;
+            request.ClientSecret = fields["client_secret"].ToString();
+            request.Scope = fields["scope"].ToString();
             request.SetParameter("corp_id", fields["corp_id"].ToString());
             request.SetParameter("object_type", fields["object_type"].ToString());
             request.SetParameter("object_id", fields["object_id"].ToString());
 
             return await HandleTokenRequestAsync(request, cancellationToken);
-        }
-
-        private static EncryptedFieldsResult ParseEncryptedFields(EncryptedLoginRequest body)
-        {
-            if (body == null || string.IsNullOrWhiteSpace(body.Encrypted))
-            {
-                return new EncryptedFieldsResult
-                {
-                    Result = new BadRequestObjectResult(new OpenIddictResponse
-                    {
-                        Error = Errors.InvalidRequest,
-                        ErrorDescription = "The encrypted field is required."
-                    })
-                };
-            }
-
-            string json;
-            try
-            {
-                var bytes = Convert.FromBase64String(body.Encrypted);
-                json = Encoding.UTF8.GetString(bytes);
-            }
-            catch (FormatException)
-            {
-                return new EncryptedFieldsResult
-                {
-                    Result = new BadRequestObjectResult(new OpenIddictResponse
-                    {
-                        Error = Errors.InvalidRequest,
-                        ErrorDescription = "The encrypted value is not a valid Base64 string."
-                    })
-                };
-            }
-
-            try
-            {
-                return new EncryptedFieldsResult
-                {
-                    Fields = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new Dictionary<string, string>()
-                };
-            }
-            catch (JsonException)
-            {
-                return new EncryptedFieldsResult
-                {
-                    Result = new BadRequestObjectResult(new OpenIddictResponse
-                    {
-                        Error = Errors.InvalidRequest,
-                        ErrorDescription = "The encrypted payload is not a valid JSON object."
-                    })
-                };
-            }
         }
 
         private async Task<IActionResult> HandleTokenRequestAsync(OpenIddictRequest request, CancellationToken cancellationToken)
@@ -273,25 +223,16 @@ namespace EIMSNext.Auth.Host.Controllers
 
         private IActionResult CreateErrorResult(string error, string description)
         {
-            return Forbid(
-                new AuthenticationProperties(new Dictionary<string, string?>
-                {
-                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = error,
-                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description
-                }),
-                [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+            return BadRequest(new OpenIddictResponse
+            {
+                Error = error,
+                ErrorDescription = description
+            });
         }
     }
 
     public sealed class EncryptedLoginRequest
     {
         public string Encrypted { get; set; } = string.Empty;
-    }
-
-    internal sealed class EncryptedFieldsResult
-    {
-        public Dictionary<string, string>? Fields { get; set; }
-
-        public IActionResult? Result { get; set; }
     }
 }

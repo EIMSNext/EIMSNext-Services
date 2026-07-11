@@ -10,6 +10,7 @@ using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.ApiService;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
@@ -217,7 +218,7 @@ namespace EIMSNext.Auth.Tests
                 ["client_id"] = InternalClients.PublicClientId
             }), CancellationToken.None);
 
-            Assert.IsInstanceOfType<ForbidResult>(result);
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
             Assert.AreEqual(0, handler.CallCount);
         }
 

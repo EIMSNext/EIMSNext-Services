@@ -151,6 +151,7 @@ namespace EIMSNext.Auth.Tests
             private readonly List<User> _users;
             private readonly List<Client> _clients = [];
             private readonly List<AuditLogin> _auditLogins = [];
+            private readonly List<EIMSNext.Auth.Models.PublicAccessSetting> _publicSettings = [];
 
             public FakeAuthDbContext(IEnumerable<User>? users = null)
             {
@@ -159,6 +160,7 @@ namespace EIMSNext.Auth.Tests
 
             public IQueryable<Client> Clients => _clients.AsQueryable();
             public IQueryable<User> Users => _users.AsQueryable();
+            public IQueryable<EIMSNext.Auth.Models.PublicAccessSetting> PublicSettings => _publicSettings.AsQueryable();
 
             public Task AddClient(Client entity)
             {

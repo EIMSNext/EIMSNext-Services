@@ -15,7 +15,7 @@ namespace EIMSNext.Core.Repositories
         public RepositoryBase(IMongoDbContex dbContext)
         {
             DbContext = dbContext;
-            Collection = dbContext.Database.GetCollection<T>(typeof(T).Name);
+            Collection = dbContext.GetCollection<T>();
         }
 
         public IMongoDbContex DbContext { get; private set; }

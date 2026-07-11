@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Models;
 
 namespace EIMSNext.Auth.Interfaces
 {
@@ -6,6 +7,7 @@ namespace EIMSNext.Auth.Interfaces
     {
         IQueryable<Client> Clients { get; }
         IQueryable<User> Users { get; }
+        IQueryable<PublicAccessSetting> PublicSettings { get; }
 
         Task AddClient(Client entity);
         Task UpdateClient(Client entity);

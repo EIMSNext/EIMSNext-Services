@@ -35,7 +35,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddWorkflow(opt =>
 {
-    opt.UseMongoDB((services) => services.GetRequiredService<IMongoDbContex>().Database);
+    opt.UseMongoDB(services => services.GetRequiredService<IWfDbContext>());
 });
 
 builder.Services.AddStepBodys();
