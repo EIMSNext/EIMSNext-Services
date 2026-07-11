@@ -15,7 +15,7 @@ namespace EIMSNext.Auth.Services
         {
         }
 
-        public string GrantType => CustomGrantType.SystemTask;
+        public string GrantType => CustomGrantType.System;
 
         public Task<TokenRequestResult> HandleAsync(Client client, OpenIddictRequest request, IReadOnlyList<string> scopes, CancellationToken cancellationToken = default)
         {
@@ -45,7 +45,7 @@ namespace EIMSNext.Auth.Services
                 new(AuthClaimTypes.AuthTime, authenticationTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
 
-            return Task.FromResult(TokenRequestResult.Success("system", CustomGrantType.SystemTask, client.AccessTokenLifetime, scopes, claims));
+            return Task.FromResult(TokenRequestResult.Success("system", CustomGrantType.System, client.AccessTokenLifetime, scopes, claims));
         }
     }
 }

@@ -19,8 +19,10 @@ using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service.Host.Controllers
 {
@@ -37,6 +39,7 @@ namespace EIMSNext.Service.Host.Controllers
         private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
         private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
         private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
+        private readonly IFormDataService _formDataService = resolver.Resolve<IFormDataService>();
 
 
         /// <summary>
@@ -48,10 +51,17 @@ namespace EIMSNext.Service.Host.Controllers
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.QueryLink)]
         [HttpPost("dynamic/$count")]
-        public ActionResult GetDynamicCount([FromBody] DynamicFilter filter)
+        public ActionResult GetDynamicCount([FromBody] DynamicFindOptions<FormData> options)
         {
-            var options = FilterResult(new DynamicFindOptions<FormData> { Filter = filter });
-            return Ok(ApiService.Count(options.Filter ?? DynamicFilter.Empty));
+            var filtered = FilterResult(new DynamicFindOptions<FormData>
+            {
+                Filter = options.Filter,
+                Keyword = options.Keyword,
+                SearchFields = options.SearchFields,
+                Scope = options.Scope,
+                IncludeDeleted = options.IncludeDeleted,
+            });
+            return Ok(ApiService.Count(filtered.Filter ?? DynamicFilter.Empty));
         }
         /// <summary>
         /// 动态查询数据
@@ -64,9 +74,9 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
-            //TODO: fill field type
-            var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result.Cast(ToFormDataViewModel) });
+            var filtered = FilterResult(options);
+            var result = ApiService.Find(filtered).ToList();
+            return Ok(new { value = result.Select(item => ToViewModel(item)) });
         }
 
         /// <summary>
@@ -104,8 +114,9 @@ namespace EIMSNext.Service.Host.Controllers
                     DynamicField.Create("changeLog",false)
                 };
             }
-            var result = ApiService.Find(FilterResult(options)).ToList();
-            return Ok(new { value = result.Cast(ToFormDataViewModel) });
+            var filtered = FilterResult(options);
+            var result = ApiService.Find(filtered).ToList();
+            return Ok(new { value = result.Select(item => ToViewModel(item)) });
         }
 
         [Permission(Operation = Operation.Read)]
@@ -127,7 +138,94 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("Export")]
         public async Task<ActionResult> Export([FromBody] FormDataExportRequest request)
         {
-            return Ok(ApiResult.Success(await ApiService.ExportAsync(FilterByPermission(FilterByDeleted(FilterByCorpId(request))))));
+            return Ok(await ApiService.ExportAsync(FilterResult(request)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import/Preview")]
+        public ActionResult PreviewImport([FromForm] IFormFile file, [FromForm] string formId)
+        {
+            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(formId))
+            {
+                return BadRequest();
+            }
+
+            using var stream = file.OpenReadStream();
+            return Ok(ApiResult.Success(ApiService.PreviewImport(formId, stream, file.FileName, file.Length)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import")]
+        public async Task<ActionResult> Import([FromForm] IFormFile file, [FromForm] string options)
+        {
+            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(options))
+            {
+                return BadRequest();
+            }
+
+            var request = options.DeserializeFromJson<FormDataImportStartRequest>();
+            if (request == null)
+            {
+                return BadRequest();
+            }
+
+            await using var stream = file.OpenReadStream();
+            return Ok(ApiResult.Success(await ApiService.StartImportAsync(request, stream, file.FileName, file.Length)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpGet("Import/{id}")]
+        public ActionResult GetImportStatus([FromRoute] string id)
+        {
+            return Ok(ApiResult.Success(ApiService.GetImportStatus(id)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpGet("Import/{id}/Errors")]
+        public ActionResult GetImportErrors([FromRoute] string id)
+        {
+            return Ok(ApiResult.Success(ApiService.GetEditableImportErrors(id)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [HttpPost("Import/{id}/Retry")]
+        public async Task<ActionResult> RetryImport([FromRoute] string id, [FromBody] FormDataImportRetryRequest request)
+        {
+            return Ok(ApiResult.Success(await ApiService.RetryImportAsync(id, request)));
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Delete)]
+        [HttpPost("manage/restore")]
+        public async Task<ActionResult> Restore([FromBody] FormDataManageRequest request)
+        {
+            var keys = request.Keys?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? [];
+            if (keys.Count == 0)
+            {
+                return BadRequest();
+            }
+
+            await _formDataService.RestoreAsync(FilterManageableIds(keys));
+            return NoContent();
+        }
+
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Delete)]
+        [HttpDelete("manage/purge")]
+        public async Task<ActionResult> Purge([FromBody] FormDataManageRequest request)
+        {
+            var keys = request.Keys?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? [];
+            if (keys.Count == 0)
+            {
+                return BadRequest();
+            }
+
+            await _formDataService.PurgeAsync(FilterManageableIds(keys));
+            return NoContent();
         }
 
         /// <summary>
@@ -137,7 +235,13 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
         {
-            return FilterByPermission(FilterByDeleted(FilterByCorpId(query)));
+            query = FilterByCorpId(query);
+            if (!query.IncludeDeleted)
+            {
+                query = FilterByDeleted(query);
+            }
+            query = FilterBySearch(query);
+            return FilterByPermission(query);
         }
         protected DynamicFindOptions<FormData> FilterByDeleted(DynamicFindOptions<FormData> query)
         {
@@ -214,6 +318,24 @@ namespace EIMSNext.Service.Host.Controllers
             return query;
         }
 
+        protected virtual DynamicFindOptions<FormData> FilterBySearch(DynamicFindOptions<FormData> query)
+        {
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            query.Filter = AndFilters(query.Filter, BuildSearchFilter(formId, query.Keyword, query.SearchFields));
+            return query;
+        }
+
+        protected virtual FormDataExportRequest FilterResult(FormDataExportRequest request)
+        {
+            request = FilterByCorpId(request);
+            if (!request.IncludeDeleted)
+            {
+                request = FilterByDeleted(request);
+            }
+            request = FilterBySearch(request);
+            return FilterByPermission(request);
+        }
+
         protected virtual FormDataExportRequest FilterByPermission(FormDataExportRequest request)
         {
             if (IdentityContext.IdentityType == IdentityType.Public)
@@ -266,6 +388,12 @@ namespace EIMSNext.Service.Host.Controllers
                 }
             }
 
+            return request;
+        }
+
+        protected virtual FormDataExportRequest FilterBySearch(FormDataExportRequest request)
+        {
+            request.Filter = AndFilters(request.Filter, BuildSearchFilter(request.FormId, request.Keyword, request.SearchFields));
             return request;
         }
 
@@ -474,7 +602,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return NotFound();
             }
 
-            return Ok(ToFormDataViewModel(result));
+            return Ok(ToViewModel(result, publicData != null ? _formDefService.Get(publicData.FormId) : null));
         }
 
         /// <summary>
@@ -483,7 +611,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="model"></param>
         /// <returns></returns>
         [HttpPost]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Add)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.FormLink)]
         public async Task<IActionResult> Post([FromBody] FormDataRequest model)
@@ -536,7 +664,7 @@ namespace EIMSNext.Service.Host.Controllers
             //    return BadRequest(fail?.Message);
 
             await ApiService.AddAsync(entity, model.Action);
-            return Ok(ToFormDataViewModel(entity));
+            return Ok(ToViewModel(entity));
         }
 
         private static string? TryGetWxOpenId(FormData entity)
@@ -585,7 +713,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key"></param>
         /// <param name="model"></param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Edit)]
         [HttpPut("{key}")]
         public async Task<IActionResult> Put([FromRoute] string key, [FromBody] FormDataRequest model)
         {
@@ -601,13 +729,21 @@ namespace EIMSNext.Service.Host.Controllers
 
             //保存原始实体的重要字段
             var originalCorpId = entity.CorpId;
+            var originalAppId = entity.AppId;
+            var originalFormId = entity.FormId;
             var originalDeleteFlag = entity.DeleteFlag;
+            if (!ValidateFormDataScope(entity, model, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
 
             //将请求的数据直接复制到原始实体，而不是通过中间转换
             model.CopyTo(entity);
 
             //恢复重要字段，确保不会丢失
             entity.CorpId = originalCorpId;
+            entity.AppId = originalAppId;
+            entity.FormId = originalFormId;
             entity.DeleteFlag = originalDeleteFlag;
 
 
@@ -620,14 +756,7 @@ namespace EIMSNext.Service.Host.Controllers
             //    return BadRequest(fail?.Message);
 
             await ApiService.ReplaceAsync(entity, model.Action);
-            return Ok(ToFormDataViewModel(entity));
-        }
-
-        private FormDataViewModel ToFormDataViewModel(FormData formData)
-        {
-            var formDef = _formDefService.Get(formData.FormId);
-            var dataTitle = formDef == null ? null : _dataTitleResolver.ResolveDataTitle(formData, formDef);
-            return FormDataViewModel.FromFormData(formData, dataTitle);
+            return Ok(ToViewModel(entity));
         }
 
         /// <summary>
@@ -636,7 +765,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key"></param>
         /// <param name="delta"></param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Edit)]
         [HttpPatch("{key}")]
         public async Task<IActionResult> Patch([FromRoute] string key, [FromBody] Delta<FormDataRequest> delta)
         {
@@ -662,15 +791,34 @@ namespace EIMSNext.Service.Host.Controllers
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 
             delta.Patch(model);
+            if (!ValidateFormDataScope(entity, model, out var scopeError))
+            {
+                return BadRequest(scopeError);
+            }
 
             model.CopyTo(entity);
 
             //if (!ValidateData(entity, delta, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
-            await ApiService.ReplaceAsync(entity);
+            // 透传 body 中的 action：缺省视为 Save。流水号、提交流程等仅在 Submit 时触发，
+            // 旧实现漏传 action 导致 PATCH 永远走 Save，流水号不会生成。
+            await ApiService.ReplaceAsync(entity, model.Action);
 
-            return Ok(entity.CastTo<FormData, FormData>());
+            return Ok(ToViewModel(entity));
+        }
+
+        private static bool ValidateFormDataScope(FormData entity, FormDataRequest model, out string message)
+        {
+            message = string.Empty;
+            if (!string.Equals(entity.AppId, model.AppId, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(entity.FormId, model.FormId, StringComparison.OrdinalIgnoreCase))
+            {
+                message = "请求修改对象的应用或表单不一致";
+                return false;
+            }
+
+            return true;
         }
 
         /// <summary>
@@ -679,7 +827,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key">主键Id</param>
         /// <param name="batch">批量删除</param>
         /// <returns></returns>
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.FormData, Operation = Operation.Delete)]
         [HttpDelete("{key}")]
         public async Task<ActionResult> Delete([FromRoute] string key, [FromBody] DeleteBatch? batch)
         {
@@ -975,6 +1123,129 @@ namespace EIMSNext.Service.Host.Controllers
                 Rel = FilterRel.And,
                 Items = [current, additional],
             };
+        }
+
+        private List<string> FilterManageableIds(IEnumerable<string> ids)
+        {
+            var requested = ids
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (requested.Count == 0)
+            {
+                return [];
+            }
+
+            var query = FilterResult(new DynamicFindOptions<FormData>
+            {
+                IncludeDeleted = true,
+                Filter = new DynamicFilter
+                {
+                    Field = Fields.BsonId,
+                    Op = FilterOp.In,
+                    Value = requested.Cast<object>().ToList(),
+                },
+                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
+                Take = requested.Count,
+            });
+
+            return ApiService.Find(query).ToList().Select(x => x.Id).ToList();
+        }
+
+        private Dictionary<string, string> BuildSearchableFieldMap(FormDef formDef)
+        {
+            var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                [Fields.DataTitle] = FieldType.Input
+            };
+
+            foreach (var item in formDef.Content?.Items ?? [])
+            {
+                AppendSearchableField(map, item, null);
+            }
+
+            return map;
+        }
+
+        private void AppendSearchableField(Dictionary<string, string> map, FieldDef field, FieldDef? parent)
+        {
+            if (field.Type == FieldType.TableForm)
+            {
+                foreach (var sub in field.Columns ?? [])
+                {
+                    AppendSearchableField(map, sub, field);
+                }
+                return;
+            }
+
+            if (!IsSearchableFieldType(field.Type))
+            {
+                return;
+            }
+
+            var logicalField = parent == null ? field.Field : $"{parent.Field}>{field.Field}";
+            map[logicalField] = field.Type;
+        }
+
+        private static bool IsSearchableFieldType(string? type)
+        {
+            return type == FieldType.Input
+                || type == FieldType.TextArea
+                || type == FieldType.Number
+                || type == FieldType.Radio
+                || type == FieldType.CheckBox
+                || type == FieldType.Select1
+                || type == FieldType.Select2
+                || type == FieldType.SerialNo;
+        }
+
+        private DynamicFilter? BuildSearchFilter(string? formId, string? keyword, IEnumerable<string>? searchFields)
+        {
+            var normalizedKeyword = keyword?.Trim();
+            if (string.IsNullOrWhiteSpace(normalizedKeyword))
+            {
+                return null;
+            }
+
+            if (string.IsNullOrWhiteSpace(formId))
+            {
+                return CreateNoMatchFilter();
+            }
+
+            var formDef = _formDefService.Get(formId);
+            if (formDef == null)
+            {
+                return CreateNoMatchFilter();
+            }
+
+            var searchableMap = BuildSearchableFieldMap(formDef);
+            var requestedFields = (searchFields ?? [])
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            var actualFields = requestedFields.Count > 0
+                ? requestedFields.Where(field => searchableMap.ContainsKey(field)).ToList()
+                : searchableMap.Keys.ToList();
+
+            if (actualFields.Count == 0)
+            {
+                return CreateNoMatchFilter();
+            }
+
+            return OrFilters(actualFields.Select(field => new DynamicFilter
+            {
+                Field = field,
+                Type = searchableMap[field],
+                Op = FilterOp.Text,
+                Value = normalizedKeyword,
+            }));
+        }
+
+        private FormDataViewModel ToViewModel(FormData formData, FormDef? formDef = null)
+        {
+            formDef ??= _formDefService.Get(formData.FormId);
+            var dataTitle = formDef == null ? null : _dataTitleResolver.ResolveDataTitle(formData, formDef);
+            return FormDataViewModel.FromFormData(formData, dataTitle);
         }
 
         private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)

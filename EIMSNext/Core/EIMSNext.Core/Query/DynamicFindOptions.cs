@@ -9,6 +9,12 @@ namespace EIMSNext.Core.Query
         public int Take { get; set; } = 20;
 
         public DataScope? Scope { get; set; }
+
+        public string? Keyword { get; set; }
+
+        public List<string>? SearchFields { get; set; }
+
+        public bool IncludeDeleted { get; set; }
     }
 
     public class DataScope

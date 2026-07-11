@@ -29,13 +29,11 @@ namespace EIMSNext.Flow.Tests
             var result = await manager.ReloadAsync();
 
             Assert.AreEqual(1, result.Items.Count);
-            Assert.AreEqual("sampleplugin", result.Items[0].PluginId);
-            Assert.AreEqual("2.0", result.Items[0].CurrentVersion);
-            Assert.IsTrue(result.Items[0].Updated);
+            Assert.AreEqual("2.0", manager.GetPlugin("sampleplugin")!.Version);
         }
 
         [TestMethod]
-        public async Task Reload_Should_Report_Unload_Result_For_Previous_Runtime()
+        public async Task Reload_Should_Replace_Previous_Runtime_With_Latest_Version()
         {
             var services = new ServiceCollection().BuildServiceProvider();
             var manager = new PluginRuntimeManager(
@@ -48,13 +46,11 @@ namespace EIMSNext.Flow.Tests
                 CreateFakeRuntime(new PluginRuntimeManager.PluginAssemblyCandidate
                 {
                     PluginId = "sampleplugin",
-                    Version = new Version(1, 0),
+                    Version = ParseVersion("1.0"),
                     VersionText = "1.0",
                     AssemblyPath = Path.Combine("Plugins", "sampleplugin", "1.0", "SamplePlugin.dll")
                 })
             ]);
-
-            Directory.CreateDirectory(Path.Combine(Path.GetTempPath(), "reload-plugin-test", "Plugins", "sampleplugin", "2.0"));
 
             var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             var pluginV2Dir = Path.Combine(root, "Plugins", "sampleplugin", "2.0");
@@ -70,7 +66,7 @@ namespace EIMSNext.Flow.Tests
                 CreateFakeRuntime(new PluginRuntimeManager.PluginAssemblyCandidate
                 {
                     PluginId = "sampleplugin",
-                    Version = new Version(1, 0),
+                    Version = ParseVersion("1.0"),
                     VersionText = "1.0",
                     AssemblyPath = Path.Combine(root, "Plugins", "sampleplugin", "1.0", "SamplePlugin.dll")
                 })
@@ -79,7 +75,8 @@ namespace EIMSNext.Flow.Tests
             var result = await manager.ReloadAsync();
 
             Assert.AreEqual("2.0", result.Items[0].CurrentVersion);
-            Assert.IsTrue(result.Items[0].UnloadedOldVersion);
+            Assert.AreEqual("1.0", result.Items[0].PreviousVersion);
+            Assert.AreEqual("2.0", manager.GetPlugin("sampleplugin")!.Version);
         }
 
         private static PluginRuntimeManager.PluginRuntime CreateFakeRuntime(PluginRuntimeManager.PluginAssemblyCandidate candidate)
@@ -95,6 +92,12 @@ namespace EIMSNext.Flow.Tests
                 binder: null,
                 args: [services, NullLogger.Instance, candidate.PluginId, candidate.Version, candidate.AssemblyPath, typeof(FakePlugin), fakeDesc, loadContext],
                 culture: null)!;
+        }
+
+        private static PluginVersion ParseVersion(string text)
+        {
+            Assert.IsTrue(PluginVersion.TryParse(text, out var version), $"Failed to parse version '{text}' in test");
+            return version;
         }
 
         private sealed class FakePlugin : IPlugin

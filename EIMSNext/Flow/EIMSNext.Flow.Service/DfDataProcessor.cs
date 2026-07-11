@@ -12,6 +12,20 @@ using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Service
 {
+    /// <summary>
+    /// Dataflow 写数据的入口。
+    /// <para>
+    /// 重要约束：dataflow 通过本处理器写入的 <see cref="FormData"/> 使用
+    /// <see cref="DataAction.Dataflow"/> 而非 <see cref="DataAction.Submit"/>，
+    /// 因此 <see cref="FormDataService.BeforeAdd"/> 中 <c>ResolveSerialNumbers</c>
+    /// 不会触发——这意味着 dataflow 插入的 <c>serialno</c> 类型字段会留空。
+    /// </para>
+    /// <para>
+    /// 这是有意为之：dataflow 通常用于子表/批量/历史回写，让流水号在子表内自增会与
+    /// 主表单号冲突。若业务需要让 dataflow 写入的记录也带流水号，请在该节点之前的
+    /// 公式/赋值中显式计算序列值，或将上游 Action 改为 <c>Submit</c>。
+    /// </para>
+    /// </summary>
     public class DfDataProcessor : IDfDataProcessor
     {
         protected IResolver Resolver { get; private set; }

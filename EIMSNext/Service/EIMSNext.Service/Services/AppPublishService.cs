@@ -68,7 +68,6 @@ namespace EIMSNext.Service
                     Type = FormType.Form,
                     Icon = string.Empty,
                     Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap),
-                    IsLedger = formDef.IsLedger,
                     UsingWorkflow = formDef.UsingWorkflow,
                     FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap)
                 });
@@ -168,7 +167,7 @@ namespace EIMSNext.Service
             profile.Description = appDef.Description;
             profile.Icon = appDef.Icon;
             profile.ThemeColor = appDef.IconColor;
-            profile.Status = "Published";
+            profile.Status = AppProfileStatus.Published;
             profile.PublishedAt = DateTime.UtcNow;
             if (string.IsNullOrWhiteSpace(profile.Author))
             {

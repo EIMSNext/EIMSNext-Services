@@ -1,6 +1,7 @@
 using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.ApiCore;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -14,11 +15,13 @@ namespace EIMSNext.Auth.Host.Controllers
     {
         private readonly IUserService _userService;
         private readonly IAccountSecurityService _accountSecurityService;
+        private readonly ILogoutTokenStore _logoutTokenStore;
 
-        public AuthController(IUserService userService, IAccountSecurityService accountSecurityService)
+        public AuthController(IUserService userService, IAccountSecurityService accountSecurityService, ILogoutTokenStore logoutTokenStore)
         {
             _userService = userService;
             _accountSecurityService = accountSecurityService;
+            _logoutTokenStore = logoutTokenStore;
         }
 
         /// <summary>
@@ -55,6 +58,26 @@ namespace EIMSNext.Auth.Host.Controllers
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [Authorize]
+        [Route("auth/logout"), HttpPost]
+        public async Task<IActionResult> Logout(CancellationToken cancellationToken)
+        {
+            var token = LogoutTokenHelper.ReadBearerToken(Request);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return Unauthorized();
+            }
+
+            var expiresAt = LogoutTokenHelper.ReadExpirationUtc(token);
+            if (expiresAt is null || expiresAt <= DateTimeOffset.UtcNow)
+            {
+                return Ok(new { success = true });
+            }
+
+            await _logoutTokenStore.MarkLoggedOutAsync(token, expiresAt.Value, cancellationToken);
+            return Ok(new { success = true });
         }
 
         [Authorize]

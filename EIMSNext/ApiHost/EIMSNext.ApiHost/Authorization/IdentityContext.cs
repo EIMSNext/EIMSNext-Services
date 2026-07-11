@@ -83,6 +83,8 @@ namespace EIMSNext.ApiHost.Authorization
                     {
                         CurrentCorpId = client.CorpId;
                         CurrentUserID = "system";
+                        _type = IdentityType.Client;
+                        _retrieved = true;
                     }
                 }
             }

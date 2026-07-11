@@ -31,8 +31,8 @@ namespace EIMSNext.Core.Query
                     case FieldType.CheckBox:
                     case FieldType.Radio:
                         if (!(
-                           field.EndsWith(".value") ||
-                           field.EndsWith(".label")))
+                           field.EndsWith(".label") ||
+                           field.EndsWith(".value")))
                         {
                             finalField = $"{field}.value";
                         }

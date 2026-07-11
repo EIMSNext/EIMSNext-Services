@@ -35,11 +35,6 @@ namespace EIMSNext.Service.Entities
         public FormContent Content { get; set; } = new FormContent();
 
         /// <summary>
-        /// 是否台账， 台账不支持手动增删改？？？
-        /// </summary>
-        public bool IsLedger { get; set; }
-
-        /// <summary>
         /// 是否流程表单
         /// </summary>
         public bool UsingWorkflow { get; set; }
@@ -153,6 +148,12 @@ namespace EIMSNext.Service.Entities
         public FieldProp Props { get; set; } = new FieldProp();
 
         /// <summary>
+        /// 是否必填。兼容前端 form-create 的 $required 配置。
+        /// </summary>
+        [JsonPropertyName("$required")]
+        public bool Required { get; set; }
+
+        /// <summary>
         /// 子表单中的列
         /// </summary>
         public IList<FieldDef>? Columns { get; set; }
@@ -186,6 +187,10 @@ namespace EIMSNext.Service.Entities
         /// Number/Timestamp的格式
         /// </summary>
         public string? Format { get; set; }
+        /// <summary>
+        /// 兼容部分子表单列把必填配置存放在 props.required 的情况。
+        /// </summary>
+        public bool? Required { get; set; }
         /// <summary>
         /// 值配置
         /// </summary>

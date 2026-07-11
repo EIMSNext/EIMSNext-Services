@@ -120,6 +120,8 @@ namespace EIMSNext.ApiCore
                 return ConnectionMultiplexer.Connect(config);
             });
 
+            services.AddSingleton<ILogoutTokenStore, DistributedLogoutTokenStore>();
+
             //services.AddSingleton<ICacheClient, DistributedCacheClient>();
             services.AddSingleton<ICacheClient, FakeCacheClient>();
             services.AddScoped<IScopeCache, ScopeCache>();
@@ -144,6 +146,7 @@ namespace EIMSNext.ApiCore
                  opt.Authority = authority;
                  opt.SaveToken = true;
                  opt.RequireHttpsMetadata = requireHttps;
+                 opt.Events = JwtBearerLogoutTokenEvents.Create();
 
                  opt.TokenValidationParameters = new TokenValidationParameters
                  {

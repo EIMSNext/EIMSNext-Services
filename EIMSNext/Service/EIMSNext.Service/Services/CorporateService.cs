@@ -21,7 +21,6 @@ namespace EIMSNext.Service
             var empRepo = Resolver.GetRepository<Employee>();
             var empDeptRepo = Resolver.GetRepository<EmployeeDepartment>();
             var adminGroupRepo = Resolver.GetRepository<AdminGroup>();
-            var clientRepo = Resolver.GetRepository<EIMSNext.Auth.Entities.Client>();
             var userRepo = Resolver.GetRepository<User>();
             var user = Context.User as User;
 
@@ -30,17 +29,6 @@ namespace EIMSNext.Service
                 entity.Code = (Resolver.GetService<SerialNoSequence>() as ISerialNoSequenceService)!.NextCorpCode(entity.Platform);
 
             Repository.EnsureId(entity);
-
-            var serviceClient = new Auth.Entities.Client
-            {
-                ClientName = "service_" + entity.Code,
-                ClientSecrets = { },
-                AllowedGrantTypes = [new ClientGrantType { GrantType = "client_credentials" }],
-                AllowedScopes = { new ClientScope { Scope = "api.readwrite" } },
-                AccessTokenLifetime = 28800,
-                IdentityTokenLifetime = 28800,
-                CorpId = entity.Id
-            };
 
             var dept = new Department
             {
@@ -96,7 +84,6 @@ namespace EIMSNext.Service
             var tasks = new List<Task>
             {
                 base.AddCoreAsync(entities, session),
-                clientRepo.InsertAsync(serviceClient,session),
                 deptRepo.InsertAsync(dept, session),
                 empRepo.InsertAsync(new List<Employee>{emp}, session),
                 empDeptRepo.InsertAsync(empDepartments, session),

@@ -14,6 +14,7 @@ namespace EIMSNext.Async.Tasks
             services.AddHostedService<SystemMessageConsumer>();
             services.AddHostedService<EmailConsumer>();
             services.AddHostedService<DataExportConsumer>();
+            services.AddHostedService<DataImportConsumer>();
             services.AddHostedService<WebhookConsumer>();
             services.AddHostedService<DataflowRunConsumer>();
             services.AddHostedService<WorkflowExpireConsumer>();

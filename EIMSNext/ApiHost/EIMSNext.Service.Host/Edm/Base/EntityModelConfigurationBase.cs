@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Edm
         /// <param name="entityType"></param>
         protected override void ConfigureCommon(EntityTypeConfiguration<T> entityType)
         {
-            entityType.Ignore(x => x.CreateBy);
+            //entityType.Ignore(x => x.CreateBy);
             //entityType.Ignore(x => x.CreateTime);
             entityType.Ignore(x => x.UpdateBy);
             entityType.Ignore(x => x.UpdateTime);
@@ -39,7 +39,7 @@ namespace EIMSNext.Service.Host.Edm
         /// <param name="entityType"></param>
         protected override void ConfigureCommon(EntityTypeConfiguration<T> entityType)
         {
-            entityType.Ignore(x => x.CreateBy);
+            //entityType.Ignore(x => x.CreateBy);
             //entityType.Ignore(x => x.CreateTime);
             entityType.Ignore(x => x.UpdateBy);
             entityType.Ignore(x => x.UpdateTime);

@@ -1,4 +1,5 @@
 using EIMSNext.ApiClient.Flow;
+using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
@@ -33,10 +34,52 @@ namespace EIMSNext.Service
             return;
         }
 
+        protected override Task BeforeAdd(IEnumerable<FormDef> entities, IClientSessionHandle? session)
+        {
+            foreach (var entity in entities)
+            {
+                ValidateFieldIds(entity);
+            }
+            return base.BeforeAdd(entities, session);
+        }
+
         protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
         {
-
+            ValidateFieldIds(entity);
             return base.BeforeReplace(entity, session);
+        }
+
+        /// <summary>
+        /// 校验 FormDef 中所有字段 ID 符合 <see cref="FieldIdRules"/>。
+        /// 失败时抛 <see cref="BadRequestException"/>，由 controller 统一转换为 400。
+        /// </summary>
+        private static void ValidateFieldIds(FormDef formDef)
+        {
+            if (formDef?.Content?.Items == null)
+            {
+                return;
+            }
+
+            foreach (var field in formDef.Content.Items)
+            {
+                var err = FieldIdRules.ValidateFieldId(field.Field);
+                if (!string.IsNullOrEmpty(err))
+                {
+                    throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 非法: {err}");
+                }
+
+                if (field.Columns != null)
+                {
+                    foreach (var col in field.Columns)
+                    {
+                        var subErr = FieldIdRules.ValidateSubFieldId(col.Field);
+                        if (!string.IsNullOrEmpty(subErr))
+                        {
+                            throw new BadRequestException($"表单 [{formDef.Name}] 子表列 ID 非法: {subErr}");
+                        }
+                    }
+                }
+            }
         }
 
         protected override async Task AfterReplace(FormDef entity, IClientSessionHandle? session)

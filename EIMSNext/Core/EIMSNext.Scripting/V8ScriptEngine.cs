@@ -62,7 +62,27 @@ namespace EIMSNext.Scripting
 
         private Microsoft.ClearScript.V8.V8ScriptEngine CreateEngine()
         {
-            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine(V8ScriptEngineFlags.EnableDynamicModuleImports);
+            // Stage A: 7.5.1 上 V8RuntimeConstraints 真正生效(老生代/新生代/ArrayBuffer 上限)
+            var constraints = new Microsoft.ClearScript.V8.V8RuntimeConstraints
+            {
+                MaxNewSpaceSize = _option.MaxNewSpaceSizeMB,
+                MaxOldSpaceSize = _option.MaxOldSpaceSizeMB,
+            };
+            if (_option.MaxArrayBufferAllocation > 0)
+            {
+                constraints.MaxArrayBufferAllocation = (ulong)_option.MaxArrayBufferAllocation;
+            }
+
+            var engine = new Microsoft.ClearScript.V8.V8ScriptEngine(constraints);
+
+            // Stage A: 软堆上限(V8 周期性采样)。超过时 V8 按 ViolationPolicy 抛 ScriptEngineException
+            // → catch (Exception) 转 Error → engine.IsBroken = true → ReturnEngine 不回池
+            // 软上限应显著小于硬上限 MaxOldSpaceSize,确保在 V8 触发 abort 之前先被软上限接住。
+            if (_option.MaxRuntimeHeapSizeMB > 0)
+            {
+                engine.MaxRuntimeHeapSize = (UIntPtr)((long)_option.MaxRuntimeHeapSizeMB * 1024 * 1024);
+            }
+            engine.RuntimeHeapSizeViolationPolicy = MapViolationPolicy(_option.ViolationPolicy);
 
             // 预加载公共函数库
             var jsFiles = LoadJsFiles();
@@ -75,6 +95,19 @@ namespace EIMSNext.Scripting
             }
 
             return engine;
+        }
+
+        /// <summary>
+        /// 将 <see cref="Scripting.ScriptViolationPolicy"/> 映射到 ClearScript 的 V8 策略。
+        /// </summary>
+        private static Microsoft.ClearScript.V8.V8RuntimeViolationPolicy MapViolationPolicy(ScriptViolationPolicy policy)
+        {
+            return policy switch
+            {
+                ScriptViolationPolicy.Exception => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Exception,
+                ScriptViolationPolicy.Interrupt => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Interrupt,
+                _ => Microsoft.ClearScript.V8.V8RuntimeViolationPolicy.Exception,
+            };
         }
 
         private List<string> LoadJsFiles()
@@ -121,7 +154,7 @@ namespace EIMSNext.Scripting
             return files;
         }
 
-        public EvaluationResult<dynamic> Evaluate(string script, IDictionary<string, object>? parameters = null)
+        public EvaluationResult<dynamic> Evaluate(string script, IDictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
             var result = new EvaluationResult<dynamic>();
             if (string.IsNullOrEmpty(script) || script == ScriptExpression.TRUE)
@@ -135,9 +168,36 @@ namespace EIMSNext.Scripting
                 return result;
             }
 
+            // 调用方未传可取消的 CT 时,按 ScriptEngineOption.DefaultEvaluationTimeout 应用默认上限。
+            // 设为 Zero 时不创建(等价于"仅在调用方显式传 CT 时才超时")。
+            CancellationTokenSource? defaultCts = null;
+            var isDefaultTimeout = false;
+            if (!ct.CanBeCanceled)
+            {
+                var timeout = _option.DefaultEvaluationTimeout;
+                if (timeout > TimeSpan.Zero)
+                {
+                    defaultCts = new CancellationTokenSource(timeout);
+                    ct = defaultCts.Token;
+                    isDefaultTimeout = true;
+                }
+            }
+
             var engine = RentEngine();
+            CancellationTokenRegistration registration = default;
             try
             {
+                if (ct.CanBeCanceled)
+                {
+                    // CT 触发时由 ClearScript 抛 ScriptInterruptedException 打断脚本。
+                    // 注意:Interrupt 之后的引擎状态不可靠,后续会强制标记 IsBroken,不再回池。
+                    registration = ct.Register(() =>
+                    {
+                        try { engine.Engine.Interrupt(); }
+                        catch { /* 引擎可能已被 dispose,忽略 */ }
+                    });
+                }
+
                 // 注入参数
                 if (parameters != null)
                 {
@@ -153,6 +213,15 @@ namespace EIMSNext.Scripting
                 // 执行脚本
                 result.Value = engine.Engine.Evaluate($"(() => {{ return {script} }})()");
             }
+            catch (Microsoft.ClearScript.ScriptInterruptedException)
+            {
+                result.Error = isDefaultTimeout
+                    ? "Script execution timed out"
+                    : "Script execution cancelled";
+                Logger.Warning("V8 script interrupted. Script={Script}, Reason={Reason}",
+                    script, isDefaultTimeout ? "timeout" : "cancelled");
+                engine.IsBroken = true;
+            }
             catch (Exception ex)
             {
                 result.Error = ex.Message;
@@ -162,6 +231,8 @@ namespace EIMSNext.Scripting
             }
             finally
             {
+                registration.Dispose();
+
                 // 清理参数
                 if (parameters != null)
                 {
@@ -172,16 +243,17 @@ namespace EIMSNext.Scripting
                 }
 
                 ReturnEngine(engine);
+                defaultCts?.Dispose();
             }
 
             return result;
         }
-        public EvaluationResult<T> Evaluate<T>(string script, IDictionary<string, object>? parameters = null)
+        public EvaluationResult<T> Evaluate<T>(string script, IDictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
             var result = new EvaluationResult<T>();
             try
             {
-                var temp = Evaluate(script, parameters);
+                var temp = Evaluate(script, parameters, ct);
                 result.Error = temp.Error;
                 if (string.IsNullOrEmpty(result.Error))
                     result.Value = (T)Convert.ChangeType(temp.Value, typeof(T));

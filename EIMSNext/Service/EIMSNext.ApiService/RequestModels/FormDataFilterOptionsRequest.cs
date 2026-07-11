@@ -15,6 +15,8 @@ namespace EIMSNext.ApiService.RequestModels
 
         public DynamicFilter? Filter { get; set; }
 
+        public string? AuthGroupId { get; set; }
+
         public int Limit { get; set; } = 50;
     }
 

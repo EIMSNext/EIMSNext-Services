@@ -21,7 +21,7 @@ namespace EIMSNext.Service.Host.Controllers
     public class RoleController(IResolver resolver) : ApiControllerBase<RoleApiService, Role, RoleViewModel>(resolver)
     {
         [HttpPost("AddEmps")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Role, Operation = Operation.Add)]
         public virtual async Task<ActionResult> AddEmps([FromBody] AddEmpsToRoleRequest request)
         {
             if (!string.IsNullOrEmpty(request.RoleId) && request.EmpIds?.Count > 0)
@@ -35,7 +35,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("RemoveEmps")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Role, Operation = Operation.Delete)]
         public virtual async Task<ActionResult> RemoveEmps([FromBody] RemoveEmpsToRoleRequest request)
         {
             if (!string.IsNullOrEmpty(request.RoleId) && request.EmpIds?.Count > 0)
@@ -49,7 +49,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("Move")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(ResourceCode = Resources.Role, Operation = Operation.Edit)]
         public virtual async Task<ActionResult> Move([FromBody] MoveRoleTreeNodeRequest request)
         {
             try

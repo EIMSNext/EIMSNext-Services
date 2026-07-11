@@ -191,6 +191,9 @@ namespace EIMSNext.Component
                         FormId = flowNode.Metadata.InsertMeta!.FormId,
                         FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.InsertMeta!.FormFieldList)
                     };
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.InsertSetting.FieldSettings,
+                        $"Insert node [{flowNode.Id}]");
                     otherFormIds.TryAdd(dfNodeSetting.InsertSetting.FormId);
                     break;
                 case WfNodeType.QueryOne:
@@ -282,6 +285,12 @@ namespace EIMSNext.Component
                     if (dfNodeSetting.UpdateSetting.InsertIfNoData)
                         dfNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList);
 
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.UpdateSetting.FieldSettings,
+                        $"Update node [{flowNode.Id}]");
+                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
+                        dfNodeSetting.UpdateSetting.InsertFieldSettings,
+                        $"Update node [{flowNode.Id}] insert-if-no-data");
                     otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
                     break;
                 case WfNodeType.Plugin:
@@ -289,7 +298,6 @@ namespace EIMSNext.Component
                     dfNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
                     {
                         PluginId = flowNode.Metadata.PluginMeta.PluginId,
-                        PluginVersion = flowNode.Metadata.PluginMeta.PluginVersion,
                         FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
                         FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings),
                         ResultFields = ParsePluginResultFieldList(flowNode.Metadata.PluginMeta.ResultFields)
@@ -400,12 +408,55 @@ namespace EIMSNext.Component
             }
 
             var exp = formulaValue.Expression ?? string.Empty;
-            foreach (var formulaRef in formulaValue.Refs)
+            exp = SubstituteFormulaTokens(exp, formulaValue.Refs);
+            return exp;
+        }
+
+        /// <summary>
+        /// 把 <c>$F1</c>/<c>$F2</c>/… 占位符替换为 <c>data.{formId|nodeId}.field</c>。
+        /// <para>
+        /// 关键保护：
+        ///  1) 长度降序处理避免 <c>$F1</c> 先替换后吞掉 <c>$F10</c> 的前缀；
+        ///  2) 字面量保护：表达式体里形如 <c>"$F1"</c>/<c>'$F1'</c> 的字符串字面量先被
+        ///     控制字符占位符挪走，替换完再还原，避免误改用户字符串。
+        /// </para>
+        /// </summary>
+        private static string SubstituteFormulaTokens(string expression, List<FormulaRef> refs)
+        {
+            if (string.IsNullOrEmpty(expression) || refs == null || refs.Count == 0)
             {
-                exp = exp.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+                return expression;
             }
 
-            return exp;
+            // 1) 把字面量里的 $F\d+ 暂时挪走（用 ASCII 控制字符做占位符，源码中几乎不可能出现）
+            var literals = new List<string>();
+            var masked = System.Text.RegularExpressions.Regex.Replace(
+                expression,
+                @"\$F\d+",
+                match =>
+                {
+                    var idx = literals.Count;
+                    literals.Add(match.Value);
+                    return $"\u0001FMLIT{idx}\u0002";
+                });
+
+            // 2) 按 token 长度降序，避免 $F1 抢先覆盖 $F10
+            foreach (var formulaRef in refs.OrderByDescending(r => r.Key.Length))
+            {
+                if (string.IsNullOrEmpty(formulaRef.Key))
+                {
+                    continue;
+                }
+                masked = masked.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+            }
+
+            // 3) 还原字面量
+            for (var i = 0; i < literals.Count; i++)
+            {
+                masked = masked.Replace($"\u0001FMLIT{i}\u0002", literals[i]);
+            }
+
+            return masked;
         }
         #endregion
 
@@ -515,54 +566,62 @@ namespace EIMSNext.Component
             };
         }
 
-        private List<PluginFieldSetting> ParsePluginFieldList(PluginFieldList? fieldList)
+        private List<PluginFieldSetting> ParsePluginFieldList(List<PluginFieldItem>? fieldList, bool isSubFieldSetting = false)
         {
-            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return new List<PluginFieldSetting>();
             }
 
-            return fieldList.Items.Select(item =>
-            {
-                var fieldSetting = new PluginFieldSetting
-                {
-                    FieldKey = item.FieldKey,
-                    FieldType = item.FieldType,
-                    ValueType = Enum.Parse<PluginValueType>(item.Value!.Type, true),
-                    Value = item.Value.Value,
-                };
-
-                if (item.Value.FieldValue != null)
-                {
-                    fieldSetting.ValueField = new PluginFieldReference
-                    {
-                        NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
-                        FormId = item.Value.FieldValue.FormId,
-                        Field = item.Value.FieldValue.Field,
-                        FieldType = item.Value.FieldValue.Type,
-                        IsSubField = item.Value.FieldValue.IsSubField,
-                        SingleResultNode = item.Value.FieldValue.SingleResultNode,
-                    };
-                }
-
-                return fieldSetting;
-            }).ToList();
+            return fieldList.Select(item =>
+                ParsePluginFieldItem(item, isSubFieldSetting)).ToList();
         }
 
-        private List<PluginResultFieldSetting> ParsePluginResultFieldList(PluginResultFieldList? fieldList)
+        private PluginFieldSetting ParsePluginFieldItem(PluginFieldItem item, bool isSubFieldSetting)
         {
-            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            var fieldSetting = new PluginFieldSetting
+            {
+                FieldKey = item.FieldKey,
+                FieldType = item.FieldType,
+                ValueType = Enum.TryParse<PluginValueType>(item.Value?.Type, true, out var valueType)
+                    ? valueType
+                    : PluginValueType.Empty,
+                Value = item.Value?.Value,
+                SubFieldSettings = ParsePluginFieldList(item.SubFieldSettings, isSubFieldSetting: true),
+            };
+
+            if (item.Value?.FieldValue != null)
+            {
+                fieldSetting.ValueField = new PluginFieldReference
+                {
+                    NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
+                    FormId = item.Value.FieldValue.FormId,
+                    Field = item.Value.FieldValue.Field,
+                    FieldType = item.Value.FieldValue.Type,
+                    IsSubField = item.Value.FieldValue.IsSubField || item.Value.FieldValue.Field.Contains('>'),
+                    SingleResultNode = item.Value.FieldValue.SingleResultNode,
+                };
+            }
+
+            DataflowFieldMappingValidator.ValidatePluginFieldSetting(fieldSetting, isSubFieldSetting);
+            return fieldSetting;
+        }
+
+        private List<PluginResultFieldSetting> ParsePluginResultFieldList(List<PluginResultFieldItem>? fieldList)
+        {
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return new List<PluginResultFieldSetting>();
             }
 
-            return fieldList.Items
+            return fieldList
                 .Where(item => !string.IsNullOrWhiteSpace(item.FieldKey))
                 .Select(item => new PluginResultFieldSetting
                 {
                     FieldKey = item.FieldKey,
                     FieldName = string.IsNullOrWhiteSpace(item.FieldName) ? item.FieldKey : item.FieldName,
                     FieldType = item.FieldType,
+                    SubFields = ParsePluginResultFieldList(item.SubFields),
                 })
                 .ToList();
         }
@@ -790,15 +849,9 @@ namespace EIMSNext.Component
         {
             public bool SingleResult { get; set; }
             public string PluginId { get; set; } = string.Empty;
-            public string? PluginVersion { get; set; }
             public string FunctionId { get; set; } = string.Empty;
-            public PluginFieldList FieldSettings { get; set; } = new PluginFieldList();
-            public PluginResultFieldList ResultFields { get; set; } = new PluginResultFieldList();
-        }
-
-        private class PluginFieldList
-        {
-            public List<PluginFieldItem> Items { get; set; } = new List<PluginFieldItem>();
+            public List<PluginFieldItem> FieldSettings { get; set; } = new List<PluginFieldItem>();
+            public List<PluginResultFieldItem> ResultFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
         private class PluginFieldItem
@@ -806,11 +859,7 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string FieldType { get; set; } = string.Empty;
             public FormFieldValue? Value { get; set; }
-        }
-
-        private class PluginResultFieldList
-        {
-            public List<PluginResultFieldItem> Items { get; set; } = new List<PluginResultFieldItem>();
+            public List<PluginFieldItem> SubFieldSettings { get; set; } = new List<PluginFieldItem>();
         }
 
         private class PluginResultFieldItem
@@ -818,6 +867,7 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string? FieldName { get; set; }
             public string FieldType { get; set; } = string.Empty;
+            public List<PluginResultFieldItem> SubFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
 

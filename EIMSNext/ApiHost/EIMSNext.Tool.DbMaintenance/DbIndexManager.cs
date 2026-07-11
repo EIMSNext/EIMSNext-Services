@@ -204,6 +204,16 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<FormDataChangeLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.FormId).Descending(x => x.OperateTime),
                 options,
                 "ix_formdatachangelog_corp_form_operatetime");
+
+            CreateIndex(GetCollection<FormDataImportLog>(),
+                Builders<FormDataImportLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.FormId).Ascending(x => x.Status).Descending(x => x.CreateTime),
+                options,
+                "ix_formdataimportlog_corp_form_status_createtime");
+
+            CreateIndex(GetCollection<FormDataImportLog>(),
+                Builders<FormDataImportLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.CreateBy!.Value).Descending(x => x.CreateTime),
+                options,
+                "ix_formdataimportlog_corp_createby_createtime");
         }
 
         private void CreateFormNotifyIndexes(CreateIndexOptions options)

@@ -73,7 +73,6 @@ namespace EIMSNext.Service
                     Name = formTemplate.Name,
                     Content = AppTemplateReferenceRewriter.RewriteFormContent(formTemplate, newAppId, formMap, dashboardMap),
                     FormSettings = AppTemplateReferenceRewriter.RewriteFormSettings(formTemplate, formMap, dashboardMap),
-                    IsLedger = formTemplate.IsLedger,
                     UsingWorkflow = formTemplate.UsingWorkflow
                 };
                 await formDefRepo.InsertAsync(formDef);

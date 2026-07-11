@@ -148,7 +148,7 @@ namespace EIMSNext.Service.Tests
             var profile = profileRepo.Queryable.Single();
 
             Assert.AreEqual(appTemplateId, profile.TemplateId);
-            Assert.AreEqual("Published", profile.Status);
+            Assert.AreEqual(AppProfileStatus.Published, profile.Status);
             Assert.AreEqual(sourceForm.TemplateId, workflowTemplate.ExternalTemplateId);
             Assert.AreEqual(sourceForm.TemplateId, workflowTemplate.SourceTemplateId);
             Assert.AreEqual(sourceForm.TemplateId, printTemplate.FormTemplateId);

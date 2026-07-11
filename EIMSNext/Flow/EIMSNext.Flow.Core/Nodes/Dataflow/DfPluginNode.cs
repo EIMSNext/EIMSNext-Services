@@ -4,6 +4,7 @@ using System.Collections;
 
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -33,6 +34,12 @@ namespace EIMSNext.Flow.Core.Nodes
 
             try
             {
+                if (!IsPluginEnabled(dataContext.CorpId, setting.PluginId))
+                {
+                    CreateFailureExecLog(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    return ExecutionResult.Next();
+                }
+
                 var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
                 var payload = BuildPayload(dataContext, setting);
                 var invocationContext = new PluginInvocationContext
@@ -51,7 +58,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 var result = runtimeManager.ExecuteAsync(
                         setting.PluginId,
                         setting,
-                        new PluginExecArgs { FunName = setting.FunctionId, FunArgs = JsonSerializer.Serialize(payload) },
+                        new PluginExecArgs { FunName = setting.FunctionId, FunArgs = payload.SerializeToJson() },
                         invocationContext,
                         context.CancellationToken)
                     .GetAwaiter()
@@ -87,6 +94,23 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.Next();
         }
 
+        private bool IsPluginEnabled(string corpId, string pluginId)
+        {
+            if (string.IsNullOrWhiteSpace(corpId) || string.IsNullOrWhiteSpace(pluginId))
+            {
+                return false;
+            }
+
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            return Resolver.Resolve<IRepository<PluginInstall>>().Queryable.Any(x =>
+                x.CorpId == corpId
+                && x.PluginId == pluginId
+                && !x.DeleteFlag
+                && x.Status == PluginInstallStatus.Installed
+                && x.Enabled
+                && (x.ExpireAt == null || x.ExpireAt > now));
+        }
+
         private Dictionary<string, object?> BuildPayload(DfDataContext dataContext, Plugin.Contracts.PluginSetting setting)
         {
             var scriptData = GetNodeScriptData(dataContext);
@@ -101,6 +125,12 @@ namespace EIMSNext.Flow.Core.Nodes
 
         private object? ResolveFieldValue(PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
+            if (string.Equals(field.FieldType, PluginFieldKind.TableForm, StringComparison.OrdinalIgnoreCase)
+                && field.SubFieldSettings.Count > 0)
+            {
+                return BuildSubListPayload(field, scriptData);
+            }
+
             return field.ValueType switch
             {
                 PluginValueType.Empty => null,
@@ -109,12 +139,138 @@ namespace EIMSNext.Flow.Core.Nodes
             };
         }
 
-        private object? ResolveMappedFieldValue(PluginFieldReference field, Dictionary<string, object> scriptData)
+        private List<Dictionary<string, object?>> BuildSubListPayload(PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
-            var value = ScriptEngine.Evaluate(BuildFieldExpression(field), scriptData).Value;
+            var columns = field.SubFieldSettings
+                .Select(subField => BuildSubListColumn(subField, scriptData))
+                .ToList();
+            var rowCount = columns
+                .Where(x => x.RowValues != null)
+                .Select(x => x.RowValues!.Count)
+                .DefaultIfEmpty(columns.Any(x => x.CreatesRowWhenNoRowValues) ? 1 : 0)
+                .Max();
+            var rows = new List<Dictionary<string, object?>>();
+
+            for (var rowIndex = 0; rowIndex < rowCount; rowIndex++)
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                foreach (var column in columns)
+                {
+                    row[column.Setting.FieldKey] = column.RowValues != null
+                        ? rowIndex < column.RowValues.Count ? column.RowValues[rowIndex] : null
+                        : column.ScalarValue;
+                }
+
+                rows.Add(row);
+            }
+
+            return rows;
+        }
+
+        private SubListColumn BuildSubListColumn(PluginFieldSetting field, Dictionary<string, object> scriptData)
+        {
+            if (field.ValueType == PluginValueType.Field && field.ValueField != null)
+            {
+                var usesRowValues = UsesRowValues(field.ValueField);
+                var value = ResolveMappedFieldValue(field.ValueField, scriptData, usesRowValues);
+                return usesRowValues
+                    ? new SubListColumn(field, ToValueList(value), null, false)
+                    : new SubListColumn(field, null, value, true);
+            }
+
+            if (field.ValueType == PluginValueType.Empty)
+            {
+                return new SubListColumn(field, null, null, false);
+            }
+
+            return new SubListColumn(field, null, field.Value, true);
+        }
+
+        private static bool UsesRowValues(PluginFieldReference field)
+        {
+            return field.IsSubField || field.SingleResultNode == false;
+        }
+
+        private static List<object?>? ToValueList(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value is JsonElement jsonElement)
+            {
+                value = ConvertJsonElement(jsonElement);
+            }
+
+            if (value is string text)
+            {
+                var trimmed = text.Trim();
+                if (trimmed.StartsWith("[", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        var list = trimmed.DeserializeFromJson<List<object?>>();
+                        if (list != null)
+                        {
+                            return NormalizeValueList(list);
+                        }
+                    }
+                    catch (JsonException)
+                    {
+                    }
+                }
+
+                return [text];
+            }
+
+            if (value is IDictionary)
+            {
+                return [value];
+            }
+
+            if (value is IEnumerable enumerable and not string)
+            {
+                var list = new List<object?>();
+                foreach (var item in enumerable)
+                {
+                    list.Add(NormalizeValueListItem(item));
+                }
+
+                return list;
+            }
+
+            return [value];
+        }
+
+        private static List<object?> NormalizeValueList(IEnumerable<object?> values)
+        {
+            var list = new List<object?>();
+            foreach (var value in values)
+            {
+                list.Add(NormalizeValueListItem(value));
+            }
+
+            return list;
+        }
+
+        private static object? NormalizeValueListItem(object? value)
+        {
+            return value is JsonElement jsonElement ? ConvertJsonElement(jsonElement) : value;
+        }
+
+        private sealed record SubListColumn(
+            PluginFieldSetting Setting,
+            List<object?>? RowValues,
+            object? ScalarValue,
+            bool CreatesRowWhenNoRowValues);
+
+        private object? ResolveMappedFieldValue(PluginFieldReference field, Dictionary<string, object> scriptData, bool asRowValues = false)
+        {
+            var value = ScriptEngine.Evaluate(BuildFieldExpression(field, asRowValues), scriptData).Value;
             if (!field.IsSubField)
             {
-                return NormalizeComplexValue(field.FieldType, value);
+                return value;
             }
 
             if (value is not string && value is IEnumerable enumerable)
@@ -122,58 +278,24 @@ namespace EIMSNext.Flow.Core.Nodes
                 var list = new List<object?>();
                 foreach (var item in enumerable)
                 {
-                    list.Add(NormalizeComplexValue(field.FieldType, item));
+                    list.Add(item);
                 }
 
                 return list;
             }
 
-            return NormalizeComplexValue(field.FieldType, value);
-        }
-
-        private object? NormalizeComplexValue(string fieldType, object? value)
-        {
-            if (value == null)
-            {
-                return null;
-            }
-
-            if (string.Equals(fieldType, EIMSNext.Common.FieldType.FileUpload, StringComparison.OrdinalIgnoreCase)
-                || string.Equals(fieldType, EIMSNext.Common.FieldType.ImageUpload, StringComparison.OrdinalIgnoreCase))
-            {
-                return NormalizeUploadValue(value);
-            }
-
             return value;
         }
 
-        private static object? NormalizeUploadValue(object value)
-        {
-            if (value is string)
-            {
-                return value;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return new
-                {
-                    id = dict.TryGetValue("id", out var id) ? id : null,
-                    fileName = dict.TryGetValue("fileName", out var fileName) ? fileName : null,
-                    savePath = dict.TryGetValue("savePath", out var savePath) ? savePath : null,
-                    thumbPath = dict.TryGetValue("thumbPath", out var thumbPath) ? thumbPath : null,
-                    fileExt = dict.TryGetValue("fileExt", out var fileExt) ? fileExt : null,
-                    fileSize = dict.TryGetValue("fileSize", out var fileSize) ? fileSize : null,
-                };
-            }
-
-            return value;
-        }
-
-        private static string BuildFieldExpression(PluginFieldReference field)
+        private static string BuildFieldExpression(PluginFieldReference field, bool asRowValues = false)
         {
             if (!field.IsSubField)
             {
+                if (asRowValues && field.SingleResultNode == false)
+                {
+                    return $"MAP(data.n_{field.NodeId},'{field.Field}')";
+                }
+
                 return $"data.n_{field.NodeId}.{field.Field}";
             }
 
@@ -244,8 +366,8 @@ namespace EIMSNext.Flow.Core.Nodes
                 return result;
             }
 
-            var json = JsonSerializer.Serialize(value);
-            return JsonSerializer.Deserialize<Dictionary<string, object?>>(json)
+            var json = value.SerializeToJson();
+            return json.DeserializeFromJson<Dictionary<string, object?>>()
                 ?? new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
         }
 
@@ -296,6 +418,18 @@ namespace EIMSNext.Flow.Core.Nodes
                 }
 
                 return list;
+            }
+
+            var type = value.GetType();
+            if (!type.IsPrimitive
+                && type != typeof(string)
+                && type != typeof(decimal)
+                && type != typeof(DateTime)
+                && type != typeof(DateTimeOffset)
+                && type != typeof(Guid)
+                && !type.IsEnum)
+            {
+                return ToScriptValue(ToDictionary(value));
             }
 
             return value;

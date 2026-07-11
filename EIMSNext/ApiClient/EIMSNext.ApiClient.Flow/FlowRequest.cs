@@ -18,6 +18,7 @@ namespace EIMSNext.ApiClient.Flow
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
         Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken);
         Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken);
+        Task<WfResponse?> DeleteWorkflowInstances(DeleteWorkflowInstancesRequest req, string accessToken);
         Task<WfResponse?> ExpireAction(ExpireActionRequest req, string accessToken);
 
         Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken);
@@ -225,5 +226,11 @@ namespace EIMSNext.ApiClient.Flow
         public string? AppId { get; set; }
         public IEnumerable<string>? FormIds { get; set; }
         public bool? DeleteDef { get; set; }
+    }
+
+    public class DeleteWorkflowInstancesRequest
+    {
+        public IEnumerable<string>? DataIds { get; set; }
+        public IEnumerable<string>? WfInstanceIds { get; set; }
     }
 }

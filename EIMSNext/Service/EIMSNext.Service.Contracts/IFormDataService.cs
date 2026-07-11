@@ -11,6 +11,8 @@ namespace EIMSNext.Service.Contracts
         void Add(IEnumerable<FormData> entities, IClientSessionHandle? session);
         ReplaceOneResult Replace(FormData entity, IClientSessionHandle? session);
         object Delete(IEnumerable<string> ids, IClientSessionHandle? session);
+        Task RestoreAsync(IEnumerable<string> ids);
+        Task PurgeAsync(IEnumerable<string> ids);
 
         Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, CascadeMode cascade, string? eventIds);
 

@@ -114,13 +114,14 @@ namespace EIMSNext.Service.Host.Authorization
 
         private bool HasActionPermission(AuthorizationFilterContext context, PermissionAttribute permission)
         {
-            if (string.IsNullOrWhiteSpace(permission.ResourceCode) || permission.Operation == Operation.NotSet)
+            // 只有当 ResourceCode 和 Operation 都未设置时才完全跳过检查；
+            // 只要其中任一被显式标注，就必须进入匹配。
+            if (string.IsNullOrWhiteSpace(permission.ResourceCode) && permission.Operation == Operation.NotSet)
             {
                 return true;
             }
 
             if (_identity.IdentityType == IdentityType.System ||
-                _identity.IdentityType == IdentityType.Client ||
                 _identity.IdentityType == IdentityType.CorpOwmer ||
                 _identity.IdentityType == IdentityType.CorpAdmin)
             {
@@ -133,12 +134,77 @@ namespace EIMSNext.Service.Host.Authorization
                 return true;
             }
 
+            // Client (client_credentials grant) 走 ClientGrant 缓存
+            if (_identity.IdentityType == IdentityType.Client)
+            {
+                var clientId = context.HttpContext.User.Claims
+                    .FirstOrDefault(c => string.Equals(c.Type, EIMSNext.Auth.Entities.AuthClaimTypes.ClientId, StringComparison.OrdinalIgnoreCase))?.Value;
+                if (string.IsNullOrWhiteSpace(clientId))
+                {
+                    return false;
+                }
+                var clientInfo = _cache.Get<EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo>(
+                    "clientGrant", CacheScope.Client, clientId);
+
+                // 缓存未命中：lazy refresh（避免重启 Auth.Host 后第一次 token 失败）
+                if (clientInfo == null)
+                {
+                    clientInfo = TryLazyRefreshClientInfo(context, clientId);
+                }
+
+                if (clientInfo == null)
+                {
+                    return false;
+                }
+
+                // Client / Grant 启用检查
+                if (!clientInfo.ClientEnabled)
+                {
+                    _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}, ClientId={ClientId}",
+                        context.HttpContext.Request.Path, "Client 已禁用", clientId);
+                    return false;
+                }
+                if (!clientInfo.GrantEnabled)
+                {
+                    _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}, ClientId={ClientId}",
+                        context.HttpContext.Request.Path, "ClientGrant 已禁用", clientId);
+                    return false;
+                }
+
+                // IP 白名单检查（非空且不包含则拒绝）
+                if (clientInfo.IpWhitelist != null && clientInfo.IpWhitelist.Count > 0)
+                {
+                    var httpAccessor = context.HttpContext.RequestServices
+                        .GetService<Microsoft.AspNetCore.Http.IHttpContextAccessor>();
+                    var clientIp = httpAccessor != null
+                        ? EIMSNext.ApiCore.IpHelper.GetClientIp(httpAccessor)
+                        : string.Empty;
+                    if (string.IsNullOrEmpty(clientIp) || !clientInfo.IpWhitelist.Any(ip => IpMatches(ip.Trim(), clientIp)))
+                    {
+                        _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}, ClientId={ClientId}, ClientIp={ClientIp}",
+                            context.HttpContext.Request.Path, "Client IP 不在白名单", clientId, clientIp);
+                        return false;
+                    }
+                }
+
+                if (clientInfo.Codes == null || clientInfo.Codes.Count == 0)
+                {
+                    return false;
+                }
+                return requiredCodes.Any(code => clientInfo.Codes.Any(c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase)));
+            }
+
             var userCodes = ResolveUserPermissionCodes(context).ToHashSet(StringComparer.OrdinalIgnoreCase);
             return requiredCodes.Any(userCodes.Contains);
         }
 
         private static IEnumerable<string> BuildPermissionCodes(PermissionAttribute permission)
         {
+            if (string.IsNullOrWhiteSpace(permission.ResourceCode))
+            {
+                yield break;
+            }
+
             var resourceCode = permission.ResourceCode.Trim();
             yield return resourceCode;
 
@@ -147,9 +213,24 @@ namespace EIMSNext.Service.Host.Authorization
                 yield return $"{resourceCode}:read";
             }
 
-            if (permission.Operation.HasFlag(Operation.Write))
+            if (permission.Operation.HasFlag(Operation.Add))
             {
-                yield return $"{resourceCode}:write";
+                yield return $"{resourceCode}:add";
+            }
+
+            if (permission.Operation.HasFlag(Operation.Edit))
+            {
+                yield return $"{resourceCode}:edit";
+            }
+
+            if (permission.Operation.HasFlag(Operation.Delete))
+            {
+                yield return $"{resourceCode}:delete";
+            }
+
+            if (permission.Operation.HasFlag(Operation.Import))
+            {
+                yield return $"{resourceCode}:import";
             }
         }
 
@@ -196,6 +277,42 @@ namespace EIMSNext.Service.Host.Authorization
                    string.Equals(type, "permission", StringComparison.OrdinalIgnoreCase) ||
                    string.Equals(type, "permissions", StringComparison.OrdinalIgnoreCase);
         }
+
+        /// <summary>
+        /// 缓存未命中时，尝试从 DB 拉一次 ClientGrant 重建缓存。
+        /// 仅供 Client 路径使用。
+        /// </summary>
+        private EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo?
+            TryLazyRefreshClientInfo(AuthorizationFilterContext context, string clientId)
+        {
+            try
+            {
+                var grantApi = (EIMSNext.ApiService.ClientGrantApiService?)
+                    context.HttpContext.RequestServices.GetService(typeof(EIMSNext.ApiService.ClientGrantApiService));
+                var clientApi = (EIMSNext.ApiService.ClientApiService?)
+                    context.HttpContext.RequestServices.GetService(typeof(EIMSNext.ApiService.ClientApiService));
+                if (grantApi == null || clientApi == null) return null;
+
+                // 同步等待（这里在 IAsyncAuthorizationFilter.OnAuthorizationAsync 内，本身就是异步上下文）
+                EIMSNext.Service.Host.OpenPlatform.ClientPermissionCache
+                    .RefreshAsync(_cache, grantApi, clientApi, _identity.CurrentCorpId, clientId)
+                    .GetAwaiter()
+                    .GetResult();
+                return _cache.Get<EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo>(
+                    "clientGrant", CacheScope.Client, clientId);
+            }
+            catch
+            {
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// 判断 <paramref name="clientIp"/> 是否匹配 <paramref name="rule"/>。
+        /// 由 <see cref="EIMSNext.Common.IpMatcher"/> 提供：支持精确 IP、通配符 <c>10.0.0.*</c> 与 CIDR <c>10.0.0.0/24</c>。
+        /// </summary>
+        private static bool IpMatches(string rule, string clientIp)
+            => EIMSNext.Common.IpMatcher.Matches(rule, clientIp);
 
         private static IEnumerable<string> SplitPermissionCodes(string? value)
         {

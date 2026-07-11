@@ -95,11 +95,11 @@ namespace EIMSNext.Core.Services
             var op = Context.Operator;
             var ip = Context.ClientIp;
             var corpId = Context.CorpId;
-            newData.ForEach(x => logList.Add(
+             newData.ForEach(x => logList.Add(
              new AuditLog
              {
                  Action = DbAction.Insert,
-                 EntityType = nameof(T),
+                 EntityType = typeof(T).Name,
                  DataId = x.Id,
                  Detail = $"新增数据:", //TODO:考虑显示一两个主字段？
                  NewData = x.SerializeToJson(),
@@ -125,7 +125,7 @@ namespace EIMSNext.Core.Services
                 logList.Add(new AuditLog
                 {
                     Action = DbAction.Update,
-                    EntityType = nameof(T),
+                    EntityType = typeof(T).Name,
                     Detail = $"批量更新数据(无旧对象):{filter?.ToString()}",
                     DataFilter = filter?.ToString(),
                     CreateBy = op,
@@ -146,7 +146,7 @@ namespace EIMSNext.Core.Services
                         logList.Add(new AuditLog
                         {
                             Action = DbAction.Update,
-                            EntityType = nameof(T),
+                            EntityType = typeof(T).Name,
                             DataId = x.Id,
                             Detail = GetChangeDetail(x, y),
                             OldData = x.SerializeToJson(),
@@ -177,7 +177,7 @@ namespace EIMSNext.Core.Services
                 logList.Add(new AuditLog
                 {
                     Action = DbAction.Delete,
-                    EntityType = nameof(T),
+                    EntityType = typeof(T).Name,
                     Detail = $"批量删除数据:",
                     DataFilter = filter?.ToString(),
                     CreateBy = op,
@@ -194,7 +194,7 @@ namespace EIMSNext.Core.Services
                 logList.Add(new AuditLog
                 {
                     Action = DbAction.Delete,
-                    EntityType = nameof(T),
+                    EntityType = typeof(T).Name,
                     DataId = x.Id,
                     Detail = $"删除数据:", //TODO:考虑显示一两个主字段？
                     OldData = x.SerializeToJson(),
@@ -263,10 +263,11 @@ namespace EIMSNext.Core.Services
         }
         protected virtual ReplaceOneResult ReplaceCore(T entity, IClientSessionHandle? session)
         {
+            var entityId = entity.Id;
             FillSystemField(entity, true);
             BeforeReplace(entity, session).Wait();
+            var old = ScopeCache.Get<T>(entityId, DataVersion.Old) ?? GetCore(entityId, session);
             var result = Repository.Replace(entity, session);
-            var old = ScopeCache.Get<T>(entity.Id, DataVersion.Old);
             CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             AfterReplace(entity, session).Wait();
             return result;
@@ -425,10 +426,11 @@ namespace EIMSNext.Core.Services
         }
         protected virtual async Task<ReplaceOneResult> ReplaceCoreAsync(T entity, IClientSessionHandle? session)
         {
+            var entityId = entity.Id;
             FillSystemField(entity, true);
             await BeforeReplace(entity, session);
+            var old = ScopeCache.Get<T>(entityId, DataVersion.Old) ?? await GetCoreAsync(entityId, session);
             var result = await Repository.ReplaceAsync(entity, session);
-            var old = ScopeCache.Get<T>(entity.Id, DataVersion.Old);
             CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity], null, null, session);
             await AfterReplace(entity, session);
             return result;

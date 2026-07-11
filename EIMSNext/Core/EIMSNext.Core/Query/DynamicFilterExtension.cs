@@ -1,6 +1,7 @@
 using EIMSNext.Common;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Core.Query
 {
@@ -34,6 +35,10 @@ namespace EIMSNext.Core.Query
                     //    || mainFields.Contains(filter.Field, StringComparer.OrdinalIgnoreCase))
                     //    ? filter.Field : "Data." + filter.Field;
                     var field = DynamicField.FormatFieldForFilter(filter.Field, filter.Type);
+                    if (string.Equals(filter.Op, FilterOp.Text, StringComparison.OrdinalIgnoreCase))
+                    {
+                        field = FormatTextSearchField(field, filter.Type);
+                    }
                     var filterValues = new List<object>();
                     if (filter.Value is List<object>)
                     {
@@ -67,6 +72,18 @@ namespace EIMSNext.Core.Query
         private static FilterDefinition<T> BuildFilter<T>(string field, string op, List<object> filterValues)
         {
             var filter = Builders<T>.Filter.Empty;
+
+            if (op == FilterOp.Text && filterValues.Count > 0)
+            {
+                var keyword = filterValues[0]?.ToString() ?? string.Empty;
+                if (string.IsNullOrWhiteSpace(keyword))
+                {
+                    return Builders<T>.Filter.Empty;
+                }
+
+                var regex = new BsonRegularExpression(Regex.Escape(keyword), "i");
+                return Builders<T>.Filter.Regex(field, regex);
+            }
 
             if (op == FilterOp.Empty)
             {
@@ -174,6 +191,48 @@ namespace EIMSNext.Core.Query
             }
 
             return filter;
+        }
+
+        private static string FormatTextSearchField(string field, string? fieldType)
+        {
+            if (!IsOptionFieldType(fieldType))
+            {
+                return field;
+            }
+
+            if (field.Contains('>'))
+            {
+                var fields = field.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+                if (fields.Length == 2)
+                {
+                    var childField = fields[1];
+                    if (childField.EndsWith(".value", StringComparison.OrdinalIgnoreCase))
+                    {
+                        childField = $"{childField[..^".value".Length]}.label";
+                    }
+                    else if (!childField.EndsWith(".label", StringComparison.OrdinalIgnoreCase))
+                    {
+                        childField = $"{childField}.label";
+                    }
+
+                    return $"{fields[0]}>{childField}";
+                }
+            }
+
+            if (field.EndsWith(".value", StringComparison.OrdinalIgnoreCase))
+            {
+                return $"{field[..^".value".Length]}.label";
+            }
+
+            return field.EndsWith(".label", StringComparison.OrdinalIgnoreCase) ? field : $"{field}.label";
+        }
+
+        private static bool IsOptionFieldType(string? fieldType)
+        {
+            return fieldType == FieldType.Select1
+                || fieldType == FieldType.Select2
+                || fieldType == FieldType.CheckBox
+                || fieldType == FieldType.Radio;
         }
         private static FilterDefinition<T> ParseDynamicFilterGroup<T>(DynamicFilter filter)
         {

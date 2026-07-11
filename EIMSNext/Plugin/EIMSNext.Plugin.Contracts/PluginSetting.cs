@@ -13,7 +13,6 @@ namespace EIMSNext.Plugin.Contracts
     public class PluginSetting
     {
         public string PluginId { get; set; } = string.Empty;
-        public string? PluginVersion { get; set; }
         public string FunctionId { get; set; } = string.Empty;
         public string? Settings { get; set; }
         public List<PluginFieldSetting> FieldSettings { get; set; } = new List<PluginFieldSetting>();
@@ -27,6 +26,7 @@ namespace EIMSNext.Plugin.Contracts
         public PluginValueType ValueType { get; set; }
         public object? Value { get; set; }
         public PluginFieldReference? ValueField { get; set; }
+        public List<PluginFieldSetting> SubFieldSettings { get; set; } = new List<PluginFieldSetting>();
     }
 
     public class PluginFieldReference
@@ -44,6 +44,7 @@ namespace EIMSNext.Plugin.Contracts
         public string FieldKey { get; set; } = string.Empty;
         public string FieldName { get; set; } = string.Empty;
         public string FieldType { get; set; } = string.Empty;
+        public List<PluginResultFieldSetting> SubFields { get; set; } = new List<PluginResultFieldSetting>();
     }
 
     public class PluginExecArgs

@@ -5,7 +5,8 @@ namespace EIMSNext.Core
         None,
         Insert,
         Update,
-        Delete
+        Delete,
+        PhysicalDelete
     }
 
     /// <summary>

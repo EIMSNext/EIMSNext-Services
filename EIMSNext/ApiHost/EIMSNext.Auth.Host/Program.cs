@@ -22,7 +22,9 @@ builder.Host.UseSerilog((ctx, cfg) =>
 
 builder.Services.AddControllers();
 builder.Services.AddAuthorization();
+builder.Services.Configure<BuiltInClientsOptions>(builder.Configuration.GetSection(BuiltInClientsOptions.SectionName));
 builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
+builder.Services.AddSingleton<IBuiltInClientRequestPolicy, BuiltInClientRequestPolicy>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddAuthServices(builder.Configuration, builder.Environment.ContentRootPath);
@@ -87,13 +89,52 @@ void EnsureSeedData(IAuthDbContext context, IConfiguration configuration)
             }
 
             var changed = false;
-            foreach (var grantType in seedClient.AllowedGrantTypes)
+            if (!string.Equals(client.Name, seedClient.Name, StringComparison.Ordinal))
             {
-                if (!client.AllowedGrantTypes.Any(x => x.GrantType == grantType.GrantType))
-                {
-                    client.AllowedGrantTypes.Add(grantType);
-                    changed = true;
-                }
+                client.Name = seedClient.Name;
+                changed = true;
+            }
+
+            if (client.RequireClientSecret != seedClient.RequireClientSecret)
+            {
+                client.RequireClientSecret = seedClient.RequireClientSecret;
+                changed = true;
+            }
+
+            var currentGrantTypes = client.AllowedGrantTypes
+                .Select(x => x.GrantType)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+            var seedGrantTypes = seedClient.AllowedGrantTypes
+                .Select(x => x.GrantType)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+            if (!currentGrantTypes.SequenceEqual(seedGrantTypes, StringComparer.Ordinal))
+            {
+                client.AllowedGrantTypes = seedClient.AllowedGrantTypes
+                    .Select(x => new EIMSNext.Auth.Entities.ClientGrantType { GrantType = x.GrantType })
+                    .ToList();
+                changed = true;
+            }
+
+            var currentScopes = client.AllowedScopes
+                .Select(x => x.Scope)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+            var seedScopes = seedClient.AllowedScopes
+                .Select(x => x.Scope)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .OrderBy(x => x, StringComparer.Ordinal)
+                .ToArray();
+            if (!currentScopes.SequenceEqual(seedScopes, StringComparer.Ordinal))
+            {
+                client.AllowedScopes = seedClient.AllowedScopes
+                    .Select(x => new EIMSNext.Auth.Entities.ClientScope { Scope = x.Scope })
+                    .ToList();
+                changed = true;
             }
 
             if (changed)
