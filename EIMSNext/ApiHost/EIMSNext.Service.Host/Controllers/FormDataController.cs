@@ -142,35 +142,37 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [Consumes("multipart/form-data")]
         [HttpPost("Import/Preview")]
-        public ActionResult PreviewImport([FromForm] IFormFile file, [FromForm] string formId)
+        public ActionResult PreviewImport([FromForm] FormDataImportPreviewRequest request)
         {
-            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(formId))
+            if (request.File == null || request.File.Length == 0 || string.IsNullOrWhiteSpace(request.FormId))
             {
                 return BadRequest();
             }
 
-            using var stream = file.OpenReadStream();
-            return Ok(ApiResult.Success(ApiService.PreviewImport(formId, stream, file.FileName, file.Length)));
+            using var stream = request.File.OpenReadStream();
+            return Ok(ApiResult.Success(ApiService.PreviewImport(request.FormId, stream, request.File.FileName, request.File.Length)));
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [Consumes("multipart/form-data")]
         [HttpPost("Import")]
-        public async Task<ActionResult> Import([FromForm] IFormFile file, [FromForm] string options)
+        public async Task<ActionResult> Import([FromForm] FormDataImportRequest request)
         {
-            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(options))
+            if (request.File == null || request.File.Length == 0 || string.IsNullOrWhiteSpace(request.Options))
             {
                 return BadRequest();
             }
 
-            var request = options.DeserializeFromJson<FormDataImportStartRequest>();
-            if (request == null)
+            var importRequest = request.Options.DeserializeFromJson<FormDataImportStartRequest>();
+            if (importRequest == null)
             {
                 return BadRequest();
             }
 
-            await using var stream = file.OpenReadStream();
-            return Ok(ApiResult.Success(await ApiService.StartImportAsync(request, stream, file.FileName, file.Length)));
+            await using var stream = request.File.OpenReadStream();
+            return Ok(ApiResult.Success(await ApiService.StartImportAsync(importRequest, stream, request.File.FileName, request.File.Length)));
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
