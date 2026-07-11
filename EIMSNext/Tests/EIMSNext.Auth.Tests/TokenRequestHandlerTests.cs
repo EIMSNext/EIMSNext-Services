@@ -116,7 +116,7 @@ namespace EIMSNext.Auth.Tests
                 [
                     new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
                 ],
-                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.SystemTask }],
+                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.System }],
                 AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
             };
 
@@ -128,7 +128,7 @@ namespace EIMSNext.Auth.Tests
             {
                 ClientId = InternalClients.SystemClientId,
                 ClientSecret = InternalClients.SystemClientSecret,
-                GrantType = CustomGrantType.SystemTask,
+                GrantType = CustomGrantType.System,
                 Scope = "api.readwrite"
             };
             request.SetParameter("corp_id", "corp-001");
@@ -156,7 +156,7 @@ namespace EIMSNext.Auth.Tests
                 [
                     new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
                 ],
-                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.SystemTask }],
+                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.System }],
                 AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
             };
 
@@ -168,7 +168,7 @@ namespace EIMSNext.Auth.Tests
             {
                 ClientId = InternalClients.SystemClientId,
                 ClientSecret = InternalClients.SystemClientSecret,
-                GrantType = CustomGrantType.SystemTask,
+                GrantType = CustomGrantType.System,
                 Scope = "api.readwrite"
             };
             request.SetParameter("corp_id", "corp-001");

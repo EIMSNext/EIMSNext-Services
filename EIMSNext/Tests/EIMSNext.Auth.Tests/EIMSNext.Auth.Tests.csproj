@@ -11,6 +11,7 @@
     <PackageReference Include="MSTest" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ApiHost\EIMSNext.Auth.Host\EIMSNext.Auth.Host.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth\EIMSNext.Auth.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />

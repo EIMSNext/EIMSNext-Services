@@ -12,8 +12,8 @@ namespace EIMSNext.Async.Tasks.SystemTask
 
         public SystemTaskTokenProvider(AppSetting appSetting)
         {
-            var tokenEndpoint = appSetting.OAuth_TokenEndPoint
-                ?? throw new InvalidOperationException("Missing OAuth:TokenEndPoint for system task token provider");
+            var tokenEndpoint = appSetting.OAuth_SystemTokenEndPoint
+                ?? throw new InvalidOperationException("Missing OAuth:TokenBaseUrl or OAuth:Authority for system task token provider");
             _client = new RestClient(tokenEndpoint);
             _clientSecret = InternalClients.SystemClientSecret;
         }
@@ -23,7 +23,7 @@ namespace EIMSNext.Async.Tasks.SystemTask
             var request = new RestRequest(string.Empty, Method.Post);
             request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
             request.AddParameter("application/x-www-form-urlencoded",
-                $"grant_type=system_task&client_id={Uri.EscapeDataString(InternalClients.SystemClientId)}&client_secret={Uri.EscapeDataString(_clientSecret)}&scope={Uri.EscapeDataString("api.readwrite")}&corp_id={Uri.EscapeDataString(corpId)}&object_type={Uri.EscapeDataString(objectType)}&object_id={Uri.EscapeDataString(objectId)}",
+                $"grant_type={Uri.EscapeDataString(CustomGrantType.System)}&client_id={Uri.EscapeDataString(InternalClients.SystemClientId)}&client_secret={Uri.EscapeDataString(_clientSecret)}&scope={Uri.EscapeDataString("api.readwrite")}&corp_id={Uri.EscapeDataString(corpId)}&object_type={Uri.EscapeDataString(objectType)}&object_id={Uri.EscapeDataString(objectId)}",
                 ParameterType.RequestBody);
 
             var response = await _client.ExecuteAsync<SystemTokenResponse>(request, cancellationToken);

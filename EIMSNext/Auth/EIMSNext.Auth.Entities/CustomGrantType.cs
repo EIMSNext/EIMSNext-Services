@@ -5,7 +5,7 @@ namespace EIMSNext.Auth.Entities
         public const string VerificationCode = "verification_code";
         public const string SingleSignOn = "sso_credentials";
         public const string Public = "public";
-        public const string SystemTask = "system_task";
+        public const string System = "system";
 
         /// <summary>
         /// 标准 OAuth2 <c>client_credentials</c> grant：第三方应用以 ClientId/ClientSecret 直接换取 token，

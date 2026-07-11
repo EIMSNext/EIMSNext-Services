@@ -17,8 +17,7 @@ namespace EIMSNext.Auth.Host
                     [
                         new Auth.Entities.ClientGrantType { GrantType = "password" },
                         new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.VerificationCode },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn },
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Public }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SingleSignOn }
                     ],
                     AllowedScopes =
                     [
@@ -28,6 +27,29 @@ namespace EIMSNext.Auth.Host
                     ],
                     AccessTokenLifetime=Auth.Constants.TokenLifetime_Default,
                     IdentityTokenLifetime=Auth.Constants.TokenLifetime_Default
+                },
+                new Auth.Entities.Client
+                {
+                    Id = Auth.Entities.InternalClients.PublicClientId,
+                    Name = "EIMSNext.Public",
+                    RequireClientSecret = false,
+                    AllowedGrantTypes =
+                    [
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.Public }
+                    ],
+                    AllowedScopes =
+                    [
+                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DashLink) },
+                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.FormLink) },
+                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DataLink) },
+                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.QueryLink) },
+                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.DashLink).ToString() },
+                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.FormLink).ToString() },
+                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.DataLink).ToString() },
+                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.QueryLink).ToString() }
+                    ],
+                    AccessTokenLifetime = Auth.Constants.TokenLifetime_Default,
+                    IdentityTokenLifetime = Auth.Constants.TokenLifetime_Default
                 },
                 new Auth.Entities.Client
                 {
@@ -44,7 +66,7 @@ namespace EIMSNext.Auth.Host
                     ],
                     AllowedGrantTypes =
                     [
-                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.SystemTask }
+                        new Auth.Entities.ClientGrantType { GrantType = Auth.Entities.CustomGrantType.System }
                     ],
                     AllowedScopes =
                     [

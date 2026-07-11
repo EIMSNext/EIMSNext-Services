@@ -22,10 +22,14 @@ namespace EIMSNext.Auth.Host.Controllers
     public class AuthorizationController : ControllerBase
     {
         private readonly ITokenRequestHandler _tokenRequestHandler;
+        private readonly IBuiltInClientRequestPolicy _builtInClientRequestPolicy;
 
-        public AuthorizationController(ITokenRequestHandler tokenRequestHandler)
+        public AuthorizationController(
+            ITokenRequestHandler tokenRequestHandler,
+            IBuiltInClientRequestPolicy builtInClientRequestPolicy)
         {
             _tokenRequestHandler = tokenRequestHandler;
+            _builtInClientRequestPolicy = builtInClientRequestPolicy;
         }
 
         [HttpPost("~/connect/token")]
@@ -41,6 +45,12 @@ namespace EIMSNext.Auth.Host.Controllers
                     Error = Errors.InvalidRequest,
                     ErrorDescription = "The OpenID Connect request cannot be retrieved."
                 });
+            }
+
+            var validation = _builtInClientRequestPolicy.ValidateTokenEndpoint(request.ClientId);
+            if (!validation.Succeeded)
+            {
+                return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
             }
 
             return await HandleTokenRequestAsync(request, cancellationToken);
@@ -68,12 +78,19 @@ namespace EIMSNext.Auth.Host.Controllers
                 });
             }
 
+            var clientId = fields.TryGetValue("client_id", out var clientIdValue) ? clientIdValue : null;
+            var validation = _builtInClientRequestPolicy.ValidateLogin(clientId, Request);
+            if (!validation.Succeeded)
+            {
+                return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
+            }
+
             var request = new OpenIddictRequest
             {
                 GrantType = fields.TryGetValue("grant_type", out var grantType) && !string.IsNullOrWhiteSpace(grantType) ? grantType : "password",
                 Username = username,
                 Password = password,
-                ClientId = fields.TryGetValue("client_id", out var clientId) ? clientId : null,
+                ClientId = clientId,
                 Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
             };
 
@@ -102,14 +119,60 @@ namespace EIMSNext.Auth.Host.Controllers
                 });
             }
 
+            var clientId = fields.TryGetValue("client_id", out var clientIdValue) ? clientIdValue : null;
+            var grantType = fields.TryGetValue("grant_type", out var grantTypeValue) ? grantTypeValue : null;
+            var validation = _builtInClientRequestPolicy.ValidatePublicToken(clientId, grantType, Request);
+            if (!validation.Succeeded)
+            {
+                return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
+            }
+
             var request = new OpenIddictRequest
             {
                 GrantType = CustomGrantType.Public,
                 Username = username,
                 Password = password,
-                ClientId = fields.TryGetValue("client_id", out var clientId) ? clientId : null,
+                ClientId = clientId,
                 Scope = fields.TryGetValue("scope", out var scope) ? scope : null,
             };
+
+            return await HandleTokenRequestAsync(request, cancellationToken);
+        }
+
+        [HttpPost("~/system/token")]
+        [Consumes("application/x-www-form-urlencoded")]
+        [Produces("application/json")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<IActionResult> SystemToken(CancellationToken cancellationToken)
+        {
+            if (!Request.HasFormContentType)
+            {
+                return BadRequest(new OpenIddictResponse
+                {
+                    Error = Errors.InvalidRequest,
+                    ErrorDescription = "The request must use application/x-www-form-urlencoded."
+                });
+            }
+
+            var fields = await Request.ReadFormAsync(cancellationToken);
+            var clientId = fields["client_id"].ToString();
+            var grantType = fields["grant_type"].ToString();
+            var validation = _builtInClientRequestPolicy.ValidateSystemToken(clientId, grantType);
+            if (!validation.Succeeded)
+            {
+                return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
+            }
+
+            var request = new OpenIddictRequest
+            {
+                GrantType = grantType,
+                ClientId = clientId,
+                ClientSecret = fields["client_secret"].ToString(),
+                Scope = fields["scope"].ToString()
+            };
+            request.SetParameter("corp_id", fields["corp_id"].ToString());
+            request.SetParameter("object_type", fields["object_type"].ToString());
+            request.SetParameter("object_id", fields["object_id"].ToString());
 
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
@@ -171,13 +234,7 @@ namespace EIMSNext.Auth.Host.Controllers
             var result = await _tokenRequestHandler.HandleAsync(request, cancellationToken);
             if (!result.Succeeded)
             {
-                return Forbid(
-                    new AuthenticationProperties(new Dictionary<string, string?>
-                    {
-                        [OpenIddictServerAspNetCoreConstants.Properties.Error] = result.Error,
-                        [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = result.ErrorDescription
-                    }),
-                    [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
+                return CreateErrorResult(result.Error!, result.ErrorDescription!);
             }
 
             var identity = new ClaimsIdentity(TokenValidationParameters.DefaultAuthenticationType, AuthClaimTypes.Name, ClaimTypes.Role);
@@ -212,6 +269,17 @@ namespace EIMSNext.Auth.Host.Controllers
                     ["access_token_lifetime"] = result.AccessTokenLifetime.ToString(CultureInfo.InvariantCulture)
                 }),
                 OpenIddictServerAspNetCoreDefaults.AuthenticationScheme);
+        }
+
+        private IActionResult CreateErrorResult(string error, string description)
+        {
+            return Forbid(
+                new AuthenticationProperties(new Dictionary<string, string?>
+                {
+                    [OpenIddictServerAspNetCoreConstants.Properties.Error] = error,
+                    [OpenIddictServerAspNetCoreConstants.Properties.ErrorDescription] = description
+                }),
+                [OpenIddictServerAspNetCoreDefaults.AuthenticationScheme]);
         }
     }
 

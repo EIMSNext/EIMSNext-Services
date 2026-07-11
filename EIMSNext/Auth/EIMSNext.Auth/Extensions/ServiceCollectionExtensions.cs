@@ -54,7 +54,7 @@ namespace EIMSNext.Auth.Extensions
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SingleSignOn);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.Public);
-                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.SystemTask);
+                    options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.System);
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.ClientCredentials);
 
                     options.EnableDegradedMode();

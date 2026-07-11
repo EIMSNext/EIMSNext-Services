@@ -33,8 +33,27 @@ namespace EIMSNext.Common
         /// </summary>
         public string? OAuth_Authority => _config.GetSection("OAuth:Authority").Value;
         /// <summary>
+        /// OAuth的TokenBaseUrl
+        /// </summary>
+        public string? OAuth_TokenBaseUrl => _config.GetSection("OAuth:TokenBaseUrl").Value;
+        /// <summary>
         /// OAuth的TokenEndPoint
         /// </summary>
-        public string? OAuth_TokenEndPoint => _config.GetSection("OAuth:TokenEndPoint").Value;
+        public string? OAuth_TokenEndPoint => BuildOAuthEndpoint("connect/token");
+        /// <summary>
+        /// OAuth的SystemTokenEndPoint
+        /// </summary>
+        public string? OAuth_SystemTokenEndPoint => BuildOAuthEndpoint("system/token");
+
+        private string? BuildOAuthEndpoint(string relativePath)
+        {
+            var baseUrl = OAuth_TokenBaseUrl ?? OAuth_Authority;
+            if (string.IsNullOrWhiteSpace(baseUrl))
+            {
+                return null;
+            }
+
+            return $"{baseUrl.TrimEnd('/')}/{relativePath}";
+        }
     }
 }
