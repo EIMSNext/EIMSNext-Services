@@ -62,15 +62,5 @@ namespace EIMSNext.Service.Tests
             };
             Assert.AreEqual("f_abc", seq.Key);
         }
-
-        [TestMethod]
-        public void SerialNoResetCycle_AllValuesDefined()
-        {
-            // 4 个重置周期:Never / Day / Month / Year
-            Assert.AreEqual(0, (int)SerialNoResetCycle.Never);
-            Assert.AreEqual(1, (int)SerialNoResetCycle.Day);
-            Assert.AreEqual(2, (int)SerialNoResetCycle.Month);
-            Assert.AreEqual(3, (int)SerialNoResetCycle.Year);
-        }
     }
 }

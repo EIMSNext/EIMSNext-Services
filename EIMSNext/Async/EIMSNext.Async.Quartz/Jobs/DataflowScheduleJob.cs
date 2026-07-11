@@ -76,7 +76,7 @@ namespace EIMSNext.Async.Quartz.Jobs
 
                     await publisher.PublishAsync(new DataflowRunTaskArgs
                     {
-                        CorpId = definition.CorpId,
+                        CorpId = definition.CorpId??string.Empty,
                         DataflowId = definition.Id,
                         AppId = definition.AppId,
                         FormId = item.FormId,

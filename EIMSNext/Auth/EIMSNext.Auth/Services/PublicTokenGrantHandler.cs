@@ -78,13 +78,7 @@ namespace EIMSNext.Auth.Services
             var raw = request.GetParameter("scope")?.ToString();
             if (string.IsNullOrWhiteSpace(raw)) return PublicScope.None;
 
-            var tokens = raw.Split([' ', ','], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (tokens.Length != 1)
-            {
-                return PublicScope.None;
-            }
-
-            return Enum.TryParse<PublicScope>(tokens[0], ignoreCase: true, out var parsed)
+            return Enum.TryParse<PublicScope>(raw, ignoreCase: true, out var parsed)
                 && parsed is not PublicScope.None
                 && IsSingleScope(parsed)
                 ? parsed

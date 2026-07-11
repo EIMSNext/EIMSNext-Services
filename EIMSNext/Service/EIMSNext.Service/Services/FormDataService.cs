@@ -813,8 +813,8 @@ namespace EIMSNext.Service
 
                 yield return new FilterOptionItem
                 {
-                    Id = id,
-                    Label = label,
+                    Id = id!,
+                    Label = label!,
                     Value = BsonTypeMapper.MapToDotNetValue(value)
                 };
                 yield break;

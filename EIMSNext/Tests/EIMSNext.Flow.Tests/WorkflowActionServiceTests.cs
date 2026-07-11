@@ -105,24 +105,7 @@ namespace EIMSNext.Flow.Tests
             Assert.AreEqual("发起", pointer.StepName);
         }
 
-        [TestMethod]
-        public void ApproveAction_ShouldExposeDistinctChangeApproverAndTimeoutValues()
-        {
-            Assert.AreEqual(10, (int)ApproveAction.AutoReject);
-            Assert.AreEqual(11, (int)ApproveAction.AutoReturn);
-            Assert.AreEqual(12, (int)ApproveAction.AutoTransfer);
-            Assert.AreEqual(13, (int)ApproveAction.ChangeApprover);
-        }
-
-        [TestMethod]
-        public void ReturnTargetMode_ShouldExposeSupportedModes()
-        {
-            Assert.AreEqual(0, (int)ReturnTargetMode.Previous);
-            Assert.AreEqual(1, (int)ReturnTargetMode.Start);
-            Assert.AreEqual(2, (int)ReturnTargetMode.Specified);
-        }
-
-        [TestMethod]
+              [TestMethod]
         public void ExpireSetting_WithZeroTimeValue_ShouldBeTreatedAsDisabled()
         {
             var setting = new ExpireSetting

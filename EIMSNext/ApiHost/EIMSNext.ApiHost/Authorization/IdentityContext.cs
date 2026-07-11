@@ -81,7 +81,7 @@ namespace EIMSNext.ApiHost.Authorization
                     var client = resolver.GetService<EIMSNext.Auth.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
-                        CurrentCorpId = client.CorpId;
+                        CurrentCorpId = client.CorpId??string.Empty;
                         CurrentUserID = "system";
                         _type = IdentityType.Client;
                         _retrieved = true;

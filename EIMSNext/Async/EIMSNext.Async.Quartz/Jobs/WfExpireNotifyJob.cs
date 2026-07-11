@@ -54,7 +54,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 {
                     await publisher.PublishAsync(new NotifyDispatchTaskArgs
                     {
-                        CorpId = sample.CorpId,
+                        CorpId = sample.CorpId ?? string.Empty,
                         MessageType = MessageType.WfExpireNotify,
                         AppId = sample.AppId,
                         FormId = sample.FormId,

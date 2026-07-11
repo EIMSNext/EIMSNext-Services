@@ -46,6 +46,7 @@ namespace EIMSNext.Json.Tests
             var expando = JsonSerializer.Deserialize<ExpandoObject>(json, options);
             var dict = (IDictionary<string, object>)expando!;
             var items = dict["items"] as IList<object>;
+            Assert.IsNotNull(items);
             Assert.AreEqual(2, items.Count);
             var first = items[0] as ExpandoObject;
             var firstDict = (IDictionary<string, object>)first!;
@@ -71,6 +72,7 @@ namespace EIMSNext.Json.Tests
             var dict = (IDictionary<string, object>)expando!;
             Assert.IsNull(dict["a"]);
             var b = dict["b"] as IList<object>;
+            Assert.IsNotNull(b);
             var first = b[0] as ExpandoObject;
             var firstDict = (IDictionary<string, object>)first!;
             Assert.IsNull(firstDict["c"]);
