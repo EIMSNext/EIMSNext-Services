@@ -4,7 +4,6 @@ namespace EIMSNext.ApiService.ViewModels
 {
     public class EmployeeViewModel : Employee
     {
-        public List<DepartmentRef> Departments { get; set; } = [];
     }
 
     public class DepartmentRef

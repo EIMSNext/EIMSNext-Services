@@ -12,6 +12,8 @@ namespace EIMSNext.Service
 {
     public class DepartmentService(IResolver resolver) : EntityServiceBase<Department>(resolver), IDepartmentService
     {
+        private IRepository<Employee> EmployeeRepository => Resolver.GetRepository<Employee>();
+
         protected override Task BeforeAdd(IEnumerable<Department> entities, IClientSessionHandle? session)
         {
             foreach (var entity in entities)
@@ -52,7 +54,8 @@ namespace EIMSNext.Service
         protected override async Task AfterReplace(Department entity, IClientSessionHandle? session)
         {
             await base.AfterReplace(entity, session);
-            RefreshDescendantHierarchy(entity, session);
+            await RefreshDescendantHierarchy(entity, session);
+            await UpdateEmployeeEmpDeptsOnNameChangeAsync(entity.Id, entity.Name);
         }
 
         protected override Task BeforeDelete(FilterDefinition<Department> filter, IClientSessionHandle? session)
@@ -124,7 +127,7 @@ namespace EIMSNext.Service
             entity.HeriarchyName = $"{entity.Name}/{parent.HeriarchyName}";
         }
 
-        private void RefreshDescendantHierarchy(Department parent, IClientSessionHandle? session)
+        private async Task RefreshDescendantHierarchy(Department parent, IClientSessionHandle? session)
         {
             var children = Repository.Queryable
                 .Where(x => x.CorpId == parent.CorpId && !x.DeleteFlag && x.ParentId == parent.Id)
@@ -136,8 +139,29 @@ namespace EIMSNext.Service
                 child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
                 child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
                 Repository.Replace(child, session);
-                RefreshDescendantHierarchy(child, session);
+                await UpdateEmployeeEmpDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId);
+                await RefreshDescendantHierarchy(child, session);
             }
+        }
+
+        private async Task UpdateEmployeeEmpDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
+        {
+            var filter = Builders<Employee>.Filter.ElemMatch(
+                x => x.EmpDepts,
+                d => d.Id == departmentId);
+            var update = Builders<Employee>.Update.Set(
+                "EmpDepts.$.HeriarchyId", newHeriarchyId);
+            await EmployeeRepository.UpdateManyAsync(filter, update);
+        }
+
+        private async Task UpdateEmployeeEmpDeptsOnNameChangeAsync(string departmentId, string newName)
+        {
+            var filter = Builders<Employee>.Filter.ElemMatch(
+                x => x.EmpDepts,
+                d => d.Id == departmentId);
+            var update = Builders<Employee>.Update.Set(
+                "EmpDepts.$.Name", newName);
+            await EmployeeRepository.UpdateManyAsync(filter, update);
         }
     }
 }

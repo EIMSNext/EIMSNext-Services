@@ -51,6 +51,7 @@ namespace EIMSNext.Service.Host.Edm
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();
+            builder.ComplexType<EmpDept>();
             builder.ComplexType<Operator>();
             builder.ComplexType<DepartmentRef>();
             builder.ComplexType<EmployeeDepartmentRequest>();

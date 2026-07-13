@@ -1,4 +1,5 @@
 using EIMSNext.Core.Entities;
+using System.Text.Json.Serialization;
 
 namespace EIMSNext.Service.Entities
 {
@@ -56,6 +57,11 @@ namespace EIMSNext.Service.Entities
         public List<EmpRole> Roles { get; set; } = new List<EmpRole>();
 
         /// <summary>
+        /// 所属部门（嵌入式，用于OData查询优化）
+        /// </summary>
+        public List<EmpDept> EmpDepts { get; set; } = new List<EmpDept>();
+
+        /// <summary>
         /// 转换为操作员对象
         /// </summary>
         /// <returns>操作员实例</returns>
@@ -87,6 +93,26 @@ namespace EIMSNext.Service.Entities
         /// 角色名称
         /// </summary>
         public string RoleName { get; set; } = "";
+    }
+
+    /// <summary>
+    /// 员工部门关联（嵌入式，用于OData查询优化）
+    /// </summary>
+    public class EmpDept
+    {
+        /// <summary>
+        /// 部门ID
+        /// </summary>
+        public string Id { get; set; } = "";
+        /// <summary>
+        /// 部门层级路径，格式：|parentId|grandparentId|...
+        /// </summary>
+        [JsonIgnore]
+        public string HeriarchyId { get; set; } = "";
+        /// <summary>
+        /// 部门名称
+        /// </summary>
+        public string Name { get; set; } = "";
     }
 
     /// <summary>

@@ -105,7 +105,7 @@ namespace EIMSNext.ApiCore
                     // User
                     //Password = "xxxxxx",
                     //AllowAdmin = true,
-                    DefaultDatabase = (configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1),
+                    DefaultDatabase = (configuration.GetSection("CacheServer:Database").Value ?? "6").SafeToInt(6),
                     AbortOnConnectFail = false,//当为true时，当没有可用的服务器时则不会创建一个连接
                 };
                 options.ConfigurationOptions.EndPoints.Add(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
@@ -115,15 +115,14 @@ namespace EIMSNext.ApiCore
             {
                 var config = ConfigurationOptions.Parse(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
                 config.AbortOnConnectFail = false;
-                var database = (configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1);
+                var database = (configuration.GetSection("CacheServer:Database").Value ?? "6").SafeToInt(6);
                 config.DefaultDatabase = database;
                 return ConnectionMultiplexer.Connect(config);
             });
 
             services.AddSingleton<ILogoutTokenStore, DistributedLogoutTokenStore>();
 
-            //services.AddSingleton<ICacheClient, DistributedCacheClient>();
-            services.AddSingleton<ICacheClient, FakeCacheClient>();
+            services.AddSingleton<ICacheClient, DistributedCacheClient>();
             services.AddScoped<IScopeCache, ScopeCache>();
             services.AddScoped<PublicRateLimiter>();
         }
