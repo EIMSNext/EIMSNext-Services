@@ -55,7 +55,7 @@ namespace EIMSNext.Service
         {
             await base.AfterReplace(entity, session);
             await RefreshDescendantHierarchy(entity, session);
-            await UpdateEmployeeEmpDeptsOnNameChangeAsync(entity.Id, entity.Name);
+            await UpdateEmployeeDeptsOnNameChangeAsync(entity.Id, entity.Name);
         }
 
         protected override Task BeforeDelete(FilterDefinition<Department> filter, IClientSessionHandle? session)
@@ -139,28 +139,28 @@ namespace EIMSNext.Service
                 child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
                 child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
                 Repository.Replace(child, session);
-                await UpdateEmployeeEmpDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId);
+                await UpdateEmployeeDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId);
                 await RefreshDescendantHierarchy(child, session);
             }
         }
 
-        private async Task UpdateEmployeeEmpDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
+        private async Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
         {
             var filter = Builders<Employee>.Filter.ElemMatch(
-                x => x.EmpDepts,
-                d => d.Id == departmentId);
+                x => x.Depts,
+                d => d.DeptId == departmentId);
             var update = Builders<Employee>.Update.Set(
-                "EmpDepts.$.HeriarchyId", newHeriarchyId);
+                "Depts.$.HeriarchyId", newHeriarchyId);
             await EmployeeRepository.UpdateManyAsync(filter, update);
         }
 
-        private async Task UpdateEmployeeEmpDeptsOnNameChangeAsync(string departmentId, string newName)
+        private async Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName)
         {
             var filter = Builders<Employee>.Filter.ElemMatch(
-                x => x.EmpDepts,
-                d => d.Id == departmentId);
+                x => x.Depts,
+                d => d.DeptId == departmentId);
             var update = Builders<Employee>.Update.Set(
-                "EmpDepts.$.Name", newName);
+                "Depts.$.DeptName", newName);
             await EmployeeRepository.UpdateManyAsync(filter, update);
         }
     }

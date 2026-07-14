@@ -30,7 +30,7 @@ namespace EIMSNext.ApiService
             var relations = BuildEmployeeDepartments(entity, departments);
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, null, relations.Select(x => x.DepartmentId));
 
-            entity.EmpDepts = BuildEmpDepts(entity, departments);
+            entity.Depts = BuildDepts(entity, departments);
             await AddAsync(entity);
             await ReplaceEmployeeDepartmentsAsync(entity.Id, relations);
         }
@@ -41,7 +41,7 @@ namespace EIMSNext.ApiService
             if (syncDepartments)
             {
                 relations = BuildEmployeeDepartments(entity, departments);
-                entity.EmpDepts = BuildEmpDepts(entity, departments);
+                entity.Depts = BuildDepts(entity, departments);
             }
 
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, original: null, relations?.Select(x => x.DepartmentId));
@@ -361,7 +361,7 @@ namespace EIMSNext.ApiService
             }).ToList();
         }
 
-        private List<EmpDept> BuildEmpDepts(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
+        private List<EmpDept> BuildDepts(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
         {
             if (string.IsNullOrWhiteSpace(entity.CorpId))
             {
@@ -397,9 +397,9 @@ namespace EIMSNext.ApiService
                     var dept = departmentsMap[x.DepartmentId];
                     return new EmpDept
                     {
-                        Id = dept.Id,
+                        DeptId = dept.Id,
                         HeriarchyId = dept.HeriarchyId,
-                        Name = dept.Name
+                        DeptName = dept.Name
                     };
                 })
                 .ToList();

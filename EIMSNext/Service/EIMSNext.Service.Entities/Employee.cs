@@ -59,7 +59,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 所属部门（嵌入式，用于OData查询优化）
         /// </summary>
-        public List<EmpDept> EmpDepts { get; set; } = new List<EmpDept>();
+        public List<EmpDept> Depts { get; set; } = new List<EmpDept>();
 
         /// <summary>
         /// 转换为操作员对象
@@ -103,7 +103,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 部门ID
         /// </summary>
-        public string Id { get; set; } = "";
+        public string DeptId { get; set; } = "";
         /// <summary>
         /// 部门层级路径，格式：|parentId|grandparentId|...
         /// </summary>
@@ -112,7 +112,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 部门名称
         /// </summary>
-        public string Name { get; set; } = "";
+        public string DeptName { get; set; } = "";
     }
 
     /// <summary>

@@ -126,8 +126,8 @@ namespace EIMSNext.Service.Tests
             Assert.IsTrue(relations[0].IsManager);
             Assert.AreEqual(deptB.Id, relations[1].DepartmentId);
 
-            Assert.AreEqual(2, employee.EmpDepts.Count);
-            CollectionAssert.AreEqual(new[] { "研发部", "运营部" }, employee.EmpDepts.Select(x => x.Name).ToArray());
+            Assert.AreEqual(2, employee.Depts.Count);
+            CollectionAssert.AreEqual(new[] { "研发部", "运营部" }, employee.Depts.Select(x => x.DeptName).ToArray());
         }
 
         [TestMethod]
