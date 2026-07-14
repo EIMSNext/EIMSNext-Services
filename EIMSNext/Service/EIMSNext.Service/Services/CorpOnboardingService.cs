@@ -75,6 +75,12 @@ namespace EIMSNext.Service
                 UpdateTime = now,
             };
             EmployeeRepository.EnsureId(employee);
+
+            employee.EmpDepts = new List<EmpDept>
+            {
+                new() { Id = rootDepartment.Id, HeriarchyId = rootDepartment.HeriarchyId, Name = rootDepartment.Name }
+            };
+
             var employeeDepartment = new EmployeeDepartment
             {
                 CorpId = corporate.Id,

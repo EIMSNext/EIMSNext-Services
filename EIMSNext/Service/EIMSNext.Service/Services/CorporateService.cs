@@ -53,6 +53,11 @@ namespace EIMSNext.Service
             };
             empRepo.EnsureId(emp);
 
+            emp.EmpDepts = new List<EmpDept>
+            {
+                new() { Id = dept.Id, HeriarchyId = dept.HeriarchyId, Name = dept.Name }
+            };
+
             dept.CreateBy = Context.Operator;
             dept.CreateTime = DateTime.UtcNow.ToTimeStampMs();
             dept.UpdateBy = dept.CreateBy;
