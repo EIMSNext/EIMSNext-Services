@@ -1,10 +1,12 @@
 using EIMSNext.ApiService;
 using EIMSNext.Cache;
 using EIMSNext.Common;
+using EIMSNext.Service.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
+using System.Text.Json;
 
 namespace EIMSNext.Service.Host.Authorization
 {
@@ -16,40 +18,43 @@ namespace EIMSNext.Service.Host.Authorization
         private readonly ICacheClient _cache;
         private readonly IIdentityContext _identity;
         private readonly IPublicAccessValidator _publicAccessValidator;
+        private readonly AdminPermissionEvaluator _permissionEvaluator;
         private readonly ILogger<PermissionFilter> _logger;
 
         public PermissionFilter(
             IIdentityContext identityContext,
             ICacheClient cache,
             IPublicAccessValidator publicAccessValidator,
+            AdminPermissionEvaluator permissionEvaluator,
             ILogger<PermissionFilter> logger)
         {
             _identity = identityContext;
             _cache = cache;
             _publicAccessValidator = publicAccessValidator;
+            _permissionEvaluator = permissionEvaluator;
             _logger = logger;
         }
 
-        public Task OnAuthorizationAsync(AuthorizationFilterContext context)
+        public async Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
             var actionDescriptor = context.ActionDescriptor as ControllerActionDescriptor;
             if (AllowAnonymous(context, actionDescriptor))
             {
-                return Task.CompletedTask;
+                return;
             }
 
             var permission = ResolvePermission(context, actionDescriptor);
             var requiresAuthorization = RequiresAuthorization(context, actionDescriptor);
             if (permission == null && !requiresAuthorization)
             {
-                return Task.CompletedTask;
+                return;
             }
 
             if (_identity.IdentityType == IdentityType.None || _identity.IdentityType == IdentityType.Disabled)
             {
                 _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "无身份用户或用户已被禁用");
                 context.Result = new UnauthorizedResult();
-                return Task.CompletedTask;
+                return;
             }
 
             if (_identity.IdentityType == IdentityType.Public)
@@ -58,14 +63,14 @@ namespace EIMSNext.Service.Host.Authorization
                 {
                     _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "公开接口缺少权限标记或显式禁止");
                     context.Result = new ForbidResult();
-                    return Task.CompletedTask;
+                return;
                 }
 
                 if (!_publicAccessValidator.IsAnySectionEnabled())
                 {
                     _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "公开资源未启用任何 section");
                     context.Result = new ForbidResult();
-                    return Task.CompletedTask;
+                return;
                 }
 
                 var requiredScope = ResolvePublicScope(context, actionDescriptor);
@@ -77,17 +82,17 @@ namespace EIMSNext.Service.Host.Authorization
                         requiredScope,
                         _identity.PublicScope);
                     context.Result = new ForbidResult();
-                    return Task.CompletedTask;
+                return;
                 }
 
                 _identity.AccessControlLevel = permission.AccessControlLevel;
-                return Task.CompletedTask;
+                return;
             }
 
             if (permission == null || permission.AccessControlLevel == AccessControlLevel.Allow || permission.AccessControlLevel == AccessControlLevel.Owner)
             {
                 _identity.AccessControlLevel = permission == null ? AccessControlLevel.Allow : permission.AccessControlLevel;
-                return Task.CompletedTask;
+                return;
             }
             else if (permission.AccessControlLevel == AccessControlLevel.Forbid)
             {
@@ -99,7 +104,7 @@ namespace EIMSNext.Service.Host.Authorization
                 _identity.AccessControlLevel = permission.AccessControlLevel;
             }
 
-            if (permission != null && !HasActionPermission(context, permission))
+            if (permission != null && !await HasActionPermissionAsync(context, permission))
             {
                 _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}, ResourceCode={ResourceCode}, Operation={Operation}",
                     context.HttpContext.Request.Path,
@@ -109,10 +114,10 @@ namespace EIMSNext.Service.Host.Authorization
                 context.Result = new ForbidResult();
             }
 
-            return Task.CompletedTask;
+            return;
         }
 
-        private bool HasActionPermission(AuthorizationFilterContext context, PermissionAttribute permission)
+        private async Task<bool> HasActionPermissionAsync(AuthorizationFilterContext context, PermissionAttribute permission)
         {
             // 只有当 ResourceCode 和 Operation 都未设置时才完全跳过检查；
             // 只要其中任一被显式标注，就必须进入匹配。
@@ -195,7 +200,92 @@ namespace EIMSNext.Service.Host.Authorization
             }
 
             var userCodes = ResolveUserPermissionCodes(context).ToHashSet(StringComparer.OrdinalIgnoreCase);
-            return requiredCodes.Any(userCodes.Contains);
+            if (requiredCodes.Any(userCodes.Contains))
+            {
+                return true;
+            }
+
+            if (string.Equals(permission.ResourceCode, Resources.FormData, StringComparison.OrdinalIgnoreCase))
+            {
+                return await HasFormDataPermissionAsync(context, permission.Operation);
+            }
+
+            return false;
+        }
+
+        private async Task<bool> HasFormDataPermissionAsync(AuthorizationFilterContext context, Operation operation)
+        {
+            if (_identity.CurrentEmployee == null)
+            {
+                return false;
+            }
+
+            var formId = await ReadFormIdAsync(context.HttpContext.Request);
+            if (string.IsNullOrWhiteSpace(formId))
+            {
+                return false;
+            }
+
+            var required = operation.HasFlag(Operation.Add) ? DataPerms.AddNew :
+                operation.HasFlag(Operation.Edit) ? DataPerms.Edit :
+                operation.HasFlag(Operation.Delete) ? DataPerms.Remove :
+                operation.HasFlag(Operation.Import) ? DataPerms.Import :
+                operation.HasFlag(Operation.Read) ? DataPerms.View : DataPerms.None;
+
+            if (required == DataPerms.None)
+            {
+                return false;
+            }
+
+            return _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+                .Any(group => (GetEffectiveDataPerms(group) & required) == required);
+        }
+
+        private static async Task<string?> ReadFormIdAsync(HttpRequest request)
+        {
+            if (request.ContentLength is null or 0 || request.Body == Stream.Null)
+            {
+                return null;
+            }
+
+            request.EnableBuffering();
+            request.Body.Position = 0;
+            using var reader = new StreamReader(request.Body, leaveOpen: true);
+            var json = await reader.ReadToEndAsync();
+            request.Body.Position = 0;
+
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                return null;
+            }
+
+            try
+            {
+                using var document = JsonDocument.Parse(json);
+                foreach (var property in document.RootElement.EnumerateObject())
+                {
+                    if (string.Equals(property.Name, "formId", StringComparison.OrdinalIgnoreCase))
+                    {
+                        return property.Value.GetString();
+                    }
+                }
+            }
+            catch (JsonException)
+            {
+                return null;
+            }
+
+            return null;
+        }
+
+        private static DataPerms GetEffectiveDataPerms(AuthGroup group)
+        {
+            return group.Type switch
+            {
+                AuthGroupType.ManageSelfData or AuthGroupType.ManageAllData => DataPerms.All,
+                AuthGroupType.ViewAllData => DataPerms.View,
+                _ => (DataPerms)group.DataPerms,
+            };
         }
 
         private static IEnumerable<string> BuildPermissionCodes(PermissionAttribute permission)

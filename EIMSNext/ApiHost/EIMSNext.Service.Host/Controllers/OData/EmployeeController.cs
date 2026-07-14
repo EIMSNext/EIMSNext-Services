@@ -25,14 +25,20 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeViewModel, EmployeeRequest>(resolver)
     {
         [HttpGet]
-        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
+        [Permission(
+            ResourceCode = Resources.Employee,
+            Operation = Operation.Read,
+            AccessControlLevel = AccessControlLevel.Allow)]
         public override IActionResult Get(ODataQueryOptions<EmployeeViewModel> options)
         {
             return base.Get(options);
         }
 
         [HttpGet]
-        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
+        [Permission(
+            ResourceCode = Resources.Employee,
+            Operation = Operation.Read,
+            AccessControlLevel = AccessControlLevel.Allow)]
         public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<EmployeeViewModel> options)
         {
             return base.Get(key, options);
