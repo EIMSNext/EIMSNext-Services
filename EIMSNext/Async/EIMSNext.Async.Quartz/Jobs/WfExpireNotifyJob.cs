@@ -62,6 +62,10 @@ namespace EIMSNext.Async.Quartz.Jobs
                         WfInstanceId = sample.WfInstanceId,
                         ApproveNodeId = sample.ApproveNodeId
                     });
+
+                    // The notification task is now durably queued. Mark the source todos
+                    // handled here so the minute-level scan does not publish duplicates.
+                    await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
                 }
                 else
                 {

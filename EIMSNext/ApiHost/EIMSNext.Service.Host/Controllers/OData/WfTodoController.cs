@@ -49,9 +49,11 @@ namespace EIMSNext.Service.Host.Controllers.OData
                           UpdateBy = x.UpdateBy,
                           UpdateTime = x.UpdateTime,
                            FormName = y.Name,
-                           Starter = x.Starter,
-                           DataBrief = x.DataBrief,
-                           ApproveNodeStartTime = x.ApproveNodeStartTime,
+                          Starter = x.Starter,
+                          DataBrief = x.DataBrief,
+                          ApproveNodeStartTime = x.ApproveNodeStartTime,
+                          ExpireTime = x.ExpireTime,
+                          ExpireHandled = x.ExpireHandled,
                         }
 
                    );
