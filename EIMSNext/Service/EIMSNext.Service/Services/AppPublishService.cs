@@ -1,7 +1,10 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
+using System.Linq.Expressions;
 
+using EIMSNext.Common;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -31,7 +34,11 @@ namespace EIMSNext.Service
             var printTemplateRepo = _resolver.GetRepository<PrintDefTemplate>();
             var appProfileRepo = _resolver.GetRepository<AppProfile>();
 
-            var appDef = appDefRepo.Get(appDefId) ?? throw new InvalidOperationException("应用定义不存在");
+            var appDef = appDefRepo.Get(appDefId);
+            if (appDef == null || appDef.DeleteFlag)
+            {
+                throw new NotFoundException("应用定义不存在");
+            }
             var formDefs = formDefRepo.Queryable.Where(x => x.AppId == appDefId && !x.DeleteFlag).ToList();
             var dashboardDefs = dashboardDefRepo.Queryable.Where(x => x.AppId == appDefId && !x.DeleteFlag).ToList();
             var dashboardIds = dashboardDefs.Select(x => x.Id).ToList();
@@ -49,119 +56,90 @@ namespace EIMSNext.Service
             var authGroupMap = authGroups.ToDictionary(x => x.Id, x => EnsureTemplateId(authGroupTemplateRepo, x.TemplateId));
             var dashboardLayoutMap = CreateLayoutTemplateMap(dashboardDefs);
 
-            await UpsertAsync(appTemplateRepo, new AppTemplate
+            var formTemplateState = GetTemplateState(formTemplateRepo, appTemplateId, formMap.Values, x => x.AppTemplateId);
+            var dashboardTemplateState = GetTemplateState(dashboardTemplateRepo, appTemplateId, dashboardMap.Values, x => x.AppTemplateId);
+            var dashboardItemTemplateState = GetTemplateState(dashboardItemTemplateRepo, appTemplateId, dashboardItemMap.Values, x => x.AppTemplateId);
+            var workflowTemplateState = GetTemplateState(wfTemplateRepo, appTemplateId, wfMap.Values, x => x.AppTemplateId);
+            var printTemplateState = GetTemplateState(printTemplateRepo, appTemplateId, printMap.Values, x => x.AppTemplateId);
+            var authGroupTemplateState = GetTemplateState(authGroupTemplateRepo, appTemplateId, authGroupMap.Values, x => x.AppTemplateId);
+            var appTemplateExists = appTemplateRepo.Get(appTemplateId) != null;
+            var profile = appProfileRepo.Queryable.FirstOrDefault(x => x.TemplateId == appTemplateId && !x.DeleteFlag);
+            var profileExists = profile != null;
+            profile ??= new AppProfile { Id = appProfileRepo.NewId(), TemplateId = appTemplateId };
+
+            var appTemplate = new AppTemplate
             {
                 Id = appTemplateId,
                 Name = appDef.Name,
                 Description = appDef.Description,
                 Icon = appDef.Icon,
                 Menus = SerializeTemplateMenus(appDef.AppMenus, formMap, dashboardMap)
+            };
+            var formTemplates = formDefs.ToDictionary(formDef => formDef.Id, formDef => new FormTemplate
+            {
+                Id = formMap[formDef.Id],
+                AppTemplateId = appTemplateId,
+                Name = formDef.Name,
+                Type = FormType.Form,
+                Icon = string.Empty,
+                Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap),
+                UsingWorkflow = formDef.UsingWorkflow,
+                FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap)
             });
-
-            foreach (var formDef in formDefs)
+            var dashboardTemplates = dashboardDefs.ToDictionary(dashboardDef => dashboardDef.Id, dashboardDef => new DashboardTemplate
             {
-                await UpsertAsync(formTemplateRepo, new FormTemplate
-                {
-                    Id = formMap[formDef.Id],
-                    AppTemplateId = appTemplateId,
-                    Name = formDef.Name,
-                    Type = FormType.Form,
-                    Icon = string.Empty,
-                    Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap),
-                    UsingWorkflow = formDef.UsingWorkflow,
-                    FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap)
-                });
-
-                await SetTemplateIdAsync(formDefRepo, formDef, formMap[formDef.Id]);
-            }
-
-            foreach (var dashboardDef in dashboardDefs)
+                Id = dashboardMap[dashboardDef.Id],
+                AppTemplateId = appTemplateId,
+                Name = dashboardDef.Name,
+                Layout = RewriteDashboardLayoutToTemplate(dashboardDef.Layout, dashboardLayoutMap)
+            });
+            var dashboardItemTemplates = dashboardItemDefs.ToDictionary(itemDef => itemDef.Id, itemDef => new DashboardItemTemplate
             {
-                await UpsertAsync(dashboardTemplateRepo, new DashboardTemplate
-                {
-                    Id = dashboardMap[dashboardDef.Id],
-                    AppTemplateId = appTemplateId,
-                    Name = dashboardDef.Name,
-                    Layout = RewriteDashboardLayoutToTemplate(dashboardDef.Layout, dashboardLayoutMap)
-                });
-
-                await SetTemplateIdAsync(dashboardDefRepo, dashboardDef, dashboardMap[dashboardDef.Id]);
-            }
-
-            foreach (var itemDef in dashboardItemDefs)
+                Id = dashboardItemMap[itemDef.Id],
+                AppTemplateId = appTemplateId,
+                DashboardTemplateId = dashboardMap[itemDef.DashboardId],
+                ItemType = itemDef.ItemType,
+                LayoutId = dashboardLayoutMap.TryGetValue(itemDef.LayoutId, out var layoutId) ? layoutId : itemDef.LayoutId,
+                Name = itemDef.Name,
+                Details = RewriteJsonToTemplate(itemDef.Details, formMap, dashboardMap, wfMap, printMap)
+            });
+            var workflowTemplates = wfDefs.ToDictionary(wfDef => wfDef.Id, wfDef => new WfDefinitionTemplate
             {
-                await UpsertAsync(dashboardItemTemplateRepo, new DashboardItemTemplate
-                {
-                    Id = dashboardItemMap[itemDef.Id],
-                    AppTemplateId = appTemplateId,
-                    DashboardTemplateId = dashboardMap[itemDef.DashboardId],
-                    ItemType = itemDef.ItemType,
-                    LayoutId = dashboardLayoutMap.TryGetValue(itemDef.LayoutId, out var layoutId) ? layoutId : itemDef.LayoutId,
-                    Name = itemDef.Name,
-                    Details = RewriteJsonToTemplate(itemDef.Details, formMap, dashboardMap, wfMap, printMap)
-                });
-
-                await SetTemplateIdAsync(dashboardItemDefRepo, itemDef, dashboardItemMap[itemDef.Id]);
-            }
-
-            foreach (var wfDef in wfDefs)
+                Id = wfMap[wfDef.Id],
+                AppTemplateId = appTemplateId,
+                Name = wfDef.Name,
+                FlowType = wfDef.FlowType,
+                ExternalTemplateId = formMap.TryGetValue(wfDef.ExternalId, out var formTemplateId) ? formTemplateId : wfDef.ExternalId,
+                Description = wfDef.Description,
+                Content = RewriteJsonToTemplate(wfDef.Content, formMap, dashboardMap, wfMap, printMap),
+                Metadata = RewriteWorkflowMetadataToTemplate(wfDef.Metadata, formMap, dashboardMap, wfMap, printMap),
+                EventSource = wfDef.EventSource,
+                SourceTemplateId = MapEntityReferenceToTemplate(wfDef.SourceId, formMap, dashboardMap, wfMap),
+                EventSetting = RewriteEventSettingToTemplate(wfDef.EventSetting, formMap, dashboardMap, wfMap),
+                Disabled = wfDef.Disabled
+            });
+            var printTemplates = printDefs.ToDictionary(printDef => printDef.Id, printDef => new PrintDefTemplate
             {
-                await UpsertAsync(wfTemplateRepo, new WfDefinitionTemplate
-                {
-                    Id = wfMap[wfDef.Id],
-                    AppTemplateId = appTemplateId,
-                    Name = wfDef.Name,
-                    FlowType = wfDef.FlowType,
-                    ExternalTemplateId = formMap.TryGetValue(wfDef.ExternalId, out var formTemplateId) ? formTemplateId : wfDef.ExternalId,
-                    Description = wfDef.Description,
-                    Content = RewriteJsonToTemplate(wfDef.Content, formMap, dashboardMap, wfMap, printMap),
-                    Metadata = RewriteWorkflowMetadataToTemplate(wfDef.Metadata, formMap, dashboardMap, wfMap, printMap),
-                    EventSource = wfDef.EventSource,
-                    SourceTemplateId = MapEntityReferenceToTemplate(wfDef.SourceId, formMap, dashboardMap, wfMap),
-                    EventSetting = RewriteEventSettingToTemplate(wfDef.EventSetting, formMap, dashboardMap, wfMap),
-                    Disabled = wfDef.Disabled
-                });
-
-                await SetTemplateIdAsync(wfDefRepo, wfDef, wfMap[wfDef.Id]);
-            }
-
-            foreach (var printDef in printDefs)
+                Id = printMap[printDef.Id],
+                AppTemplateId = appTemplateId,
+                FormTemplateId = formMap.TryGetValue(printDef.FormId, out var formTemplateId) ? formTemplateId : string.Empty,
+                Name = printDef.Name,
+                Content = RewriteJsonToTemplate(printDef.Content, formMap, dashboardMap, wfMap, printMap),
+                PrintType = printDef.PrintType
+            });
+            var authGroupTemplates = authGroups.ToDictionary(authGroup => authGroup.Id, authGroup => new AuthGroupTemplate
             {
-                await UpsertAsync(printTemplateRepo, new PrintDefTemplate
-                {
-                    Id = printMap[printDef.Id],
-                    AppTemplateId = appTemplateId,
-                    FormTemplateId = formMap.TryGetValue(printDef.FormId, out var formTemplateId) ? formTemplateId : string.Empty,
-                    Name = printDef.Name,
-                    Content = RewriteJsonToTemplate(printDef.Content, formMap, dashboardMap, wfMap, printMap),
-                    PrintType = printDef.PrintType
-                });
-
-                await SetTemplateIdAsync(printDefRepo, printDef, printMap[printDef.Id]);
-            }
-
-            foreach (var authGroup in authGroups)
-            {
-                await UpsertAsync(authGroupTemplateRepo, new AuthGroupTemplate
-                {
-                    Id = authGroupMap[authGroup.Id],
-                    AppTemplateId = appTemplateId,
-                    FormTemplateId = formMap.TryGetValue(authGroup.FormId, out var formTemplateId) ? formTemplateId : authGroup.FormId,
-                    Name = authGroup.Name,
-                    Desc = authGroup.Desc,
-                    Type = authGroup.Type,
-                    DataPerms = authGroup.DataPerms,
-                    DataFilter = authGroup.DataFilter,
-                    FieldPerms = authGroup.FieldPerms,
-                    Disabled = authGroup.Disabled,
-                });
-
-                await SetTemplateIdAsync(authGroupRepo, authGroup, authGroupMap[authGroup.Id]);
-            }
-
-            await SetTemplateIdAsync(appDefRepo, appDef, appTemplateId);
-
-            var profile = appProfileRepo.Queryable.FirstOrDefault(x => x.TemplateId == appTemplateId && !x.DeleteFlag) ?? new AppProfile { Id = appProfileRepo.NewId(), TemplateId = appTemplateId };
+                Id = authGroupMap[authGroup.Id],
+                AppTemplateId = appTemplateId,
+                FormTemplateId = formMap.TryGetValue(authGroup.FormId, out var formTemplateId) ? formTemplateId : authGroup.FormId,
+                Name = authGroup.Name,
+                Desc = authGroup.Desc,
+                Type = authGroup.Type,
+                DataPerms = authGroup.DataPerms,
+                DataFilter = authGroup.DataFilter,
+                FieldPerms = authGroup.FieldPerms,
+                Disabled = authGroup.Disabled,
+            });
             profile.Name = appDef.Name;
             profile.Summary = string.IsNullOrWhiteSpace(appDef.Description) ? appDef.Name : appDef.Description;
             profile.Description = appDef.Description;
@@ -169,14 +147,93 @@ namespace EIMSNext.Service
             profile.ThemeColor = appDef.IconColor;
             profile.Status = AppProfileStatus.Published;
             profile.PublishedAt = DateTime.UtcNow;
-            if (string.IsNullOrWhiteSpace(profile.Author))
+
+            using var scope = appDefRepo.NewTransactionScope();
+
+            await DeleteTemplatesAsync(formTemplateRepo, formTemplateState.StaleIds);
+            await DeleteTemplatesAsync(dashboardTemplateRepo, dashboardTemplateState.StaleIds);
+            await DeleteTemplatesAsync(dashboardItemTemplateRepo, dashboardItemTemplateState.StaleIds);
+            await DeleteTemplatesAsync(wfTemplateRepo, workflowTemplateState.StaleIds);
+            await DeleteTemplatesAsync(printTemplateRepo, printTemplateState.StaleIds);
+            await DeleteTemplatesAsync(authGroupTemplateRepo, authGroupTemplateState.StaleIds);
+
+            await UpsertAsync(appTemplateRepo, appTemplate, appTemplateExists);
+
+            foreach (var formDef in formDefs)
             {
-                profile.Author = "EIMSNext";
+                await UpsertAsync(formTemplateRepo, formTemplates[formDef.Id], formTemplateState.ExistingIds.Contains(formMap[formDef.Id]));
+
+                await SetTemplateIdAsync(formDefRepo, formDef, formMap[formDef.Id]);
             }
 
-            await UpsertAsync(appProfileRepo, profile);
+            foreach (var dashboardDef in dashboardDefs)
+            {
+                await UpsertAsync(dashboardTemplateRepo, dashboardTemplates[dashboardDef.Id], dashboardTemplateState.ExistingIds.Contains(dashboardMap[dashboardDef.Id]));
+
+                await SetTemplateIdAsync(dashboardDefRepo, dashboardDef, dashboardMap[dashboardDef.Id]);
+            }
+
+            foreach (var itemDef in dashboardItemDefs)
+            {
+                await UpsertAsync(dashboardItemTemplateRepo, dashboardItemTemplates[itemDef.Id], dashboardItemTemplateState.ExistingIds.Contains(dashboardItemMap[itemDef.Id]));
+
+                await SetTemplateIdAsync(dashboardItemDefRepo, itemDef, dashboardItemMap[itemDef.Id]);
+            }
+
+            foreach (var wfDef in wfDefs)
+            {
+                await UpsertAsync(wfTemplateRepo, workflowTemplates[wfDef.Id], workflowTemplateState.ExistingIds.Contains(wfMap[wfDef.Id]));
+
+                await SetTemplateIdAsync(wfDefRepo, wfDef, wfMap[wfDef.Id]);
+            }
+
+            foreach (var printDef in printDefs)
+            {
+                await UpsertAsync(printTemplateRepo, printTemplates[printDef.Id], printTemplateState.ExistingIds.Contains(printMap[printDef.Id]));
+
+                await SetTemplateIdAsync(printDefRepo, printDef, printMap[printDef.Id]);
+            }
+
+            foreach (var authGroup in authGroups)
+            {
+                await UpsertAsync(authGroupTemplateRepo, authGroupTemplates[authGroup.Id], authGroupTemplateState.ExistingIds.Contains(authGroupMap[authGroup.Id]));
+
+                await SetTemplateIdAsync(authGroupRepo, authGroup, authGroupMap[authGroup.Id]);
+            }
+
+            await SetTemplateIdAsync(appDefRepo, appDef, appTemplateId);
+
+            await UpsertAsync(appProfileRepo, profile, profileExists);
+
+            scope.CommitTransaction();
 
             return appTemplateId;
+        }
+
+        private static TemplateState GetTemplateState<T>(
+            IRepository<T> repo,
+            string appTemplateId,
+            IEnumerable<string> currentIds,
+            Expression<Func<T, string>> appTemplateIdSelector)
+            where T : class, IMongoEntity
+        {
+            var keepIds = currentIds.ToHashSet(StringComparer.Ordinal);
+            var existingIds = repo.Queryable
+                .Where(Expression.Lambda<Func<T, bool>>(
+                    Expression.Equal(appTemplateIdSelector.Body, Expression.Constant(appTemplateId)),
+                    appTemplateIdSelector.Parameters))
+                .Select(x => x.Id)
+                .ToHashSet(StringComparer.Ordinal);
+            return new TemplateState(existingIds, existingIds.Where(id => !keepIds.Contains(id)).ToList());
+        }
+
+        private static async Task DeleteTemplatesAsync<T>(IRepository<T> repo, IReadOnlyCollection<string> staleIds)
+            where T : class, IMongoEntity
+        {
+            if (staleIds.Count > 0)
+            {
+                await repo.DeleteAsync(staleIds);
+            }
         }
 
         private static string EnsureTemplateId<T>(IRepository<T> repo, string? templateId) where T : class, EIMSNext.Core.Entities.IMongoEntity
@@ -184,9 +241,9 @@ namespace EIMSNext.Service
             return string.IsNullOrWhiteSpace(templateId) ? repo.NewId() : templateId;
         }
 
-        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity) where T : class, EIMSNext.Core.Entities.IMongoEntity
+        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity, bool exists) where T : class, EIMSNext.Core.Entities.IMongoEntity
         {
-            if (repo.Get(entity.Id) == null)
+            if (!exists)
             {
                 await repo.InsertAsync(entity);
                 return;
@@ -194,6 +251,8 @@ namespace EIMSNext.Service
 
             await repo.ReplaceAsync(entity);
         }
+
+        private sealed record TemplateState(HashSet<string> ExistingIds, List<string> StaleIds);
 
         private static async Task SetTemplateIdAsync<T>(IRepository<T> repo, T entity, string templateId) where T : class, EIMSNext.Core.Entities.IMongoEntity
         {

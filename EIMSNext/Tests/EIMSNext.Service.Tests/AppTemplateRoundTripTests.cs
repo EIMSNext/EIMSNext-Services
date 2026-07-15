@@ -1,4 +1,5 @@
 using System.Composition.Hosting;
+using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 
 using EIMSNext.Core;
@@ -6,6 +7,7 @@ using EIMSNext.Core.Entities;
 using EIMSNext.Core.MongoDb;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
+using EIMSNext.Cache;
 using EIMSNext.MongoDb;
 using EIMSNext.Service;
 using EIMSNext.Service.Entities;
@@ -41,6 +43,11 @@ namespace EIMSNext.Service.Tests
             var profileRepo = repos.Add(new InMemoryRepository<AppProfile>());
             var authGroupRepo = repos.Add(new InMemoryRepository<AuthGroup>());
             var authGroupTemplateRepo = repos.Add(new InMemoryRepository<AuthGroupTemplate>());
+            repos.AddService<IServiceContext>(new TestServiceContext
+            {
+                CorpId = "corp-installed",
+                Operator = new Operator("employee-1", "E001", "Installer")
+            });
 
             const string sourceAppId = "app-source";
             const string sourceFormId = "form-source";
@@ -178,6 +185,8 @@ namespace EIMSNext.Service.Tests
             var installedPrint = printRepo.Queryable.Single(x => x.AppId == installedAppId);
 
             Assert.AreNotEqual(sourceAppId, installedAppId);
+            Assert.AreEqual("corp-installed", installedApp.CorpId);
+            Assert.AreEqual("employee-1", installedApp.CreateBy?.Id);
             Assert.AreEqual(appTemplateId, installedApp.TemplateId);
             Assert.AreEqual(sourceForm.TemplateId, installedForm.TemplateId);
             Assert.AreEqual(sourceDashboard.TemplateId, installedDashboard.TemplateId);
@@ -213,6 +222,15 @@ namespace EIMSNext.Service.Tests
             CollectionAssert.Contains(installedMenuIds, installedDashboard.Id);
             CollectionAssert.DoesNotContain(installedMenuIds, sourceForm.TemplateId!);
             CollectionAssert.DoesNotContain(installedMenuIds, sourceDashboard.TemplateId!);
+
+            sourceForm.DeleteFlag = true;
+            await formRepo.ReplaceAsync(sourceForm);
+            await publishService.PublishAsync(sourceAppId);
+            Assert.IsNull(formTemplateRepo.Get(sourceForm.TemplateId!));
+
+            profile.Status = AppProfileStatus.Draft;
+            await profileRepo.ReplaceAsync(profile);
+            await Assert.ThrowsExactlyAsync<EIMSNext.Common.NotFoundException>(() => installService.InstallAsync(profile.Id));
         }
 
         private sealed class RepositoryRegistry
@@ -225,6 +243,11 @@ namespace EIMSNext.Service.Tests
             {
                 _services[typeof(IRepository<T>)] = repository;
                 return repository;
+            }
+
+            public void AddService<T>(T service) where T : class
+            {
+                _services[typeof(T)] = service;
             }
         }
 
@@ -259,7 +282,11 @@ namespace EIMSNext.Service.Tests
             public ProjectionDefinitionBuilder<T> ProjectionBuilder => Builders<T>.Projection;
             public UpdateDefinitionBuilder<T> UpdateBuilder => Builders<T>.Update;
 
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
+            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null)
+            {
+                // The in-memory repository has no Mongo session. An uninitialized non-root scope is a no-op on commit/dispose.
+                return (MongoTransactionScope)RuntimeHelpers.GetUninitializedObject(typeof(MongoTransactionScope));
+            }
             public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public IFindFluent<T, T> Find(System.Linq.Expressions.Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
@@ -300,7 +327,16 @@ namespace EIMSNext.Service.Tests
             }
 
             public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
+            {
+                if (_items.TryGetValue(id, out var entity) && entity is AppProfile profile)
+                {
+                    profile.InstallCount += 1;
+                    return Task.FromResult<UpdateResult>(null!);
+                }
+
+                throw new NotSupportedException();
+            }
             public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
@@ -323,7 +359,15 @@ namespace EIMSNext.Service.Tests
             public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null)
+            {
+                foreach (var id in ids)
+                {
+                    _items.Remove(id);
+                }
+
+                return Task.FromResult<DeleteResult>(null!);
+            }
             public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
 
@@ -351,6 +395,19 @@ namespace EIMSNext.Service.Tests
             {
                 return Task.FromResult(new List<BsonValue>());
             }
+        }
+
+        private sealed class TestServiceContext : IServiceContext
+        {
+            public string AccessToken { get; set; } = string.Empty;
+            public string CorpId { get; set; } = string.Empty;
+            public Operator? Operator { get; set; }
+            public string UserId { get; set; } = string.Empty;
+            public IUser? User { get; set; }
+            public IEmployee? Employee { get; set; }
+            public string? ClientIp { get; set; }
+            public DataAction Action { get; set; }
+            public IScopeCache ScopeCache => null!;
         }
     }
 }

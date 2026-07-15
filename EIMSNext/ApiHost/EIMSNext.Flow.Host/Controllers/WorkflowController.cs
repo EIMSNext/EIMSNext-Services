@@ -112,6 +112,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var workerId = IdentityContext.CurrentEmployee.Id;
+            var workerCode = IdentityContext.CurrentEmployee.Code;
             var todo = _todoservice.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
@@ -142,7 +143,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 
-            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, IdentityContext.CurrentUserID, workerId, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
+            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
 
             await _wfHost.SubmitActivitySuccess(act.Token, approveData.ToExpando());
             var errMsg = WaitForComplete(approveData.ExecLogId);
