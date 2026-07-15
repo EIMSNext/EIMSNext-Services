@@ -12,6 +12,14 @@ namespace EIMSNext.File.Host.Controllers
     [ApiVersion(1.0)]
     public class UploadController : MefControllerBase
     {
+        private static readonly HashSet<string> BlockedFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".ashx", ".asmx", ".aspx", ".bat", ".cgi", ".cmd", ".com", ".cpl",
+            ".dll", ".exe", ".htm", ".html", ".hta", ".jar", ".js", ".jse",
+            ".jsp", ".jspx", ".msi", ".msp", ".php", ".pl", ".ps1", ".psm1",
+            ".py", ".scr", ".sh", ".svg", ".vbe", ".vbs", ".wsf", ".wsh", ".xhtml"
+        };
+
         private readonly ILogger<UploadController> _logger;
         private readonly IUploadedFileService _uploadService;
 
@@ -25,7 +33,7 @@ namespace EIMSNext.File.Host.Controllers
         /// 上传附件
         /// </summary>
         /// <returns></returns>
-        [HttpPost, Route("Upload")]
+        [HttpPost]
         [RequestFormLimits(MultipartBodyLengthLimit = 1024 * 1024 * 1024)]
         [RequestSizeLimit(1024 * 1024 * 1024)]
         public async Task<IActionResult> Upload()
@@ -33,13 +41,24 @@ namespace EIMSNext.File.Host.Controllers
             var files = Request.Form.Files;
             _logger.LogDebug("收到上传文件 {FileCount} 个", files.Count);
 
+            if (files.Count == 0)
+            {
+                return BadRequest("请至少选择一个文件");
+            }
+
+            var blockedFile = files.FirstOrDefault(file => BlockedFileExtensions.Contains(Path.GetExtension(file.FileName)));
+            if (blockedFile != null)
+            {
+                return BadRequest($"不允许上传文件类型 {Path.GetExtension(blockedFile.FileName)}");
+            }
+
             var attachments = new List<UploadedFile>();
             foreach (var file in files)
             {
                 var fileExt = new FileInfo(file.FileName).Extension;
                 var saveName = GeneratFileName() + fileExt;
-                var savePath = $"{AppSetting.FileBasePath}\\{IdentityContext.CurrentCorpId}\\{saveName}";
-                var thumbPath = $"{AppSetting.FileBasePath}\\{IdentityContext.CurrentCorpId}\\thumb\\{saveName}";
+                var savePath = $"{AppSetting.FileBasePath}/{IdentityContext.CurrentCorpId}/{saveName}";
+                var thumbPath = $"{AppSetting.FileBasePath}/{IdentityContext.CurrentCorpId}/thumb/{saveName}";
 
                 var attachment = new UploadedFile() { FileName = file.FileName, SavePath = savePath, ThumbPath = thumbPath, FileExt = fileExt, FileSize = Convert.ToInt64(Math.Floor(file.Length / 1000.0)) };
 

@@ -9,6 +9,7 @@ using EIMSNext.Service.Entities;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -47,6 +48,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Data export task {ExportLogId} failed", exportLog.Id);
                 await exportLogService.MarkFailedAsync(exportLog.Id, ex.Message);
                 await PublishFailedMessageAsync(exportLog, ex.Message, resolver, ct);
             }

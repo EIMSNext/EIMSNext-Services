@@ -92,6 +92,15 @@ namespace EIMSNext.Service
                 return;
             }
 
+            var dashboardIds = deletedDashboards.Select(x => x.Id).ToList();
+            var dashboardItemRepo = Resolver.GetRepository<DashboardItemDef>();
+            await dashboardItemRepo.UpdateManyAsync(
+                dashboardItemRepo.FilterBuilder.And(
+                    dashboardItemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    dashboardItemRepo.FilterBuilder.In(x => x.DashboardId, dashboardIds)),
+                dashboardItemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
             var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();
             foreach (var appId in appIds)

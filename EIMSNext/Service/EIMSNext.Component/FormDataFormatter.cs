@@ -94,9 +94,35 @@ namespace EIMSNext.Component
                     or FieldType.Employee1 or FieldType.Employee2
                     or FieldType.Department1 or FieldType.Department2
                     => FormatLabelValue(value),
+                FieldType.ImageUpload or FieldType.FileUpload => FormatFileValue(value),
                 FieldType.TableForm => FormatDisplayTableFormValue(value, fieldDef.Columns),
                 _ => value,
             };
+        }
+
+        private static object? FormatFileValue(object? value)
+        {
+            var names = new List<string>();
+            foreach (var item in EnumerateItemsOrSingle(value))
+            {
+                var dict = AsDictionary(item);
+                var display = dict == null
+                    ? item?.ToString()
+                    : GetDictionaryValue(dict, "name") ?? GetDictionaryValue(dict, "fileName") ?? GetDictionaryValue(dict, "url");
+
+                if (!string.IsNullOrWhiteSpace(display))
+                {
+                    names.Add(display);
+                }
+            }
+
+            return names.Count == 0 ? null : string.Join(',', names);
+        }
+
+        private static string? GetDictionaryValue(IDictionary<string, object?> dict, string key)
+        {
+            var pair = dict.FirstOrDefault(x => string.Equals(x.Key, key, StringComparison.OrdinalIgnoreCase));
+            return pair.Value?.ToString();
         }
 
         private static object? FormatTableFormValue(object? value, IList<FieldDef>? columns)

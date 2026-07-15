@@ -155,6 +155,7 @@ namespace EIMSNext.Service.Host.OData
         {
             var query = ApiService.Query(x => x.Id == key);
 
+            query = FilterResult(query, options);
             query = Expand(query, options);
 
             return SingleResult.Create(query);

@@ -1236,7 +1236,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             return OrFilters(actualFields.Select(field => new DynamicFilter
             {
-                Field = field,
+                Field = Fields.IsSystemField(field) ? field : $"data.{field}",
                 Type = searchableMap[field],
                 Op = FilterOp.Text,
                 Value = normalizedKeyword,

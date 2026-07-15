@@ -4,3 +4,5 @@ bin
 .config/
 *.user
 Logs/
+EIMSNext/ApiHost/EIMSNext.File.Host/wwwroot/Export/
+EIMSNext/ApiHost/EIMSNext.File.Host/wwwroot/Upload/*/

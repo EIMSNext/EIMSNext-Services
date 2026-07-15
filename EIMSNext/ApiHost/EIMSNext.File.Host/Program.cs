@@ -70,6 +70,7 @@ app.UseStaticFiles(new StaticFileOptions()
     OnPrepareResponse = (e) =>
     {
         e.Context.RequestServices.GetRequiredService<CorsPolicyHelper>().Apply(e.Context);
+        e.Context.Response.Headers.XContentTypeOptions = "nosniff";
     }
 });
 
