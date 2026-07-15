@@ -74,7 +74,9 @@ namespace EIMSNext.Service.Host.Authorization
                 }
 
                 var requiredScope = ResolvePublicScope(context, actionDescriptor);
-                if (requiredScope != PublicScope.None && (_identity.PublicScope & requiredScope) != requiredScope)
+                // A public token carries exactly one scope. Controller metadata may
+                // combine several scopes to allow any of those public link types.
+                if (requiredScope != PublicScope.None && (_identity.PublicScope & requiredScope) == PublicScope.None)
                 {
                     _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}, RequiredScope={Required}, TokenScope={Token}",
                         context.HttpContext.Request.Path,
