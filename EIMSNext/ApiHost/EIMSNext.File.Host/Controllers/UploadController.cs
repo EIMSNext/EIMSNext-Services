@@ -6,6 +6,7 @@ using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using NanoidDotNet;
+using System.Text;
 
 namespace EIMSNext.File.Host.Controllers
 {
@@ -52,17 +53,26 @@ namespace EIMSNext.File.Host.Controllers
                 return BadRequest($"不允许上传文件类型 {Path.GetExtension(blockedFile.FileName)}");
             }
 
+            foreach (var file in files)
+            {
+                var validationError = await ValidateFileContent(file);
+                if (validationError != null)
+                {
+                    return BadRequest(validationError);
+                }
+            }
+
             var attachments = new List<UploadedFile>();
             foreach (var file in files)
             {
                 var fileExt = new FileInfo(file.FileName).Extension;
                 var saveName = GeneratFileName() + fileExt;
-                var savePath = $"{AppSetting.FileBasePath}/{IdentityContext.CurrentCorpId}/{saveName}";
-                var thumbPath = $"{AppSetting.FileBasePath}/{IdentityContext.CurrentCorpId}/thumb/{saveName}";
+                var savePath = $"{AppSetting.Storage.UploadFolder}/{IdentityContext.CurrentCorpId}/{saveName}";
+                var thumbPath = $"{AppSetting.Storage.UploadFolder}/{IdentityContext.CurrentCorpId}/thumb/{saveName}";
 
                 var attachment = new UploadedFile() { FileName = file.FileName, SavePath = savePath, ThumbPath = thumbPath, FileExt = fileExt, FileSize = Convert.ToInt64(Math.Floor(file.Length / 1000.0)) };
 
-                var saveFolder = Path.Combine(Common.Constants.WebRootPath, AppSetting.FileBasePath, IdentityContext.CurrentCorpId);
+                var saveFolder = Path.Combine(Common.Constants.WebRootPath, AppSetting.Storage.UploadFolder, IdentityContext.CurrentCorpId);
                 if (!Directory.Exists(saveFolder)) Directory.CreateDirectory(saveFolder);
                 var thumbFolder = Path.Combine(saveFolder, "thumb");
                 if (!Directory.Exists(thumbFolder)) Directory.CreateDirectory(thumbFolder);
@@ -70,9 +80,10 @@ namespace EIMSNext.File.Host.Controllers
                 var saveToPath = Path.Combine(Common.Constants.WebRootPath, savePath);
                 _logger.LogDebug("保存上传文件到 {SavePath}", saveToPath);
 
-                using (var targetStream = System.IO.File.Create(saveToPath))
+                await using (var sourceStream = file.OpenReadStream())
+                await using (var targetStream = System.IO.File.Create(saveToPath))
                 {
-                    await file.CopyToAsync(targetStream);
+                    await sourceStream.CopyToAsync(targetStream);
                 }
 
                 //TODO:生成缩略图
@@ -84,9 +95,75 @@ namespace EIMSNext.File.Host.Controllers
 
             return Ok(new
             {
-                value = attachments.Select(x => new { x.Id, x.FileName, x.SavePath, x.ThumbPath, x.FileExt, x.FileSize })
+                value = attachments.Select(x =>
+                {
+                    return new
+                    {
+                        x.Id,
+                        x.FileName,
+                        x.SavePath,
+                        x.ThumbPath,
+                        x.FileExt,
+                        x.FileSize,
+                        url = BuildFileUrl(x.SavePath),
+                        thumbUrl = BuildFileUrl(x.ThumbPath),
+                    };
+                })
             });
         }
+
+        private string BuildFileUrl(string? path)
+        {
+            var baseUrl = (AppSetting.Storage.PublicUrl ?? string.Empty).TrimEnd('/');
+            var normalizedPath = (path ?? string.Empty).TrimStart('/').Replace('\\', '/');
+            return $"{baseUrl}/{normalizedPath}";
+        }
+
+        private static async Task<string?> ValidateFileContent(IFormFile file)
+        {
+            const int sniffLength = 64 * 1024;
+            await using var stream = file.OpenReadStream();
+            var buffer = new byte[(int)Math.Min(sniffLength, Math.Max(1L, file.Length))];
+            var read = 0;
+            while (read < buffer.Length)
+            {
+                var count = await stream.ReadAsync(buffer.AsMemory(read, buffer.Length - read));
+                if (count == 0) break;
+                read += count;
+            }
+
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            var text = Encoding.UTF8.GetString(buffer, 0, read);
+            var activeMarker = new[] { "<script", "<html", "<!doctype html", "<svg", "<?php", "javascript:", "vbscript:" }
+                .FirstOrDefault(marker => text.Contains(marker, StringComparison.OrdinalIgnoreCase));
+            if (activeMarker != null)
+            {
+                return $"文件内容包含主动内容标记 {activeMarker}";
+            }
+
+            if (!HasExpectedSignature(extension, buffer.AsSpan(0, read)))
+            {
+                return $"文件内容与扩展名 {extension} 不匹配";
+            }
+
+            return null;
+        }
+
+        private static bool HasExpectedSignature(string extension, ReadOnlySpan<byte> content)
+        {
+            return extension switch
+            {
+                ".jpg" or ".jpeg" => StartsWith(content, [0xff, 0xd8, 0xff]),
+                ".png" => StartsWith(content, [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+                ".gif" => StartsWith(content, "GIF8"u8),
+                ".webp" => content.Length >= 12 && StartsWith(content, "RIFF"u8) && content[8..].StartsWith("WEBP"u8),
+                ".pdf" => StartsWith(content, "%PDF-"u8),
+                ".zip" or ".docx" or ".xlsx" or ".pptx" => StartsWith(content, [0x50, 0x4b, 0x03, 0x04]),
+                _ => true,
+            };
+        }
+
+        private static bool StartsWith(ReadOnlySpan<byte> content, ReadOnlySpan<byte> signature) => content.StartsWith(signature);
 
         private string GeneratFileName()
         {

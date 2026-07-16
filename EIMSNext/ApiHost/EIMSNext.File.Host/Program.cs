@@ -8,6 +8,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using EIMSNext.File.Host;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigWebEnvironment();
@@ -65,6 +66,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+app.UseMiddleware<FileAccessMiddleware>();
 app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>
@@ -74,9 +79,6 @@ app.UseStaticFiles(new StaticFileOptions()
     }
 });
 
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
 

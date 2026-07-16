@@ -34,7 +34,7 @@ namespace EIMSNext.Service.Host.Controllers
 
                 if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
                 {
-                    var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
+                    var savePath = $"{AppSetting.Storage.UploadFolder}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
                     var storage = Resolver.Resolve<IStorageProvider>();
                     if (!storage.Upload(printResult.Content, savePath))
                         return ApiResult.Fail(500, "上传打印文件失败").ToActionResult();
@@ -76,7 +76,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
             {
-                var savePath = $"{AppSetting.FileBasePath}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
+                    var savePath = $"{AppSetting.Storage.UploadFolder}\\Temp\\{IdentityContext.CurrentCorpId}\\{printResult.FileName}";
                 var storage = Resolver.Resolve<IStorageProvider>();
                 if (!storage.Upload(printResult.Content, savePath))
                     return ApiResult.Fail(500, "上传打印文件失败").ToActionResult();

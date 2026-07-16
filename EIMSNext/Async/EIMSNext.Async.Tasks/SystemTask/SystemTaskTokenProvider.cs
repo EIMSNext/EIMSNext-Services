@@ -12,7 +12,7 @@ namespace EIMSNext.Async.Tasks.SystemTask
 
         public SystemTaskTokenProvider(AppSetting appSetting)
         {
-            var tokenEndpoint = appSetting.OAuth_SystemTokenEndPoint
+            var tokenEndpoint = appSetting.OAuth.SystemTokenEndPoint
                 ?? throw new InvalidOperationException("Missing OAuth:BaseUrl or OAuth:Authority for system task token provider");
             _client = new RestClient(tokenEndpoint);
             _clientSecret = InternalClients.SystemClientSecret;
