@@ -638,6 +638,25 @@ namespace EIMSNext.Service.Host.Controllers
                 Select = fields,
                 Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
             };
+            if (IdentityContext.IdentityType != IdentityType.Public)
+            {
+                var accessProbe = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
+                {
+                    Select = new DynamicFieldList { DynamicField.Create(Fields.FormId, true) },
+                    Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                    Take = 1,
+                })).FirstOrDefault();
+                if (accessProbe == null)
+                {
+                    return NotFound();
+                }
+
+                queryOptions.Scope = new DataScope
+                {
+                    FormId = accessProbe.FormId,
+                    InheritMemberPermissions = true,
+                };
+            }
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 queryOptions.Scope = new DataScope { FormId = publicData!.FormId };
