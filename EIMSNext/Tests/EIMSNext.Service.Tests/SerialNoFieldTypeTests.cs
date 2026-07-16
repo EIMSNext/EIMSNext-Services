@@ -23,6 +23,12 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void IsInputField_DataSelect_ReturnsTrue()
+        {
+            Assert.IsTrue(FieldType.IsInputField(FieldType.DataSelect));
+        }
+
+        [TestMethod]
         public void IsInputField_Unknown_ReturnsFalse()
         {
             Assert.IsFalse(FieldType.IsInputField("nonsense"));

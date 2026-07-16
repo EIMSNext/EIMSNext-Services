@@ -27,23 +27,37 @@ namespace EIMSNext.Service
             });
         }
 
-        public Task MarkReadAsync(string id)
+        public Task MarkReadAsync(string id, string corpId, string empId)
         {
             var update = UpdateBuilder
                 .Set(x => x.IsRead, true)
                 .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
 
-            Repository.Update(id, update, upsert: false);
+            Repository.UpdateMany(
+                Repository.FilterBuilder.And(
+                    Repository.FilterBuilder.Eq(x => x.Id, id),
+                    Repository.FilterBuilder.Eq(x => x.CorpId, corpId),
+                    Repository.FilterBuilder.Eq(x => x.ReceiverEmpId, empId),
+                    Repository.FilterBuilder.Eq(x => x.DeleteFlag, false)),
+                update,
+                upsert: false);
             return Task.CompletedTask;
         }
 
-        public Task MarkReadBatchAsync(IEnumerable<string> ids)
+        public Task MarkReadBatchAsync(IEnumerable<string> ids, string corpId, string empId)
         {
             var update = UpdateBuilder
                 .Set(x => x.IsRead, true)
                 .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
 
-            Repository.UpdateMany(Repository.FilterBuilder.In(x => x.Id, ids), update, upsert: false);
+            Repository.UpdateMany(
+                Repository.FilterBuilder.And(
+                    Repository.FilterBuilder.In(x => x.Id, ids),
+                    Repository.FilterBuilder.Eq(x => x.CorpId, corpId),
+                    Repository.FilterBuilder.Eq(x => x.ReceiverEmpId, empId),
+                    Repository.FilterBuilder.Eq(x => x.DeleteFlag, false)),
+                update,
+                upsert: false);
             return Task.CompletedTask;
         }
     }

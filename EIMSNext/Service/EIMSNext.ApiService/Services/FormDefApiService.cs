@@ -43,6 +43,10 @@ namespace EIMSNext.ApiService
             var sourceFormIds = bindings.Select(x => x.SourceFormId).Distinct().ToList();
             var sourceAppIds = bindings.Select(x => x.SourceAppId).Distinct().ToList();
 
+            var accessibleSourceFormIds = sourceAppIds
+                .SelectMany(sourceAppId => WorkbenchTargetResolver.GetAccessibleFormIds(Resolver, IdentityContext, sourceAppId))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var apps = Resolver.Resolve<IAppDefService>().All()
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && sourceAppIds.Contains(x.Id))
                 .ToDictionary(x => x.Id);
@@ -51,7 +55,8 @@ namespace EIMSNext.ApiService
                 .Where(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    sourceFormIds.Contains(x.Id))
+                    sourceFormIds.Contains(x.Id) &&
+                    accessibleSourceFormIds.Contains(x.Id))
                 .ToList()
                 .Where(x => apps.ContainsKey(x.AppId))
                 .Select(x => BuildView(x, external: true))

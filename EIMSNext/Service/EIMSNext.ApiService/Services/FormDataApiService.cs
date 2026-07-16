@@ -593,6 +593,15 @@ namespace EIMSNext.ApiService
 
             var formDef = _formDefService.Get(request.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
             var fields = formDef.Content?.Items ?? [];
+            request.Columns = request.Columns
+                .Where(column => !IsDataSelectFieldPath(column.Key, fields))
+                .ToList();
+
+            if (request.Columns.Count == 0)
+            {
+                throw new BadRequestException("数据选择字段不能导出");
+            }
+
             foreach (var column in request.Columns)
             {
                 column.Type = ResolveColumnType(column.Key, fields);
@@ -1569,6 +1578,37 @@ namespace EIMSNext.ApiService
                 FieldType.TimeStamp => ExportColumnType.Date,
                 _ => ExportColumnType.String,
             };
+        }
+
+        private static bool IsDataSelectFieldPath(string? path, IList<FieldDef> fields)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var fieldPath = path.StartsWith("data.", StringComparison.OrdinalIgnoreCase)
+                ? path[5..]
+                : path;
+            var parts = fieldPath.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return false;
+            }
+
+            var field = fields.FirstOrDefault(x => string.Equals(x.Field, parts[0], StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                return field.Type == FieldType.DataSelect;
+            }
+
+            var child = field.Columns?.FirstOrDefault(x => string.Equals(x.Field, parts[1], StringComparison.OrdinalIgnoreCase));
+            return child?.Type == FieldType.DataSelect;
         }
 
         private static string BuildDedupKey(object source)

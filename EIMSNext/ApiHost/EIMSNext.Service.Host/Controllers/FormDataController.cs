@@ -130,6 +130,12 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest();
             }
 
+            var formDef = _formDefService.Get(request.FormId);
+            if (formDef != null && IsDataSelectFieldPath(request.Field, formDef.Content?.Items ?? []))
+            {
+                return BadRequest("数据选择字段不能用于过滤");
+            }
+
             var result = await ApiService.GetFilterOptionsAsync(request);
             return Ok(result);
         }
@@ -243,6 +249,8 @@ namespace EIMSNext.Service.Host.Controllers
                 query = FilterByDeleted(query);
             }
             query = FilterBySearch(query);
+            query = RejectUnsupportedFilterFields(query);
+            query = FilterByUnsupportedSortFields(query);
             return FilterByPermission(query);
         }
         protected DynamicFindOptions<FormData> FilterByDeleted(DynamicFindOptions<FormData> query)
@@ -335,7 +343,46 @@ namespace EIMSNext.Service.Host.Controllers
                 request = FilterByDeleted(request);
             }
             request = FilterBySearch(request);
+            request = RejectUnsupportedFilterFields(request);
             return FilterByPermission(request);
+        }
+
+        private DynamicFindOptions<FormData> RejectUnsupportedFilterFields(DynamicFindOptions<FormData> query)
+        {
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            var formDef = string.IsNullOrWhiteSpace(formId) ? null : _formDefService.Get(formId);
+            if (formDef != null && ContainsDataSelectFilter(query.Filter, formDef.Content?.Items ?? []))
+            {
+                throw new BadRequestException("数据选择字段不能用于过滤");
+            }
+
+            return query;
+        }
+
+        private FormDataExportRequest RejectUnsupportedFilterFields(FormDataExportRequest request)
+        {
+            var formDef = string.IsNullOrWhiteSpace(request.FormId) ? null : _formDefService.Get(request.FormId);
+            if (formDef != null && ContainsDataSelectFilter(request.Filter, formDef.Content?.Items ?? []))
+            {
+                throw new BadRequestException("数据选择字段不能用于过滤");
+            }
+
+            return request;
+        }
+
+        private static bool ContainsDataSelectFilter(DynamicFilter? filter, IList<FieldDef> fields)
+        {
+            if (filter == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Field))
+            {
+                return IsDataSelectFieldPath(filter.Field, fields);
+            }
+
+            return filter.Items?.Any(item => ContainsDataSelectFilter(item, fields)) == true;
         }
 
         protected virtual FormDataExportRequest FilterByPermission(FormDataExportRequest request)
@@ -1199,6 +1246,58 @@ namespace EIMSNext.Service.Host.Controllers
                 || type == FieldType.Select1
                 || type == FieldType.Select2
                 || type == FieldType.SerialNo;
+        }
+
+        private DynamicFindOptions<FormData> FilterByUnsupportedSortFields(DynamicFindOptions<FormData> query)
+        {
+            if (query.Sort == null || query.Sort.Count == 0)
+            {
+                return query;
+            }
+
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            var formDef = string.IsNullOrWhiteSpace(formId) ? null : _formDefService.Get(formId);
+            if (formDef == null)
+            {
+                return query;
+            }
+
+            var fields = formDef.Content?.Items ?? [];
+            var allowedSort = new DynamicSortList();
+            allowedSort.AddRange(query.Sort.Where(sort => !IsDataSelectFieldPath(sort.Field, fields)));
+            query.Sort = allowedSort;
+            return query;
+        }
+
+        private static bool IsDataSelectFieldPath(string? path, IList<FieldDef> fields)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var fieldPath = path.StartsWith("data.", StringComparison.OrdinalIgnoreCase)
+                ? path[5..]
+                : path;
+            var parts = fieldPath.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return false;
+            }
+
+            var field = fields.FirstOrDefault(x => string.Equals(x.Field, parts[0], StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                return field.Type == FieldType.DataSelect;
+            }
+
+            var child = field.Columns?.FirstOrDefault(x => string.Equals(x.Field, parts[1], StringComparison.OrdinalIgnoreCase));
+            return child?.Type == FieldType.DataSelect;
         }
 
         private DynamicFilter? BuildSearchFilter(string? formId, string? keyword, IEnumerable<string>? searchFields)
