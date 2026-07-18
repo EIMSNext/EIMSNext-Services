@@ -264,6 +264,7 @@ namespace EIMSNext.Flow.Core.Nodes
         #region Filter
         protected void BuildDynamicFilter(DynamicFilter filter, Dictionary<string, object> data)
         {
+            filter.Value = DynamicValueNormalizer.Normalize(filter.Value);
             if (filter.ValueIsExp)
             {
                 filter.Value = EvalFilterValue(filter.ValueIsField, filter.Value!.ToString()!, data);
@@ -649,6 +650,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var valueExp = $"data.n_{valueField.Field.NodeId}[{mIndex}].{valueField.Field.Field}";
             subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
         }
+
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>

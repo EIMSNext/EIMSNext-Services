@@ -113,13 +113,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
                                             foreach (var toUpdate in toUpdates)
                                             {
-                                                var toUpdateSubData = toUpdate.FormData.Data.GetValueOrDefault<List<ExpandoObject>>(subFormField);
-                                                if (toUpdateSubData == null)
-                                                {
-                                                    //如果子表单不存在
-                                                    toUpdateSubData = new List<ExpandoObject>();
-                                                    toUpdate.FormData.Data.AddOrUpdate(subFormField, toUpdateSubData);
-                                                }
+                                                var toUpdateSubData = GetSubFormData(toUpdate.FormData, subFormField);
 
                                                 var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);
 
@@ -181,13 +175,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
                                     foreach (var toUpdate in toUpdates)
                                     {
-                                        var toUpdateSubData = toUpdate.FormData.Data.GetValueOrDefault<List<ExpandoObject>>(subFormField);
-                                        if (toUpdateSubData == null)
-                                        {
-                                            //如果子表单不存在
-                                            toUpdateSubData = new List<ExpandoObject>();
-                                            toUpdate.FormData.Data.AddOrUpdate(subFormField, toUpdateSubData);
-                                        }
+                                        var toUpdateSubData = GetSubFormData(toUpdate.FormData, subFormField);
 
                                         var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);
 
@@ -321,6 +309,42 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.Next();
             });
 
+        }
+
+        private static List<ExpandoObject> GetSubFormData(FormData formData, string field)
+        {
+            var raw = formData.Data.GetValueOrDefault(field);
+            if (raw is List<ExpandoObject> typed)
+                return typed;
+
+            var result = new List<ExpandoObject>();
+            if (raw is System.Collections.IEnumerable items && raw is not string)
+            {
+                foreach (var item in items)
+                {
+                    if (item is ExpandoObject expando)
+                    {
+                        result.Add(expando);
+                    }
+                    else if (item is IDictionary<string, object?> dictionary)
+                    {
+                        var expandoItem = new ExpandoObject();
+                        var target = (IDictionary<string, object?>)expandoItem;
+                        foreach (var pair in dictionary)
+                            target[pair.Key] = pair.Value;
+                        result.Add(expandoItem);
+                    }
+                    else if (item is JsonElement element && element.ValueKind == JsonValueKind.Object)
+                    {
+                        var expandoItem = element.Deserialize<ExpandoObject>();
+                        if (expandoItem != null)
+                            result.Add(expandoItem);
+                    }
+                }
+            }
+
+            formData.Data.AddOrUpdate(field, result);
+            return result;
         }
 
         protected string BuildFieldMatchExp(DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex = -1)

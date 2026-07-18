@@ -25,10 +25,12 @@ namespace EIMSNext.Service
     {
         private FlowApiClient _flowClient;
         private ISerialNoSequenceService? _serialNoSvc;
+        private readonly AttachmentReferenceService _attachmentReferenceService;
         public FormDataService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
             _serialNoSvc = resolver.Resolve<ISerialNoSequenceService>();
+            _attachmentReferenceService = new AttachmentReferenceService(resolver);
         }
 
         protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update)
@@ -132,6 +134,10 @@ namespace EIMSNext.Service
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;
+            foreach (var entity in entities)
+            {
+                _attachmentReferenceService.Apply(entity, null, session);
+            }
             if (Context.Action == DataAction.Submit)
             {
                 entities.ForEach(entity => ResolveSerialNumbers(entity, formDef, null));
@@ -224,6 +230,8 @@ namespace EIMSNext.Service
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+
             var logicDeleted = DeleteFormDataByIds(logicIds, physical: false, session);
             if (logicIds.Count > 0)
             {
@@ -258,6 +266,8 @@ namespace EIMSNext.Service
                 .Where(x => !string.IsNullOrWhiteSpace(x) && !physicalIdSet.Contains(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
 
             var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false, session);
             if (logicIds.Count > 0)
@@ -362,6 +372,8 @@ namespace EIMSNext.Service
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (dataIds.Count == 0) return;
+
+            _attachmentReferenceService.Release(targets, session);
 
             await DeleteStronglyRelatedDataAsync(dataIds, session);
             await DeleteFormDataByIdsAsync(dataIds, physical: true, session);
@@ -525,10 +537,11 @@ namespace EIMSNext.Service
 
         protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)
         {
+            var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old) ?? GetFromStore<FormData>(entity.Id, DataVersion.Old);
+            _attachmentReferenceService.Apply(entity, old, session);
             if (Context.Action == DataAction.Submit)
             {
                 var formDef = GetFromStore<FormDef>(entity.FormId)!;
-                var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
                 ResolveSerialNumbers(entity, formDef, old);
             }
 

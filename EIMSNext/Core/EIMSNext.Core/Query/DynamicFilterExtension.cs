@@ -42,12 +42,14 @@ namespace EIMSNext.Core.Query
                     var filterValues = new List<object>();
                     if (filter.Value is List<object>)
                     {
-                        filterValues = (filter.Value as List<object>)!;
+                        filterValues = (filter.Value as List<object>)!
+                            .Select(value => DynamicValueNormalizer.Normalize(value)!)
+                            .ToList();
                     }
                     else
                     {
                         if (filter.Value != null)
-                            filterValues.Add(filter.Value);
+                            filterValues.Add(DynamicValueNormalizer.Normalize(filter.Value)!);
                     }
 
                     var arrField = "";

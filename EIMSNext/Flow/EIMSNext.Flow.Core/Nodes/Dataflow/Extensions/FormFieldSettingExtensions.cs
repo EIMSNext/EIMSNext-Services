@@ -19,7 +19,8 @@ namespace EIMSNext.Flow.Core.Nodes.Dataflow
 
         public static bool IsEmpty(this DataMatchSetting matchSetting)
         {
-            return string.IsNullOrEmpty(matchSetting.Field.Field) && matchSetting.Items?.Count == 0;
+            return string.IsNullOrEmpty(matchSetting.Field.Field)
+                && (matchSetting.Items == null || matchSetting.Items.Count == 0);
         }
 
         public static bool IsSubFieldMatch(this DataMatchSetting matchSetting)

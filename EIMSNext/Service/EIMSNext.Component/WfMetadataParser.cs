@@ -19,6 +19,10 @@ namespace EIMSNext.Component
             meta.Id = def.ExternalId;
             meta.Version = def.Version;
             var flowData = def.Content.DeserializeFromJson<FlowData>()!;
+            if (def.FlowType == FlowType.Dataflow)
+            {
+                ValidatePrintSources(flowData);
+            }
             meta.WorkflowSetting = new WorkflowSetting
             {
                 Description = flowData.WorkflowMeta?.Description,
@@ -30,6 +34,70 @@ namespace EIMSNext.Component
             meta.Steps = ParseSteps(def.CorpId!, eventSetting, def.FlowType, flowData);
 
             return (meta, eventSetting);
+        }
+
+        private static void ValidatePrintSources(FlowData flowData)
+        {
+            var nodes = EnumerateNodes(flowData).ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
+            foreach (var printNode in nodes.Values.Where(x => x.NodeType == WfNodeType.Print))
+            {
+                var sourceId = printNode.Metadata.PrintMeta?.SourceNodeId;
+                if (string.IsNullOrWhiteSpace(sourceId)
+                    || !nodes.TryGetValue(sourceId, out var sourceNode))
+                {
+                    throw new ArgumentException($"Print node [{printNode.Id}] 的打印来源节点不存在");
+                }
+
+                if (sourceNode.NodeType is WfNodeType.Print or WfNodeType.Plugin
+                    || !string.Equals(GetFormId(sourceNode), printNode.Metadata.PrintMeta?.FormId, StringComparison.OrdinalIgnoreCase)
+                    || !IsPreviousNode(printNode, sourceNode, nodes))
+                {
+                    throw new ArgumentException($"Print node [{printNode.Id}] 的打印来源节点不合法");
+                }
+            }
+        }
+
+        private static IEnumerable<FlowNodeData> EnumerateNodes(FlowData flowData)
+        {
+            return Enumerate(flowData.StartNode)
+                .Concat(flowData.Nodes.SelectMany(Enumerate))
+                .Concat(Enumerate(flowData.EndNode));
+
+            static IEnumerable<FlowNodeData> Enumerate(FlowNodeData node)
+            {
+                yield return node;
+                if (node.ChildNodes == null) yield break;
+                foreach (var child in node.ChildNodes.SelectMany(Enumerate)) yield return child;
+            }
+        }
+
+        private static bool IsPreviousNode(FlowNodeData node, FlowNodeData source, IReadOnlyDictionary<string, FlowNodeData> nodes)
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var current = node;
+            while (!string.IsNullOrWhiteSpace(current.PrevId)
+                && visited.Add(current.Id)
+                && nodes.TryGetValue(current.PrevId, out var previous))
+            {
+                if (string.Equals(previous.Id, source.Id, StringComparison.OrdinalIgnoreCase)) return true;
+                current = previous;
+            }
+
+            return false;
+        }
+
+        private static string? GetFormId(FlowNodeData node)
+        {
+            return node.NodeType switch
+            {
+                WfNodeType.Start => node.Metadata.TriggerMeta?.FormId,
+                WfNodeType.Insert => node.Metadata.InsertMeta?.FormId,
+                WfNodeType.QueryOne => node.Metadata.QueryOneMeta?.FormId,
+                WfNodeType.QueryMany => node.Metadata.QueryManyMeta?.FormId,
+                WfNodeType.Update => node.Metadata.UpdateMeta?.FormId,
+                WfNodeType.Delete => node.Metadata.DeleteMeta?.FormId,
+                _ => null,
+            };
         }
 
         private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, FlowData flowData)
@@ -292,6 +360,25 @@ namespace EIMSNext.Component
                         dfNodeSetting.UpdateSetting.InsertFieldSettings,
                         $"Update node [{flowNode.Id}] insert-if-no-data");
                     otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
+                    break;
+                case WfNodeType.Print:
+                    var printMeta = flowNode.Metadata.PrintMeta;
+                    if (printMeta == null
+                        || string.IsNullOrWhiteSpace(printMeta.SourceNodeId)
+                        || string.IsNullOrWhiteSpace(printMeta.FormId)
+                        || string.IsNullOrWhiteSpace(printMeta.PrintDefId))
+                    {
+                        throw new ArgumentException($"Print node [{flowNode.Id}] is not configured");
+                    }
+
+                    dfNodeSetting.SingleResult = true;
+                    dfNodeSetting.PrintSetting = new PrintSetting
+                    {
+                        SourceNodeId = printMeta.SourceNodeId,
+                        FormId = printMeta.FormId,
+                        PrintDefId = printMeta.PrintDefId,
+                    };
+                    otherFormIds.TryAdd(dfNodeSetting.PrintSetting.FormId);
                     break;
                 case WfNodeType.Plugin:
                     dfNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
@@ -843,6 +930,9 @@ namespace EIMSNext.Component
         }
         private class PrintMeta
         {
+            public string SourceNodeId { get; set; } = string.Empty;
+            public string FormId { get; set; } = string.Empty;
+            public string PrintDefId { get; set; } = string.Empty;
             public bool SingleResult { get; set; }
         }
         private class PluginMeta

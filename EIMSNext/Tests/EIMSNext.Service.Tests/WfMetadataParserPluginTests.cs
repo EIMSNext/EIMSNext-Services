@@ -320,6 +320,21 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void Parse_UpdateNode_RejectsMultiResultSubFieldToSubField()
+        {
+            var parser = new WfMetadataParser();
+            var definition = CreateFormMappingDefinition(
+                WfNodeType.Update,
+                new object[]
+                {
+                    FormField("paymentDetails>payeeName", "sourceLines>payeeName", singleResultNode: false),
+                });
+
+            var exception = Assert.ThrowsExactly<InvalidOperationException>(() => parser.Parse(definition));
+            StringAssert.Contains(exception.Message, "cannot map multi-result subfields");
+        }
+
+        [TestMethod]
         public void Parse_UpdateNode_InsertIfNoData_RejectsSameTargetSubListFromDifferentIterableSources()
         {
             var parser = new WfMetadataParser();

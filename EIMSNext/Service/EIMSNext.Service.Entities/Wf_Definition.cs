@@ -927,7 +927,23 @@ namespace EIMSNext.Service.Entities
     /// <summary>
     /// 打印设置
     /// </summary>
-    public class PrintSetting { }
+    public class PrintSetting
+    {
+        /// <summary>
+        /// 打印数据来源节点 ID
+        /// </summary>
+        public string SourceNodeId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 打印数据来源表单 ID
+        /// </summary>
+        public string FormId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 打印模板 ID
+        /// </summary>
+        public string PrintDefId { get; set; } = string.Empty;
+    }
 
     /// <summary>
     /// 流程类型枚举

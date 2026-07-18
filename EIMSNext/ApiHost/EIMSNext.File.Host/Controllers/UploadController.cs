@@ -5,7 +5,6 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
-using NanoidDotNet;
 using System.Text;
 
 namespace EIMSNext.File.Host.Controllers
@@ -62,36 +61,22 @@ namespace EIMSNext.File.Host.Controllers
                 }
             }
 
-            var attachments = new List<UploadedFile>();
-            foreach (var file in files)
+            var streams = new List<Stream>(files.Count);
+            IReadOnlyList<UploadedFile> attachments;
+            try
             {
-                var fileExt = new FileInfo(file.FileName).Extension;
-                var saveName = GeneratFileName() + fileExt;
-                var savePath = $"{AppSetting.Storage.UploadFolder}/{IdentityContext.CurrentCorpId}/{saveName}";
-                var thumbPath = $"{AppSetting.Storage.UploadFolder}/{IdentityContext.CurrentCorpId}/thumb/{saveName}";
-
-                var attachment = new UploadedFile() { FileName = file.FileName, SavePath = savePath, ThumbPath = thumbPath, FileExt = fileExt, FileSize = Convert.ToInt64(Math.Floor(file.Length / 1000.0)) };
-
-                var saveFolder = Path.Combine(Common.Constants.WebRootPath, AppSetting.Storage.UploadFolder, IdentityContext.CurrentCorpId);
-                if (!Directory.Exists(saveFolder)) Directory.CreateDirectory(saveFolder);
-                var thumbFolder = Path.Combine(saveFolder, "thumb");
-                if (!Directory.Exists(thumbFolder)) Directory.CreateDirectory(thumbFolder);
-
-                var saveToPath = Path.Combine(Common.Constants.WebRootPath, savePath);
-                _logger.LogDebug("保存上传文件到 {SavePath}", saveToPath);
-
-                await using (var sourceStream = file.OpenReadStream())
-                await using (var targetStream = System.IO.File.Create(saveToPath))
-                {
-                    await sourceStream.CopyToAsync(targetStream);
-                }
-
-                //TODO:生成缩略图
-
-                attachments.Add(attachment);
+                streams.AddRange(files.Select(file => file.OpenReadStream()));
+                attachments = _uploadService.Upload(
+                    files.Select((file, index) => new UploadedFileUpload(
+                        streams[index],
+                        file.FileName,
+                        Convert.ToInt64(Math.Floor(file.Length / 1000.0)))),
+                    IdentityContext.CurrentCorpId);
             }
-
-            _uploadService.Add(attachments);
+            finally
+            {
+                streams.ForEach(stream => stream.Dispose());
+            }
 
             return Ok(new
             {
@@ -105,18 +90,11 @@ namespace EIMSNext.File.Host.Controllers
                         x.ThumbPath,
                         x.FileExt,
                         x.FileSize,
-                        url = BuildFileUrl(x.SavePath),
-                        thumbUrl = BuildFileUrl(x.ThumbPath),
+                        url = x.SavePath,
+                        thumbUrl = x.ThumbPath,
                     };
                 })
             });
-        }
-
-        private string BuildFileUrl(string? path)
-        {
-            var baseUrl = (AppSetting.Storage.PublicUrl ?? string.Empty).TrimEnd('/');
-            var normalizedPath = (path ?? string.Empty).TrimStart('/').Replace('\\', '/');
-            return $"{baseUrl}/{normalizedPath}";
         }
 
         private static async Task<string?> ValidateFileContent(IFormFile file)
@@ -164,11 +142,5 @@ namespace EIMSNext.File.Host.Controllers
         }
 
         private static bool StartsWith(ReadOnlySpan<byte> content, ReadOnlySpan<byte> signature) => content.StartsWith(signature);
-
-        private string GeneratFileName()
-        {
-            var alphabet = "_0123456789abcdefghijklmnopqrstuvwxyz";
-            return Nanoid.Generate(alphabet, 24);
-        }
     }
 }

@@ -84,6 +84,8 @@ namespace EIMSNext.Service
             var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag).Select(x => x.Version).OrderByDescending(x => x).FirstOrDefault();
 
             entity.Version = maxVersion + 1;
+            entity.Metadata.Id = entity.ExternalId;
+            entity.Metadata.Version = entity.Version;
             entity.IsCurrent = false;
             entity.Released = false;
 
