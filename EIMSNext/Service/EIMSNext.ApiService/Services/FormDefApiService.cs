@@ -72,6 +72,7 @@ namespace EIMSNext.ApiService
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            PopulatePublicRelatedForms(entity);
             return base.AddAsync(entity);
         }
 
@@ -81,6 +82,7 @@ namespace EIMSNext.ApiService
             var existing = CoreService.Get(entity.Id);
             PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            PopulatePublicRelatedForms(entity);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 
             return base.ReplaceAsync(entity);
@@ -105,6 +107,27 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private void PopulatePublicRelatedForms(FormDef entity)
+        {
+            var relatedFormIds = FormRelatedSourceResolver.ResolveFormIds(entity.Content.Layout).ToList();
+            if (relatedFormIds.Count == 0)
+            {
+                entity.PublicRelatedFormIds = [];
+                return;
+            }
+
+            var accessibleFormIds = GetFormsIncludeCross(entity.AppId)
+                .Select(x => x.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var inaccessible = relatedFormIds.Where(x => !accessibleFormIds.Contains(x)).ToList();
+            if (inaccessible.Count > 0)
+            {
+                throw new BadRequestException($"关联数据源表单不可访问: {string.Join(',', inaccessible)}");
+            }
+
+            entity.PublicRelatedFormIds = relatedFormIds;
         }
 
         private static FormDefViewModel BuildView(FormDef form, bool external)

@@ -49,7 +49,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("dynamic/$count")]
         public ActionResult GetDynamicCount([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -70,7 +70,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -86,7 +86,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {
@@ -101,7 +101,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -121,7 +121,7 @@ namespace EIMSNext.Service.Host.Controllers
 
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("filter/options")]
         public async Task<ActionResult> GetFilterOptions([FromBody] FormDataFilterOptionsRequest request)
         {
@@ -965,6 +965,11 @@ namespace EIMSNext.Service.Host.Controllers
                 return filter;
             }
 
+            if (validator.IsRelatedForm(formId))
+            {
+                return filter;
+            }
+
             var allowedFields = new HashSet<string>(setting.Form.QueryLink.QueryFields ?? [], StringComparer.OrdinalIgnoreCase);
             return IsFilterAllowed(filter, allowedFields) ? filter : CreateNoMatchFilter();
         }
@@ -1014,6 +1019,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             var setting = validator.GetCurrentSetting();
             if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return;
+            }
+
+            if (validator.IsRelatedForm(formId))
             {
                 return;
             }

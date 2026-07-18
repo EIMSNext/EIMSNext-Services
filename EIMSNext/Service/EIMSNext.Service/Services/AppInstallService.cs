@@ -1,6 +1,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json;
 using EIMSNext.Common;
+using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core;
@@ -84,6 +85,10 @@ namespace EIMSNext.Service
                 FormSettings = AppTemplateReferenceRewriter.RewriteFormSettings(formTemplate, formMap, dashboardMap),
                 UsingWorkflow = formTemplate.UsingWorkflow
             }, context, now)).ToList();
+            foreach (var formDef in formDefs)
+            {
+                formDef.PublicRelatedFormIds = FormRelatedSourceResolver.ResolveFormIds(formDef.Content.Layout).ToList();
+            }
 
             var dashboardDefs = new List<DashboardDef>();
             foreach (var dashboardTemplate in dashboardTemplates)

@@ -25,6 +25,8 @@ namespace EIMSNext.ApiService
 
         bool CanQueryFormData(string formId);
 
+        bool IsRelatedForm(string formId);
+
         bool CanReadDashboardForm(string formId);
 
         IReadOnlyCollection<string> GetReadableFormIds();

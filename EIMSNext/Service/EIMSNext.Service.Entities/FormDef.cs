@@ -43,6 +43,12 @@ namespace EIMSNext.Service.Entities
         /// 表单设置
         /// </summary>
         public FormSettings FormSettings { get; set; } = new FormSettings();
+
+        /// <summary>
+        /// 公开表单可直接查询的关联数据源表单。仅后端持久化和鉴权使用。
+        /// </summary>
+        [JsonIgnore]
+        public List<string> PublicRelatedFormIds { get; set; } = [];
     }
 
     /// <summary>

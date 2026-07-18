@@ -1,4 +1,5 @@
 using EIMSNext.Common;
+using EIMSNext.Component;
 using EIMSNext.Core.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -10,6 +11,8 @@ namespace EIMSNext.ApiService
     {
         private PublicSetting? _setting;
         private DashboardDef? _dashboard;
+        private FormDef? _ownerForm;
+        private HashSet<string>? _relatedFormIds;
         private HashSet<string>? _dashboardFormIds;
         private HashSet<string>? _dashboardItemIds;
 
@@ -105,11 +108,34 @@ namespace EIMSNext.ApiService
 
             if (setting.TargetType == PublicTargetType.Form)
             {
-                return string.Equals(setting.TargetId, formId, StringComparison.Ordinal) &&
-                       IsSectionAvailable(setting.Form.QueryLink);
+                if (string.Equals(setting.TargetId, formId, StringComparison.Ordinal))
+                {
+                    return IsSectionAvailable(setting.Form.QueryLink);
+                }
+
+                return IdentityContext.PublicScope == PublicScope.FormLink &&
+                       IsSectionAvailable(setting.Form.FormLink) &&
+                       IsRelatedForm(formId);
             }
 
             return CanReadDashboardForm(formId);
+        }
+
+        public bool IsRelatedForm(string formId)
+        {
+            if (string.IsNullOrWhiteSpace(formId))
+            {
+                return false;
+            }
+
+            var setting = GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return false;
+            }
+
+            EnsureRelatedFormIds();
+            return _relatedFormIds?.Contains(formId) == true;
         }
 
         public bool CanReadDashboardForm(string formId)
@@ -204,6 +230,33 @@ namespace EIMSNext.ApiService
             }
 
             return _dashboard ??= Resolver.Resolve<IDashboardDefService>().Get(setting.TargetId);
+        }
+
+        private void EnsureRelatedFormIds()
+        {
+            if (_relatedFormIds != null)
+            {
+                return;
+            }
+
+            _relatedFormIds = [];
+            var setting = GetCurrentSetting();
+            if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return;
+            }
+
+            _ownerForm ??= Resolver.Resolve<IFormDefService>().Get(setting.TargetId);
+            if (_ownerForm == null || _ownerForm.DeleteFlag ||
+                !string.Equals(_ownerForm.CorpId, setting.CorpId, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var relatedIds = _ownerForm.PublicRelatedFormIds.Count > 0
+                ? _ownerForm.PublicRelatedFormIds
+                : FormRelatedSourceResolver.ResolveFormIds(_ownerForm.Content.Layout);
+            _relatedFormIds.UnionWith(relatedIds);
         }
 
         private void EnsureDashboardScopes()
