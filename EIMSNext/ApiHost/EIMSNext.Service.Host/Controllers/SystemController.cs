@@ -95,8 +95,6 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("JoinCorp")]
-        [Permission(Operation = Operation.Add)]
-        [IdentityType(IdentityType.NoCorp)]
         public async Task<IActionResult> JoinCorp([FromBody] ApplyJoinCorporateRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CorpId))

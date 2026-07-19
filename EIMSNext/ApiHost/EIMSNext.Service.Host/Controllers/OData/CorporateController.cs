@@ -22,7 +22,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class CorporateController(IResolver resolver) : ODataController<CorporateApiService, Corporate, CorporateViewModel, CorporateRequest>(resolver)
     {
         [Permission(Operation = Common.Operation.NotSet)]
-        [IdentityType(IdentityType.NoCorp)]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
         public override Task<ActionResult> Post([FromBody] CorporateRequest model)
         {
             return base.Post(model);
