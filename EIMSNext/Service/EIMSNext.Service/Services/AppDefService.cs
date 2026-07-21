@@ -25,7 +25,7 @@ namespace EIMSNext.Service
             if (deletedApps.Count == 0)
                 return;
 
-            deletedApps.ForEach(async app =>
+            foreach (var app in deletedApps)
             {
                 var formDefRepo = Resolver.GetRepository<FormDef>();
                 await formDefRepo.UpdateManyAsync(formDefRepo.FilterBuilder.And(formDefRepo.FilterBuilder.Eq(x => x.DeleteFlag, false), formDefRepo.FilterBuilder.Eq(x => x.AppId, app.Id)), formDefRepo.UpdateBuilder.Set(x => x.DeleteFlag, true), session: session);
@@ -37,7 +37,7 @@ namespace EIMSNext.Service
                 await todoRepo.DeleteAsync(todoRepo.FilterBuilder.Eq(x => x.AppId, app.Id), session);
 
                 await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, AppId = app.Id }, Context.AccessToken);
-            });
+            }
         }
     }
 }
