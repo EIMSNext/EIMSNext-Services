@@ -146,7 +146,7 @@ namespace EIMSNext.Service
             profile.Icon = appDef.Icon;
             profile.ThemeColor = appDef.IconColor;
             profile.Status = AppProfileStatus.Published;
-            profile.PublishedAt = DateTime.UtcNow;
+            profile.PublishedAt ??= DateTime.UtcNow;
 
             using var scope = appDefRepo.NewTransactionScope();
 
@@ -443,21 +443,33 @@ namespace EIMSNext.Service
             var items = new JsonArray();
             foreach (var menu in menus)
             {
-                items.Add(MapMenuToTemplate(menu, formMap, dashboardMap));
+                var mappedMenu = MapMenuToTemplate(menu, formMap, dashboardMap);
+                if (mappedMenu != null)
+                {
+                    items.Add(mappedMenu);
+                }
             }
 
             return items.ToJsonString();
         }
 
-        private static JsonObject MapMenuToTemplate(AppMenu menu, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
+        private static JsonObject? MapMenuToTemplate(AppMenu menu, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
         {
             var menuId = menu.MenuId;
-            if (menu.MenuType == FormType.Form && formMap.TryGetValue(menu.MenuId, out var formTemplateId))
+            if (menu.MenuType == FormType.Form)
             {
+                if (!formMap.TryGetValue(menu.MenuId, out var formTemplateId))
+                {
+                    return null;
+                }
                 menuId = formTemplateId;
             }
-            else if (menu.MenuType == FormType.Dashboard && dashboardMap.TryGetValue(menu.MenuId, out var dashboardTemplateId))
+            else if (menu.MenuType == FormType.Dashboard)
             {
+                if (!dashboardMap.TryGetValue(menu.MenuId, out var dashboardTemplateId))
+                {
+                    return null;
+                }
                 menuId = dashboardTemplateId;
             }
 
@@ -469,6 +481,9 @@ namespace EIMSNext.Service
                 ["iconColor"] = menu.IconColor,
                 ["menuType"] = (int)menu.MenuType,
                 ["sortIndex"] = menu.SortIndex,
+                ["editable"] = menu.Editable,
+                ["deletable"] = menu.Deletable,
+                ["listComponent"] = menu.ListComponent,
             };
 
             if (menu.SubMenus?.Count > 0)
@@ -476,7 +491,11 @@ namespace EIMSNext.Service
                 var subMenus = new JsonArray();
                 foreach (var subMenu in menu.SubMenus)
                 {
-                    subMenus.Add(MapMenuToTemplate(subMenu, formMap, dashboardMap));
+                    var mappedSubMenu = MapMenuToTemplate(subMenu, formMap, dashboardMap);
+                    if (mappedSubMenu != null)
+                    {
+                        subMenus.Add(mappedSubMenu);
+                    }
                 }
                 obj["subMenus"] = subMenus;
             }

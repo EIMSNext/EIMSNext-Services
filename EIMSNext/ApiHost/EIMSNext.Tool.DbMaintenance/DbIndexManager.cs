@@ -118,6 +118,11 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<PluginInstall>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.Enabled),
                 options,
                 "ix_plugininstall_corp_enabled");
+
+            CreateIndex(GetCollection<ECoinPrice>(),
+                Builders<ECoinPrice>.IndexKeys.Ascending(x => x.TargetType).Ascending(x => x.FeatureId),
+                CreateUniqueOptions(options),
+                "ix_ecoinprice_target_feature_unique");
         }
 
         private void CreateDefinitionIndexes(CreateIndexOptions options)

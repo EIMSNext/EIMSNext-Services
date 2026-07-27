@@ -32,12 +32,14 @@ namespace EIMSNext.Service.Host.Controllers
         private UserApiService UserApiService => Resolver.Resolve<UserApiService>();
         private ICorpOnboardingService CorpOnboardingService => Resolver.Resolve<ICorpOnboardingService>();
         private PluginStoreApiService PluginStoreApiService => Resolver.Resolve<PluginStoreApiService>();
+        private ECoinPriceApiService ECoinPriceApiService => Resolver.Resolve<ECoinPriceApiService>();
 
         /// <summary>
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
         [HttpGet("CurrentUser")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult CurrentUser()
         {
             var user = IdentityContext.CurrentUser!;
@@ -88,8 +90,10 @@ namespace EIMSNext.Service.Host.Controllers
         {
             if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
 
-            var user = IdentityContext.CurrentUser! as User;
-            user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
+            if (IdentityContext.CurrentUser is not User user)
+                return Unauthorized();
+
+            user.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
             await UserApiService.ReplaceAsync(user);
             return ApiResult.Success(req.CorpId).ToActionResult();
         }
@@ -136,6 +140,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("Plugins")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult GetPlugins()
         {
             return ApiResult.Success(PluginStoreApiService.GetInstalledRuntimePlugins()).ToActionResult();
@@ -227,6 +232,22 @@ namespace EIMSNext.Service.Host.Controllers
                 return Unauthorized();
             }
             return ApiResult.Success(new { pluginInstallId = result.PluginInstallId }).ToActionResult();
+        }
+
+        [HttpPost("pluginstore/publish")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> PublishPlugin([FromBody] PluginPublishRequest request)
+        {
+            var profile = await PluginStoreApiService.PublishAsync(request);
+            return ApiResult.Success(new { profile.Id, profile.PluginId, profile.Version }).ToActionResult();
+        }
+
+        [HttpPost("ecoinprice/batch")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> BatchUpsertECoinPrices([FromBody] List<ECoinPriceBatchItemRequest> requests)
+        {
+            var result = await ECoinPriceApiService.BatchUpsertAsync(requests);
+            return ApiResult.Success(result).ToActionResult();
         }
     }
 }

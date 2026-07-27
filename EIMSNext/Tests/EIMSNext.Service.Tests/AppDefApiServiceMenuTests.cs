@@ -87,6 +87,9 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual("dash-icon", result.AppMenus[0].Icon);
             Assert.AreEqual("#222222", result.AppMenus[0].IconColor);
             Assert.AreEqual(100, result.AppMenus[0].SortIndex);
+            Assert.IsFalse(result.AppMenus[0].Editable);
+            Assert.IsFalse(result.AppMenus[0].Deletable);
+            Assert.AreEqual("custom/dashboard/list", result.AppMenus[0].ListComponent);
 
             var group = result.AppMenus[1];
             Assert.AreEqual("group-1", group.MenuId);
@@ -158,7 +161,17 @@ namespace EIMSNext.Service.Tests
                 AppMenus =
                 [
                     new AppMenu { MenuId = "form-1", Title = "Form", Icon = "form-icon", IconColor = "#111111", MenuType = FormType.Form },
-                    new AppMenu { MenuId = "dashboard-1", Title = "Dashboard", Icon = "dash-icon", IconColor = "#222222", MenuType = FormType.Dashboard },
+                    new AppMenu
+                    {
+                        MenuId = "dashboard-1",
+                        Title = "Dashboard",
+                        Icon = "dash-icon",
+                        IconColor = "#222222",
+                        MenuType = FormType.Dashboard,
+                        Editable = false,
+                        Deletable = false,
+                        ListComponent = "custom/dashboard/list"
+                    },
                     new AppMenu { MenuId = "group-1", Title = "Group", Icon = "group-icon", IconColor = "#333333", MenuType = FormType.Group, SubMenus = [] },
                 ],
             };

@@ -6,6 +6,7 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Core;
 using EIMSNext.Service.Contracts;
+using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -58,45 +59,12 @@ namespace EIMSNext.Service.Host.Controllers
 
         [HttpPost("api/v{version:apiVersion}/open/appstore/{id}/install")]
         [Authorize]
+        [IdentityType(IdentityType.Corp_Admins)]
         public async Task<IActionResult> Install(string id)
         {
             var appId = await _appInstallService.InstallAsync(id);
             return ApiResult.Success(new { appId }).ToActionResult();
         }
 
-        [HttpGet("api/v{version:apiVersion}/open/dashboard/{token}")]
-        public IActionResult GetDashboard(string token)
-        {
-            return DashboardPublicApiGone();
-        }
-
-        [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/chart")]
-        public IActionResult CalculateChart(string token)
-        {
-            return DashboardPublicApiGone();
-        }
-
-        [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/data/count")]
-        public IActionResult CountData(string token)
-        {
-            return DashboardPublicApiGone();
-        }
-
-        [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/data/query")]
-        public IActionResult QueryData(string token)
-        {
-            return DashboardPublicApiGone();
-        }
-
-        [HttpPost("api/v{version:apiVersion}/open/dashboard/{token}/filter/options")]
-        public IActionResult GetFilterOptions(string token)
-        {
-            return DashboardPublicApiGone();
-        }
-
-        private IActionResult DashboardPublicApiGone()
-        {
-            return StatusCode(StatusCodes.Status410Gone, "公开仪表盘匿名接口已关闭，请通过 public/token 获取 Public 身份后访问普通接口。");
-        }
     }
 }

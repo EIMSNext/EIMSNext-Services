@@ -80,7 +80,15 @@ namespace EIMSNext.Auth.Host
             {
                 //new Auth.Entities.User {Id="system", Name = "System" },
                 //new Auth.Entities.User {Id="anonymous", Name = "Anonymous" },
-                new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" }
+                new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" },
+                new Auth.Entities.User
+                {
+                    Id = "cloudadmin",
+                    Name = "Cloud Admin",
+                    Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
+                    Email = "cloudadmin@easyun.com.cn",
+                    UserType = "platadmin"
+                }
             };
         }
 

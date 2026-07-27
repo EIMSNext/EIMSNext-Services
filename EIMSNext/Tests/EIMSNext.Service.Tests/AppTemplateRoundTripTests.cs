@@ -66,7 +66,15 @@ namespace EIMSNext.Service.Tests
                 IconColor = "#3366ff",
                 AppMenus =
                 [
-                    new AppMenu { MenuId = sourceFormId, Title = "Form", MenuType = FormType.Form },
+                    new AppMenu
+                    {
+                        MenuId = sourceFormId,
+                        Title = "Form",
+                        MenuType = FormType.Form,
+                        Editable = false,
+                        Deletable = false,
+                        ListComponent = "custom/orders/index"
+                    },
                     new AppMenu { MenuId = sourceDashboardId, Title = "Dashboard", MenuType = FormType.Dashboard }
                 ]
             });
@@ -166,6 +174,11 @@ namespace EIMSNext.Service.Tests
                 .ToList();
             CollectionAssert.Contains(templateMenuIds, sourceForm.TemplateId!);
             CollectionAssert.Contains(templateMenuIds, sourceDashboard.TemplateId!);
+            var templateFormMenu = JsonNode.Parse(appTemplate.Menus)!.AsArray()
+                .Single(node => node!["menuId"]!.GetValue<string>() == sourceForm.TemplateId);
+            Assert.IsFalse(templateFormMenu!["editable"]!.GetValue<bool>());
+            Assert.IsFalse(templateFormMenu["deletable"]!.GetValue<bool>());
+            Assert.AreEqual("custom/orders/index", templateFormMenu["listComponent"]!.GetValue<string>());
 
             var templateLayoutId = JsonNode.Parse(dashboardTemplate.Layout)![0]!["i"]!.GetValue<string>();
             Assert.AreNotEqual(sourceLayoutId, templateLayoutId);
@@ -175,10 +188,33 @@ namespace EIMSNext.Service.Tests
             StringAssert.Contains(dashboardItemTemplate.Details, sourceWorkflow.TemplateId!);
             StringAssert.Contains(dashboardItemTemplate.Details, sourcePrint.TemplateId!);
 
+            var originalProfileId = profile.Id;
+            var originalPublishedAt = profile.PublishedAt;
+            var originalFormTemplateId = sourceForm.TemplateId;
+            const string addedFormId = "form-added";
+            await formRepo.InsertAsync(new FormDef
+            {
+                Id = addedFormId,
+                AppId = sourceAppId,
+                Name = "Added Form"
+            });
+            sourceApp.AppMenus.Add(new AppMenu { MenuId = addedFormId, Title = "Added Form", MenuType = FormType.Form });
+            await appRepo.ReplaceAsync(sourceApp);
+
+            var republishedTemplateId = await publishService.PublishAsync(sourceAppId);
+            var addedForm = formRepo.Get(addedFormId)!;
+            Assert.AreEqual(appTemplateId, republishedTemplateId);
+            Assert.AreEqual(originalFormTemplateId, formRepo.Get(sourceFormId)!.TemplateId);
+            Assert.IsFalse(string.IsNullOrWhiteSpace(addedForm.TemplateId));
+            Assert.IsNotNull(formTemplateRepo.Get(addedForm.TemplateId!));
+            Assert.AreEqual(originalProfileId, profileRepo.Queryable.Single().Id);
+            Assert.AreEqual(originalPublishedAt, profileRepo.Queryable.Single().PublishedAt);
+            Assert.AreEqual(0L, profileRepo.Queryable.Single().InstallCount);
+
             var installedAppId = await installService.InstallAsync(profile.Id);
 
             var installedApp = appRepo.Get(installedAppId)!;
-            var installedForm = formRepo.Queryable.Single(x => x.AppId == installedAppId);
+            var installedForm = formRepo.Queryable.Single(x => x.AppId == installedAppId && x.TemplateId == sourceForm.TemplateId);
             var installedDashboard = dashboardRepo.Queryable.Single(x => x.AppId == installedAppId);
             var installedDashboardItem = dashboardItemRepo.Queryable.Single(x => x.AppId == installedAppId);
             var installedWorkflow = workflowRepo.Queryable.Single(x => x.AppId == installedAppId);
@@ -220,6 +256,10 @@ namespace EIMSNext.Service.Tests
             var installedMenuIds = installedApp.AppMenus.Select(x => x.MenuId).ToList();
             CollectionAssert.Contains(installedMenuIds, installedForm.Id);
             CollectionAssert.Contains(installedMenuIds, installedDashboard.Id);
+            var installedFormMenu = installedApp.AppMenus.Single(x => x.MenuId == installedForm.Id);
+            Assert.IsFalse(installedFormMenu.Editable);
+            Assert.IsFalse(installedFormMenu.Deletable);
+            Assert.AreEqual("custom/orders/index", installedFormMenu.ListComponent);
             CollectionAssert.DoesNotContain(installedMenuIds, sourceForm.TemplateId!);
             CollectionAssert.DoesNotContain(installedMenuIds, sourceDashboard.TemplateId!);
 
@@ -227,6 +267,12 @@ namespace EIMSNext.Service.Tests
             await formRepo.ReplaceAsync(sourceForm);
             await publishService.PublishAsync(sourceAppId);
             Assert.IsNull(formTemplateRepo.Get(sourceForm.TemplateId!));
+            var republishedMenuIds = JsonNode.Parse(appTemplateRepo.Get(appTemplateId)!.Menus)!
+                .AsArray()
+                .Select(node => node!["menuId"]!.GetValue<string>())
+                .ToList();
+            CollectionAssert.DoesNotContain(republishedMenuIds, sourceFormId);
+            CollectionAssert.DoesNotContain(republishedMenuIds, sourceForm.TemplateId!);
 
             profile.Status = AppProfileStatus.Draft;
             await profileRepo.ReplaceAsync(profile);

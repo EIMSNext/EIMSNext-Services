@@ -176,6 +176,13 @@ namespace EIMSNext.ApiHost.Authorization
             {
                 if (_type == IdentityType.None && CurrentUser != null && CurrentUser is User)
                 {
+                    var explicitIdentityType = ResolveExplicitIdentityType(_user!);
+                    if (explicitIdentityType.HasValue)
+                    {
+                        _type = explicitIdentityType.Value;
+                        return _type;
+                    }
+
                     var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
                     if (corp != null)
                     {
@@ -185,11 +192,7 @@ namespace EIMSNext.ApiHost.Authorization
                         }
                         else
                         {
-                            if (_user!.Disabled)
-                            {
-                                _type = IdentityType.Disabled;
-                            }
-                            else if (_employee != null)
+                            if (_employee != null)
                             {
                                 var adminGroups = _resolver.GetService<AdminGroup>().All()
                                     .Where(x =>
@@ -225,6 +228,22 @@ namespace EIMSNext.ApiHost.Authorization
 
                 return _type;
             }
+        }
+
+        internal static IdentityType? ResolveExplicitIdentityType(User user)
+        {
+            if (user.Disabled)
+            {
+                return IdentityType.Disabled;
+            }
+            if (string.IsNullOrWhiteSpace(user.UserType))
+            {
+                return null;
+            }
+
+            return Enum.TryParse<IdentityType>(user.UserType.Trim(), true, out var explicitType)
+                ? explicitType
+                : IdentityType.None;
         }
 
         /// <summary>

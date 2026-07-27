@@ -81,6 +81,15 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public float SortIndex { get; set; }
 
+        /// <summary>前端是否显示菜单编辑入口。</summary>
+        public bool Editable { get; set; } = true;
+
+        /// <summary>前端是否显示菜单删除入口。</summary>
+        public bool Deletable { get; set; } = true;
+
+        /// <summary>自定义列表页组件路径，为空时使用默认数据列表。</summary>
+        public string ListComponent { get; set; } = string.Empty;
+
         /// <summary>
         /// 子菜单
         /// </summary>

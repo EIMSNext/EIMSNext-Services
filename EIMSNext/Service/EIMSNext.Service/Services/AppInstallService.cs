@@ -238,6 +238,9 @@ namespace EIMSNext.Service
                 IconColor = obj["iconColor"]?.GetValue<string>() ?? string.Empty,
                 MenuType = (FormType)menuType,
                 SortIndex = obj["sortIndex"]?.GetValue<float>() ?? 0,
+                Editable = obj["editable"]?.GetValue<bool>() ?? true,
+                Deletable = obj["deletable"]?.GetValue<bool>() ?? true,
+                ListComponent = obj["listComponent"]?.GetValue<string>() ?? string.Empty,
                 SubMenus = subMenus?.Select(x => MapMenu(x, formMap, dashboardMap)).Where(x => x != null).Cast<AppMenu>().ToList()
             };
         }

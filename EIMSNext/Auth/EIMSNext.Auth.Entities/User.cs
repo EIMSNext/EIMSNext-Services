@@ -29,6 +29,11 @@ namespace EIMSNext.Auth.Entities
         /// </summary>
         public bool Disabled {  get; set; }
 
+        /// <summary>
+        /// 显式用户身份。为空时由业务服务按企业和员工关系计算。
+        /// </summary>
+        public string? UserType { get; set; }
+
         public IList<UserCorp> Crops { get; set; } = new List<UserCorp>();
 
         public bool IsSystem => Id == "system";

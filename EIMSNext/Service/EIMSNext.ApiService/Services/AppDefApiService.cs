@@ -284,6 +284,9 @@ namespace EIMSNext.ApiService
                     IconColor = existing.IconColor,
                     MenuType = existing.MenuType,
                     SortIndex = existing.SortIndex,
+                    Editable = existing.Editable,
+                    Deletable = existing.Deletable,
+                    ListComponent = existing.ListComponent,
                     SubMenus = existing.MenuType == FormType.Group
                         ? CloneSortableMenuTree(submitted.SubMenus ?? [], existingById)
                         : null,

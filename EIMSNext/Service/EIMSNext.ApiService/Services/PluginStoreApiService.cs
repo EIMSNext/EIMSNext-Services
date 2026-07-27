@@ -1,10 +1,11 @@
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiService.RequestModels;
+using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 
@@ -23,8 +24,8 @@ namespace EIMSNext.ApiService
         }
 
         private IPluginRuntimeManager PluginRuntimeManager => Resolver.Resolve<IPluginRuntimeManager>();
-        private IRepository<PluginInstall> PluginInstallRepository => Resolver.GetRepository<PluginInstall>();
-        private IRepository<PluginProfile> PluginProfileRepository => Resolver.GetRepository<PluginProfile>();
+        private IPluginInstallService PluginInstallService => Resolver.GetService<IPluginInstallService, PluginInstall>();
+        private IPluginProfileService PluginProfileService => Resolver.GetService<IPluginProfileService, PluginProfile>();
 
         public IEnumerable<PluginRuntimeInfo> GetEnabledPlugins()
         {
@@ -35,8 +36,7 @@ namespace EIMSNext.ApiService
             }
 
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var enabledInstalls = PluginInstallRepository.Queryable
-                .Where(x => x.CorpId == corpId)
+            var enabledInstalls = PluginInstallService.Query(x => x.CorpId == corpId)
                 .ToList()
                 .Where(x => IsInstallUsable(x, now))
                 .ToList();
@@ -51,16 +51,15 @@ namespace EIMSNext.ApiService
         public IEnumerable<PluginInstall> GetPluginInstalls()
         {
             var corpId = IdentityContext.CurrentCorpId;
-            return PluginInstallRepository.Queryable
-                .Where(x => x.CorpId == corpId && !x.DeleteFlag)
+            return PluginInstallService.Query(x => x.CorpId == corpId && !x.DeleteFlag)
                 .OrderByDescending(x => x.InstalledAt)
                 .ToList();
         }
 
         public async Task<PluginInstall?> EnablePluginInstallAsync(string id)
         {
-            var entity = PluginInstallRepository.Queryable
-                .FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .FirstOrDefault();
             if (entity == null)
             {
                 return null;
@@ -75,14 +74,14 @@ namespace EIMSNext.ApiService
             entity.Enabled = true;
             entity.LastEnabledAt = now;
             entity.Status = PluginInstallStatus.Installed;
-            await PluginInstallRepository.ReplaceAsync(entity);
+            await PluginInstallService.ReplaceAsync(entity);
             return entity;
         }
 
         public async Task<PluginInstall?> DisablePluginInstallAsync(string id)
         {
-            var entity = PluginInstallRepository.Queryable
-                .FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .FirstOrDefault();
             if (entity == null)
             {
                 return null;
@@ -90,14 +89,14 @@ namespace EIMSNext.ApiService
 
             entity.Enabled = false;
             entity.LastDisabledAt = DateTime.UtcNow.ToTimeStampMs();
-            await PluginInstallRepository.ReplaceAsync(entity);
+            await PluginInstallService.ReplaceAsync(entity);
             return entity;
         }
 
         public async Task<PluginInstall?> DeletePluginInstallAsync(string id)
         {
-            var entity = PluginInstallRepository.Queryable
-                .FirstOrDefault(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag);
+            var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .FirstOrDefault();
             if (entity == null)
             {
                 return null;
@@ -107,7 +106,7 @@ namespace EIMSNext.ApiService
             entity.Enabled = false;
             entity.Status = PluginInstallStatus.Uninstalled;
             entity.UninstalledAt = DateTime.UtcNow.ToTimeStampMs();
-            await PluginInstallRepository.ReplaceAsync(entity);
+            await PluginInstallService.ReplaceAsync(entity);
 
             await UpdatePluginInstallCountAsync(entity.PluginId, -1);
 
@@ -116,7 +115,7 @@ namespace EIMSNext.ApiService
 
         public (long total, IReadOnlyList<object> items) GetPluginStore(PluginProfileQueryRequest request)
         {
-            var query = PluginProfileRepository.Queryable.Where(x => !x.DeleteFlag && x.Status == PublishedStatus);
+            var query = PluginProfileService.Query(x => !x.DeleteFlag && x.Status == PublishedStatus);
 
             if (!string.IsNullOrWhiteSpace(request.Keyword))
             {
@@ -141,8 +140,7 @@ namespace EIMSNext.ApiService
             var corpId = IdentityContext.CurrentCorpId;
             var installedPluginIds = string.IsNullOrWhiteSpace(corpId)
                 ? new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-                : PluginInstallRepository.Queryable
-                    .Where(x => x.CorpId == corpId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed)
+                : PluginInstallService.Query(x => x.CorpId == corpId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed)
                     .Select(x => x.PluginId)
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -178,7 +176,6 @@ namespace EIMSNext.ApiService
                     x.PublishedAt,
                     x.HelpDocUrl,
                     x.TemplateUrl,
-                    x.PricingPlans,
                     installed = installedPluginIds.Contains(x.PluginId)
                 })
                 .ToList();
@@ -188,7 +185,7 @@ namespace EIMSNext.ApiService
 
         public object? GetPluginStoreDetail(string id)
         {
-            var profile = PluginProfileRepository.Get(id);
+            var profile = PluginProfileService.Get(id);
             if (profile == null || profile.DeleteFlag || profile.Status != PublishedStatus)
             {
                 return null;
@@ -197,7 +194,8 @@ namespace EIMSNext.ApiService
             var corpId = IdentityContext.CurrentCorpId;
             var install = string.IsNullOrWhiteSpace(corpId)
                 ? null
-                : PluginInstallRepository.Queryable.FirstOrDefault(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed);
+                : PluginInstallService.Query(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag && x.Status == PluginInstallStatus.Installed)
+                    .FirstOrDefault();
             var now = DateTime.UtcNow.ToTimeStampMs();
             var runtime = PluginRuntimeManager.GetPlugin(profile.PluginId);
             var functions = runtime?.Functions.Select(x => (object)new
@@ -207,15 +205,7 @@ namespace EIMSNext.ApiService
                     Description = x.Description ?? string.Empty,
                     inputFields = x.InputFields.ToList(),
                     resultFields = x.ResultFields.ToList(),
-                }).ToList()
-                ?? profile.Functions.Select(x => (object)new
-                {
-                    x.Id,
-                    x.Name,
-                    Description = x.Description ?? string.Empty,
-                    inputFields = x.InputFields.ToList(),
-                    resultFields = x.ResultFields.ToList(),
-                }).ToList();
+                }).ToList() ?? [];
 
             return new
             {
@@ -242,7 +232,6 @@ namespace EIMSNext.ApiService
                 profile.PublishedAt,
                 profile.HelpDocUrl,
                 profile.TemplateUrl,
-                profile.PricingPlans,
                 functions,
                 installed = install != null,
                 installEnabled = install != null && IsInstallUsable(install, now),
@@ -256,7 +245,7 @@ namespace EIMSNext.ApiService
                 return null;
             }
 
-            var profile = PluginProfileRepository.Get(id);
+            var profile = PluginProfileService.Get(id);
             if (profile == null || profile.DeleteFlag || profile.Status != PublishedStatus)
             {
                 return null;
@@ -264,8 +253,8 @@ namespace EIMSNext.ApiService
 
             var corpId = IdentityContext.CurrentCorpId;
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var existing = PluginInstallRepository.Queryable
-                .FirstOrDefault(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag);
+            var existing = PluginInstallService.Query(x => x.CorpId == corpId && x.PluginId == profile.PluginId && !x.DeleteFlag)
+                .FirstOrDefault();
 
             if (existing != null)
             {
@@ -274,7 +263,7 @@ namespace EIMSNext.ApiService
 
             var entity = new PluginInstall
             {
-                Id = PluginInstallRepository.NewId(),
+                Id = Resolver.GetRepository<PluginInstall>().NewId(),
                 CorpId = corpId,
                 PluginId = profile.PluginId,
                 Name = profile.Name,
@@ -286,7 +275,7 @@ namespace EIMSNext.ApiService
                 InstalledBy = IdentityContext.CurrentEmployee?.ToOperator() ?? new Operator(IdentityContext.CurrentUserID, IdentityContext.CurrentUser?.Name ?? string.Empty, IdentityContext.CurrentUser?.Name ?? string.Empty),
                 Source = "pluginstore"
             };
-            await PluginInstallRepository.InsertAsync(entity);
+            await PluginInstallService.AddAsync(entity);
 
             await UpdatePluginInstallCountAsync(profile.PluginId, 1);
 
@@ -295,16 +284,74 @@ namespace EIMSNext.ApiService
 
         public IEnumerable<PluginRuntimeInfo> GetInstalledRuntimePlugins() => PluginRuntimeManager.GetPlugins();
 
+        public async Task<PluginProfile> PublishAsync(PluginPublishRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.PluginId))
+            {
+                throw new BadRequestException("PluginId 不能为空");
+            }
+
+            var runtime = PluginRuntimeManager.GetPlugin(request.PluginId.Trim());
+            if (runtime == null)
+            {
+                throw new BadRequestException("未找到已加载的运行时插件");
+            }
+
+            var profile = PluginProfileService.Query(x => x.PluginId == runtime.PluginId && x.Version == runtime.Version)
+                .FirstOrDefault();
+            var exists = profile != null;
+            profile ??= new PluginProfile
+            {
+                Id = Resolver.GetRepository<PluginProfile>().NewId(),
+                PluginId = runtime.PluginId,
+                Version = runtime.Version
+            };
+
+            profile.Name = runtime.Name;
+            profile.Description = runtime.Description ?? string.Empty;
+            profile.Summary = string.IsNullOrWhiteSpace(request.Summary)
+                ? profile.Description
+                : request.Summary.Trim();
+            profile.Icon = request.Icon?.Trim() ?? string.Empty;
+            profile.CoverImage = request.CoverImage?.Trim() ?? string.Empty;
+            profile.BannerImage = request.BannerImage?.Trim() ?? string.Empty;
+            profile.GalleryImages = request.GalleryImages?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct().ToList() ?? [];
+            profile.Category = request.Category?.Trim() ?? string.Empty;
+            profile.Scenario = request.Scenario?.Trim() ?? string.Empty;
+            profile.Tags = request.Tags?.Where(x => !string.IsNullOrWhiteSpace(x)).Select(x => x.Trim()).Distinct().ToList() ?? [];
+            profile.DeveloperName = request.DeveloperName?.Trim() ?? string.Empty;
+            profile.DeveloperCorpId = request.DeveloperCorpId?.Trim() ?? string.Empty;
+            profile.IsOfficial = request.IsOfficial;
+            profile.IsHot = request.IsHot;
+            profile.IsRecommended = request.IsRecommended;
+            profile.SortIndex = request.SortIndex;
+            profile.Status = PublishedStatus;
+            profile.PublishedAt ??= DateTime.UtcNow;
+            profile.HelpDocUrl = request.HelpDocUrl?.Trim() ?? string.Empty;
+            profile.TemplateUrl = request.TemplateUrl?.Trim() ?? string.Empty;
+            profile.DeleteFlag = false;
+
+            if (exists)
+            {
+                await PluginProfileService.ReplaceAsync(profile);
+            }
+            else
+            {
+                await PluginProfileService.AddAsync(profile);
+            }
+
+            return profile;
+        }
+
         private async Task UpdatePluginInstallCountAsync(string pluginId, long delta)
         {
-            var profiles = PluginProfileRepository.Queryable
-                .Where(x => x.PluginId == pluginId && !x.DeleteFlag)
+            var profiles = PluginProfileService.Query(x => x.PluginId == pluginId && !x.DeleteFlag)
                 .ToList();
 
             foreach (var profile in profiles)
             {
                 profile.InstallCount = Math.Max(0, profile.InstallCount + delta);
-                await PluginProfileRepository.ReplaceAsync(profile);
+                await PluginProfileService.ReplaceAsync(profile);
             }
         }
 
