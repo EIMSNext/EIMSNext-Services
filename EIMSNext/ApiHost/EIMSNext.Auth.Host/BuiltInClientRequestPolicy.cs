@@ -37,7 +37,7 @@ namespace EIMSNext.Auth.Host
                 IsClient(clientId, InternalClients.SystemClientId))
             {
                 return BuiltInClientValidationResult.Failure(
-                    OpenIddictConstants.Errors.UnauthorizedClient,
+                    OpenIddictConstants.Errors.InvalidClient,
                     "The client application is not allowed to use this endpoint.");
             }
 
@@ -56,7 +56,7 @@ namespace EIMSNext.Auth.Host
             if (!IsClient(clientId, InternalClients.WebClientId))
             {
                 return BuiltInClientValidationResult.Failure(
-                    OpenIddictConstants.Errors.UnauthorizedClient,
+                    OpenIddictConstants.Errors.InvalidClient,
                     "The client application is not allowed to use this endpoint.");
             }
 

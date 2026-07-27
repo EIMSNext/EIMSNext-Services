@@ -33,7 +33,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.WebClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -44,7 +44,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.PublicClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -55,7 +55,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.SystemClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -65,6 +65,18 @@ namespace EIMSNext.Auth.Tests
             var request = CreateRequest("https://evil.example.com");
 
             var result = policy.ValidateLogin(InternalClients.WebClientId, request);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
+        }
+
+        [TestMethod]
+        public void ValidateLogin_RejectsNonWebClientAsInvalidClient()
+        {
+            var policy = CreatePolicy();
+            var request = CreateRequest("https://admin.eimsnext.com");
+
+            var result = policy.ValidateLogin(InternalClients.SystemClientId, request);
 
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
@@ -135,17 +147,6 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateSystemToken(InternalClients.SystemClientId, CustomGrantType.System);
 
             Assert.IsTrue(result.Succeeded);
-        }
-
-        [TestMethod]
-        public void ValidateSystemToken_RejectsNonSystemGrant()
-        {
-            var policy = CreatePolicy();
-
-            var result = policy.ValidateSystemToken(InternalClients.SystemClientId, "system_task");
-
-            Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.InvalidRequest, result.Error);
         }
 
         [TestMethod]

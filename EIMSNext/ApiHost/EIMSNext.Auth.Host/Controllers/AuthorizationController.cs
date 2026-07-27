@@ -1,6 +1,7 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Utilities;
+using EIMSNext.ApiCore.RateLimiting;
 
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
@@ -22,13 +23,16 @@ namespace EIMSNext.Auth.Host.Controllers
     {
         private readonly ITokenRequestHandler _tokenRequestHandler;
         private readonly IBuiltInClientRequestPolicy _builtInClientRequestPolicy;
+        private readonly PublicRateLimiter? _rateLimiter;
 
         public AuthorizationController(
             ITokenRequestHandler tokenRequestHandler,
-            IBuiltInClientRequestPolicy builtInClientRequestPolicy)
+            IBuiltInClientRequestPolicy builtInClientRequestPolicy,
+            PublicRateLimiter? rateLimiter = null)
         {
             _tokenRequestHandler = tokenRequestHandler;
             _builtInClientRequestPolicy = builtInClientRequestPolicy;
+            _rateLimiter = rateLimiter;
         }
 
         [HttpPost("~/connect/token")]
@@ -100,7 +104,7 @@ namespace EIMSNext.Auth.Host.Controllers
             request.ClientId = clientId;
             request.Scope = fields.TryGetValue("scope", out var scope) ? scope : null;
 
-            return await HandleTokenRequestAsync(request, cancellationToken);
+            return await HandleTokenRequestAsync(request, cancellationToken, username);
         }
 
         [Route("~/public/token"), HttpPost]
@@ -179,11 +183,28 @@ namespace EIMSNext.Auth.Host.Controllers
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
 
-        private async Task<IActionResult> HandleTokenRequestAsync(OpenIddictRequest request, CancellationToken cancellationToken)
+        private async Task<IActionResult> HandleTokenRequestAsync(
+            OpenIddictRequest request,
+            CancellationToken cancellationToken,
+            string? loginRateLimitTarget = null)
         {
             var result = await _tokenRequestHandler.HandleAsync(request, cancellationToken);
             if (!result.Succeeded)
             {
+                if (_rateLimiter != null && !string.IsNullOrWhiteSpace(loginRateLimitTarget) && result.Error == Errors.InvalidGrant)
+                {
+                    var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                    var rate = await _rateLimiter.CheckAsync("login", loginRateLimitTarget, ip);
+                    if (!rate.Allowed)
+                    {
+                        return StatusCode(StatusCodes.Status429TooManyRequests, new OpenIddictResponse
+                        {
+                            Error = "rate_limited",
+                            ErrorDescription = "登录失败次数过多，请稍后再试。"
+                        });
+                    }
+                }
+
                 return CreateErrorResult(result.Error!, result.ErrorDescription!);
             }
 

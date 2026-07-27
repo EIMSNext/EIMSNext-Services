@@ -1,4 +1,5 @@
 using System.Security.Cryptography.X509Certificates;
+using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Persistence;
@@ -22,6 +23,7 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
             services.AddScoped<PublicSettingLookupService>();
+            services.AddSingleton<IVerificationCodeProvider, MockVerificationCodeProvider>();
             services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             services.AddScoped<ISingleSignOnService, SingleSignOnService>();
             services.AddScoped<IAuditLoginService, AuditLoginService>();
@@ -45,7 +47,7 @@ namespace EIMSNext.Auth.Extensions
                 {
                     var issuerValue = configuration.GetSection("OAuth:Issuer").Value
                         ?? "https://auth.eimsnext.com";
-                    options.SetIssuer(new Uri(issuerValue));
+                    options.SetIssuer(issuerValue);
                     options.SetTokenEndpointUris("connect/token", "auth/login", "public/token", "system/token");
                     options.RegisterScopes(
                         Scopes.OpenId,

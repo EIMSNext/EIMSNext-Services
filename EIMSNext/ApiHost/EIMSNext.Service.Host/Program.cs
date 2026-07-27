@@ -174,4 +174,17 @@ async Task EnsureSeedData(IResolver resolver)
         };
         await pluginProfileRepo.InsertAsync(profile);
     }
+
+    var corporateSettingService = resolver.GetService<CorporateSetting>();
+    if (corporateSettingService != null && !corporateSettingService.All()
+        .Any(x => x.CorpId == "test-corp" && x.Name == CorporateSettingNames.SsoSecret && !x.DeleteFlag))
+    {
+        await corporateSettingService.AddAsync(new CorporateSetting
+        {
+            CorpId = "test-corp",
+            Name = CorporateSettingNames.SsoSecret,
+            Value = string.Empty,
+            Desc = "SSO Secret"
+        });
+    }
 }

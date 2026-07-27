@@ -21,6 +21,7 @@ namespace EIMSNext.Auth.Services
 
         public async Task<TokenRequestResult> HandleAsync(OpenIddictRequest request, CancellationToken cancellationToken = default)
         {
+            var grantType = request.GrantType;
             var client = ValidateClient(request.ClientId, request.ClientSecret);
             if (client == null)
             {
@@ -42,12 +43,12 @@ namespace EIMSNext.Auth.Services
                 return TokenRequestResult.Failure(Errors.InvalidScope, "The specified scope is invalid.");
             }
 
-            if (!IsGrantTypeAllowed(client, request.GrantType))
+            if (!IsGrantTypeAllowed(client, grantType))
             {
                 return TokenRequestResult.Failure(Errors.UnauthorizedClient, "The client application is not allowed to use this grant type.");
             }
 
-            if (string.IsNullOrWhiteSpace(request.GrantType) || !_grantHandlers.TryGetValue(request.GrantType, out var grantHandler))
+            if (string.IsNullOrWhiteSpace(grantType) || !_grantHandlers.TryGetValue(grantType, out var grantHandler))
             {
                 return TokenRequestResult.Failure(Errors.UnsupportedGrantType, "The specified grant type is not supported.");
             }

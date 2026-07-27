@@ -7,7 +7,9 @@ namespace EIMSNext.Auth.Interfaces
     {
         IQueryable<Client> Clients { get; }
         IQueryable<User> Users { get; }
+        IQueryable<EmployeeLookup> Employees { get; }
         IQueryable<PublicAccessSetting> PublicSettings { get; }
+        IQueryable<CorporateSettingReadModel> CorporateSettings { get; }
 
         Task AddClient(Client entity);
         Task UpdateClient(Client entity);

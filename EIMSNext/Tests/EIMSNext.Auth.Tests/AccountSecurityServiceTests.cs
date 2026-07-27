@@ -32,12 +32,17 @@ namespace EIMSNext.Auth.Tests
         {
             using var dbContext = new FakeAuthDbContext();
             var service = CreateService(dbContext);
+            var code = (await service.SendRegCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000"
+            })).MockCode!;
 
             await service.RegisterAsync(new RegisterRequest
             {
                 Type = PinCodeTargetType.Phone,
                 Phone = "13800138000",
-                Code = "123456",
+                Code = code,
                 Password = "Strong123!"
             });
 
@@ -53,12 +58,17 @@ namespace EIMSNext.Auth.Tests
         {
             using var dbContext = new FakeAuthDbContext();
             var service = CreateService(dbContext);
+            var code = (await service.SendRegCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Email,
+                Target = "tester@example.com"
+            })).MockCode!;
 
             await service.RegisterAsync(new RegisterRequest
             {
                 Type = PinCodeTargetType.Email,
                 Email = "tester@example.com",
-                Code = "123456",
+                Code = code,
                 Password = "Strong123!"
             });
 
@@ -72,12 +82,17 @@ namespace EIMSNext.Auth.Tests
         {
             using var dbContext = new FakeAuthDbContext();
             var service = CreateService(dbContext);
+            var code = (await service.SendRegCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Email,
+                Target = "tester@example.com"
+            })).MockCode!;
 
             var ex = await AssertThrowsAsync<InvalidOperationException>(() => service.RegisterAsync(new RegisterRequest
             {
                 Type = PinCodeTargetType.Email,
                 Email = "tester@example.com",
-                Code = "123456",
+                Code = code,
                 Password = "abcdefghi"
             }));
 
@@ -152,6 +167,7 @@ namespace EIMSNext.Auth.Tests
             private readonly List<Client> _clients = [];
             private readonly List<AuditLogin> _auditLogins = [];
             private readonly List<EIMSNext.Auth.Models.PublicAccessSetting> _publicSettings = [];
+            private readonly List<CorporateSettingReadModel> _corporateSettings = [];
 
             public FakeAuthDbContext(IEnumerable<User>? users = null)
             {
@@ -160,7 +176,9 @@ namespace EIMSNext.Auth.Tests
 
             public IQueryable<Client> Clients => _clients.AsQueryable();
             public IQueryable<User> Users => _users.AsQueryable();
+            public IQueryable<EmployeeLookup> Employees => Array.Empty<EmployeeLookup>().AsQueryable();
             public IQueryable<EIMSNext.Auth.Models.PublicAccessSetting> PublicSettings => _publicSettings.AsQueryable();
+            public IQueryable<CorporateSettingReadModel> CorporateSettings => _corporateSettings.AsQueryable();
 
             public Task AddClient(Client entity)
             {

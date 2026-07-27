@@ -125,6 +125,7 @@ namespace EIMSNext.ApiCore
             services.AddSingleton<ICacheClient, DistributedCacheClient>();
             services.AddScoped<IScopeCache, ScopeCache>();
             services.AddScoped<PublicRateLimiter>();
+            services.AddScoped<VerificationCodeRateLimiter>();
         }
 
         public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)
@@ -158,6 +159,7 @@ namespace EIMSNext.ApiCore
                  };
              });
         }
+
         public static void UseCustomMiddlewares(this IApplicationBuilder app)
         {
             app.UseMiddleware<ExceptionFilterMiddleware>();

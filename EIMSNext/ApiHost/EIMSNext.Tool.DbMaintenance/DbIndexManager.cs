@@ -22,6 +22,7 @@ namespace EIMSNext.Auth.DbMaintenance
             var background = new CreateIndexOptions { Background = true };
 
             CreateAuthIndexes(background);
+            CreateCorporateSettingIndexes(background);
             CreateOrganizationIndexes(background);
             CreatePluginStoreIndexes(background);
             CreateDefinitionIndexes(background);
@@ -123,6 +124,19 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<ECoinPrice>.IndexKeys.Ascending(x => x.TargetType).Ascending(x => x.FeatureId),
                 CreateUniqueOptions(options),
                 "ix_ecoinprice_target_feature_unique");
+        }
+
+        private void CreateCorporateSettingIndexes(CreateIndexOptions options)
+        {
+            var indexOptions = CreateUniqueOptions(options);
+            CreateIndex(
+                GetCollection<CorporateSetting>(),
+                Builders<CorporateSetting>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.Name)
+                    .Ascending(x => x.DeleteFlag),
+                indexOptions,
+                "ix_corporatesetting_corp_name_unique");
         }
 
         private void CreateDefinitionIndexes(CreateIndexOptions options)

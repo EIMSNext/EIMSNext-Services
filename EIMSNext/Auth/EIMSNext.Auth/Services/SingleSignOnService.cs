@@ -1,14 +1,21 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace EIMSNext.Auth.Services
 {
     public class SingleSignOnService : ISingleSignOnService
     {
         private readonly IUserService _userService;
-        public SingleSignOnService(IUserService userService)
+        private readonly IAuthDbContext _dbContext;
+
+        public SingleSignOnService(
+            IUserService userService,
+            IAuthDbContext dbContext)
         {
             _userService = userService;
+            _dbContext = dbContext;
         }
 
         public User? Validate(string? corp_empno, string? secret)
@@ -24,7 +31,20 @@ namespace EIMSNext.Auth.Services
         }
         private bool VerifySecret(string corpId, string? secret)
         {
-            return true;
+            var configuredSecret = _dbContext.CorporateSettings
+                .Where(x => x.CorpId == corpId &&
+                            x.Name == CorporateSettingNames.SsoSecret &&
+                            !x.DeleteFlag)
+                .Select(x => x.Value)
+                .FirstOrDefault();
+            if (string.IsNullOrWhiteSpace(configuredSecret) || string.IsNullOrWhiteSpace(secret))
+            {
+                return false;
+            }
+
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(configuredSecret),
+                Encoding.UTF8.GetBytes(secret));
         }
     }
 }

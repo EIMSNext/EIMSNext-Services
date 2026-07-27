@@ -47,4 +47,5 @@ internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IW
             IssuerSigningKey = new X509SecurityKey(certificate)
         };
     }
+
 }
