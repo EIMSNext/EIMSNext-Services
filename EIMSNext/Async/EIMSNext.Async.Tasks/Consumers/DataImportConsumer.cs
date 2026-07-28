@@ -4,7 +4,7 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Async.Tasks.SystemTask;
+using EIMSNext.Async.Tasks.System;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
@@ -126,7 +126,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             if (importLog.ImportAction == DataAction.Submit)
             {
-                var tokenProvider = resolver.Resolve<ISystemTaskTokenProvider>();
+                var tokenProvider = resolver.Resolve<ISystemTokenProvider>();
                 serviceContext.AccessToken = await tokenProvider.GetAccessTokenAsync(
                     importLog.CorpId ?? string.Empty,
                     "form-import",

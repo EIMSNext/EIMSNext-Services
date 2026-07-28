@@ -105,7 +105,7 @@ namespace EIMSNext.Auth.Tests
         }
 
         [TestMethod]
-        public async Task HandleAsync_SystemTaskGrant_ReturnsSystemClaims()
+        public async Task HandleAsync_SystemGrant_ReturnsSystemClaims()
         {
             var client = new Client
             {
@@ -145,7 +145,7 @@ namespace EIMSNext.Auth.Tests
         }
 
         [TestMethod]
-        public async Task HandleAsync_SystemTaskGrant_Fails_WhenObjectInfoMissing()
+        public async Task HandleAsync_SystemGrant_Fails_WhenObjectInfoMissing()
         {
             var client = new Client
             {
@@ -195,7 +195,7 @@ namespace EIMSNext.Auth.Tests
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
                 new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
-                new SystemTaskTokenGrantHandler(contextAccessor)
+                new SystemTokenGrantHandler(contextAccessor)
             ];
         }
 

@@ -1,7 +1,7 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Async.Tasks.SystemTask;
+using EIMSNext.Async.Tasks.System;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Service.Entities;
@@ -31,7 +31,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var flowClient = resolver.Resolve<FlowApiClient>();
-            var tokenProvider = resolver.Resolve<ISystemTaskTokenProvider>();
+            var tokenProvider = resolver.Resolve<ISystemTokenProvider>();
             try
             {
                 var accessToken = await tokenProvider.GetAccessTokenAsync(args.CorpId, "df", args.DataflowId, ct);

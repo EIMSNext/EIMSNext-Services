@@ -132,7 +132,7 @@ namespace EIMSNext.ApiCore
         {
             var oauthSection = configuration.GetSection("OAuth");
             var authority = oauthSection["Authority"];
-            var issuer = oauthSection["Issuer"] ?? "https://auth.eimsnext.com";
+            var issuer = oauthSection["Issuer"] ?? "https://auth.eimsnext.com/issuer";
             var audience = oauthSection["Audience"] ?? "eimsnext.api";
             var requireHttps = oauthSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
 
@@ -151,8 +151,7 @@ namespace EIMSNext.ApiCore
                  opt.TokenValidationParameters = new TokenValidationParameters
                  {
                      ValidateIssuer = true,
-                     // OpenIddict emits the issuer as the canonical URI with a trailing slash.
-                     ValidIssuer = issuer + "/",
+                     ValidIssuer = issuer,
                      ValidateAudience = true,
                      ValidAudience = audience,
                      ValidateLifetime = true,

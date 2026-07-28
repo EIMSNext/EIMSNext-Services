@@ -42,7 +42,7 @@ namespace EIMSNext.Service.Host.Controllers
         [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult CurrentUser()
         {
-            var user = IdentityContext.CurrentUser!;
+            var user = IdentityContext.CurrentUser;
             var emp = IdentityContext.CurrentEmployee as Employee;
             var departmentIds = emp == null
                 ? new List<string>()
@@ -54,10 +54,10 @@ namespace EIMSNext.Service.Host.Controllers
 
             return ApiResult.Success(new
             {
-                userId = user.Id,
-                userName = user.Name,
-                phone = user.Phone,
-                email = user.Email,
+                userId = user?.Id ?? IdentityContext.CurrentUserID,
+                userName = user?.Name ?? User.Identity?.Name ?? IdentityContext.CurrentUserID,
+                phone = user?.Phone,
+                email = user?.Email,
                 empId = emp?.Id,
                 empCode = emp?.Code,
                 empName = emp?.EmpName,

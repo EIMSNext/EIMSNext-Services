@@ -349,7 +349,7 @@ namespace EIMSNext.Async.Tasks.Export
 
         private static IEnumerable<object?> EnumerateItems(object value)
         {
-            if (value is System.Collections.IEnumerable enumerable and not string)
+            if (value is global::System.Collections.IEnumerable enumerable and not string)
             {
                 foreach (var item in enumerable)
                 {

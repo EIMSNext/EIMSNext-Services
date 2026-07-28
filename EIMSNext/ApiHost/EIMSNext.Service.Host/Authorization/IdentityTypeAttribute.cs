@@ -31,7 +31,7 @@ namespace EIMSNext.Service.Host.Authorization
         public const IdentityType PlatAdmin = IdentityType.PlatAdmin;
 
         /// <summary>
-        /// 企业所有者 + 超管 + 系统后台任务
+        /// 企业所有者 + 超管 + 系统身份
         /// </summary>
         public const IdentityType CorpAdmin =
             IdentityType.System |

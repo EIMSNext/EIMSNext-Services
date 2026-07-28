@@ -31,7 +31,7 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<ITokenGrantHandler, VerificationCodeTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, PublicTokenGrantHandler>();
-            services.AddScoped<ITokenGrantHandler, SystemTaskTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, SystemTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, ClientCredentialsTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
@@ -46,7 +46,7 @@ namespace EIMSNext.Auth.Extensions
                 .AddServer(options =>
                 {
                     var issuerValue = configuration.GetSection("OAuth:Issuer").Value
-                        ?? "https://auth.eimsnext.com";
+                        ?? "https://auth.eimsnext.com/issuer";
                     options.SetIssuer(issuerValue);
                     options.SetTokenEndpointUris("connect/token", "auth/login", "public/token", "system/token");
                     options.RegisterScopes(

@@ -271,9 +271,9 @@ namespace EIMSNext.Async.Tasks
             };
         }
 
-        public static System.Dynamic.ExpandoObject ToExpandoObject(JsonElement element)
+        public static global::System.Dynamic.ExpandoObject ToExpandoObject(JsonElement element)
         {
-            var expando = new System.Dynamic.ExpandoObject();
+            var expando = new global::System.Dynamic.ExpandoObject();
             var dict = (IDictionary<string, object?>)expando;
             foreach (var prop in element.EnumerateObject())
             {
