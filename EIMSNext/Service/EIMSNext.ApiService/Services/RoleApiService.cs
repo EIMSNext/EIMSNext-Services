@@ -131,19 +131,45 @@ namespace EIMSNext.ApiService
         protected override Task AddAsyncCore(Role entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有创建角色的权限");
+            EnsureRoleGroupBelongsToCurrentCorp(entity.RoleGroupId);
             return base.AddAsyncCore(entity);
         }
 
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(Role entity)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有修改角色的权限");
+            EnsureRoleGroupBelongsToCurrentCorp(entity.RoleGroupId);
             return base.ReplaceAsyncCore(entity);
         }
 
         protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureUnrestrictedManagement("没有删除角色的权限");
+
+            var roleIds = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var referenced = Resolver.GetRepository<Employee>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
+                .Any(x => x.Roles.Any(r => roleIds.Contains(r.RoleId)));
+            if (referenced)
+            {
+                throw new BadRequestException("该角色有员工使用，不能删除");
+            }
+
             return base.DeleteAsyncCore(ids);
+        }
+
+        private void EnsureRoleGroupBelongsToCurrentCorp(string? roleGroupId)
+        {
+            if (string.IsNullOrWhiteSpace(roleGroupId))
+            {
+                return;
+            }
+
+            var group = Resolver.GetRepository<RoleGroup>().Get(roleGroupId);
+            if (group == null || group.DeleteFlag || group.CorpId != IdentityContext.CurrentCorpId)
+            {
+                throw new BadRequestException("角色组不存在或不属于当前企业");
+            }
         }
 
         private List<RoleSortNode> LoadRoleRootNodes(IRoleGroupService groupService, IRoleService roleService, string movingId)

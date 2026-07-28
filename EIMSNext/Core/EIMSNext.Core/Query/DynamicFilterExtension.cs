@@ -52,6 +52,8 @@ namespace EIMSNext.Core.Query
                             filterValues.Add(DynamicValueNormalizer.Normalize(filter.Value)!);
                     }
 
+                    EnsureSafeValues(filterValues);
+
                     var arrField = "";
                     if (field.Contains('>'))
                     {
@@ -69,6 +71,33 @@ namespace EIMSNext.Core.Query
             }
 
             return myFilter;
+        }
+
+        private static void EnsureSafeValues(IEnumerable<object> values)
+        {
+            foreach (var value in values)
+            {
+                if (ContainsMongoOperatorObject(value))
+                {
+                    throw new BadRequestException("过滤值不允许包含 Mongo 操作符");
+                }
+            }
+        }
+
+        private static bool ContainsMongoOperatorObject(object? value)
+        {
+            if (value is IDictionary<string, object?> dictionary)
+            {
+                return dictionary.Any(x => x.Key.StartsWith('$')) ||
+                       dictionary.Values.Any(ContainsMongoOperatorObject);
+            }
+
+            if (value is IEnumerable<object?> items && value is not string)
+            {
+                return items.Any(ContainsMongoOperatorObject);
+            }
+
+            return false;
         }
 
         private static FilterDefinition<T> BuildFilter<T>(string field, string op, List<object> filterValues)

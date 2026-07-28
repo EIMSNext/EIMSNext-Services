@@ -67,12 +67,22 @@ namespace EIMSNext.Flow.Host.Controllers
                 {
                     return BadRequest("数据流定义不存在或已禁用");
                 }
+
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(dataflow.CorpId))
+                {
+                    return NotFound("数据流定义不存在");
+                }
             }
 
             if (!string.IsNullOrEmpty(request.DataId))
             {
                 formData = _formDataservice.Get(request.DataId);
                 if (formData == null)
+                {
+                    return NotFound("数据不存在");
+                }
+
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(formData.CorpId))
                 {
                     return NotFound("数据不存在");
                 }
@@ -114,6 +124,14 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id ?? "", Error = "" }).ToActionResult();
+        }
+
+        private bool IsSystemIdentity => IdentityContext.IdentityType == ApiService.IdentityType.System;
+
+        private bool BelongsToCurrentCorp(string? corpId)
+        {
+            return !string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) &&
+                   string.Equals(corpId, IdentityContext.CurrentCorpId, StringComparison.Ordinal);
         }
 
         private Operator? ResolveStarter(DfRunRequest request)

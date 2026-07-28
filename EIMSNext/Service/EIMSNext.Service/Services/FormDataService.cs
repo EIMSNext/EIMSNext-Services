@@ -140,6 +140,7 @@ namespace EIMSNext.Service
             }
             if (Context.Action == DataAction.Submit)
             {
+                ValidateRequiredFields(entities.First(), formDef);
                 entities.ForEach(entity => ResolveSerialNumbers(entity, formDef, null));
             }
             if (!formDef.UsingWorkflow)
@@ -542,6 +543,7 @@ namespace EIMSNext.Service
             if (Context.Action == DataAction.Submit)
             {
                 var formDef = GetFromStore<FormDef>(entity.FormId)!;
+                ValidateRequiredFields(entity, formDef);
                 ResolveSerialNumbers(entity, formDef, old);
             }
 
@@ -666,6 +668,73 @@ namespace EIMSNext.Service
             });
 
             doc.Dispose();
+        }
+
+        private static void ValidateRequiredFields(FormData entity, FormDef formDef)
+        {
+            if (formDef.Content?.Items == null || formDef.Content.Items.Count == 0)
+            {
+                return;
+            }
+
+            using var document = JsonDocument.Parse(entity.Data.SerializeToJson());
+            foreach (var field in formDef.Content.Items)
+            {
+                ValidateField(field, document.RootElement, field.Field);
+            }
+
+            static void ValidateField(FieldDef field, JsonElement parent, string path)
+            {
+                var value = TryGetProperty(parent, field.Field, out var property)
+                    ? property
+                    : default;
+
+                if ((field.Required || field.Props?.Required == true) && IsEmpty(value))
+                {
+                    throw new BadRequestException($"字段 [{path}] 不能为空");
+                }
+
+                if (field.Columns == null || value.ValueKind != JsonValueKind.Array)
+                {
+                    return;
+                }
+
+                var rowIndex = 0;
+                foreach (var row in value.EnumerateArray())
+                {
+                    foreach (var column in field.Columns)
+                    {
+                        ValidateField(column, row, $"{path}[{rowIndex}].{column.Field}");
+                    }
+
+                    rowIndex++;
+                }
+            }
+
+            static bool TryGetProperty(JsonElement parent, string name, out JsonElement value)
+            {
+                if (parent.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var property in parent.EnumerateObject())
+                    {
+                        if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            value = property.Value;
+                            return true;
+                        }
+                    }
+                }
+
+                value = default;
+                return false;
+            }
+
+            static bool IsEmpty(JsonElement value)
+            {
+                return value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                    || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
+                    || value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0;
+            }
         }
 
         private void AppendSegment(JsonElement seg, StringBuilder sb, FormData entity, IDictionary<string, object?> dataDict, string serialNoField)

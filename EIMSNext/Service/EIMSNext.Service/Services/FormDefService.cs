@@ -38,6 +38,7 @@ namespace EIMSNext.Service
         {
             foreach (var entity in entities)
             {
+                NormalizeFieldMetadata(entity);
                 ValidateFieldIds(entity);
             }
             return base.BeforeAdd(entities, session);
@@ -45,8 +46,40 @@ namespace EIMSNext.Service
 
         protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
         {
+            NormalizeFieldMetadata(entity);
             ValidateFieldIds(entity);
             return base.BeforeReplace(entity, session);
+        }
+
+        private static void NormalizeFieldMetadata(FormDef formDef)
+        {
+            if (formDef?.Content?.Items == null)
+            {
+                return;
+            }
+
+            foreach (var field in formDef.Content.Items)
+            {
+                NormalizeField(field);
+            }
+
+            static void NormalizeField(FieldDef field)
+            {
+                if (field.Props?.Required == true)
+                {
+                    field.Required = true;
+                }
+
+                if (field.Columns == null)
+                {
+                    return;
+                }
+
+                foreach (var column in field.Columns)
+                {
+                    NormalizeField(column);
+                }
+            }
         }
 
         /// <summary>
@@ -60,12 +93,18 @@ namespace EIMSNext.Service
                 return;
             }
 
+            var fieldIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var field in formDef.Content.Items)
             {
                 var err = FieldIdRules.ValidateFieldId(field.Field);
                 if (!string.IsNullOrEmpty(err))
                 {
                     throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 非法: {err}");
+                }
+
+                if (!fieldIds.Add(field.Field))
+                {
+                    throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 重复: {field.Field}");
                 }
 
                 if (field.Columns != null)
@@ -76,6 +115,11 @@ namespace EIMSNext.Service
                         if (!string.IsNullOrEmpty(subErr))
                         {
                             throw new BadRequestException($"表单 [{formDef.Name}] 子表列 ID 非法: {subErr}");
+                        }
+
+                        if (!fieldIds.Add(col.Field))
+                        {
+                            throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 重复: {col.Field}");
                         }
                     }
                 }
@@ -158,13 +202,58 @@ namespace EIMSNext.Service
             var flowFormIds = deletedForms.Where(x => x.UsingWorkflow).Select(x => x.Id);
             if (flowFormIds.Any())
             {
+                var flowFormIdList = flowFormIds.Distinct().ToList();
                 //删除所有待办
                 var todoRepo = Resolver.GetRepository<Wf_Todo>();
-                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIds), session);
+                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIdList), session);
 
                 //废弃所有流程实例
-                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIds }, Context.AccessToken);
+                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIdList }, Context.AccessToken);
             }
+
+            var corpIds = deletedForms.Select(x => x.CorpId).Distinct().ToList();
+
+            // 表单删除后，所有直接引用和嵌入引用都必须失效，避免孤儿配置继续被读取。
+            var printRepo = Resolver.GetRepository<PrintDef>();
+            await printRepo.UpdateManyAsync(
+                printRepo.FilterBuilder.And(
+                    printRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    printRepo.FilterBuilder.In(x => x.FormId, formIds)),
+                printRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var bindingRepo = Resolver.GetRepository<CrossBinding>();
+            await bindingRepo.UpdateManyAsync(
+                bindingRepo.FilterBuilder.And(
+                    bindingRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    bindingRepo.FilterBuilder.In(x => x.SourceFormId, formIds)),
+                bindingRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var authGroupRepo = Resolver.GetRepository<AuthGroup>();
+            await authGroupRepo.UpdateManyAsync(
+                authGroupRepo.FilterBuilder.And(
+                    authGroupRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    authGroupRepo.FilterBuilder.In(x => x.FormId, formIds)),
+                authGroupRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var itemRepo = Resolver.GetRepository<DashboardItemDef>();
+            var deletedFormIdSet = formIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var embeddedItems = itemRepo.Queryable
+                .Where(x => corpIds.Contains(x.CorpId) && !x.DeleteFlag)
+                .ToList()
+                .Where(x => deletedFormIdSet.Any(id => x.Details.Contains(id, StringComparison.OrdinalIgnoreCase)))
+                .Select(x => x.Id)
+                .ToList();
+            if (embeddedItems.Count > 0)
+            {
+                await itemRepo.UpdateManyAsync(
+                    itemRepo.FilterBuilder.In(x => x.Id, embeddedItems),
+                    itemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                    session: session);
+            }
+
         }
 
     }

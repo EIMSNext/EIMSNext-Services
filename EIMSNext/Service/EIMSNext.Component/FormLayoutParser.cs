@@ -84,11 +84,17 @@ namespace EIMSNext.Component
                 Hidden = field["hidden"]?.GetValue<bool>() ?? false,
                 Source = GetStringValue(field, "source"),
                 SystemKind = GetStringValue(field, "systemKind"),
+                Required = field["$required"]?.GetValue<bool>() ?? false,
             };
 
             var fieldType = fieldDef.Type;
             if (field.TryGetPropertyValue("props", out var propsNode) && propsNode is JsonObject props)
             {
+                if (props.TryGetPropertyValue("required", out var requiredNode) && requiredNode is JsonValue requiredValue)
+                {
+                    fieldDef.Props.Required = requiredValue.GetValue<bool>();
+                }
+
                 switch (fieldType)
                 {
                     case FieldType.TableForm:

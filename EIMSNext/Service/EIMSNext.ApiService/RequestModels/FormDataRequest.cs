@@ -9,7 +9,7 @@ namespace EIMSNext.ApiService.RequestModels
     public class FormDataRequest : RequestBase
     {
         /// <summary>
-        /// 0 - Save, 1 - Submit
+        /// DataAction enum: 1 - Save, 2 - Submit
         /// </summary>
         public DataAction Action { get; set; } = DataAction.Save;
 

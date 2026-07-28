@@ -29,6 +29,10 @@ namespace EIMSNext.Service
                         entity.HeriarchyId = $"|{entity.Id}|";
                         entity.HeriarchyName = entity.Name;
                     }
+                    else if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.Ordinal))
+                    {
+                        throw new BadRequestException("上级部门必须属于当前企业");
+                    }
                     else
                     {
                         entity.HeriarchyId = $"{parent.HeriarchyId}{entity.Id}|";
@@ -117,6 +121,11 @@ namespace EIMSNext.Service
                 return;
             }
 
+            if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.Ordinal))
+            {
+                throw new BadRequestException("上级部门必须属于当前企业");
+            }
+
             if (parent.HeriarchyId.Contains($"|{entity.Id}|"))
             {
                 throw new BadRequestException("部门不能移动到自己的下级部门下");
@@ -144,24 +153,42 @@ namespace EIMSNext.Service
             }
         }
 
-        private async Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
+        private Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
         {
-            var filter = Builders<Employee>.Filter.ElemMatch(
-                x => x.Depts,
-                d => d.DeptId == departmentId);
-            var update = Builders<Employee>.Update.Set(
-                "Depts.$.HeriarchyId", newHeriarchyId);
-            await EmployeeRepository.UpdateManyAsync(filter, update);
+            var employees = EmployeeRepository.Queryable
+                .Where(x => x.Depts.Any(d => d.DeptId == departmentId))
+                .ToList();
+
+            foreach (var employee in employees)
+            {
+                foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                {
+                    dept.HeriarchyId = newHeriarchyId;
+                }
+
+                EmployeeRepository.Replace(employee);
+            }
+
+            return Task.CompletedTask;
         }
 
-        private async Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName)
+        private Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName)
         {
-            var filter = Builders<Employee>.Filter.ElemMatch(
-                x => x.Depts,
-                d => d.DeptId == departmentId);
-            var update = Builders<Employee>.Update.Set(
-                "Depts.$.DeptName", newName);
-            await EmployeeRepository.UpdateManyAsync(filter, update);
+            var employees = EmployeeRepository.Queryable
+                .Where(x => x.Depts.Any(d => d.DeptId == departmentId))
+                .ToList();
+
+            foreach (var employee in employees)
+            {
+                foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                {
+                    dept.DeptName = newName;
+                }
+
+                EmployeeRepository.Replace(employee);
+            }
+
+            return Task.CompletedTask;
         }
     }
 }

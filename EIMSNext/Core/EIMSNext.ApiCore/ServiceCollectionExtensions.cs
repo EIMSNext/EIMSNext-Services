@@ -151,7 +151,8 @@ namespace EIMSNext.ApiCore
                  opt.TokenValidationParameters = new TokenValidationParameters
                  {
                      ValidateIssuer = true,
-                     ValidIssuer = issuer,
+                     // OpenIddict emits the issuer as the canonical URI with a trailing slash.
+                     ValidIssuer = issuer + "/",
                      ValidateAudience = true,
                      ValidAudience = audience,
                      ValidateLifetime = true,
