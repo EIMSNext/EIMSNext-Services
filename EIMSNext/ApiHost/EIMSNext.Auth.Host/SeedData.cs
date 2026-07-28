@@ -86,7 +86,7 @@ namespace EIMSNext.Auth.Host
                     Id = "cloudadmin",
                     Name = "Cloud Admin",
                     Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
-                    Email = "cloudadmin@easyun.com.cn",
+                    Email = "cloudadmin@easyun.cn",
                     UserType = "platadmin"
                 }
             };
