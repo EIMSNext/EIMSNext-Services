@@ -26,7 +26,7 @@ namespace EIMSNext.Service
                 FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.Roles, r => r.RoleId == role.Id) // 排除已存在该RoleId的员工
     )           );
 
-            return Repository.UpdateManyAsync(filter, update);
+            return Repository.UpdateManyAsync(filter, update, upsert: false);
         }
 
         public Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds)
@@ -34,7 +34,7 @@ namespace EIMSNext.Service
             var update = UpdateBuilder.PullFilter(x => x.Roles, r => r.RoleId == roleId);
             var filter = FilterBuilder.In(x => x.Id, empIds);
 
-            return Repository.UpdateManyAsync(filter, update);
+            return Repository.UpdateManyAsync(filter, update, upsert: false);
         }
 
         public async Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved, string corpId)

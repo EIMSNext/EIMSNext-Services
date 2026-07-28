@@ -59,7 +59,7 @@ namespace EIMSNext.Service
         {
             await base.AfterReplace(entity, session);
             await RefreshDescendantHierarchy(entity, session);
-            await UpdateEmployeeDeptsOnNameChangeAsync(entity.Id, entity.Name);
+            await UpdateEmployeeDeptsOnNameChangeAsync(entity.Id, entity.Name, session);
         }
 
         protected override Task BeforeDelete(FilterDefinition<Department> filter, IClientSessionHandle? session)
@@ -148,44 +148,88 @@ namespace EIMSNext.Service
                 child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
                 child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
                 Repository.Replace(child, session);
-                await UpdateEmployeeDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId);
+                await UpdateEmployeeDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId, session);
                 await RefreshDescendantHierarchy(child, session);
             }
         }
 
-        private Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId)
+        private Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId, IClientSessionHandle? session)
         {
-            var employees = EmployeeRepository.Queryable
-                .Where(x => x.Depts.Any(d => d.DeptId == departmentId))
-                .ToList();
-
-            foreach (var employee in employees)
+            var filter = EmployeeRepository.FilterBuilder.ElemMatch(
+                x => x.Depts,
+                dept => dept.DeptId == departmentId);
+            var update = EmployeeRepository.UpdateBuilder.Set(
+                "Depts.$[dept].HeriarchyId",
+                newHeriarchyId);
+            try
             {
-                foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                EmployeeRepository.Collection.UpdateMany(
+                    session,
+                    filter,
+                    update,
+                    new UpdateOptions
+                    {
+                        ArrayFilters =
+                        [
+                            new BsonDocumentArrayFilterDefinition<EmpDept>(
+                                new MongoDB.Bson.BsonDocument("dept.DeptId", departmentId))
+                        ]
+                    });
+            }
+            catch (NotSupportedException)
+            {
+                foreach (var employee in EmployeeRepository.Queryable
+                    .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
+                    .ToList())
                 {
-                    dept.HeriarchyId = newHeriarchyId;
-                }
+                    foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                    {
+                        dept.HeriarchyId = newHeriarchyId;
+                    }
 
-                EmployeeRepository.Replace(employee);
+                    EmployeeRepository.Replace(employee, session);
+                }
             }
 
             return Task.CompletedTask;
         }
 
-        private Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName)
+        private Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName, IClientSessionHandle? session)
         {
-            var employees = EmployeeRepository.Queryable
-                .Where(x => x.Depts.Any(d => d.DeptId == departmentId))
-                .ToList();
-
-            foreach (var employee in employees)
+            var filter = EmployeeRepository.FilterBuilder.ElemMatch(
+                x => x.Depts,
+                dept => dept.DeptId == departmentId);
+            var update = EmployeeRepository.UpdateBuilder.Set(
+                "Depts.$[dept].DeptName",
+                newName);
+            try
             {
-                foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                EmployeeRepository.Collection.UpdateMany(
+                    session,
+                    filter,
+                    update,
+                    new UpdateOptions
+                    {
+                        ArrayFilters =
+                        [
+                            new BsonDocumentArrayFilterDefinition<EmpDept>(
+                                new MongoDB.Bson.BsonDocument("dept.DeptId", departmentId))
+                        ]
+                    });
+            }
+            catch (NotSupportedException)
+            {
+                foreach (var employee in EmployeeRepository.Queryable
+                    .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
+                    .ToList())
                 {
-                    dept.DeptName = newName;
-                }
+                    foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
+                    {
+                        dept.DeptName = newName;
+                    }
 
-                EmployeeRepository.Replace(employee);
+                    EmployeeRepository.Replace(employee, session);
+                }
             }
 
             return Task.CompletedTask;

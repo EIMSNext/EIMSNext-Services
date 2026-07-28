@@ -88,6 +88,27 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsync(entity);
         }
 
+        public async Task PurgeFieldChangeLogsAsync(string formId, IEnumerable<string>? fieldIds, bool clearAll)
+        {
+            var ids = fieldIds?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? [];
+            if (clearAll == (ids.Count > 0))
+            {
+                throw new BadRequestException("彻底删除字段参数无效");
+            }
+
+            var form = CoreService.Get(formId);
+            if (form == null || form.DeleteFlag || form.CorpId != IdentityContext.CurrentCorpId)
+            {
+                throw new BadRequestException("表单不存在");
+            }
+
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(form.AppId);
+            await CoreService.PurgeFieldChangeLogsAsync(formId, ids, clearAll);
+        }
+
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

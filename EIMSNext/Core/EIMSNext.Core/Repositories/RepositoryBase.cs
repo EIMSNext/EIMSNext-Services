@@ -298,7 +298,7 @@ namespace EIMSNext.Core.Repositories
         }
         protected virtual Task<UpdateResult> UpdateCoreAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool many, bool upsert, IClientSessionHandle? session)
         {
-            var options = new UpdateOptions { IsUpsert = true, BypassDocumentValidation = true };
+            var options = new UpdateOptions { IsUpsert = upsert, BypassDocumentValidation = true };
             session = GetSessionHandle(session);
             if (session == null)
                 return Collection.UpdateManyAsync(filter, update, options);

@@ -30,7 +30,6 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<FormType>();
             builder.EnumType<FlowType>();
             builder.EnumType<EventSourceType>();
-            builder.EnumType<FieldChangeType>();
             builder.EnumType<PlatformType>();
             builder.EnumType<CandidateType>();
             builder.EnumType<WfNodeType>();

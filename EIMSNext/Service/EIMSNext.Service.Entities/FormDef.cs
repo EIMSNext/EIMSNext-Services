@@ -125,6 +125,11 @@ namespace EIMSNext.Service.Entities
         /// 表单组件（仅表单元素，不包含布局组件）
         /// </summary>
         public IList<FieldDef>? Items { get; set; }
+
+        /// <summary>
+        /// 已删除字段记录。
+        /// </summary>
+        public IList<FieldChangeLog> FieldChangeLogs { get; set; } = [];
     }
 
     /// <summary>
@@ -232,40 +237,29 @@ namespace EIMSNext.Service.Entities
     }
 
     /// <summary>
-    /// 字段变更日志
+    /// 已删除字段记录
     /// </summary>
     public class FieldChangeLog
     {
         /// <summary>
-        /// 变动类型
+        /// 字段 ID。子表字段使用 parentField&gt;childField。
         /// </summary>
-        public FieldChangeType ChangeType { get; set; }
+        public string FieldId { get; set; } = string.Empty;
         /// <summary>
-        /// 变更时间
+        /// 字段类型
         /// </summary>
-        public long ChangeTime { get; set; }
+        public string FieldType { get; set; } = string.Empty;
         /// <summary>
-        /// 字段定义
+        /// 字段名称。子表字段使用 parentLabel.childLabel。
         /// </summary>
-        public FieldDef Field { get; set; } = new FieldDef();
+        public string FieldLabel { get; set; } = string.Empty;
         /// <summary>
-        /// 操作人
+        /// 删除人
         /// </summary>
-        public Operator ChangedBy { get; set; } = Operator.Empty;
-    }
-
-    /// <summary>
-    /// 变动类型
-    /// </summary>
-    public enum FieldChangeType
-    {
+        public Operator DeletedBy { get; set; } = Operator.Empty;
         /// <summary>
-        /// 移除
+        /// 删除时间
         /// </summary>
-        Remove,
-        /// <summary>
-        /// 恢复
-        /// </summary>
-        Restore
+        public long DeletedTime { get; set; }
     }
 }

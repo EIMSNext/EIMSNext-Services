@@ -18,4 +18,7 @@
     <ProjectReference Include="..\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
     <ProjectReference Include="..\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EIMSNext.Service.Tests" />
+  </ItemGroup>
 </Project>

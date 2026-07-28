@@ -20,18 +20,18 @@ namespace EIMSNext.Auth.Services
             _secretKey = accessOptions.Value.SecretKey;
         }
 
-        public PublicTokenSubject? Validate(string? username, string? password, PublicScope scope)
+        public PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope)
         {
             if (string.IsNullOrWhiteSpace(username) ||
                 !username.StartsWith(UsernamePrefix, StringComparison.Ordinal))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
             var targetId = username[UsernamePrefix.Length..];
             if (string.IsNullOrWhiteSpace(targetId))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
             var setting = _dbContext.PublicSettings
@@ -41,16 +41,22 @@ namespace EIMSNext.Auth.Services
 
             if (setting == null || string.IsNullOrWhiteSpace(setting.CorpId))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
             var section = PublicAccessValidator.ResolveSection(setting, scope);
-            if (!PublicAccessValidator.ValidateSection(section, password, setting.TargetId, _secretKey))
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (section?.ExpireTime is long expireTime && now > expireTime)
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问链接已过期");
             }
 
-            return new PublicTokenSubject(targetId, setting.CorpId, setting.AppId);
+            if (!PublicAccessValidator.ValidateSection(section, password, setting.TargetId, _secretKey))
+            {
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
+            }
+
+            return PublicTokenValidationResult.Success(new PublicTokenSubject(targetId, setting.CorpId, setting.AppId));
         }
     }
 }

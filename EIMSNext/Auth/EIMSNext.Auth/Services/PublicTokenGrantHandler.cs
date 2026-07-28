@@ -51,11 +51,13 @@ namespace EIMSNext.Auth.Services
                 }
             }
 
-            var subject = _publicTokenService.Validate(request.Username, request.Password, publicScope);
-            if (subject == null)
+            var validation = _publicTokenService.Validate(request.Username, request.Password, publicScope);
+            if (!validation.Succeeded)
             {
-                return TokenRequestResult.Failure(OpenIddictConstants.Errors.InvalidGrant, "公开访问凭证无效");
+                return TokenRequestResult.Failure(validation.Error!, validation.ErrorDescription!);
             }
+
+            var subject = validation.Subject!;
 
             var authenticationTime = DateTimeOffset.UtcNow;
             var claims = new List<Claim>

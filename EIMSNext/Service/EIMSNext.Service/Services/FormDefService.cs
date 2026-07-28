@@ -1,6 +1,8 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Common;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
@@ -38,6 +40,7 @@ namespace EIMSNext.Service
         {
             foreach (var entity in entities)
             {
+                entity.Content.FieldChangeLogs = [];
                 NormalizeFieldMetadata(entity);
                 ValidateFieldIds(entity);
             }
@@ -46,10 +49,104 @@ namespace EIMSNext.Service
 
         protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
         {
+            var old = ScopeCache.Get<FormDef>(entity.Id, Cache.DataVersion.Old)
+                ?? GetFromStore<FormDef>(entity.Id, Cache.DataVersion.Old);
+            ReconcileFieldChangeLogs(old?.Content, entity.Content, Context.Operator, DateTime.UtcNow.ToTimeStampMs());
             NormalizeFieldMetadata(entity);
             ValidateFieldIds(entity);
             return base.BeforeReplace(entity, session);
         }
+
+        public async Task PurgeFieldChangeLogsAsync(string formId, IReadOnlyCollection<string> fieldIds, bool clearAll)
+        {
+            var normalizedIds = fieldIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (!clearAll && normalizedIds.Count == 0)
+            {
+                throw new BadRequestException("请选择要彻底删除的字段");
+            }
+
+            var filter = FilterBuilder.And(
+                FilterBuilder.Eq(x => x.Id, formId),
+                FilterBuilder.Eq(x => x.CorpId, Context.CorpId),
+                FilterBuilder.Eq(x => x.DeleteFlag, false));
+            var update = clearAll
+                ? UpdateBuilder.Set(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>())
+                : UpdateBuilder.PullFilter(x => x.Content.FieldChangeLogs, x => normalizedIds.Contains(x.FieldId));
+
+            using var scope = NewTransactionScope();
+            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
+            scope.CommitTransaction();
+        }
+
+        internal static void ReconcileFieldChangeLogs(
+            FormContent? oldContent,
+            FormContent newContent,
+            Operator? deletedBy,
+            long deletedTime)
+        {
+            var oldFields = FlattenFields(oldContent?.Items);
+            var newFields = FlattenFields(newContent.Items);
+            var activeIds = newFields.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var logs = (oldContent?.FieldChangeLogs ?? [])
+                .Where(x => !string.IsNullOrWhiteSpace(x.FieldId) && !activeIds.Contains(x.FieldId))
+                .GroupBy(x => x.FieldId, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.OrderByDescending(log => log.DeletedTime).First())
+                .ToDictionary(x => x.FieldId, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var oldField in oldFields.Values)
+            {
+                if (activeIds.Contains(oldField.FieldId) || logs.ContainsKey(oldField.FieldId))
+                {
+                    continue;
+                }
+
+                logs[oldField.FieldId] = new FieldChangeLog
+                {
+                    FieldId = oldField.FieldId,
+                    FieldType = oldField.FieldType,
+                    FieldLabel = oldField.FieldLabel,
+                    DeletedBy = deletedBy ?? Operator.Empty,
+                    DeletedTime = deletedTime
+                };
+            }
+
+            newContent.FieldChangeLogs = logs.Values
+                .OrderByDescending(x => x.DeletedTime)
+                .ThenBy(x => x.FieldId, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        internal static Dictionary<string, FieldChangeSnapshot> FlattenFields(IList<FieldDef>? fields)
+        {
+            var result = new Dictionary<string, FieldChangeSnapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var field in fields ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(field.Field))
+                {
+                    continue;
+                }
+
+                result.TryAdd(field.Field, new FieldChangeSnapshot(field.Field, field.Type, field.Title));
+                foreach (var column in field.Columns ?? [])
+                {
+                    if (string.IsNullOrWhiteSpace(column.Field))
+                    {
+                        continue;
+                    }
+
+                    var fieldId = $"{field.Field}>{column.Field}";
+                    var fieldLabel = $"{field.Title}.{column.Title}";
+                    result.TryAdd(fieldId, new FieldChangeSnapshot(fieldId, column.Type, fieldLabel));
+                }
+            }
+
+            return result;
+        }
+
+        internal sealed record FieldChangeSnapshot(string FieldId, string FieldType, string FieldLabel);
 
         private static void NormalizeFieldMetadata(FormDef formDef)
         {

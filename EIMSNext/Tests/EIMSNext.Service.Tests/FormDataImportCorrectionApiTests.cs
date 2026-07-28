@@ -329,6 +329,7 @@ namespace EIMSNext.Service.Tests
         {
             public override FormDef? Get(string id) => id == formDef.Id ? formDef : null;
             public override IQueryable<FormDef> All() => new[] { formDef }.AsQueryable();
+            public Task PurgeFieldChangeLogsAsync(string formId, IReadOnlyCollection<string> fieldIds, bool clearAll) => throw new NotSupportedException();
         }
 
         private sealed class FakeFormDataChangeLogService : FakeEntityService<FormDataChangeLog>, IFormDataChangeLogService

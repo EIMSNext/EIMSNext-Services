@@ -173,7 +173,7 @@ namespace EIMSNext.ApiService
 
         private void CachePlainSecret(string clientId, string plain)
         {
-            CacheClient.Set(
+            CacheClient.SetString(
                 PlainCacheKeyPrefix + clientId,
                 plain,
                 CacheScope.Client,

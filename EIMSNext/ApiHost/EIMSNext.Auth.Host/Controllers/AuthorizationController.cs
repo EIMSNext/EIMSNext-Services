@@ -191,6 +191,15 @@ namespace EIMSNext.Auth.Host.Controllers
             var result = await _tokenRequestHandler.HandleAsync(request, cancellationToken);
             if (!result.Succeeded)
             {
+                if (result.Error == "rate_limited")
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new OpenIddictResponse
+                    {
+                        Error = result.Error,
+                        ErrorDescription = result.ErrorDescription
+                    });
+                }
+
                 if (_rateLimiter != null && !string.IsNullOrWhiteSpace(loginRateLimitTarget) && result.Error == Errors.InvalidGrant)
                 {
                     var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";

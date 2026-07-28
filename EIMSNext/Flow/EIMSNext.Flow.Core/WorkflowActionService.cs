@@ -1,6 +1,7 @@
 using System.Dynamic;
 using System.Linq;
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core;
 using EIMSNext.Core.Entities;
@@ -99,12 +100,12 @@ namespace EIMSNext.Flow.Core
         {
             if (string.IsNullOrWhiteSpace(targetEmployeeId))
             {
-                throw new InvalidOperationException("转交目标不能为空");
+                throw new BadRequestException("转交目标不能为空");
             }
 
             if (targetEmployeeId == context.CurrentEmployeeId)
             {
-                throw new InvalidOperationException("转交目标不能是本人");
+                throw new BadRequestException("转交目标不能是本人");
             }
 
             await ValidateNodeActionEnabledAsync(workflowInstance, todo, NodeActionType.Transfer);
@@ -128,7 +129,7 @@ namespace EIMSNext.Flow.Core
         {
             if (string.IsNullOrWhiteSpace(targetEmployeeId))
             {
-                throw new InvalidOperationException("加签目标不能为空");
+                throw new BadRequestException("加签目标不能为空");
             }
 
             await ValidateNodeActionEnabledAsync(workflowInstance, todo, NodeActionType.AddSign);
@@ -150,18 +151,18 @@ namespace EIMSNext.Flow.Core
         {
             if (string.IsNullOrWhiteSpace(targetEmployeeId))
             {
-                throw new InvalidOperationException("审批人不能为空");
+                throw new BadRequestException("审批人不能为空");
             }
 
             if (targetEmployeeId == todo.EmployeeId)
             {
-                throw new InvalidOperationException("当前节点审批人未发生变化");
+                throw new BadRequestException("当前节点审批人未发生变化");
             }
 
             var employee = await _employeeRepo.GetAsync(targetEmployeeId);
             if (employee == null || employee.CorpId != context.CorpId)
             {
-                throw new InvalidOperationException("目标审批人不存在");
+                throw new BadRequestException("目标审批人不存在");
             }
 
             using var scope = _todoRepo.NewTransactionScope();
@@ -201,7 +202,7 @@ namespace EIMSNext.Flow.Core
         {
             if (string.IsNullOrWhiteSpace(targetNodeId))
             {
-                throw new InvalidOperationException("回退节点不能为空");
+                throw new BadRequestException("回退节点不能为空");
             }
 
             if (action == ApproveAction.Return)
@@ -216,10 +217,10 @@ namespace EIMSNext.Flow.Core
             var target = trail.FirstOrDefault(x => x.NodeId == targetNodeId);
             if (target == null)
             {
-                throw new InvalidOperationException("目标节点不在可回退范围内");
+                throw new BadRequestException("目标节点不在可回退范围内");
             }
 
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             dataContext.Round += 1;
             workflowInstance.Data = dataContext.ToExpando();
             workflowInstance.NextExecution = null;
@@ -279,7 +280,7 @@ namespace EIMSNext.Flow.Core
 
         public Task ValidateSubmitConditionAsync(WorkflowInstance workflowInstance, Wf_Todo todo)
         {
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId);
             var submitCondition = step?.WfNodeSetting?.ApproveSetting?.SubmitCondition;
             if (submitCondition?.Enabled != true || string.IsNullOrWhiteSpace(submitCondition.Expression))
@@ -287,7 +288,7 @@ namespace EIMSNext.Flow.Core
                 return Task.CompletedTask;
             }
 
-            var formData = _formDataRepo.Get(todo.DataId) ?? throw new InvalidOperationException("审批数据不存在");
+            var formData = _formDataRepo.Get(todo.DataId) ?? throw new BadRequestException("审批数据不存在");
             var scriptData = formData.Data;
             scriptData.TryAdd(EIMSNext.Common.Fields.CreateBy, formData.CreateBy);
             scriptData.TryAdd(WfConsts.MatchedResult, false);
@@ -302,7 +303,7 @@ namespace EIMSNext.Flow.Core
 
             if (!Convert.ToBoolean(result.Value))
             {
-                throw new InvalidOperationException(string.IsNullOrWhiteSpace(submitCondition.PromptText)
+                throw new BadRequestException(string.IsNullOrWhiteSpace(submitCondition.PromptText)
                     ? "当前数据不满足提交条件"
                     : submitCondition.PromptText);
             }
@@ -312,12 +313,12 @@ namespace EIMSNext.Flow.Core
 
         public Task ValidateNodeActionEnabledAsync(WorkflowInstance workflowInstance, Wf_Todo todo, NodeActionType actionType)
         {
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId);
             var action = step?.WfNodeSetting?.ApproveSetting?.NodeActions?.FirstOrDefault(x => x.ActionType == actionType && x.Enabled);
             if (action == null)
             {
-                throw new InvalidOperationException("当前节点未启用该操作");
+                throw new BadRequestException("当前节点未启用该操作");
             }
 
             return Task.CompletedTask;
@@ -325,9 +326,9 @@ namespace EIMSNext.Flow.Core
 
         public async Task<WorkflowActionResult> HandleExpiredTodoAsync(WorkflowInstance workflowInstance, Wf_Todo todo)
         {
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
-            var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId) ?? throw new InvalidOperationException("审批节点不存在");
-            var expireSetting = step.WfNodeSetting?.ApproveSetting?.ExpireSetting ?? throw new InvalidOperationException("审批节点未配置超时动作");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
+            var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId) ?? throw new BadRequestException("审批节点不存在");
+            var expireSetting = step.WfNodeSetting?.ApproveSetting?.ExpireSetting ?? throw new BadRequestException("审批节点未配置超时动作");
 
             if (expireSetting.TimeValue <= 0)
             {
@@ -353,14 +354,14 @@ namespace EIMSNext.Flow.Core
 
         private async Task ValidateTargetEmployeeAsync(WorkflowInstance workflowInstance, Wf_Todo todo, NodeActionType actionType, string targetEmployeeId)
         {
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             var step = definition.Metadata?.Steps?.FirstOrDefault(x => x.Id == todo.ApproveNodeId);
             var action = step?.WfNodeSetting?.ApproveSetting?.NodeActions?.FirstOrDefault(x => x.ActionType == actionType && x.Enabled)
-                ?? throw new InvalidOperationException("当前节点未启用该操作");
+                ?? throw new BadRequestException("当前节点未启用该操作");
             var candidateIds = await PopulateEmpIds(todo.DataId, action.Candidates);
             if (!candidateIds.Contains(targetEmployeeId))
             {
-                throw new InvalidOperationException("目标人员不在候选范围内");
+                throw new BadRequestException("目标人员不在候选范围内");
             }
         }
 
@@ -375,7 +376,7 @@ namespace EIMSNext.Flow.Core
             var activity = await _workflowHost.GetPendingActivity($"{workflowInstance.Id}_{todo.DataId}_{todo.ApproveNodeId}", todo.EmployeeId);
             if (activity == null)
             {
-                throw new InvalidOperationException("审批超时自动处理失败：当前节点活动不存在");
+                throw new BadRequestException("审批超时自动处理失败：当前节点活动不存在");
             }
 
             var approveData = new WfApproveData(
@@ -401,7 +402,7 @@ namespace EIMSNext.Flow.Core
                 .ToList();
             if (targetEmployeeIds.Count == 0)
             {
-                throw new InvalidOperationException("审批超时自动转交失败：未找到目标审批人");
+                throw new BadRequestException("审批超时自动转交失败：未找到目标审批人");
             }
 
             var sourceTodos = _todoRepo.Find(x => x.WfInstanceId == workflowInstance.Id && x.ApproveNodeId == todo.ApproveNodeId).ToList();
@@ -504,26 +505,26 @@ namespace EIMSNext.Flow.Core
                 .ToList();
             if (trail.Count == 0)
             {
-                throw new InvalidOperationException("审批超时自动回退失败：没有可回退节点");
+                throw new BadRequestException("审批超时自动回退失败：没有可回退节点");
             }
 
             return (returnSetting?.TargetMode ?? ReturnTargetMode.Previous) switch
             {
                 ReturnTargetMode.Start => trail.FirstOrDefault(x => x.NodeType == WfNodeType.Start)?.NodeId
-                    ?? throw new InvalidOperationException("审批超时自动回退失败：未找到发起节点"),
+                    ?? throw new BadRequestException("审批超时自动回退失败：未找到发起节点"),
                 ReturnTargetMode.Specified => trail.FirstOrDefault(x => x.NodeId == returnSetting?.TargetNodeId)?.NodeId
-                    ?? throw new InvalidOperationException("审批超时自动回退失败：指定回退节点不可达"),
+                    ?? throw new BadRequestException("审批超时自动回退失败：指定回退节点不可达"),
                 _ => trail.Last().NodeId
             };
         }
 
         private List<Wf_ApprovalLog> GetReturnTrail(WorkflowInstance workflowInstance, Wf_Todo todo, int currentRound)
         {
-            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new InvalidOperationException("流程定义不存在");
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             var startNodeId = definition.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Start)?.Id;
             if (string.IsNullOrWhiteSpace(startNodeId))
             {
-                throw new InvalidOperationException("流程定义缺少发起节点");
+                throw new BadRequestException("流程定义缺少发起节点");
             }
 
             var round = currentRound;
@@ -713,7 +714,7 @@ namespace EIMSNext.Flow.Core
             var target = FindWorkflowCoreStep(definition?.Metadata?.Steps, targetNodeId);
             if (target == null)
             {
-                throw new InvalidOperationException("流程定义缺少目标节点，无法重置流程实例");
+                throw new BadRequestException("流程定义缺少目标节点，无法重置流程实例");
             }
             var (targetStep, stepId) = target.Value;
 
