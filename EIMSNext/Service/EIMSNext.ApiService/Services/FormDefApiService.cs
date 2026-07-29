@@ -72,6 +72,7 @@ namespace EIMSNext.ApiService
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            ValidateFieldIds(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
             return base.AddAsync(entity);
         }
@@ -82,6 +83,7 @@ namespace EIMSNext.ApiService
             var existing = CoreService.Get(entity.Id);
             PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            ValidateFieldIds(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 
@@ -128,6 +130,24 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private static void ValidateFieldIds(IEnumerable<FieldDef>? fields)
+        {
+            if (fields == null)
+            {
+                return;
+            }
+
+            foreach (var field in fields)
+            {
+                if (string.IsNullOrWhiteSpace(field.Field))
+                {
+                    throw new BadRequestException("字段 ID 不能为空");
+                }
+
+                ValidateFieldIds(field.Columns);
+            }
         }
 
         private void PopulatePublicRelatedForms(FormDef entity)

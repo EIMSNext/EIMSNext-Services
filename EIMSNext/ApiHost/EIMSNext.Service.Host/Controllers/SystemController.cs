@@ -39,7 +39,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("CurrentUser")]
-        [IdentityType(IdentityTypeDefaults.Authenticated)]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
         public IActionResult CurrentUser()
         {
             var user = IdentityContext.CurrentUser;
@@ -69,6 +69,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("AdminPermissions")]
+        [IdentityType(IdentityTypeDefaults.AppAdmin)]
         public IActionResult GetAdminPermissions()
         {
             return ApiResult.Success(Resolver.Resolve<AdminPermissionEvaluator>().GetSnapshot()).ToActionResult();
@@ -88,17 +89,25 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("SwitchCorp")]
         public async Task<IActionResult> SwitchCorprate(SwitchCorprateRequest req)
         {
-            if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.CorpId)) return BadRequest("企业不能为空");
 
             if (IdentityContext.CurrentUser is not User user)
                 return Unauthorized();
 
-            user.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
+            var targetCorp = user.Crops?.FirstOrDefault(x =>
+                string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.Ordinal));
+            if (targetCorp == null)
+                return Forbid();
+
+            foreach (var corp in user.Crops ?? [])
+                corp.IsDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+
             await UserApiService.ReplaceAsync(user);
-            return ApiResult.Success(req.CorpId).ToActionResult();
+            return ApiResult.Success(targetCorp.CorpId).ToActionResult();
         }
 
         [HttpPost("JoinCorp")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public async Task<IActionResult> JoinCorp([FromBody] ApplyJoinCorporateRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CorpId))

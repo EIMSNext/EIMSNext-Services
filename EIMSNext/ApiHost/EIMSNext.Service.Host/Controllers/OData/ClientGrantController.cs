@@ -30,13 +30,35 @@ namespace EIMSNext.Service.Host.Controllers.OData
 
         public override async Task<ActionResult> Post([FromBody] ClientGrantRequest model)
         {
+            if (model == null)
+            {
+                return BadRequest("请求体不能为空");
+            }
+
+            var validation = ValidateIpWhitelist(model.IpWhitelist);
+            if (validation != null)
+            {
+                return BadRequest(validation);
+            }
+
             var result = await base.Post(model);
-            await RefreshClientCacheAsync(model?.ClientId ?? string.Empty);
+            await RefreshClientCacheAsync(model.ClientId);
             return result;
         }
 
         public override async Task<ActionResult> Put([FromODataUri] string key, [FromBody] ClientGrantRequest model)
         {
+            if (model == null)
+            {
+                return BadRequest("请求体不能为空");
+            }
+
+            var validation = ValidateIpWhitelist(model.IpWhitelist);
+            if (validation != null)
+            {
+                return BadRequest(validation);
+            }
+
             var previousClientId = await GetClientIdAsync(key);
             var result = await base.Put(key, model);
             await RefreshClientCacheAsync(previousClientId);
@@ -46,6 +68,15 @@ namespace EIMSNext.Service.Host.Controllers.OData
 
         public override async Task<ActionResult> Patch([FromODataUri] string key, [FromBody] Delta<ClientGrantRequest> delta)
         {
+            if (TryGetIpWhitelist(delta, out var ipWhitelist))
+            {
+                var validation = ValidateIpWhitelist(ipWhitelist);
+                if (validation != null)
+                {
+                    return BadRequest(validation);
+                }
+            }
+
             var previousClientId = await GetClientIdAsync(key);
             var result = await base.Patch(key, delta);
             var currentClientId = await GetClientIdAsync(key);
@@ -121,6 +152,45 @@ namespace EIMSNext.Service.Host.Controllers.OData
             }
 
             await ClientPermissionCache.RefreshAsync(CacheClient, ClientGrantApi, ClientApi, IdentityContext.CurrentCorpId, clientId);
+        }
+
+        private static string? ValidateIpWhitelist(IEnumerable<string>? rules)
+        {
+            if (rules == null)
+            {
+                return null;
+            }
+
+            foreach (var raw in rules)
+            {
+                var rule = raw?.Trim() ?? string.Empty;
+                if (IpMatcher.IsValidRule(rule))
+                {
+                    continue;
+                }
+
+                return $"IP 白名单包含无效地址：{raw}";
+            }
+
+            return null;
+        }
+
+        private static bool TryGetIpWhitelist(Delta<ClientGrantRequest> delta, out IEnumerable<string> rules)
+        {
+            rules = [];
+            if (!delta.TryGetPropertyValue(nameof(ClientGrantRequest.IpWhitelist), out var value)
+                && !delta.TryGetPropertyValue("ipWhitelist", out value))
+            {
+                return false;
+            }
+
+            if (value is IEnumerable<string> strings)
+            {
+                rules = strings;
+                return true;
+            }
+
+            return false;
         }
     }
 }

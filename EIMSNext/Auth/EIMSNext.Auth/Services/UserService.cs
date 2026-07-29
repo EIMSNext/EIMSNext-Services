@@ -38,17 +38,32 @@ namespace EIMSNext.Auth.Services
 
         public User? FindByEmailOrPhone(string emailOrPhone)
         {
-            return _dbContext.Users.FirstOrDefault(x => !x.Disabled && (x.Email == emailOrPhone || x.Phone == emailOrPhone));
+            var normalized = emailOrPhone?.Trim();
+            if (string.IsNullOrWhiteSpace(normalized))
+            {
+                return null;
+            }
+
+            return _dbContext.Users.FirstOrDefault(x =>
+                !x.Disabled &&
+                (string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase) || x.Phone == normalized));
         }
 
         public User? FindByEmail(string email)
         {
-            return _dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Email == email);
+            var normalized = email?.Trim();
+            return string.IsNullOrWhiteSpace(normalized)
+                ? null
+                : _dbContext.Users.FirstOrDefault(x =>
+                    !x.Disabled && string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase));
         }
 
         public User? FindByPhone(string phone)
         {
-            return _dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == phone);
+            var normalized = phone?.Trim();
+            return string.IsNullOrWhiteSpace(normalized)
+                ? null
+                : _dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == normalized);
         }
 
         public User? FindByEmpNo(string corpId, string empNo)
