@@ -1,5 +1,5 @@
 using EIMSNext.Auth.Entities;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using WorkflowCore.Models;

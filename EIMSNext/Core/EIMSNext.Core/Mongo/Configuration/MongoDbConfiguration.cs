@@ -1,6 +1,6 @@
 using MongoDB.Driver;
 
-namespace EIMSNext.MongoDb
+namespace EIMSNext.Core.Mongo
 {
     public class MongoDbConfiguration
     {

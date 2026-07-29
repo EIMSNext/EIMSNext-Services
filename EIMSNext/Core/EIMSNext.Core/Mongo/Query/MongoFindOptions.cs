@@ -1,6 +1,7 @@
 using MongoDB.Driver;
+using EIMSNext.Core.Query;
 
-namespace EIMSNext.Core.Query
+namespace EIMSNext.Core.Mongo.Query
 {
     public class MongoFindOptions<T>
     {
@@ -16,5 +17,15 @@ namespace EIMSNext.Core.Query
         public int Take { get; set; } = 20;
 
         public FindOptions? Options { get; set; }
+
+        public int GetEffectiveTake()
+        {
+            return Take <= 0 ? DynamicFindOptions<T>.DefaultTakeWhenUnspecified : Take;
+        }
+
+        public int GetEffectiveSkip()
+        {
+            return Math.Max(0, Skip);
+        }
     }
 }

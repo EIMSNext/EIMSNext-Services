@@ -8,9 +8,13 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Storage.Abstractions;
@@ -468,10 +472,10 @@ namespace EIMSNext.ApiService
                 .ToList();
             if (authGroups.Count == 0)
             {
-                return AndFilters(filter, CreateNoMatchFilter());
+                return filter.And(CreateNoMatchFilter())!;
             }
 
-            return AndFilters(filter, BuildDataScopeFilter(authGroups));
+            return filter.And(BuildDataScopeFilter(authGroups))!;
         }
 
         private Task<long> CountExportAsync(FormDataExportRequest request)
@@ -646,26 +650,6 @@ namespace EIMSNext.ApiService
             }
 
             return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
-        }
-
-        private static DynamicFilter AndFilters(DynamicFilter current, DynamicFilter? additional)
-        {
-            if (additional == null || additional.IsEmpty)
-            {
-                return current;
-            }
-
-            if (current.IsGroup && current.Rel == FilterRel.And)
-            {
-                current.Items!.Add(additional);
-                return current;
-            }
-
-            return new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items = [current, additional],
-            };
         }
 
         private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)

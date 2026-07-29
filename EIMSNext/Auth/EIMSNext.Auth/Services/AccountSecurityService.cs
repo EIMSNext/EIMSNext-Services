@@ -2,7 +2,8 @@ using System.Text.RegularExpressions;
 using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Auth.Services

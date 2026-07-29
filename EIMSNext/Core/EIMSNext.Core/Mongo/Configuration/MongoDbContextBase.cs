@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
-namespace EIMSNext.MongoDb
+namespace EIMSNext.Core.Mongo
 {
     public interface IMongoDbContex : IDisposable
     {

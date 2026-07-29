@@ -1,4 +1,4 @@
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo;
 
 using EIMSNext.Flow.Persistence;
 using Microsoft.Extensions.Options;

@@ -1,12 +1,18 @@
 using HKH.Mef2.Integration;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Common;
+using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
 {
@@ -72,10 +78,20 @@ namespace EIMSNext.Service
 
             var roots = deletingDepartments.Select(x => x.Id).ToList();
             var corpIds = deletingDepartments.Select(x => x.CorpId).Distinct().ToList();
-            var protectedDepartmentIds = Repository.Queryable
-                .Where(x => corpIds.Contains(x.CorpId))
+            var hierarchyFilters = roots
+                .Select(root => Repository.FilterBuilder.Regex(
+                    x => x.HeriarchyId,
+                    new BsonRegularExpression(Regex.Escape($"|{root}|"))))
+                .ToList();
+            var protectedFilter = Repository.FilterBuilder.And(
+                Repository.FilterBuilder.In(x => x.CorpId, corpIds),
+                Repository.FilterBuilder.Or(
+                    Repository.FilterBuilder.In(x => x.Id, roots),
+                    Repository.FilterBuilder.Or(hierarchyFilters)));
+            var protectedDepartmentIds = Repository.Find(
+                    new MongoFindOptions<Department> { Filter = protectedFilter, Take = int.MaxValue },
+                    session)
                 .ToList()
-                .Where(x => roots.Contains(x.Id) || roots.Any(root => x.HeriarchyId.Contains($"|{root}|")))
                 .Select(x => x.Id)
                 .ToList();
 

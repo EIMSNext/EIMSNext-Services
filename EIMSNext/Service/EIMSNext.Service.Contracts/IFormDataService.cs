@@ -1,4 +1,5 @@
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 

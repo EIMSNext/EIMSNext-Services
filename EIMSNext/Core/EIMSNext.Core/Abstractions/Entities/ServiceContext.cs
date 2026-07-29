@@ -1,6 +1,6 @@
 using EIMSNext.Cache;
 
-namespace EIMSNext.Core.Entities
+namespace EIMSNext.Core.Abstractions
 {
     public interface IServiceContext
     {

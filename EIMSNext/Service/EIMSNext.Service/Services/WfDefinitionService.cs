@@ -2,6 +2,7 @@ using HKH.Mef2.Integration;
 
 using EIMSNext.Component;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
@@ -132,11 +133,10 @@ namespace EIMSNext.Service
 
         protected override Task BeforeDelete(FilterDefinition<Wf_Definition> filter, IClientSessionHandle? session)
         {
-            var releasedDefs = Repository.Find(new MongoFindOptions<Wf_Definition> { Filter = filter }, session)
-                .ToList()
-                .Where(x => x.Released)
-                .ToList();
-            if (releasedDefs.Count > 0)
+            var releasedFilter = Builders<Wf_Definition>.Filter.And(
+                filter,
+                Builders<Wf_Definition>.Filter.Eq(x => x.Released, true));
+            if (Repository.Count(releasedFilter, session) > 0)
             {
                 throw new InvalidOperationException("已启用或历史版本不允许删除");
             }

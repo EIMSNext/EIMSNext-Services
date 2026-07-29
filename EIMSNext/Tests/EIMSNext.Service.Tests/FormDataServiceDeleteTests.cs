@@ -4,13 +4,14 @@ using System.Text.Json;
 
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.MongoDb;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 

@@ -1,5 +1,6 @@
 using System.Text.Json;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 
 namespace EIMSNext.Core.Tests
 {

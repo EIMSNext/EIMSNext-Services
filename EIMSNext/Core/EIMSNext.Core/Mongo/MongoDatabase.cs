@@ -1,11 +1,11 @@
-using EIMSNext.Core.Serialization;
+using EIMSNext.Core.Mongo.Serialization;
 
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Conventions;
 using MongoDB.Bson.Serialization.IdGenerators;
 using MongoDB.Bson.Serialization.Serializers;
 
-namespace EIMSNext.Core
+namespace EIMSNext.Core.Mongo
 {
     public static class MongoDatabase
     {

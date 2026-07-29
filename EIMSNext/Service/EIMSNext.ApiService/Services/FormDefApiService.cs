@@ -50,15 +50,16 @@ namespace EIMSNext.ApiService
             var apps = Resolver.Resolve<IAppDefService>().All()
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && sourceAppIds.Contains(x.Id))
                 .ToDictionary(x => x.Id);
+            var activeSourceAppIds = apps.Keys.ToList();
 
             var externalForms = CoreService.All()
                 .Where(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
                     sourceFormIds.Contains(x.Id) &&
+                    activeSourceAppIds.Contains(x.AppId) &&
                     accessibleSourceFormIds.Contains(x.Id))
                 .ToList()
-                .Where(x => apps.ContainsKey(x.AppId))
                 .Select(x => BuildView(x, external: true))
                 .OrderBy(x => x.AppId)
                 .ThenBy(x => x.Name)

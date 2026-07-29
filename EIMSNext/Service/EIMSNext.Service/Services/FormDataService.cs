@@ -6,10 +6,14 @@ using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -554,7 +558,7 @@ namespace EIMSNext.Service
         {
             var entity = entities.First();
 
-            if (Context.Action == EIMSNext.Core.Entities.DataAction.Submit)
+            if (Context.Action == EIMSNext.Core.Abstractions.DataAction.Submit)
             {
                 var formDef = GetFromStore<FormDef>(entity.FormId)!;
 

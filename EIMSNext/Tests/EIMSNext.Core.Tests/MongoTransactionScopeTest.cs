@@ -1,7 +1,8 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 
 namespace EIMSNext.Core.Tests
 {

@@ -9,8 +9,13 @@ using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 

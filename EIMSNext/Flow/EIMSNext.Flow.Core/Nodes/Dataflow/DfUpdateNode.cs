@@ -3,6 +3,7 @@ using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Nodes.Dataflow;
 using EIMSNext.Scripting;

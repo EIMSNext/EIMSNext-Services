@@ -1,7 +1,9 @@
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 
-namespace EIMSNext.Core.Entities
+using EIMSNext.Core.Abstractions;
+
+namespace EIMSNext.Core.Mongo.Entities
 {
     public static class EntityExtension
     {

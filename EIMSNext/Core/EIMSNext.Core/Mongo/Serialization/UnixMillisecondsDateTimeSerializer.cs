@@ -2,7 +2,7 @@ using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Bson.Serialization.Serializers;
 
-namespace EIMSNext.Core.Serialization
+namespace EIMSNext.Core.Mongo.Serialization
 {
     public class UnixMillisecondsDateTimeSerializer : SerializerBase<DateTime>
     {

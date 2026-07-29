@@ -1,7 +1,13 @@
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -393,7 +399,7 @@ namespace EIMSNext.ApiService
             EnsureIdsExist<Role>(entity.ContactRoleIds, "通讯录角色");
         }
 
-        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Entities.CorpEntityBase
+        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Mongo.Entities.CorpEntityBase
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             if (idList.Count == 0)

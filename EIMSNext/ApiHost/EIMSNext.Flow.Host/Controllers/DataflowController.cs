@@ -3,7 +3,13 @@ using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Service.Contracts;
@@ -15,7 +21,6 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 using WorkflowCore.Interface;
-using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Flow.Host.Controllers
 {

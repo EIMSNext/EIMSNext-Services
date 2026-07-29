@@ -1,4 +1,6 @@
-namespace EIMSNext.Core.Entities
+using EIMSNext.Core.Abstractions;
+
+namespace EIMSNext.Core.Mongo.Entities
 {
     /// <summary>
     /// 审计日志

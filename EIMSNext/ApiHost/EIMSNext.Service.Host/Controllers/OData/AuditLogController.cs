@@ -1,7 +1,8 @@
 using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Host.OData;
 using HKH.Mef2.Integration;
 

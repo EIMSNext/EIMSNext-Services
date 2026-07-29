@@ -49,7 +49,7 @@ namespace EIMSNext.Auth.Tests
             var created = dbContext.Users.Single();
             Assert.AreEqual("13800138000", created.Phone);
             Assert.AreEqual("13800138000", created.Name);
-            Assert.AreEqual(EIMSNext.Core.Entities.PlatformType.Public, created.Platform);
+            Assert.AreEqual(EIMSNext.Core.Abstractions.PlatformType.Public, created.Platform);
             Assert.IsTrue(HKH.Common.Security.BCrypt.Verify("Strong123!", created.Password));
         }
 

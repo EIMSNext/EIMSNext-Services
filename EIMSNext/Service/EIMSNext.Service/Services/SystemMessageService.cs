@@ -1,6 +1,7 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;

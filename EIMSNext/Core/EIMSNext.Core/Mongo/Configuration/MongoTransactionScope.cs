@@ -1,8 +1,8 @@
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo;
 
 using MongoDB.Driver;
 
-namespace EIMSNext.Core.MongoDb
+namespace EIMSNext.Core.Mongo
 {
     public class MongoTransactionScope : IDisposable
     {

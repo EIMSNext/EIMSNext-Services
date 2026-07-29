@@ -1,9 +1,14 @@
 using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Serialization;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Mongo.Serialization;
 using EIMSNext.Json.Serialization;
-using EIMSNext.MongoDb;
 using EIMSNext.Storage;
 using EIMSNext.Storage.Abstractions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;

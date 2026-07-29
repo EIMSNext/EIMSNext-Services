@@ -1,9 +1,10 @@
 using EIMSNext.Common;
+using EIMSNext.Core.Query;
 using MongoDB.Bson;
 using MongoDB.Driver;
 using System.Text.RegularExpressions;
 
-namespace EIMSNext.Core.Query
+namespace EIMSNext.Core.Mongo.Query
 {
     public static class DynamicFilterExtension
     {
@@ -367,14 +368,17 @@ namespace EIMSNext.Core.Query
             {
                 if (!string.IsNullOrEmpty(field.Field))
                 {
+                    var fieldName = string.Equals(field.Field, Fields.Id, StringComparison.OrdinalIgnoreCase)
+                        ? Fields.BsonId
+                        : field.Field;
                     if (field.Visible)
                     {
-                        var proj = Builders<T>.Projection.Include(field.Field);
+                        var proj = Builders<T>.Projection.Include(fieldName);
                         myProjection = myProjection == null ? proj : Builders<T>.Projection.Combine(myProjection, proj);
                     }
                     else
                     {
-                        var proj = Builders<T>.Projection.Exclude(field.Field);
+                        var proj = Builders<T>.Projection.Exclude(fieldName);
                         myProjection = myProjection == null ? proj : Builders<T>.Projection.Combine(myProjection, proj);
                     }
                 }

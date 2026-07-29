@@ -1,5 +1,7 @@
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Abstractions.Extensions;
+using EIMSNext.Core.Services.Extensions;
 
 namespace EIMSNext.Service.Entities
 {

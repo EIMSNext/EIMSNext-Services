@@ -1,4 +1,5 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;

@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 using MongoDB.Bson;
 
-namespace EIMSNext.Core.Serialization
+namespace EIMSNext.Core.Mongo.Serialization
 {
     public class BsonDocumentJsonConverter : JsonConverter<BsonDocument>
     {

@@ -2,13 +2,14 @@ using System.Composition.Hosting;
 using System.Runtime.CompilerServices;
 using System.Text.Json.Nodes;
 
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Cache;
-using EIMSNext.MongoDb;
 using EIMSNext.Service;
 using EIMSNext.Service.Entities;
 

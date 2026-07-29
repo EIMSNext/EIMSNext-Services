@@ -1,4 +1,4 @@
-namespace EIMSNext.Core.Entities
+namespace EIMSNext.Core.Abstractions
 {
     public interface IMongoEntity
     {

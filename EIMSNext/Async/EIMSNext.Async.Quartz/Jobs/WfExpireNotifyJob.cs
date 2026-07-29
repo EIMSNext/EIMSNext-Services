@@ -1,9 +1,13 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Persistence;
-using EIMSNext.MongoDb;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;

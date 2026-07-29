@@ -1,14 +1,20 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
+using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
 {
@@ -336,17 +342,19 @@ namespace EIMSNext.Service
                 session: session);
 
             var itemRepo = Resolver.GetRepository<DashboardItemDef>();
-            var deletedFormIdSet = formIds.ToHashSet(StringComparer.OrdinalIgnoreCase);
-            var embeddedItems = itemRepo.Queryable
-                .Where(x => corpIds.Contains(x.CorpId) && !x.DeleteFlag)
-                .ToList()
-                .Where(x => deletedFormIdSet.Any(id => x.Details.Contains(id, StringComparison.OrdinalIgnoreCase)))
-                .Select(x => x.Id)
+            var embeddedReferenceFilters = formIds
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(id => itemRepo.FilterBuilder.Regex(
+                    x => x.Details,
+                    new BsonRegularExpression(Regex.Escape(id), "i")))
                 .ToList();
-            if (embeddedItems.Count > 0)
+            if (embeddedReferenceFilters.Count > 0)
             {
                 await itemRepo.UpdateManyAsync(
-                    itemRepo.FilterBuilder.In(x => x.Id, embeddedItems),
+                    itemRepo.FilterBuilder.And(
+                        itemRepo.FilterBuilder.In(x => x.CorpId, corpIds),
+                        itemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                        itemRepo.FilterBuilder.Or(embeddedReferenceFilters)),
                     itemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
                     session: session);
             }

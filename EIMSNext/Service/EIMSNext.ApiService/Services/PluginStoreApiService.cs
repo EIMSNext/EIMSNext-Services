@@ -2,8 +2,13 @@ using EIMSNext.ApiCore.Plugin;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -36,9 +41,12 @@ namespace EIMSNext.ApiService
             }
 
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var enabledInstalls = PluginInstallService.Query(x => x.CorpId == corpId)
-                .ToList()
-                .Where(x => IsInstallUsable(x, now))
+            var enabledInstalls = PluginInstallService.Query(x =>
+                    x.CorpId == corpId &&
+                    !x.DeleteFlag &&
+                    x.Status == PluginInstallStatus.Installed &&
+                    x.Enabled &&
+                    (x.ExpireAt == null || x.ExpireAt > now))
                 .ToList();
 
             return enabledInstalls

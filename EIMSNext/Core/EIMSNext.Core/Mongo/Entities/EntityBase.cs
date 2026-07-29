@@ -1,10 +1,12 @@
 using System.Dynamic;
 using System.Text.Json;
 
+using EIMSNext.Core.Abstractions;
+
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization.Attributes;
 
-namespace EIMSNext.Core.Entities
+namespace EIMSNext.Core.Mongo.Entities
 {
     public abstract class MongoEntityBase : IMongoEntity
     {

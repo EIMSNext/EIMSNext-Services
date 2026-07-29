@@ -1,4 +1,4 @@
-namespace EIMSNext.Core
+namespace EIMSNext.Core.Abstractions
 {
     public static class MefMetadata
     {

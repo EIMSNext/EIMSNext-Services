@@ -4,7 +4,7 @@ using System.Text.Json.Nodes;
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.Http;
 using CloudNative.CloudEvents.SystemTextJson;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Service.Entities;
 using Microsoft.Extensions.Logging;
 

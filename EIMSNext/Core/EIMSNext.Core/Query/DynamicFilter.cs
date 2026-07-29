@@ -68,4 +68,31 @@ namespace EIMSNext.Core.Query
         public const string Or = "or";
         public const string Not = "not";
     }
+
+    public static class DynamicFilterCompositionExtensions
+    {
+        public static DynamicFilter? And(this DynamicFilter? current, DynamicFilter? additional)
+        {
+            if (current == null || current.IsEmpty)
+            {
+                return additional;
+            }
+
+            if (additional == null || additional.IsEmpty)
+            {
+                return current;
+            }
+
+            return new DynamicFilter
+            {
+                Rel = FilterRel.And,
+                Items = [current, additional],
+            };
+        }
+
+        public static DynamicFilter? And(this DynamicFilter? current, string field, string op, object? value)
+        {
+            return current.And(new DynamicFilter { Field = field, Op = op, Value = value });
+        }
+    }
 }

@@ -1,14 +1,15 @@
 using System.Linq.Expressions;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Query;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo.Query;
 
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Search;
 
-namespace EIMSNext.Core.Repositories
+namespace EIMSNext.Core.Mongo.Repositories
 {
     public abstract class RepositoryBase<T> : IRepository<T> where T : IMongoEntity
     {
@@ -54,7 +55,7 @@ namespace EIMSNext.Core.Repositories
             //if (options.Projection != null)
             //    result = result.Project<T>(options.Projection);
 
-            return result.Skip(options.Skip).Limit(options.Take);
+            return result.Skip(options.GetEffectiveSkip()).Limit(options.GetEffectiveTake());
         }
         public virtual Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null)
         {
@@ -62,8 +63,7 @@ namespace EIMSNext.Core.Repositories
         }
         public virtual async Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null)
         {
-            session = GetSessionHandle(session);
-            return await (session == null ? Collection.FindAsync<T>(options.Filter) : Collection.FindAsync(session, options.Filter));
+            return await Find(options, session).ToCursorAsync();
         }
         public virtual async Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null)
         {
@@ -138,11 +138,11 @@ namespace EIMSNext.Core.Repositories
         }
         public virtual UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
-            return UpdateCore(filter.ToFilterDefinition<T>(), update, true, upsert, session); ;
+            return UpdateCore(filter.ToFilterDefinition<T>(), update, true, upsert, session);
         }
         public virtual Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
-            return UpdateCoreAsync(filter.ToFilterDefinition<T>(), update, true, upsert, session); ;
+            return UpdateCoreAsync(filter.ToFilterDefinition<T>(), update, true, upsert, session);
         }
         public virtual UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
         {
@@ -210,11 +210,11 @@ namespace EIMSNext.Core.Repositories
             if (sort != null)
                 result = result.Sort(sort);
 
-            //var proj = options.Fields?.ToProjectionDefinition<T>();
-            //if (proj != null)
-            //    result = result.Project<T>(proj);
+            var projection = options.Select?.ToProjectionDefinition<T>();
+            if (projection != null)
+                result = result.Project<T>(projection);
 
-            return result.Skip(options.Skip).Limit(options.Take); ;
+            return result.Skip(options.GetEffectiveSkip()).Limit(options.GetEffectiveTake());
         }
         protected virtual IFindFluent<T, T> FindCore(Expression<Func<T, bool>> filter, IClientSessionHandle? session)
         {
@@ -223,9 +223,7 @@ namespace EIMSNext.Core.Repositories
         }
         protected virtual async Task<IAsyncCursor<T>> FindCoreAsync(DynamicFindOptions<T> options, IClientSessionHandle? session)
         {
-            var filter = options.Filter == null ? FilterBuilder.Empty : options.Filter.ToFilterDefinition<T>();
-            session = GetSessionHandle(session);
-            return await (session == null ? Collection.FindAsync(filter) : Collection.FindAsync(session, filter));
+            return await FindCore(options, session).ToCursorAsync();
         }
         protected virtual async Task<IAsyncCursor<T>> FindCoreAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session)
         {
@@ -301,9 +299,9 @@ namespace EIMSNext.Core.Repositories
             var options = new UpdateOptions { IsUpsert = upsert, BypassDocumentValidation = true };
             session = GetSessionHandle(session);
             if (session == null)
-                return Collection.UpdateManyAsync(filter, update, options);
+                return many ? Collection.UpdateManyAsync(filter, update, options) : Collection.UpdateOneAsync(filter, update, options);
             else
-                return Collection.UpdateManyAsync(session, filter, update, options);
+                return many ? Collection.UpdateManyAsync(session, filter, update, options) : Collection.UpdateOneAsync(session, filter, update, options);
         }
 
         protected virtual ReplaceOneResult ReplaceCore(T entity, IClientSessionHandle? session)

@@ -1,8 +1,8 @@
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
-using EIMSNext.Core.MongoDb;
-using EIMSNext.Core.Serialization;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Serialization;
 using MongoDB.Driver;
 using EIMSNext.Json.Serialization;
 

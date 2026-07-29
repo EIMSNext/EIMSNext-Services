@@ -1,6 +1,7 @@
 using EIMSNext.Cache;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Services;
 
 using HKH.Mef2.Integration;
@@ -8,7 +9,7 @@ using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
 
-namespace EIMSNext.Core
+namespace EIMSNext.Core.Services.Extensions
 {
     public static class IResolverExtension
     {

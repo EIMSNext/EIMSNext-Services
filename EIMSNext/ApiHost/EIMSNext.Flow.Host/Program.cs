@@ -9,7 +9,7 @@ using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

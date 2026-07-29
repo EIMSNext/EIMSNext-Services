@@ -3,9 +3,13 @@ using System.Text.Json.Nodes;
 using System.Linq.Expressions;
 
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -236,12 +240,12 @@ namespace EIMSNext.Service
             }
         }
 
-        private static string EnsureTemplateId<T>(IRepository<T> repo, string? templateId) where T : class, EIMSNext.Core.Entities.IMongoEntity
+        private static string EnsureTemplateId<T>(IRepository<T> repo, string? templateId) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
         {
             return string.IsNullOrWhiteSpace(templateId) ? repo.NewId() : templateId;
         }
 
-        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity, bool exists) where T : class, EIMSNext.Core.Entities.IMongoEntity
+        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity, bool exists) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
         {
             if (!exists)
             {
@@ -254,7 +258,7 @@ namespace EIMSNext.Service
 
         private sealed record TemplateState(HashSet<string> ExistingIds, List<string> StaleIds);
 
-        private static async Task SetTemplateIdAsync<T>(IRepository<T> repo, T entity, string templateId) where T : class, EIMSNext.Core.Entities.IMongoEntity
+        private static async Task SetTemplateIdAsync<T>(IRepository<T> repo, T entity, string templateId) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
         {
             switch (entity)
             {

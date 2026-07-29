@@ -1,7 +1,7 @@
 using System.Collections;
 using System.Dynamic;
 
-namespace EIMSNext.Core.Extensions
+namespace EIMSNext.Core.Abstractions.Extensions
 {
     public class ExpandoComparer
     {

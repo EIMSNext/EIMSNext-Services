@@ -1,7 +1,8 @@
-using EIMSNext.Core.Entities;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
 
-namespace EIMSNext.Core.Repositories
+namespace EIMSNext.Core.Mongo.Repositories
 {
     public class DbRepository<T> : RepositoryBase<T> where T : class, IMongoEntity
     {

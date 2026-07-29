@@ -1,15 +1,16 @@
 using System.Linq.Expressions;
 
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Query;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo.Query;
 
 using MongoDB.Bson;
 using MongoDB.Driver;
 using MongoDB.Driver.Search;
 
-namespace EIMSNext.Core.Repositories
+namespace EIMSNext.Core.Mongo.Repositories
 {
     public interface IRepository<T> where T : IMongoEntity
     {
