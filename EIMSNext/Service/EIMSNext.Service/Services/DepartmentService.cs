@@ -159,7 +159,7 @@ namespace EIMSNext.Service
                 x => x.Depts,
                 dept => dept.DeptId == departmentId);
             var update = EmployeeRepository.UpdateBuilder.Set(
-                "Depts.$[dept].HeriarchyId",
+                "depts.$[dept].heriarchyId",
                 newHeriarchyId);
             try
             {
@@ -172,12 +172,13 @@ namespace EIMSNext.Service
                         ArrayFilters =
                         [
                             new BsonDocumentArrayFilterDefinition<EmpDept>(
-                                new MongoDB.Bson.BsonDocument("dept.DeptId", departmentId))
+                                new MongoDB.Bson.BsonDocument("dept.deptId", departmentId))
                         ]
                     });
             }
             catch (NotSupportedException)
             {
+                // The unit-test repository has no Mongo collection. Production Mongo updates stay server-side.
                 foreach (var employee in EmployeeRepository.Queryable
                     .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
                     .ToList())
@@ -200,7 +201,7 @@ namespace EIMSNext.Service
                 x => x.Depts,
                 dept => dept.DeptId == departmentId);
             var update = EmployeeRepository.UpdateBuilder.Set(
-                "Depts.$[dept].DeptName",
+                "depts.$[dept].deptName",
                 newName);
             try
             {
@@ -213,12 +214,13 @@ namespace EIMSNext.Service
                         ArrayFilters =
                         [
                             new BsonDocumentArrayFilterDefinition<EmpDept>(
-                                new MongoDB.Bson.BsonDocument("dept.DeptId", departmentId))
+                                new MongoDB.Bson.BsonDocument("dept.deptId", departmentId))
                         ]
                     });
             }
             catch (NotSupportedException)
             {
+                // The unit-test repository has no Mongo collection. Production Mongo updates stay server-side.
                 foreach (var employee in EmployeeRepository.Queryable
                     .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
                     .ToList())
