@@ -1,4 +1,5 @@
 using System.Text.Json;
+using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 
@@ -44,6 +45,37 @@ namespace EIMSNext.Core.Tests
             var result = resp.Find(opt!).CountDocuments();
 
             Assert.IsTrue(result > 0);
+        }
+
+        [TestMethod]
+        public void DollarPrefixedStringValue_IsAllowed()
+        {
+            var filter = new DynamicFilter
+            {
+                Field = "productName",
+                Op = FilterOp.Eq,
+                Value = "$100"
+            };
+
+            Assert.IsNotNull(filter.ToFilterDefinition<FormData>());
+        }
+
+        [TestMethod]
+        public void MongoOperatorObject_IsRejectedAfterJsonNormalization()
+        {
+            var jsonFilter = "{\"field\":\"productName\",\"op\":\"eq\",\"value\":{\"$ne\":\"never\"}}";
+            var filter = jsonFilter.DeserializeFromJson<DynamicFilter>();
+
+            Assert.IsNotNull(filter);
+            try
+            {
+                filter.ToFilterDefinition<FormData>();
+                Assert.Fail("应拒绝 Mongo 操作符对象");
+            }
+            catch (BadRequestException error)
+            {
+                Assert.AreEqual("过滤值不允许包含 Mongo 操作符", error.Message);
+            }
         }
     }
 }

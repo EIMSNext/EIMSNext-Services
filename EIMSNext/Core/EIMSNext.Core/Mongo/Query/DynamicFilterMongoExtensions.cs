@@ -1,3 +1,4 @@
+using System.Collections;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using MongoDB.Bson;
@@ -87,15 +88,33 @@ namespace EIMSNext.Core.Mongo.Query
 
         private static bool ContainsMongoOperatorObject(object? value)
         {
-            if (value is IDictionary<string, object?> dictionary)
+            if (value is IDictionary dictionary)
             {
-                return dictionary.Any(x => x.Key.StartsWith('$')) ||
-                       dictionary.Values.Any(ContainsMongoOperatorObject);
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    if (entry.Key is string key && key.StartsWith('$'))
+                    {
+                        return true;
+                    }
+
+                    if (ContainsMongoOperatorObject(entry.Value))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
             }
 
-            if (value is IEnumerable<object?> items && value is not string)
+            if (value is IEnumerable items && value is not string)
             {
-                return items.Any(ContainsMongoOperatorObject);
+                foreach (var item in items)
+                {
+                    if (ContainsMongoOperatorObject(item))
+                    {
+                        return true;
+                    }
+                }
             }
 
             return false;

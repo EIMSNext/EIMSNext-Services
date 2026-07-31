@@ -101,6 +101,19 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public async Task DeleteCoreAsync_ActiveWorkflowData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            var approving = NewFormData("approving-data-async", FlowStatus.Approving);
+
+            var error = await Assert.ThrowsExactlyAsync<BadRequestException>(() => service.InvokeDeleteCoreAsync([approving]));
+
+            StringAssert.Contains(error.Message, "不允许删除");
+            Assert.AreEqual(0, service.LogicDeletedIds.Count);
+            Assert.AreEqual(0, service.HardDeletedIds.Count);
+        }
+
+        [TestMethod]
         public async Task PurgeCore_DeletedTargets_HardDeletesDataAndStrongRelations()
         {
             var service = TestableFormDataService.Create();
@@ -194,11 +207,17 @@ namespace EIMSNext.Service.Tests
                 return new TestableFormDataService(new RecordingRepository<AuditLog>());
             }
 
-            public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
-            {
-                _deleteTargets = targets;
-                DeleteCore(Builders<FormData>.Filter.Empty, null);
-            }
+        public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
+        {
+            _deleteTargets = targets;
+            DeleteCore(Builders<FormData>.Filter.Empty, null);
+        }
+
+        public Task<object> InvokeDeleteCoreAsync(IReadOnlyList<FormData> targets)
+        {
+            _deleteTargets = targets;
+            return DeleteCoreAsync(Builders<FormData>.Filter.Empty, null);
+        }
 
             public Task InvokePurgeCoreAsync(IEnumerable<string> requestedIds, IReadOnlyList<FormData> targets)
             {
