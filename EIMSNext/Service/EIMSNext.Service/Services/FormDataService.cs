@@ -223,6 +223,7 @@ namespace EIMSNext.Service
             BeforeDelete(filter, session).Wait();
 
             var targets = FindDeleteTargets(filter, session);
+            EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
                 .Select(x => x.Id)
@@ -260,6 +261,7 @@ namespace EIMSNext.Service
             await BeforeDelete(filter, session);
 
             var targets = await FindDeleteTargetsAsync(filter, session);
+            EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
                 .Select(x => x.Id)
@@ -290,6 +292,14 @@ namespace EIMSNext.Service
             await AfterDelete(filter, session);
 
             return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+        }
+
+        private static void EnsureCanDeleteTargets(IEnumerable<FormData> targets)
+        {
+            if (targets.Any(x => !x.DeleteFlag && (x.FlowStatus == FlowStatus.Approving || x.FlowStatus == FlowStatus.Suspended)))
+            {
+                throw new BadRequestException("审批中的数据不允许删除");
+            }
         }
 
         public override Task<object> DeleteAsync(string id)

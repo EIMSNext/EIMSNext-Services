@@ -129,6 +129,22 @@ namespace EIMSNext.Flow.Tests
             Assert.AreEqual(2, projected["tagCount"]);
         }
 
+        [TestMethod]
+        public void Execute_Rejects_Unannotated_And_CaseVariant_Functions()
+        {
+            using var plugin = new AttributePlugin();
+
+            var unannotated = plugin.Execute(
+                new PluginSetting(),
+                new PluginExecArgs { FunName = "Internal", FunArgs = "{}" });
+            var caseVariant = plugin.Execute(
+                new PluginSetting(),
+                new PluginExecArgs { FunName = "ECHO", FunArgs = "{}" });
+
+            Assert.AreEqual(-1, unannotated.Code);
+            Assert.AreEqual(-1, caseVariant.Code);
+        }
+
         [Plugin("attribute-plugin", "Attribute Plugin", Version = "1.2")]
         private sealed class AttributePlugin : PluginBase<AttributePluginSetting>
         {
@@ -145,6 +161,8 @@ namespace EIMSNext.Flow.Tests
                     TagCount = args.Tags.Count,
                 };
             }
+
+            private EchoResult Internal(EchoArgs args) => new();
         }
 
         private sealed class AttributePluginSetting

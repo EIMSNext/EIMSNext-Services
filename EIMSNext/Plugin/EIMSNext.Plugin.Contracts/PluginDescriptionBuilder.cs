@@ -56,8 +56,7 @@ namespace EIMSNext.Plugin.Contracts
         {
             var methods = pluginType.GetMethods(PluginMethodFlags);
             return methods.FirstOrDefault(method =>
-                string.Equals(method.GetCustomAttribute<PluginFunctionAttribute>()?.Id, functionId, StringComparison.OrdinalIgnoreCase))
-                ?? pluginType.GetMethod(functionId, PluginMethodFlags | BindingFlags.IgnoreCase);
+                string.Equals(method.GetCustomAttribute<PluginFunctionAttribute>()?.Id, functionId, StringComparison.Ordinal));
         }
 
         public static object? ProjectResult(MethodInfo method, object? value)

@@ -38,6 +38,7 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
+        private const int MongoMaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
@@ -690,6 +691,11 @@ namespace EIMSNext.Service.Host.Controllers
             //默认草稿
             entity.FlowStatus = FlowStatus.Draft;
 
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
+
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
@@ -782,6 +788,11 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest("请求修改对象的Key不一致");
             }
 
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
+
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
@@ -828,6 +839,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             model.CopyTo(entity);
 
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
+
             //if (!ValidateData(entity, delta, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
@@ -849,6 +865,11 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             return true;
+        }
+
+        private static bool IsMongoDocumentSizeAllowed(FormData entity)
+        {
+            return EntityExtension.ToBson(entity).ToBson().Length <= MongoMaxDocumentBytes;
         }
 
         /// <summary>

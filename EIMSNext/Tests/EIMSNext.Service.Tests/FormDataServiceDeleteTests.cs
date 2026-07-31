@@ -4,6 +4,7 @@ using System.Text.Json;
 
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Cache;
+using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Mongo.Entities;
@@ -81,6 +82,22 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(0, service.HardDeletedIds.Count);
             Assert.AreEqual(0, service.RelatedDeletedIds.Count);
             Assert.AreEqual(0, service.WorkflowDeletedDataIds.Count);
+        }
+
+        [TestMethod]
+        public void DeleteCore_ActiveWorkflowData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            var approving = NewFormData("approving-data", FlowStatus.Approving);
+            var suspended = NewFormData("suspended-data", FlowStatus.Suspended);
+
+            var approvingError = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeDeleteCore([approving]));
+            var suspendedError = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeDeleteCore([suspended]));
+
+            StringAssert.Contains(approvingError.Message, "不允许删除");
+            StringAssert.Contains(suspendedError.Message, "不允许删除");
+            Assert.AreEqual(0, service.LogicDeletedIds.Count);
+            Assert.AreEqual(0, service.HardDeletedIds.Count);
         }
 
         [TestMethod]

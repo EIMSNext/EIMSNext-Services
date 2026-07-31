@@ -45,8 +45,12 @@ namespace EIMSNext.Service.Host.Controllers
             if (string.IsNullOrWhiteSpace(request.Url))
                 return ApiResult.Fail(400, "服务器地址不能为空").ToActionResult();
 
-            if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var webhookUri))
-                return ApiResult.Fail(400, "服务器地址格式无效").ToActionResult();
+            if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var webhookUri) ||
+                string.IsNullOrWhiteSpace(webhookUri.Host) ||
+                (webhookUri.Scheme != Uri.UriSchemeHttp && webhookUri.Scheme != Uri.UriSchemeHttps))
+            {
+                return ApiResult.Fail(400, "服务器地址必须是有效的 HTTP 或 HTTPS 地址").ToActionResult();
+            }
 
             try
             {

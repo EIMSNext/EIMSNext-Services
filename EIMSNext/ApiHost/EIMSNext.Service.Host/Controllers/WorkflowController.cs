@@ -184,7 +184,7 @@ namespace EIMSNext.Service.Host.Controllers
                 }
                 else
                 {
-                    return Error(-1, "审批流程失败：没有审批权限");
+                    return Error(StatusCodes.Status403Forbidden, "审批流程失败：没有审批权限");
                 }
             }
             else
