@@ -25,5 +25,28 @@ namespace EIMSNext.Auth.Tests
                 IdentityType.None,
                 IdentityContext.ResolveExplicitIdentityType(new User { UserType = "not-a-valid-identity" }));
         }
+
+        [TestMethod]
+        public void ResolveCurrentCorpId_UsesPersistedDefaultWhenTokenClaimIsStale()
+        {
+            var user = new User
+            {
+                Crops = new List<UserCorp>
+                {
+                    new() { CorpId = "old-corp" },
+                    new() { CorpId = "new-corp", IsDefault = true }
+                }
+            };
+
+            Assert.AreEqual("new-corp", IdentityContext.ResolveCurrentCorpId(user, "old-corp"));
+        }
+
+        [TestMethod]
+        public void ResolveCurrentCorpId_UsesTokenClaimWhenNoDefaultIsPersisted()
+        {
+            var user = new User { Crops = new List<UserCorp> { new() { CorpId = "corp-a" } } };
+
+            Assert.AreEqual("corp-b", IdentityContext.ResolveCurrentCorpId(user, "corp-b"));
+        }
     }
 }

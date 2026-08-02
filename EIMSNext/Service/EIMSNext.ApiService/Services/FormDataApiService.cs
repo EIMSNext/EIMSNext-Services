@@ -664,7 +664,7 @@ namespace EIMSNext.ApiService
 
                     return new DynamicFilter
                     {
-                        Field = $"{Fields.CreateBy}.empId",
+                        Field = Fields.CreateById,
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };

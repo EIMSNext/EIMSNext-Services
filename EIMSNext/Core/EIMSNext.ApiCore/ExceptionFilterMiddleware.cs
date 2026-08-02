@@ -76,6 +76,11 @@ namespace EIMSNext.ApiCore
                 return (httpException.StatusCode, httpException.StateCode, httpException.Message);
             }
 
+            if (error is BadHttpRequestException or InvalidDataException)
+            {
+                return (StatusCodes.Status400BadRequest, "badrequest", "请求格式不合法或超出限制");
+            }
+
             var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(error) : "抱歉，出错了";
             return (StatusCodes.Status500InternalServerError, "internalservererror", errorMsg);
         }

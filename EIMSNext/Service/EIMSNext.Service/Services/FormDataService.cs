@@ -138,6 +138,7 @@ namespace EIMSNext.Service
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;
+            EnsureAddScope(entities, formDef);
             foreach (var entity in entities)
             {
                 _attachmentReferenceService.Apply(entity, null, session);
@@ -153,6 +154,32 @@ namespace EIMSNext.Service
                 entities.ForEach(entity => { entity.FlowStatus = FlowStatus.Approved; });
             }
             return base.BeforeAdd(entities, session);
+        }
+
+        private void EnsureAddScope(IEnumerable<FormData> entities, FormDef formDef)
+        {
+            if (formDef == null)
+            {
+                throw new BadRequestException("表单不存在");
+            }
+
+            if (!string.IsNullOrWhiteSpace(Context.CorpId) &&
+                !string.Equals(Context.CorpId, formDef.CorpId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ForbiddenException("不能向其他企业的表单新增数据");
+            }
+
+            foreach (var entity in entities)
+            {
+                if (!string.Equals(entity.FormId, formDef.Id, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(entity.AppId, formDef.AppId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BadRequestException("请求新增数据的应用或表单不一致");
+                }
+
+                // FormDataRequest does not carry CorpId. Use the owning form as the authoritative source.
+                entity.CorpId = formDef.CorpId;
+            }
         }
 
         public override async Task AddAsync(IEnumerable<FormData> entities)

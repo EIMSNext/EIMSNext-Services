@@ -1,20 +1,9 @@
-using System.Buffers;
-using System.IO.Pipelines;
-using System.Reflection;
-using System.Text;
-
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
@@ -31,6 +20,11 @@ using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.OData.UriParser;
 
 using MongoDB.AspNetCore.OData;
+
+using System.Buffers;
+using System.IO.Pipelines;
+using System.Reflection;
+using System.Text;
 using System.Text.Json;
 
 namespace EIMSNext.Service.Host.OData

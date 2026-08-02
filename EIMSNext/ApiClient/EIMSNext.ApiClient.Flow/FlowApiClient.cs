@@ -93,6 +93,15 @@ namespace EIMSNext.ApiClient.Flow
             return new WfActionStatusResponse { Error = ExtractError(response.Content, response.ErrorMessage) };
         }
 
+        public async Task<List<NodeActionResponse>?> NodeActions(ActionStatusRequest req, string accessToken)
+        {
+            var query = string.IsNullOrEmpty(req.WfInstanceId)
+                ? $"dataId={req.DataId}"
+                : $"dataId={req.DataId}&wfInstanceId={req.WfInstanceId}";
+            var response = await GetAsyncAllowError<List<NodeActionResponse>>($"Workflow/NodeActions/?{query}", accessToken);
+            return response.IsSuccessful ? response.Data! : [];
+        }
+
         public async Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken)
         {
             var query = string.IsNullOrEmpty(req.WfInstanceId)

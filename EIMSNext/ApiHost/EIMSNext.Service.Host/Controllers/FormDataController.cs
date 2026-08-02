@@ -390,11 +390,11 @@ namespace EIMSNext.Service.Host.Controllers
                     {
                         if (filter.IsGroup && filter.Rel == FilterRel.And)
                         {
-                            filter.Items!.Add(new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
+                            filter.Items!.Add(new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
                         }
                         else
                         {
-                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
+                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
                         }
                     }
                     else if (authGrp.Type == AuthGroupType.Custom)
@@ -827,11 +827,11 @@ namespace EIMSNext.Service.Host.Controllers
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
 
-            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
-
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 
             delta.Patch(model);
+            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
+
             if (!ValidateFormDataScope(entity, model, out var scopeError))
             {
                 return BadRequest(scopeError);
@@ -1354,7 +1354,7 @@ namespace EIMSNext.Service.Host.Controllers
 
                     return new DynamicFilter
                     {
-                        Field = $"{Fields.CreateBy}.empId",
+                        Field = Fields.CreateById,
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };

@@ -159,17 +159,25 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetService<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
-                    if (string.IsNullOrWhiteSpace(CurrentCorpId))
-                    {
-                        CurrentCorpId = _user.Crops.FirstOrDefault(x => x.IsDefault)?.CorpId
-                            ?? _user.Crops.FirstOrDefault()?.CorpId
-                            ?? string.Empty;
-                    }
+                    CurrentCorpId = ResolveCurrentCorpId(_user, CurrentCorpId);
 
                     _employee = _resolver.GetService<Employee>().Query(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
                 }
                 _retrieved = true;
             }
+        }
+
+        internal static string ResolveCurrentCorpId(User user, string claimedCorpId)
+        {
+            var defaultCorpId = user.Crops.FirstOrDefault(x => x.IsDefault && !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId;
+            if (!string.IsNullOrWhiteSpace(defaultCorpId))
+            {
+                return defaultCorpId;
+            }
+
+            return !string.IsNullOrWhiteSpace(claimedCorpId)
+                ? claimedCorpId
+                : user.Crops.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId ?? string.Empty;
         }
 
         /// <summary>

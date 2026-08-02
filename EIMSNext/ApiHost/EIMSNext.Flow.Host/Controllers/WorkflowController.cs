@@ -380,6 +380,45 @@ namespace EIMSNext.Flow.Host.Controllers
             });
         }
 
+        [HttpGet, Route("NodeActions")]
+        public IActionResult GetNodeActions([FromQuery] ActionStatusRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, string.Empty);
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (todo == null || wfInst == null || !string.Equals(todo.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            {
+                return Ok(new List<NodeActionResponse>());
+            }
+
+            var definition = _defservice.Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    x.ExternalId == wfInst.WorkflowDefinitionId &&
+                    x.Version == wfInst.Version)
+                .FirstOrDefault();
+            var actions = definition?.Metadata?.Steps
+                .FirstOrDefault(x => x.Id == todo.ApproveNodeId)?
+                .WfNodeSetting?.ApproveSetting?.NodeActions;
+
+            return Ok(actions?.Select(action => new NodeActionResponse
+            {
+                ActionType = action.ActionType.ToString().ToLowerInvariant(),
+                Enabled = action.Enabled,
+                Text = action.Text,
+                Candidates = action.Candidates?.Select(candidate => new ApprovalCandidateResponse
+                {
+                    CandidateId = candidate.CandidateId,
+                    CandidateType = (int)candidate.CandidateType,
+                    CandidateName = candidate.CandidateName,
+                    CascadedDept = candidate.CascadedDept,
+                }).ToList(),
+            }).ToList() ?? []);
+        }
+
         [HttpGet, Route("ReturnNodes")]
         public async Task<IActionResult> ReturnNodesAsync([FromQuery] ActionStatusRequest request)
         {
@@ -783,6 +822,22 @@ namespace EIMSNext.Flow.Host.Controllers
     {
         public bool CanWithdraw { get; set; }
         public bool CanUrge { get; set; }
+    }
+
+    public class NodeActionResponse
+    {
+        public string ActionType { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public string? Text { get; set; }
+        public List<ApprovalCandidateResponse>? Candidates { get; set; }
+    }
+
+    public class ApprovalCandidateResponse
+    {
+        public string CandidateId { get; set; } = string.Empty;
+        public int CandidateType { get; set; }
+        public string? CandidateName { get; set; }
+        public bool CascadedDept { get; set; }
     }
 
     public class ReturnTargetNode

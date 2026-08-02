@@ -371,6 +371,27 @@ namespace EIMSNext.Service.Host.Controllers
             return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
         }
 
+        [HttpGet("NodeActions")]
+        public async Task<IActionResult> NodeActions([FromQuery] WfActionStatusRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "获取流程节点操作失败：数据不存在");
+            if (dataError != null) return dataError;
+            if (data == null)
+            {
+                return Error(-1, "获取流程节点操作失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var actions = await flowClient.NodeActions(new ActionStatusRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+            }, IdentityContext.AccessToken);
+
+            return Ok(actions ?? []);
+        }
+
         [HttpGet("ReturnNodes")]
         public async Task<IActionResult> ReturnNodes([FromQuery] WfActionStatusRequest request)
         {
