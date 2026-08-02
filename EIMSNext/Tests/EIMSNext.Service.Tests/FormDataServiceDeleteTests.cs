@@ -143,6 +143,26 @@ namespace EIMSNext.Service.Tests
             Assert.IsFalse(service.WorkflowDeletedDataIds.Contains("other-data"));
         }
 
+        [TestMethod]
+        public void EnsureCanEdit_WorkflowActiveOrTerminalData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            foreach (var status in new[] { FlowStatus.Approving, FlowStatus.Approved, FlowStatus.Suspended, FlowStatus.Discarded })
+            {
+                var error = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeEnsureCanEdit(NewFormData($"workflow-{status}", status), usingWorkflow: true));
+                StringAssert.Contains(error.Message, "不允许修改");
+            }
+        }
+
+        [TestMethod]
+        public void EnsureCanEdit_DraftRejectedAndNonWorkflowApprovedData_AreAllowed()
+        {
+            var service = TestableFormDataService.Create();
+            service.InvokeEnsureCanEdit(NewFormData("workflow-draft", FlowStatus.Draft), usingWorkflow: true);
+            service.InvokeEnsureCanEdit(NewFormData("workflow-rejected", FlowStatus.Rejected), usingWorkflow: true);
+            service.InvokeEnsureCanEdit(NewFormData("plain-approved", FlowStatus.Approved), usingWorkflow: false);
+        }
+
         private static AuditLog AssertHasSinglePhysicalDeleteLog(TestableFormDataService service, string dataId)
         {
             var physicalDeleteLogs = service.AuditLogs
@@ -217,6 +237,11 @@ namespace EIMSNext.Service.Tests
         {
             _deleteTargets = targets;
             return DeleteCoreAsync(Builders<FormData>.Filter.Empty, null);
+        }
+
+        public void InvokeEnsureCanEdit(FormData entity, bool usingWorkflow)
+        {
+            EnsureCanEdit(entity, new FormDef { UsingWorkflow = usingWorkflow });
         }
 
             public Task InvokePurgeCoreAsync(IEnumerable<string> requestedIds, IReadOnlyList<FormData> targets)

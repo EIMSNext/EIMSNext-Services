@@ -48,7 +48,7 @@ namespace EIMSNext.Flow.Host.Controllers
         public IActionResult Load(DfLoadRequest request)
         {
             var def = _defservice.Find(x => x.ExternalId == request.DfDefinitionId && x.Version == request.Version).FirstOrDefault();
-            if (def == null)
+            if (def == null || def.FlowType != FlowType.Dataflow || def.DeleteFlag)
                 return BadRequest($"数据流程定义({request.DfDefinitionId}:{request.Version})不存在");
 
             _workflowLoader.LoadDefinition(def);
@@ -158,7 +158,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var def = new Wf_Definition()
             {
                 Version = request.Version,
-                Content = "",
+                Content = request.Content,
                 ExternalId = request.DfDefinitionId,
                 FlowType = FlowType.Dataflow,
             };

@@ -26,22 +26,33 @@ namespace EIMSNext.Service
         {
             await base.AfterDelete(filter, session);
 
-            var deletedApps = Repository.Find(new MongoFindOptions<AppDef> { Filter = filter }, session).ToList();
-            if (deletedApps.Count == 0)
+            var deletedAppIds = Repository.Find(new MongoFindOptions<AppDef> { Filter = filter }, session)
+                .Project(x => x.Id)
+                .ToList();
+            if (deletedAppIds.Count == 0)
                 return;
 
-            foreach (var app in deletedApps)
+            foreach (var appId in deletedAppIds)
             {
                 var formDefRepo = Resolver.GetRepository<FormDef>();
-                await formDefRepo.UpdateManyAsync(formDefRepo.FilterBuilder.And(formDefRepo.FilterBuilder.Eq(x => x.DeleteFlag, false), formDefRepo.FilterBuilder.Eq(x => x.AppId, app.Id)), formDefRepo.UpdateBuilder.Set(x => x.DeleteFlag, true), session: session);
+                var formIds = formDefRepo.Find(x => x.AppId == appId && !x.DeleteFlag)
+                    .Project(x => x.Id)
+                    .ToList();
+                if (formIds.Count > 0)
+                {
+                    await Resolver.Resolve<IFormDefService>().DeleteAsync(formIds);
+                }
 
-                var formDataRepo = Resolver.GetRepository<FormData>();
-                await formDataRepo.UpdateManyAsync(formDataRepo.FilterBuilder.And(formDataRepo.FilterBuilder.Eq(x => x.DeleteFlag, false), formDataRepo.FilterBuilder.Eq(x => x.AppId, app.Id)), formDataRepo.UpdateBuilder.Set(x => x.DeleteFlag, true), session: session);
+                var dashboardRepo = Resolver.GetRepository<DashboardDef>();
+                var dashboardIds = dashboardRepo.Find(x => x.AppId == appId && !x.DeleteFlag)
+                    .Project(x => x.Id)
+                    .ToList();
+                if (dashboardIds.Count > 0)
+                {
+                    await Resolver.Resolve<IDashboardDefService>().DeleteAsync(dashboardIds);
+                }
 
-                var todoRepo = Resolver.GetRepository<Wf_Todo>();
-                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.Eq(x => x.AppId, app.Id), session);
-
-                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, AppId = app.Id }, Context.AccessToken);
+                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, AppId = appId }, Context.AccessToken);
             }
         }
     }

@@ -16,8 +16,6 @@ using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using NanoidDotNet;
 using RestSharp;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -90,7 +88,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (!string.IsNullOrWhiteSpace(secret))
             {
-                request.AddHeader("X-EIMS-Signature", ComputeSignature(payloadJson, secret));
+                request.AddHeader("X-EIMS-Signature", WebhookSignature.Compute(payloadJson, secret));
             }
 
             request.AddStringBody(payloadJson, DataFormat.Json);
@@ -98,13 +96,5 @@ namespace EIMSNext.Service.Host.Controllers
             return request;
         }
 
-        private static string ComputeSignature(string payload, string secret)
-        {
-            var key = Encoding.UTF8.GetBytes(secret);
-            var body = Encoding.UTF8.GetBytes(payload);
-            using var hmac = new HMACSHA256(key);
-            var hash = hmac.ComputeHash(body);
-            return Convert.ToHexString(hash).ToLowerInvariant();
-        }
     }
 }

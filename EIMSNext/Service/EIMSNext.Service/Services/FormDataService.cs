@@ -553,15 +553,29 @@ namespace EIMSNext.Service
         protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)
         {
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old) ?? GetFromStore<FormData>(entity.Id, DataVersion.Old);
+            var formDef = GetFromStore<FormDef>(entity.FormId)!;
+            EnsureCanEdit(entity, formDef);
             _attachmentReferenceService.Apply(entity, old, session);
             if (Context.Action == DataAction.Submit)
             {
-                var formDef = GetFromStore<FormDef>(entity.FormId)!;
                 ValidateRequiredFields(entity, formDef);
                 ResolveSerialNumbers(entity, formDef, old);
             }
 
             return base.BeforeReplace(entity, session);
+        }
+
+        protected static void EnsureCanEdit(FormData entity, FormDef formDef)
+        {
+            if (!formDef.UsingWorkflow)
+            {
+                return;
+            }
+
+            if (entity.FlowStatus is FlowStatus.Approving or FlowStatus.Approved or FlowStatus.Suspended or FlowStatus.Discarded)
+            {
+                throw new BadRequestException("审批中的或已完成的流程数据不允许修改");
+            }
         }
 
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, EIMSNext.Service.Entities.CascadeMode cascade, string? eventIds)
