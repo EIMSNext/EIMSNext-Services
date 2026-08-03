@@ -31,6 +31,11 @@ namespace EIMSNext.Auth.Entities
         public bool Disabled {  get; set; }
 
         /// <summary>
+        /// 头像文件的相对存储路径
+        /// </summary>
+        public string? Avatar { get; set; }
+
+        /// <summary>
         /// 显式用户身份。为空时由业务服务按企业和员工关系计算。
         /// </summary>
         public string? UserType { get; set; }

@@ -9,6 +9,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
+using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using System.Text;
@@ -26,13 +27,20 @@ namespace EIMSNext.File.Host.Controllers
             ".py", ".scr", ".sh", ".svg", ".vbe", ".vbs", ".wsf", ".wsh", ".xhtml"
         };
 
+        private static readonly HashSet<string> AvatarFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gif", ".jpeg", ".jpg", ".png", ".webp"
+        };
+
         private readonly ILogger<UploadController> _logger;
         private readonly IUploadedFileService _uploadService;
+        private readonly IStorageProvider _storage;
 
         public UploadController(IResolver resolver) : base(resolver)
         {
             _logger = resolver.GetLogger<UploadController>();
             _uploadService = resolver.Resolve<IUploadedFileService>();
+            _storage = resolver.Resolve<IStorageProvider>();
         }
 
         /// <summary>
@@ -101,6 +109,49 @@ namespace EIMSNext.File.Host.Controllers
                     };
                 })
             });
+        }
+
+        /// <summary>
+        /// 上传当前用户头像。
+        /// </summary>
+        [HttpPost("Avatar")]
+        [RequestFormLimits(MultipartBodyLengthLimit = 10 * 1024 * 1024)]
+        [RequestSizeLimit(10 * 1024 * 1024)]
+        public async Task<IActionResult> UploadAvatar()
+        {
+            var files = Request.Form.Files;
+            if (files.Count != 1)
+            {
+                return BadRequest("请上传一张头像图片");
+            }
+
+            var file = files[0];
+            var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
+            if (file.Length == 0 || !AvatarFileExtensions.Contains(extension))
+            {
+                return BadRequest("头像仅支持 gif、jpeg、jpg、png、webp 图片");
+            }
+
+            var validationError = await ValidateFileContent(file);
+            if (validationError != null)
+            {
+                return BadRequest(validationError);
+            }
+
+            var userId = IdentityContext.CurrentUserID;
+            if (string.IsNullOrWhiteSpace(userId))
+            {
+                return Unauthorized();
+            }
+
+            var avatar = $"Avatar/{userId}{extension}";
+            await using var stream = file.OpenReadStream();
+            if (!_storage.Upload(stream, avatar))
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError, "头像上传失败");
+            }
+
+            return Ok(new { avatar });
         }
 
         private static async Task<string?> ValidateFileContent(IFormFile file)

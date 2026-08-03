@@ -42,9 +42,11 @@ namespace EIMSNext.Core.Tests
             var opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
 
             var resp = new FormDataRepository(_dbContext!);
-            var result = resp.Find(opt!).CountDocuments();
+            var data = new FormData { FormId = "68298220d23e843cb3001645" };
+            resp.Insert(data, _scope?.SessionHandle);
+            var result = resp.Find(opt!, _scope?.SessionHandle).CountDocuments();
 
-            Assert.IsTrue(result > 0);
+            Assert.AreEqual(1, result);
         }
 
         [TestMethod]

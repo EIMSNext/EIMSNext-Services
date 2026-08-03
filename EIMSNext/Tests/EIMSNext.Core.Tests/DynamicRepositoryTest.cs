@@ -116,7 +116,7 @@ namespace EIMSNext.Core.Tests
             //new { Data = new { f_1721094301870 = "fff" }, _id = data.Id, CreateBy = new Entity.Operator { Id = "1", Code = "001", Name = "t1" } };
             resp.Update(data.Id, udata, session: _scope?.SessionHandle);
 
-            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.empId", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
+            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.value", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
             Assert.AreEqual(1, result.CountDocuments());
         }
 
@@ -150,7 +150,7 @@ namespace EIMSNext.Core.Tests
             //new { Data = new { f_1721094301870 = "fff" }, _id = data.Id, CreateBy = new Entity.Operator { Id = "1", Code = "001", Name = "t1" } };
             resp.UpdateMany(filter, udata, session: _scope?.SessionHandle);
 
-            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.empId", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
+            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.value", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
             Assert.AreEqual(2, result.CountDocuments());
         }
 
@@ -168,7 +168,7 @@ namespace EIMSNext.Core.Tests
 
             resp.Replace(data2, _scope?.SessionHandle);
 
-            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.EmpId", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
+            var result = resp.Find(new DynamicFindOptions<FormData> { Filter = new DynamicFilter { Field = "createBy.value", Op = FilterOp.Eq, Value = "001" } }, _scope?.SessionHandle);
             Assert.AreEqual(1, result.CountDocuments());
         }
 

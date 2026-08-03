@@ -9,7 +9,6 @@ namespace EIMSNext.Core.Tests
         public FormData()
         {
             CreateTime = DateTime.UtcNow.ToTimeStampMs();
-            UpdateTime = CreateTime;
         }
 
         public FormData(
@@ -17,7 +16,6 @@ namespace EIMSNext.Core.Tests
             : base(jsonData)
         {
             CreateTime = DateTime.UtcNow.ToTimeStampMs();
-            UpdateTime = CreateTime;
         }
 
         public string AppId { get; set; } = "";

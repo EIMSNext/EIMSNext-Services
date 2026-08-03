@@ -100,6 +100,59 @@ namespace EIMSNext.Auth.Tests
         }
 
         [TestMethod]
+        public async Task RegisterAsync_RejectsCodeIssuedForAnotherTarget()
+        {
+            using var dbContext = new FakeAuthDbContext();
+            var provider = new MockVerificationCodeProvider();
+            var service = new AccountSecurityService(dbContext, new MemoryCache(new MemoryCacheOptions()), provider);
+            var code = provider.Send(VerificationCodePurpose.Register, "first@example.com").MockCode!;
+
+            await AssertThrowsAsync<InvalidOperationException>(() => service.RegisterAsync(new RegisterRequest
+            {
+                Type = PinCodeTargetType.Email,
+                Email = "second@example.com",
+                Code = code,
+                Password = "Strong123!"
+            }));
+
+            Assert.AreEqual(0, dbContext.Users.Count());
+        }
+
+        [TestMethod]
+        public async Task RegisterAsync_ConsumesSharedCodeOnlyOnce()
+        {
+            using var dbContext = new FakeAuthDbContext();
+            var provider = new MockVerificationCodeProvider();
+            var service = new AccountSecurityService(dbContext, new MemoryCache(new MemoryCacheOptions()), provider);
+            const string email = "parallel@example.com";
+            var code = provider.Send(VerificationCodePurpose.Register, email).MockCode!;
+
+            async Task<bool> RegisterAsync()
+            {
+                try
+                {
+                    await service.RegisterAsync(new RegisterRequest
+                    {
+                        Type = PinCodeTargetType.Email,
+                        Email = email,
+                        Code = code,
+                        Password = "Strong123!"
+                    });
+                    return true;
+                }
+                catch (InvalidOperationException)
+                {
+                    return false;
+                }
+            }
+
+            var results = await Task.WhenAll(Task.Run(RegisterAsync), Task.Run(RegisterAsync));
+
+            Assert.AreEqual(1, results.Count(result => result));
+            Assert.AreEqual(1, dbContext.Users.Count());
+        }
+
+        [TestMethod]
         public async Task ChangePasswordAsync_Throws_WhenConfirmPasswordMismatch()
         {
             using var dbContext = new FakeAuthDbContext(

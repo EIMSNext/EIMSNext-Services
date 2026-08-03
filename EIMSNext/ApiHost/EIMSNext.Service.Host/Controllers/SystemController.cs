@@ -32,6 +32,11 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
+        private static readonly HashSet<string> AvatarFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gif", ".jpeg", ".jpg", ".png", ".webp"
+        };
+
         private IClientApiService ClientApiService => Resolver.Resolve<IClientApiService>();
         private UserApiService UserApiService => Resolver.Resolve<UserApiService>();
         private ICorpOnboardingService CorpOnboardingService => Resolver.Resolve<ICorpOnboardingService>();
@@ -62,6 +67,7 @@ namespace EIMSNext.Service.Host.Controllers
                 userName = user?.Name ?? User.Identity?.Name ?? IdentityContext.CurrentUserID,
                 phone = user?.Phone,
                 email = user?.Email,
+                avatar = (user as User)?.Avatar,
                 empId = emp?.Id,
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
@@ -70,6 +76,29 @@ namespace EIMSNext.Service.Host.Controllers
                 userType = IdentityContext.IdentityType,
                 roles = emp?.Roles.Select(x => x.RoleId)
             }).ToActionResult();
+        }
+
+        [HttpPost("UpdateAvatar")]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
+        public async Task<IActionResult> UpdateAvatar([FromBody] UpdateAvatarRequest request)
+        {
+            if (IdentityContext.CurrentUser is not User user)
+            {
+                return Unauthorized();
+            }
+
+            var avatar = request.Avatar?.Trim().Replace('\\', '/');
+            var extension = Path.GetExtension(avatar ?? string.Empty).ToLowerInvariant();
+            var expectedAvatar = $"Avatar/{user.Id}{extension}";
+            if (!AvatarFileExtensions.Contains(extension)
+                || !string.Equals(avatar, expectedAvatar, StringComparison.Ordinal))
+            {
+                return BadRequest("头像路径无效");
+            }
+
+            user.Avatar = avatar;
+            await UserApiService.ReplaceAsync(user);
+            return ApiResult.Success(new { avatar }).ToActionResult();
         }
 
         [HttpGet("AdminPermissions")]
