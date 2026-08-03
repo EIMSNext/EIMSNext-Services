@@ -40,7 +40,7 @@ namespace EIMSNext.Auth.Extensions
             var certificate = X509CertificateLoader.LoadPkcs12FromFile(
                 certificatePath,
                 certificatePassword,
-                X509KeyStorageFlags.DefaultKeySet);
+                X509KeyStorageFlags.EphemeralKeySet);
 
             services.AddOpenIddict()
                 .AddServer(options =>

@@ -27,7 +27,7 @@ internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IW
         var certificate = X509CertificateLoader.LoadPkcs12FromFile(
             certificatePath,
             certificatePassword,
-            X509KeyStorageFlags.DefaultKeySet);
+            X509KeyStorageFlags.EphemeralKeySet);
 
         var oauthSection = configuration.GetSection("OAuth");
         var authority = oauthSection["Authority"];
