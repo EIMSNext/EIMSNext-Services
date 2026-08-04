@@ -120,9 +120,10 @@ namespace EIMSNext.Auth.Tests
                 AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
             };
 
+            var auditLoginService = new FakeAuditLoginService();
             var handler = new TokenRequestHandler(
                 new FakeUserService(new User { Id = "noop", Name = "noop" }, [client]),
-                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }));
+                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }, auditLoginService));
 
             var request = new OpenIddictRequest
             {
@@ -142,6 +143,7 @@ namespace EIMSNext.Auth.Tests
             Assert.AreEqual("wf_wf-inst-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Name).Value);
             Assert.AreEqual("corp-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Corp).Value);
             Assert.AreEqual(IdentityType.System.ToString(), result.Claims.Single(x => x.Type == AuthClaimTypes.IdentityType).Value);
+            Assert.AreEqual(0, auditLoginService.Entries.Count);
         }
 
         [TestMethod]
@@ -186,16 +188,16 @@ namespace EIMSNext.Auth.Tests
             return new HttpContextAccessor { HttpContext = context };
         }
 
-        private static IReadOnlyList<ITokenGrantHandler> CreateGrantHandlers(User user)
+        private static IReadOnlyList<ITokenGrantHandler> CreateGrantHandlers(User user, FakeAuditLoginService? auditLoginService = null)
         {
             var contextAccessor = CreateHttpContextAccessor();
-            var auditLoginService = new FakeAuditLoginService();
+            auditLoginService ??= new FakeAuditLoginService();
             return
             [
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
                 new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
-                new SystemTokenGrantHandler(contextAccessor)
+                new SystemTokenGrantHandler(auditLoginService, contextAccessor)
             ];
         }
 
@@ -229,7 +231,13 @@ namespace EIMSNext.Auth.Tests
 
         private sealed class FakeAuditLoginService : IAuditLoginService
         {
-            public Task AddAuditLogin(AuditLogin entity) => Task.CompletedTask;
+            public List<AuditLogin> Entries { get; } = [];
+
+            public Task AddAuditLogin(AuditLogin entity)
+            {
+                Entries.Add(entity);
+                return Task.CompletedTask;
+            }
         }
     }
 }

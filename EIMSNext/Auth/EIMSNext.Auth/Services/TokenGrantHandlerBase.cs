@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using EIMSNext.ApiCore;
 using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Interfaces;
 using EIMSNext.Common.Extensions;
 using Microsoft.AspNetCore.Http;
 
@@ -9,10 +10,17 @@ namespace EIMSNext.Auth.Services
     public abstract class TokenGrantHandlerBase
     {
         private readonly IHttpContextAccessor _contextAccessor;
+        private readonly IAuditLoginService _auditLoginService;
 
-        protected TokenGrantHandlerBase(IHttpContextAccessor contextAccessor)
+        protected TokenGrantHandlerBase(IAuditLoginService auditLoginService, IHttpContextAccessor contextAccessor)
         {
+            _auditLoginService = auditLoginService;
             _contextAccessor = contextAccessor;
+        }
+
+        protected Task AddAuditLogin(AuditLogin auditLogin)
+        {
+            return _auditLoginService.AddAuditLogin(auditLogin);
         }
 
         protected static List<Claim> CreateUserClaims(string subject, User user, DateTimeOffset authenticationTime)
@@ -55,6 +63,20 @@ namespace EIMSNext.Auth.Services
                 UserName = user.Name,
                 CorpId = claims.FirstOrDefault(x => x.Type == AuthClaimTypes.Corp)?.Value,
                 ClientId = InternalClients.WebClientId,
+                ClientIp = IpHelper.GetClientIp(_contextAccessor),
+                CreateTime = DateTime.UtcNow.ToTimeStampMs(),
+                GrantType = grantType
+            };
+        }
+
+        protected AuditLogin CreateSuccessAudit(string loginId, string? corpId, string clientId, string? userName, string grantType)
+        {
+            return new AuditLogin
+            {
+                LoginId = loginId,
+                CorpId = corpId,
+                ClientId = clientId,
+                UserName = userName,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 GrantType = grantType
