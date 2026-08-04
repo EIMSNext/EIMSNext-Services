@@ -21,6 +21,7 @@ using EIMSNext.Storage.Abstractions;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using NPOI.SS.UserModel;
 
 namespace EIMSNext.ApiService
@@ -1144,7 +1145,7 @@ namespace EIMSNext.ApiService
                 Filter = filter,
                 Take = 2,
             });
-            return ((IEnumerable<FormData>)found).ToList();
+            return found.ToList();
         }
 
         private IEnumerable<FormData> FindCorrectionDataById(FormDataImportLog importLog, string dataId, DynamicFilter dataScopeFilter)

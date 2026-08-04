@@ -198,6 +198,11 @@ namespace EIMSNext.ApiService
                 throw new ArgumentException("系统管理员组只能由企业创建流程生成");
             }
 
+            if (entity.EmployeeIds.Count == 0)
+            {
+                throw new ArgumentException("系统管理员组至少保留一名管理员");
+            }
+
             if (entity.EmployeeIds.Count > 5)
             {
                 throw new ArgumentException("系统管理员不能超过5人");

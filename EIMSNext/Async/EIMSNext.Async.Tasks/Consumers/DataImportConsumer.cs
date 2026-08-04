@@ -20,6 +20,7 @@ using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 
@@ -542,7 +543,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                     Filter = filter,
                     Take = 2,
                 });
-                return ((IEnumerable<FormData>)found).ToList();
+                return found.ToList();
             }
 
             private DynamicFilter? ReadDataScopeFilter()
