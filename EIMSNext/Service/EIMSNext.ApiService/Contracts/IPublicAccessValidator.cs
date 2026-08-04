@@ -1,4 +1,5 @@
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService
@@ -24,6 +25,8 @@ namespace EIMSNext.ApiService
         bool CanReadFormData(string formId);
 
         bool CanQueryFormData(string formId);
+
+        bool IsRelatedForm(string formId);
 
         bool CanReadDashboardForm(string formId);
 

@@ -11,7 +11,7 @@ namespace EIMSNext.ApiService
         protected override IQueryable<ExportLogViewModel> FilterByPermission()
         {
             var empId = IdentityContext.CurrentEmployee?.Id ?? string.Empty;
-            return base.FilterByPermission().Where(x => x.CreateBy != null && x.CreateBy.Value == empId);
+            return base.FilterByPermission().Where(x => x.CreateBy != null && x.CreateBy.Id == empId);
         }
     }
 }

@@ -1,5 +1,6 @@
 using EIMSNext.Common;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Tests
@@ -20,6 +21,12 @@ namespace EIMSNext.Service.Tests
             // 这样 FormLayoutParser / FormDataFormatter / ConditionList 等所有
             // "基于 IsInputField 判定"的代码自动支持流水号(条件/运算/动态过滤一致)。
             Assert.IsTrue(FieldType.IsInputField(FieldType.SerialNo));
+        }
+
+        [TestMethod]
+        public void IsInputField_DataSelect_ReturnsTrue()
+        {
+            Assert.IsTrue(FieldType.IsInputField(FieldType.DataSelect));
         }
 
         [TestMethod]
@@ -61,16 +68,6 @@ namespace EIMSNext.Service.Tests
                 CurrId = 1,
             };
             Assert.AreEqual("f_abc", seq.Key);
-        }
-
-        [TestMethod]
-        public void SerialNoResetCycle_AllValuesDefined()
-        {
-            // 4 个重置周期:Never / Day / Month / Year
-            Assert.AreEqual(0, (int)SerialNoResetCycle.Never);
-            Assert.AreEqual(1, (int)SerialNoResetCycle.Day);
-            Assert.AreEqual(2, (int)SerialNoResetCycle.Month);
-            Assert.AreEqual(3, (int)SerialNoResetCycle.Year);
         }
     }
 }

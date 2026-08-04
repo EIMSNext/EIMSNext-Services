@@ -1,8 +1,10 @@
 using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 
 using HKH.Mef2.Integration;
 
@@ -61,34 +63,12 @@ namespace EIMSNext.Service.Host.Controllers
         }
         protected DynamicFindOptions<T> FilterByDeleted(DynamicFindOptions<T> query)
         {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
-            }
-
-            query.Filter = filter;
+            query.Filter = query.Filter.And(Fields.DeleteFlag, FilterOp.Ne, true);
             return query;
         }
         protected DynamicFindOptions<T> FilterByCorpId(DynamicFindOptions<T> query)
         {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
-            }
-
-            query.Filter = filter;
+            query.Filter = query.Filter.And(Fields.CorpId, FilterOp.Eq, IdentityContext.CurrentCorpId);
             return query;
         }
         protected virtual DynamicFindOptions<T> FilterByPermission(DynamicFindOptions<T> query)

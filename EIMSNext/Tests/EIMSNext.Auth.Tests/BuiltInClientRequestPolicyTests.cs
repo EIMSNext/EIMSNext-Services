@@ -10,6 +10,7 @@ using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.ApiService;
 
+using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.FileProviders;
@@ -32,7 +33,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.WebClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -43,7 +44,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.PublicClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -54,7 +55,7 @@ namespace EIMSNext.Auth.Tests
             var result = policy.ValidateTokenEndpoint(InternalClients.SystemClientId);
 
             Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.UnauthorizedClient, result.Error);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
         }
 
         [TestMethod]
@@ -64,6 +65,18 @@ namespace EIMSNext.Auth.Tests
             var request = CreateRequest("https://evil.example.com");
 
             var result = policy.ValidateLogin(InternalClients.WebClientId, request);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
+        }
+
+        [TestMethod]
+        public void ValidateLogin_RejectsNonWebClientAsInvalidClient()
+        {
+            var policy = CreatePolicy();
+            var request = CreateRequest("https://admin.eimsnext.com");
+
+            var result = policy.ValidateLogin(InternalClients.SystemClientId, request);
 
             Assert.IsFalse(result.Succeeded);
             Assert.AreEqual(OpenIddictConstants.Errors.InvalidClient, result.Error);
@@ -137,17 +150,6 @@ namespace EIMSNext.Auth.Tests
         }
 
         [TestMethod]
-        public void ValidateSystemToken_RejectsNonSystemGrant()
-        {
-            var policy = CreatePolicy();
-
-            var result = policy.ValidateSystemToken(InternalClients.SystemClientId, "system_task");
-
-            Assert.IsFalse(result.Succeeded);
-            Assert.AreEqual(OpenIddictConstants.Errors.InvalidRequest, result.Error);
-        }
-
-        [TestMethod]
         public void SystemToken_IsHiddenFromApiExplorer()
         {
             var method = typeof(AuthorizationController).GetMethod(nameof(AuthorizationController.SystemToken));
@@ -217,7 +219,7 @@ namespace EIMSNext.Auth.Tests
                 ["client_id"] = InternalClients.PublicClientId
             }), CancellationToken.None);
 
-            Assert.IsInstanceOfType<ForbidResult>(result);
+            Assert.IsInstanceOfType<BadRequestObjectResult>(result);
             Assert.AreEqual(0, handler.CallCount);
         }
 

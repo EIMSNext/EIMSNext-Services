@@ -1,5 +1,6 @@
 using EIMSNext.Component;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 

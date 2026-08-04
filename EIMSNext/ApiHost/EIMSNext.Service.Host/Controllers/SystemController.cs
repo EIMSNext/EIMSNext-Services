@@ -8,9 +8,13 @@ using EIMSNext.ApiService.Extensions;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
@@ -28,19 +32,26 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
+        private static readonly HashSet<string> AvatarFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gif", ".jpeg", ".jpg", ".png", ".webp"
+        };
+
         private IClientApiService ClientApiService => Resolver.Resolve<IClientApiService>();
         private UserApiService UserApiService => Resolver.Resolve<UserApiService>();
         private ICorpOnboardingService CorpOnboardingService => Resolver.Resolve<ICorpOnboardingService>();
         private PluginStoreApiService PluginStoreApiService => Resolver.Resolve<PluginStoreApiService>();
+        private ECoinPriceApiService ECoinPriceApiService => Resolver.Resolve<ECoinPriceApiService>();
 
         /// <summary>
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
         [HttpGet("CurrentUser")]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
         public IActionResult CurrentUser()
         {
-            var user = IdentityContext.CurrentUser!;
+            var user = IdentityContext.CurrentUser;
             var emp = IdentityContext.CurrentEmployee as Employee;
             var departmentIds = emp == null
                 ? new List<string>()
@@ -52,10 +63,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             return ApiResult.Success(new
             {
-                userId = user.Id,
-                userName = user.Name,
-                phone = user.Phone,
-                email = user.Email,
+                userId = user?.Id ?? IdentityContext.CurrentUserID,
+                userName = user?.Name ?? User.Identity?.Name ?? IdentityContext.CurrentUserID,
+                phone = user?.Phone,
+                email = user?.Email,
+                avatar = (user as User)?.Avatar,
                 empId = emp?.Id,
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
@@ -66,7 +78,31 @@ namespace EIMSNext.Service.Host.Controllers
             }).ToActionResult();
         }
 
+        [HttpPost("UpdateAvatar")]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
+        public async Task<IActionResult> UpdateAvatar([FromBody] UpdateAvatarRequest request)
+        {
+            if (IdentityContext.CurrentUser is not User user)
+            {
+                return Unauthorized();
+            }
+
+            var avatar = request.Avatar?.Trim().Replace('\\', '/');
+            var extension = Path.GetExtension(avatar ?? string.Empty).ToLowerInvariant();
+            var expectedAvatar = $"Avatar/{user.Id}{extension}";
+            if (!AvatarFileExtensions.Contains(extension)
+                || !string.Equals(avatar, expectedAvatar, StringComparison.Ordinal))
+            {
+                return BadRequest("头像路径无效");
+            }
+
+            user.Avatar = avatar;
+            await UserApiService.ReplaceAsync(user);
+            return ApiResult.Success(new { avatar }).ToActionResult();
+        }
+
         [HttpGet("AdminPermissions")]
+        [IdentityType(IdentityTypeDefaults.AppAdmin)]
         public IActionResult GetAdminPermissions()
         {
             return ApiResult.Success(Resolver.Resolve<AdminPermissionEvaluator>().GetSnapshot()).ToActionResult();
@@ -86,17 +122,25 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("SwitchCorp")]
         public async Task<IActionResult> SwitchCorprate(SwitchCorprateRequest req)
         {
-            if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.CorpId)) return BadRequest("企业不能为空");
 
-            var user = IdentityContext.CurrentUser! as User;
-            user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
+            if (IdentityContext.CurrentUser is not User user)
+                return Unauthorized();
+
+            var targetCorp = user.Crops?.FirstOrDefault(x =>
+                string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.Ordinal));
+            if (targetCorp == null)
+                return Forbid();
+
+            foreach (var corp in user.Crops ?? [])
+                corp.IsDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+
             await UserApiService.ReplaceAsync(user);
-            return ApiResult.Success(req.CorpId).ToActionResult();
+            return ApiResult.Success(targetCorp.CorpId).ToActionResult();
         }
 
         [HttpPost("JoinCorp")]
-        [Permission(Operation = Operation.Add)]
-        [IdentityType(IdentityType.NoCorp)]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public async Task<IActionResult> JoinCorp([FromBody] ApplyJoinCorporateRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.CorpId))
@@ -138,6 +182,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("Plugins")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult GetPlugins()
         {
             return ApiResult.Success(PluginStoreApiService.GetInstalledRuntimePlugins()).ToActionResult();
@@ -229,6 +274,22 @@ namespace EIMSNext.Service.Host.Controllers
                 return Unauthorized();
             }
             return ApiResult.Success(new { pluginInstallId = result.PluginInstallId }).ToActionResult();
+        }
+
+        [HttpPost("pluginstore/publish")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> PublishPlugin([FromBody] PluginPublishRequest request)
+        {
+            var profile = await PluginStoreApiService.PublishAsync(request);
+            return ApiResult.Success(new { profile.Id, profile.PluginId, profile.Version }).ToActionResult();
+        }
+
+        [HttpPost("ecoinprice/batch")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> BatchUpsertECoinPrices([FromBody] List<ECoinPriceBatchItemRequest> requests)
+        {
+            var result = await ECoinPriceApiService.BatchUpsertAsync(requests);
+            return ApiResult.Success(result).ToActionResult();
         }
     }
 }

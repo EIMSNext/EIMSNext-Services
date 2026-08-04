@@ -1,4 +1,5 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Service.Entities
 {
@@ -89,7 +90,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 成员编码
         /// </summary>
-        public string? Code { get; set; }
+        public string? Value { get; set; }
         /// <summary>
         /// 成员显示名称
         /// </summary>

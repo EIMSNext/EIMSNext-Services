@@ -2,6 +2,7 @@ using System.Composition;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
 using EIMSNext.WxWork.Clients;
 
 namespace EIMSNext.Auth.Integrations.WxWork

@@ -3,8 +3,13 @@ using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Persistence;
@@ -112,6 +117,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var workerId = IdentityContext.CurrentEmployee.Id;
+            var workerCode = IdentityContext.CurrentEmployee.Code;
             var todo = _todoservice.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
@@ -142,7 +148,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 
-            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, IdentityContext.CurrentUserID, workerId, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
+            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
 
             await _wfHost.SubmitActivitySuccess(act.Token, approveData.ToExpando());
             var errMsg = WaitForComplete(approveData.ExecLogId);
@@ -372,6 +378,45 @@ namespace EIMSNext.Flow.Host.Controllers
                 CanUrge = status.CanUrge,
                 CanWithdraw = status.CanWithdraw
             });
+        }
+
+        [HttpGet, Route("NodeActions")]
+        public IActionResult GetNodeActions([FromQuery] ActionStatusRequest request)
+        {
+            if (IdentityContext.CurrentEmployee == null || string.IsNullOrEmpty(request.DataId))
+            {
+                return BadRequest("审批人和数据Id不能为空");
+            }
+
+            var todo = ResolveCurrentTodo(request.DataId, string.Empty);
+            var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
+            if (todo == null || wfInst == null || !string.Equals(todo.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            {
+                return Ok(new List<NodeActionResponse>());
+            }
+
+            var definition = _defservice.Query(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    x.ExternalId == wfInst.WorkflowDefinitionId &&
+                    x.Version == wfInst.Version)
+                .FirstOrDefault();
+            var actions = definition?.Metadata?.Steps
+                .FirstOrDefault(x => x.Id == todo.ApproveNodeId)?
+                .WfNodeSetting?.ApproveSetting?.NodeActions;
+
+            return Ok(actions?.Select(action => new NodeActionResponse
+            {
+                ActionType = action.ActionType.ToString().ToLowerInvariant(),
+                Enabled = action.Enabled,
+                Text = action.Text,
+                Candidates = action.Candidates?.Select(candidate => new ApprovalCandidateResponse
+                {
+                    CandidateId = candidate.CandidateId,
+                    CandidateType = (int)candidate.CandidateType,
+                    CandidateName = candidate.CandidateName,
+                    CascadedDept = candidate.CascadedDept,
+                }).ToList(),
+            }).ToList() ?? []);
         }
 
         [HttpGet, Route("ReturnNodes")]
@@ -777,6 +822,22 @@ namespace EIMSNext.Flow.Host.Controllers
     {
         public bool CanWithdraw { get; set; }
         public bool CanUrge { get; set; }
+    }
+
+    public class NodeActionResponse
+    {
+        public string ActionType { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public string? Text { get; set; }
+        public List<ApprovalCandidateResponse>? Candidates { get; set; }
+    }
+
+    public class ApprovalCandidateResponse
+    {
+        public string CandidateId { get; set; } = string.Empty;
+        public int CandidateType { get; set; }
+        public string? CandidateName { get; set; }
+        public bool CascadedDept { get; set; }
     }
 
     public class ReturnTargetNode

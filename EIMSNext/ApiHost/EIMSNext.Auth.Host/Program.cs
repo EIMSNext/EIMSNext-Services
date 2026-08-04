@@ -4,7 +4,13 @@ using EIMSNext.Auth.Extensions;
 using EIMSNext.Auth.Host;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Services;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
@@ -21,9 +27,14 @@ builder.Host.UseSerilog((ctx, cfg) =>
 // Add services to the container.
 
 builder.Services.AddControllers();
+builder.Services.AddAuthentication(options =>
+{
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+});
 builder.Services.AddAuthorization();
 builder.Services.Configure<BuiltInClientsOptions>(builder.Configuration.GetSection(BuiltInClientsOptions.SectionName));
-builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureAuthHostJwtBearerOptions>();
+builder.Services.AddSingleton<IConfigureOptions<JwtBearerOptions>, ConfigureJwtBearerOptions>();
 builder.Services.AddSingleton<IBuiltInClientRequestPolicy, BuiltInClientRequestPolicy>();
 builder.Services.AddScoped<IAccountSecurityService, AccountSecurityService>();
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);

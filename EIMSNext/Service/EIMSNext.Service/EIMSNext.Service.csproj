@@ -13,8 +13,12 @@
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Storage\EIMSNext.Storage.csproj" />
     <ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
     <ProjectReference Include="..\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
     <ProjectReference Include="..\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="EIMSNext.Service.Tests" />
   </ItemGroup>
 </Project>

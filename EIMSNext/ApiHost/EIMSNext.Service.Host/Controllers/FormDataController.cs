@@ -8,9 +8,13 @@ using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
@@ -34,6 +38,7 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
+        private const int MongoMaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
@@ -49,7 +54,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("dynamic/$count")]
         public ActionResult GetDynamicCount([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -70,7 +75,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("dynamic/$query")]
         public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -86,7 +91,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("$count")]
         public ActionResult GetCount([FromBody] DynamicFilter filter)
         {
@@ -101,7 +106,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
@@ -121,13 +126,19 @@ namespace EIMSNext.Service.Host.Controllers
 
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink)]
+        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("filter/options")]
         public async Task<ActionResult> GetFilterOptions([FromBody] FormDataFilterOptionsRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.FormId) || string.IsNullOrWhiteSpace(request.Field))
             {
                 return BadRequest();
+            }
+
+            var formDef = _formDefService.Get(request.FormId);
+            if (formDef != null && IsDataSelectFieldPath(request.Field, formDef.Content?.Items ?? []))
+            {
+                return BadRequest("数据选择字段不能用于过滤");
             }
 
             var result = await ApiService.GetFilterOptionsAsync(request);
@@ -142,35 +153,37 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [Consumes("multipart/form-data")]
         [HttpPost("Import/Preview")]
-        public ActionResult PreviewImport([FromForm] IFormFile file, [FromForm] string formId)
+        public ActionResult PreviewImport([FromForm] FormDataImportPreviewRequest request)
         {
-            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(formId))
+            if (request.File == null || request.File.Length == 0 || string.IsNullOrWhiteSpace(request.FormId))
             {
                 return BadRequest();
             }
 
-            using var stream = file.OpenReadStream();
-            return Ok(ApiResult.Success(ApiService.PreviewImport(formId, stream, file.FileName, file.Length)));
+            using var stream = request.File.OpenReadStream();
+            return Ok(ApiResult.Success(ApiService.PreviewImport(request.FormId, stream, request.File.FileName, request.File.Length)));
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
+        [Consumes("multipart/form-data")]
         [HttpPost("Import")]
-        public async Task<ActionResult> Import([FromForm] IFormFile file, [FromForm] string options)
+        public async Task<ActionResult> Import([FromForm] FormDataImportRequest request)
         {
-            if (file == null || file.Length == 0 || string.IsNullOrWhiteSpace(options))
+            if (request.File == null || request.File.Length == 0 || string.IsNullOrWhiteSpace(request.Options))
             {
                 return BadRequest();
             }
 
-            var request = options.DeserializeFromJson<FormDataImportStartRequest>();
-            if (request == null)
+            var importRequest = request.Options.DeserializeFromJson<FormDataImportStartRequest>();
+            if (importRequest == null)
             {
                 return BadRequest();
             }
 
-            await using var stream = file.OpenReadStream();
-            return Ok(ApiResult.Success(await ApiService.StartImportAsync(request, stream, file.FileName, file.Length)));
+            await using var stream = request.File.OpenReadStream();
+            return Ok(ApiResult.Success(await ApiService.StartImportAsync(importRequest, stream, request.File.FileName, request.File.Length)));
         }
 
         [Permission(ResourceCode = Resources.FormData, Operation = Operation.Import)]
@@ -235,44 +248,26 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
         {
+            query.Take = query.GetEffectiveTake();
+            query.Skip = query.GetEffectiveSkip();
             query = FilterByCorpId(query);
             if (!query.IncludeDeleted)
             {
                 query = FilterByDeleted(query);
             }
             query = FilterBySearch(query);
+            query = RejectUnsupportedFilterFields(query);
+            query = FilterByUnsupportedSortFields(query);
             return FilterByPermission(query);
         }
         protected DynamicFindOptions<FormData> FilterByDeleted(DynamicFindOptions<FormData> query)
         {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
-            }
-
-            query.Filter = filter;
+            query.Filter = query.Filter.And(Fields.DeleteFlag, FilterOp.Ne, true);
             return query;
         }
         protected DynamicFindOptions<FormData> FilterByCorpId(DynamicFindOptions<FormData> query)
         {
-            var filter = query.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
-            }
-
-            query.Filter = filter;
+            query.Filter = query.Filter.And(Fields.CorpId, FilterOp.Eq, IdentityContext.CurrentCorpId);
             return query;
         }
         protected virtual DynamicFindOptions<FormData> FilterByPermission(DynamicFindOptions<FormData> query)
@@ -287,7 +282,7 @@ namespace EIMSNext.Service.Host.Controllers
                     : validator.ApplyFormDataScope(formId!, query.Filter);
                 query.Scope = null;
                 ApplyPublicProjection(validator, formId, query);
-                query.Take = Math.Clamp(query.Take <= 0 ? 20 : query.Take, 1, 200);
+                query.Take = Math.Clamp(query.GetEffectiveTake(), 1, 200);
                 query.Skip = Math.Max(0, query.Skip);
                 return query;
             }
@@ -301,7 +296,7 @@ namespace EIMSNext.Service.Host.Controllers
                         return query;
                     }
 
-                    query.Filter = AndFilters(query.Filter, BuildInheritedPermissionFilter(query.Scope.FormId!));
+                    query.Filter = query.Filter.And(BuildInheritedPermissionFilter(query.Scope.FormId!));
                     return query;
                 }
 
@@ -310,7 +305,7 @@ namespace EIMSNext.Service.Host.Controllers
                     var authGrp = Resolver.GetService<AuthGroup>().Get(query.Scope.AuthGroupId);
                     if (authGrp != null)
                     {
-                        query.Filter = AndFilters(query.Filter, BuildAuthGroupDataFilter(authGrp));
+                        query.Filter = query.Filter.And(BuildAuthGroupDataFilter(authGrp));
                     }
                 }
             }
@@ -321,7 +316,7 @@ namespace EIMSNext.Service.Host.Controllers
         protected virtual DynamicFindOptions<FormData> FilterBySearch(DynamicFindOptions<FormData> query)
         {
             var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
-            query.Filter = AndFilters(query.Filter, BuildSearchFilter(formId, query.Keyword, query.SearchFields));
+            query.Filter = query.Filter.And(BuildSearchFilter(formId, query.Keyword, query.SearchFields));
             return query;
         }
 
@@ -333,7 +328,46 @@ namespace EIMSNext.Service.Host.Controllers
                 request = FilterByDeleted(request);
             }
             request = FilterBySearch(request);
+            request = RejectUnsupportedFilterFields(request);
             return FilterByPermission(request);
+        }
+
+        private DynamicFindOptions<FormData> RejectUnsupportedFilterFields(DynamicFindOptions<FormData> query)
+        {
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            var formDef = string.IsNullOrWhiteSpace(formId) ? null : _formDefService.Get(formId);
+            if (formDef != null && ContainsDataSelectFilter(query.Filter, formDef.Content?.Items ?? []))
+            {
+                throw new BadRequestException("数据选择字段不能用于过滤");
+            }
+
+            return query;
+        }
+
+        private FormDataExportRequest RejectUnsupportedFilterFields(FormDataExportRequest request)
+        {
+            var formDef = string.IsNullOrWhiteSpace(request.FormId) ? null : _formDefService.Get(request.FormId);
+            if (formDef != null && ContainsDataSelectFilter(request.Filter, formDef.Content?.Items ?? []))
+            {
+                throw new BadRequestException("数据选择字段不能用于过滤");
+            }
+
+            return request;
+        }
+
+        private static bool ContainsDataSelectFilter(DynamicFilter? filter, IList<FieldDef> fields)
+        {
+            if (filter == null)
+            {
+                return false;
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Field))
+            {
+                return IsDataSelectFieldPath(filter.Field, fields);
+            }
+
+            return filter.Items?.Any(item => ContainsDataSelectFilter(item, fields)) == true;
         }
 
         protected virtual FormDataExportRequest FilterByPermission(FormDataExportRequest request)
@@ -356,11 +390,11 @@ namespace EIMSNext.Service.Host.Controllers
                     {
                         if (filter.IsGroup && filter.Rel == FilterRel.And)
                         {
-                            filter.Items!.Add(new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
+                            filter.Items!.Add(new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
                         }
                         else
                         {
-                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = $"{Fields.CreateBy}.empId", Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
+                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
                         }
                     }
                     else if (authGrp.Type == AuthGroupType.Custom)
@@ -393,41 +427,19 @@ namespace EIMSNext.Service.Host.Controllers
 
         protected virtual FormDataExportRequest FilterBySearch(FormDataExportRequest request)
         {
-            request.Filter = AndFilters(request.Filter, BuildSearchFilter(request.FormId, request.Keyword, request.SearchFields));
+            request.Filter = request.Filter.And(BuildSearchFilter(request.FormId, request.Keyword, request.SearchFields));
             return request;
         }
 
         protected virtual FormDataExportRequest FilterByDeleted(FormDataExportRequest request)
         {
-            var filter = request.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.DeleteFlag, Op = FilterOp.Ne, Value = true }, filter] };
-            }
-
-            request.Filter = filter;
+            request.Filter = request.Filter.And(Fields.DeleteFlag, FilterOp.Ne, true);
             return request;
         }
 
         protected virtual FormDataExportRequest FilterByCorpId(FormDataExportRequest request)
         {
-            var filter = request.Filter;
-            if (filter == null) { filter = new DynamicFilter(); }
-            if (filter.IsGroup && filter.Rel == FilterRel.And)
-            {
-                filter.Items!.Add(new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId });
-            }
-            else
-            {
-                filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CorpId, Op = FilterOp.Eq, Value = IdentityContext.CurrentCorpId }, filter] };
-            }
-
-            request.Filter = filter;
+            request.Filter = request.Filter.And(Fields.CorpId, FilterOp.Eq, IdentityContext.CurrentCorpId);
             return request;
         }
 
@@ -589,6 +601,25 @@ namespace EIMSNext.Service.Host.Controllers
                 Select = fields,
                 Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
             };
+            if (IdentityContext.IdentityType != IdentityType.Public)
+            {
+                var accessProbe = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
+                {
+                    Select = new DynamicFieldList { DynamicField.Create(Fields.FormId, true) },
+                    Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                    Take = 1,
+                })).FirstOrDefault();
+                if (accessProbe == null)
+                {
+                    return NotFound();
+                }
+
+                queryOptions.Scope = new DataScope
+                {
+                    FormId = accessProbe.FormId,
+                    InheritMemberPermissions = true,
+                };
+            }
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 queryOptions.Scope = new DataScope { FormId = publicData!.FormId };
@@ -659,6 +690,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             //默认草稿
             entity.FlowStatus = FlowStatus.Draft;
+
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
 
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
@@ -752,6 +788,11 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest("请求修改对象的Key不一致");
             }
 
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
+
             //if (!ValidateData(entity, null, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
 
@@ -786,17 +827,22 @@ namespace EIMSNext.Service.Host.Controllers
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
 
-            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
-
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 
             delta.Patch(model);
+            ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
+
             if (!ValidateFormDataScope(entity, model, out var scopeError))
             {
                 return BadRequest(scopeError);
             }
 
             model.CopyTo(entity);
+
+            if (!IsMongoDocumentSizeAllowed(entity))
+            {
+                return BadRequest("表单数据不能超过 16MB");
+            }
 
             //if (!ValidateData(entity, delta, out ApiResult? fail))
             //    return BadRequest(fail?.Message);
@@ -819,6 +865,11 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             return true;
+        }
+
+        private static bool IsMongoDocumentSizeAllowed(FormData entity)
+        {
+            return EntityExtension.ToBson(entity).ToBson().Length <= MongoMaxDocumentBytes;
         }
 
         /// <summary>
@@ -897,6 +948,11 @@ namespace EIMSNext.Service.Host.Controllers
                 return filter;
             }
 
+            if (validator.IsRelatedForm(formId))
+            {
+                return filter;
+            }
+
             var allowedFields = new HashSet<string>(setting.Form.QueryLink.QueryFields ?? [], StringComparer.OrdinalIgnoreCase);
             return IsFilterAllowed(filter, allowedFields) ? filter : CreateNoMatchFilter();
         }
@@ -946,6 +1002,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             var setting = validator.GetCurrentSetting();
             if (setting?.TargetType != PublicTargetType.Form)
+            {
+                return;
+            }
+
+            if (validator.IsRelatedForm(formId))
             {
                 return;
             }
@@ -1106,25 +1167,6 @@ namespace EIMSNext.Service.Host.Controllers
             };
         }
 
-        private static DynamicFilter? AndFilters(DynamicFilter? current, DynamicFilter? additional)
-        {
-            if (current == null || current.IsEmpty)
-            {
-                return additional;
-            }
-
-            if (additional == null || additional.IsEmpty)
-            {
-                return current;
-            }
-
-            return new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items = [current, additional],
-            };
-        }
-
         private List<string> FilterManageableIds(IEnumerable<string> ids)
         {
             var requested = ids
@@ -1199,6 +1241,58 @@ namespace EIMSNext.Service.Host.Controllers
                 || type == FieldType.SerialNo;
         }
 
+        private DynamicFindOptions<FormData> FilterByUnsupportedSortFields(DynamicFindOptions<FormData> query)
+        {
+            if (query.Sort == null || query.Sort.Count == 0)
+            {
+                return query;
+            }
+
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            var formDef = string.IsNullOrWhiteSpace(formId) ? null : _formDefService.Get(formId);
+            if (formDef == null)
+            {
+                return query;
+            }
+
+            var fields = formDef.Content?.Items ?? [];
+            var allowedSort = new DynamicSortList();
+            allowedSort.AddRange(query.Sort.Where(sort => !IsDataSelectFieldPath(sort.Field, fields)));
+            query.Sort = allowedSort;
+            return query;
+        }
+
+        private static bool IsDataSelectFieldPath(string? path, IList<FieldDef> fields)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var fieldPath = path.StartsWith("data.", StringComparison.OrdinalIgnoreCase)
+                ? path[5..]
+                : path;
+            var parts = fieldPath.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return false;
+            }
+
+            var field = fields.FirstOrDefault(x => string.Equals(x.Field, parts[0], StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                return field.Type == FieldType.DataSelect;
+            }
+
+            var child = field.Columns?.FirstOrDefault(x => string.Equals(x.Field, parts[1], StringComparison.OrdinalIgnoreCase));
+            return child?.Type == FieldType.DataSelect;
+        }
+
         private DynamicFilter? BuildSearchFilter(string? formId, string? keyword, IEnumerable<string>? searchFields)
         {
             var normalizedKeyword = keyword?.Trim();
@@ -1234,7 +1328,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             return OrFilters(actualFields.Select(field => new DynamicFilter
             {
-                Field = field,
+                Field = Fields.IsSystemField(field) ? field : $"data.{field}",
                 Type = searchableMap[field],
                 Op = FilterOp.Text,
                 Value = normalizedKeyword,
@@ -1260,7 +1354,7 @@ namespace EIMSNext.Service.Host.Controllers
 
                     return new DynamicFilter
                     {
-                        Field = $"{Fields.CreateBy}.empId",
+                        Field = Fields.CreateById,
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };
@@ -1304,8 +1398,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return true;
             }
 
-            var filter = AndFilters(
-                new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = dataId },
+            var filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = dataId }.And(
                 rangeFilter);
 
             var result = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>

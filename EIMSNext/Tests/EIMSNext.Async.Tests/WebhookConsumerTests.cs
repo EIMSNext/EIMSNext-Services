@@ -1,9 +1,11 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
 using EIMSNext.CloudEvent;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
@@ -103,7 +105,7 @@ namespace EIMSNext.Async.Tests
 
         private sealed class FakeWebhookRepository(List<Webhook> webhooks) : IRepository<Webhook>
         {
-            public EIMSNext.MongoDb.IMongoDbContex DbContext => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.IMongoDbContex DbContext => throw new NotSupportedException();
             public MongoDB.Driver.IMongoCollection<Webhook> Collection => throw new NotSupportedException();
             public IQueryable<Webhook> Queryable => webhooks.AsQueryable();
             public MongoDB.Driver.FilterDefinitionBuilder<Webhook> FilterBuilder => Builders<Webhook>.Filter;
@@ -111,12 +113,12 @@ namespace EIMSNext.Async.Tests
             public MongoDB.Driver.Search.SearchDefinitionBuilder<Webhook> SearchBuilder => Builders<Webhook>.Search;
             public MongoDB.Driver.ProjectionDefinitionBuilder<Webhook> ProjectionBuilder => Builders<Webhook>.Projection;
             public MongoDB.Driver.UpdateDefinitionBuilder<Webhook> UpdateBuilder => Builders<Webhook>.Update;
-            public EIMSNext.Core.MongoDb.MongoTransactionScope NewTransactionScope(MongoDB.Driver.TransactionOptions? transOptions = null) => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.MongoTransactionScope NewTransactionScope(MongoDB.Driver.TransactionOptions? transOptions = null) => throw new NotSupportedException();
             public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(EIMSNext.Core.Query.DynamicFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(EIMSNext.Core.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(EIMSNext.Core.Mongo.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(EIMSNext.Core.Query.DynamicFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(EIMSNext.Core.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(EIMSNext.Core.Mongo.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Webhook? Get(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<Webhook?> GetAsync(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
@@ -154,7 +156,7 @@ namespace EIMSNext.Async.Tests
 
         private sealed class FakeWebhookAliasRepository(List<WebhookAlias> aliases) : IRepository<WebhookAlias>
         {
-            public EIMSNext.MongoDb.IMongoDbContex DbContext => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.IMongoDbContex DbContext => throw new NotSupportedException();
             public IMongoCollection<WebhookAlias> Collection => throw new NotSupportedException();
             public IQueryable<WebhookAlias> Queryable => aliases.AsQueryable();
             public FilterDefinitionBuilder<WebhookAlias> FilterBuilder => Builders<WebhookAlias>.Filter;
@@ -162,12 +164,12 @@ namespace EIMSNext.Async.Tests
             public MongoDB.Driver.Search.SearchDefinitionBuilder<WebhookAlias> SearchBuilder => Builders<WebhookAlias>.Search;
             public ProjectionDefinitionBuilder<WebhookAlias> ProjectionBuilder => Builders<WebhookAlias>.Projection;
             public UpdateDefinitionBuilder<WebhookAlias> UpdateBuilder => Builders<WebhookAlias>.Update;
-            public EIMSNext.Core.MongoDb.MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
             public IFindFluent<WebhookAlias, WebhookAlias> Find(EIMSNext.Core.Query.DynamicFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<WebhookAlias, WebhookAlias> Find(EIMSNext.Core.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public IFindFluent<WebhookAlias, WebhookAlias> Find(EIMSNext.Core.Mongo.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public IFindFluent<WebhookAlias, WebhookAlias> Find(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<IAsyncCursor<WebhookAlias>> FindAsync(EIMSNext.Core.Query.DynamicFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<WebhookAlias>> FindAsync(EIMSNext.Core.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public Task<IAsyncCursor<WebhookAlias>> FindAsync(EIMSNext.Core.Mongo.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<IAsyncCursor<WebhookAlias>> FindAsync(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public WebhookAlias? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<WebhookAlias?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();

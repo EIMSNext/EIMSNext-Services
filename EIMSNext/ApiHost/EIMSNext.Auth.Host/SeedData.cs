@@ -43,11 +43,7 @@ namespace EIMSNext.Auth.Host
                         new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DashLink) },
                         new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.FormLink) },
                         new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DataLink) },
-                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.QueryLink) },
-                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.DashLink).ToString() },
-                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.FormLink).ToString() },
-                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.DataLink).ToString() },
-                        new Auth.Entities.ClientScope { Scope = ((int)EIMSNext.ApiService.PublicScope.QueryLink).ToString() }
+                        new Auth.Entities.ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.QueryLink) }
                     ],
                     AccessTokenLifetime = Auth.Constants.TokenLifetime_Default,
                     IdentityTokenLifetime = Auth.Constants.TokenLifetime_Default
@@ -85,7 +81,15 @@ namespace EIMSNext.Auth.Host
             {
                 //new Auth.Entities.User {Id="system", Name = "System" },
                 //new Auth.Entities.User {Id="anonymous", Name = "Anonymous" },
-                new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" }
+                new Auth.Entities.User {Id="admin", Name = "Admin", Password = HKH.Common.Security.BCrypt.HashPassword("123456"), Email = "admin@eimsnext.com", Phone = "12345678901" },
+                new Auth.Entities.User
+                {
+                    Id = "cloudadmin",
+                    Name = "Cloud Admin",
+                    Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
+                    Email = "cloudadmin@easyun.cn",
+                    UserType = "platadmin"
+                }
             };
         }
 

@@ -11,5 +11,10 @@ namespace EIMSNext.Service.Host.Edm
     /// </summary>
     public class FormDefModelConfiguration : CorpModelConfigurationBase<FormDefViewModel,FormDefRequest>
     {
+        protected override void ConfigureCommon(EntityTypeConfiguration<FormDefViewModel> entityType)
+        {
+            base.ConfigureCommon(entityType);
+            entityType.Ignore(x => x.PublicRelatedFormIds);
+        }
     }
 }

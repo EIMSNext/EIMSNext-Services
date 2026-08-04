@@ -21,6 +21,13 @@ namespace System.Text.Json
             return JsonSerializer.Deserialize<T>(json, options ?? _options);
         }
 
+        public static T DeepClone<T>(this T value) where T : class
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            return value.SerializeToJson().DeserializeFromJson<T>()
+                ?? throw new InvalidOperationException($"无法克隆类型 {typeof(T).FullName}");
+        }
+
         public static object? DeserializeFromJson(this string json, Type returnType, JsonSerializerOptions? options = null)
         {
             return JsonSerializer.Deserialize(json, returnType, options ?? _options);

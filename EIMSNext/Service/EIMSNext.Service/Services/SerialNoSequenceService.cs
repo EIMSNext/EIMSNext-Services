@@ -1,6 +1,7 @@
 using HKH.Mef2.Integration;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
@@ -109,7 +110,9 @@ namespace EIMSNext.Service
                 Builders<SerialNoSequence>.Filter.Eq(x => x.AppId, appId),
                 Builders<SerialNoSequence>.Filter.Eq(x => x.FormId, formId),
                 Builders<SerialNoSequence>.Filter.Eq(x => x.Key, key));
-            var session = MongoTransactionScope.Transaction;
+            // 序列计数是独立的原子计数器。不要加入提交事务，否则并发提交同一表单
+            // 会在同一序列文档上产生 Mongo WriteConflict；业务事务回滚时允许出现号段间隙。
+            IClientSessionHandle? session = null;
 
             if (cycle != SerialNoResetCycle.Never)
             {
@@ -128,6 +131,7 @@ namespace EIMSNext.Service
             }
 
             var update = Builders<SerialNoSequence>.Update
+                .SetOnInsert(x => x.Id, Repository.NewId())
                 .SetOnInsert(x => x.SerialNoType, SerialNoType.Form)
                 .SetOnInsert(x => x.CorpId, corpId)
                 .SetOnInsert(x => x.AppId, appId)
@@ -135,21 +139,43 @@ namespace EIMSNext.Service
                 .SetOnInsert(x => x.Key, key)
                 .SetOnInsert(x => x.CurrDate, anchor)
                 .Inc(x => x.CurrId, 1);
-            SerialNoSequence currentSerialNo;
-            try
+            for (var attempt = 0; attempt < 5; attempt++)
             {
-                currentSerialNo = FindOneAndUpdate(filter, update, true, session)!;
-            }
-            catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
-            {
-                currentSerialNo = FindOneAndUpdate(
-                    filter,
-                    Builders<SerialNoSequence>.Update.Inc(x => x.CurrId, 1),
-                    false,
-                    session)!;
+                try
+                {
+                    var currentSerialNo = FindOneAndUpdate(filter, update, true, session);
+                    if (currentSerialNo != null)
+                    {
+                        return currentSerialNo.CurrId ?? 1;
+                    }
+                }
+                catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+                {
+                    var currentSerialNo = FindOneAndUpdate(
+                        filter,
+                        Builders<SerialNoSequence>.Update.Inc(x => x.CurrId, 1),
+                        false,
+                        session);
+                    if (currentSerialNo != null)
+                    {
+                        return currentSerialNo.CurrId ?? 1;
+                    }
+                }
+                catch (MongoException ex) when (IsWriteConflict(ex) && attempt < 4)
+                {
+                    Thread.Sleep(10 * (attempt + 1));
+                }
             }
 
-            return currentSerialNo.CurrId ?? 1;
+            throw new InvalidOperationException("流水号生成冲突，请重试");
+        }
+
+        private static bool IsWriteConflict(MongoException exception)
+        {
+            return exception.Message.Contains("WriteConflict", StringComparison.OrdinalIgnoreCase)
+                || exception.Message.Contains("Please retry your operation", StringComparison.OrdinalIgnoreCase)
+                || exception is MongoCommandException command && command.Code == 112
+                || exception is MongoWriteException write && write.WriteError?.Code == 112;
         }
 
         private SerialNoSequence? FindOneAndUpdate(

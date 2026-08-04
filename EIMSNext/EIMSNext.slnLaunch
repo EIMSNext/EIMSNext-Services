@@ -68,10 +68,14 @@
     ]
   },
   {
-    "Name": "All",
+    "Name": "ALL",
     "Projects": [
       {
-        "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
+        "Path": "ApiHost\\EIMSNext.Auth.Host\\EIMSNext.Auth.Host.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "ApiHost\\EIMSNext.File.Host\\EIMSNext.File.Host.csproj",
         "Action": "Start"
       },
       {
@@ -83,11 +87,11 @@
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.File.Host\\EIMSNext.File.Host.csproj",
+        "Path": "ApiHost\\EIMSNext.Plugin.Host\\EIMSNext.Plugin.Host.csproj",
         "Action": "Start"
       },
       {
-        "Path": "ApiHost\\EIMSNext.Auth.Host\\EIMSNext.Auth.Host.csproj",
+        "Path": "ApiHost\\EIMSNext.Async.Host\\EIMSNext.Async.Host.csproj",
         "Action": "Start"
       }
     ]

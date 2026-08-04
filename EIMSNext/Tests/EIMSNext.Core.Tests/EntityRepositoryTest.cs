@@ -1,6 +1,7 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 
 using MongoDB.Bson;
 

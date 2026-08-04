@@ -4,7 +4,8 @@ using System.Text.Json.Nodes;
 using CloudNative.CloudEvents;
 using CloudNative.CloudEvents.Http;
 using CloudNative.CloudEvents.SystemTextJson;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Common;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Service.Entities;
 using Microsoft.Extensions.Logging;
 
@@ -33,13 +34,23 @@ namespace EIMSNext.CloudEvent
 
             var content = cloudEvent.ToHttpContent(ContentMode.Structured, new JsonEventFormatter(null, default));
 
-            var httpClient = new HttpClient();
+            using var httpClient = new HttpClient();
             string? result = null;
             int httpCode = 400;
             bool success = false;
             try
             {
-                var resp = await httpClient.PostAsync(webhook.Url, content);
+                using var request = new HttpRequestMessage(HttpMethod.Post, webhook.Url)
+                {
+                    Content = content
+                };
+                if (!string.IsNullOrWhiteSpace(webhook.Secret))
+                {
+                    var payload = await content.ReadAsByteArrayAsync();
+                    request.Headers.TryAddWithoutValidation("X-EIMS-Signature", WebhookSignature.Compute(payload, webhook.Secret));
+                }
+
+                var resp = await httpClient.SendAsync(request);
                 success = resp.IsSuccessStatusCode;
                 httpCode = (int)resp.StatusCode;
                 result = await resp.Content.ReadAsStringAsync();

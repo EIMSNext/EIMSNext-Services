@@ -4,18 +4,23 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Async.Tasks.SystemTask;
+using EIMSNext.Async.Tasks.System;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using MongoDB.Driver;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 
@@ -126,7 +131,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             if (importLog.ImportAction == DataAction.Submit)
             {
-                var tokenProvider = resolver.Resolve<ISystemTaskTokenProvider>();
+                var tokenProvider = resolver.Resolve<ISystemTokenProvider>();
                 serviceContext.AccessToken = await tokenProvider.GetAccessTokenAsync(
                     importLog.CorpId ?? string.Empty,
                     "form-import",
@@ -538,7 +543,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                     Filter = filter,
                     Take = 2,
                 });
-                return ((IEnumerable<FormData>)found).ToList();
+                return found.ToList();
             }
 
             private DynamicFilter? ReadDataScopeFilter()

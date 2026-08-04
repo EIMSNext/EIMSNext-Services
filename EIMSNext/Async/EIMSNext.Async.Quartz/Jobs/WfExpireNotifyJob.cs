@@ -1,8 +1,13 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -30,7 +35,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 return;
             }
 
-            var workflowCollection = Resolver.Resolve<IMongoDbContex>().Database.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
+            var workflowCollection = Resolver.Resolve<IWfDbContext>().WorkflowInstances;
             foreach (var group in expiredTodos.GroupBy(x => new { x.WfInstanceId, x.ApproveNodeId }))
             {
                 var sample = group.First();
@@ -53,7 +58,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 {
                     await publisher.PublishAsync(new NotifyDispatchTaskArgs
                     {
-                        CorpId = sample.CorpId,
+                        CorpId = sample.CorpId ?? string.Empty,
                         MessageType = MessageType.WfExpireNotify,
                         AppId = sample.AppId,
                         FormId = sample.FormId,
@@ -61,6 +66,10 @@ namespace EIMSNext.Async.Quartz.Jobs
                         WfInstanceId = sample.WfInstanceId,
                         ApproveNodeId = sample.ApproveNodeId
                     });
+
+                    // The notification task is now durably queued. Mark the source todos
+                    // handled here so the minute-level scan does not publish duplicates.
+                    await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
                 }
                 else
                 {

@@ -8,15 +8,20 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Storage.Abstractions;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
+using MongoDB.Driver;
 using NPOI.SS.UserModel;
 
 namespace EIMSNext.ApiService
@@ -468,10 +473,10 @@ namespace EIMSNext.ApiService
                 .ToList();
             if (authGroups.Count == 0)
             {
-                return AndFilters(filter, CreateNoMatchFilter());
+                return filter.And(CreateNoMatchFilter())!;
             }
 
-            return AndFilters(filter, BuildDataScopeFilter(authGroups));
+            return filter.And(BuildDataScopeFilter(authGroups))!;
         }
 
         private Task<long> CountExportAsync(FormDataExportRequest request)
@@ -593,6 +598,15 @@ namespace EIMSNext.ApiService
 
             var formDef = _formDefService.Get(request.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
             var fields = formDef.Content?.Items ?? [];
+            request.Columns = request.Columns
+                .Where(column => !IsDataSelectFieldPath(column.Key, fields))
+                .ToList();
+
+            if (request.Columns.Count == 0)
+            {
+                throw new BadRequestException("数据选择字段不能导出");
+            }
+
             foreach (var column in request.Columns)
             {
                 column.Type = ResolveColumnType(column.Key, fields);
@@ -639,26 +653,6 @@ namespace EIMSNext.ApiService
             return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
         }
 
-        private static DynamicFilter AndFilters(DynamicFilter current, DynamicFilter? additional)
-        {
-            if (additional == null || additional.IsEmpty)
-            {
-                return current;
-            }
-
-            if (current.IsGroup && current.Rel == FilterRel.And)
-            {
-                current.Items!.Add(additional);
-                return current;
-            }
-
-            return new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items = [current, additional],
-            };
-        }
-
         private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)
         {
             switch (authGroup.Type)
@@ -671,7 +665,7 @@ namespace EIMSNext.ApiService
 
                     return new DynamicFilter
                     {
-                        Field = $"{Fields.CreateBy}.empId",
+                        Field = Fields.CreateById,
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };
@@ -1151,7 +1145,7 @@ namespace EIMSNext.ApiService
                 Filter = filter,
                 Take = 2,
             });
-            return ((IEnumerable<FormData>)found).ToList();
+            return found.ToList();
         }
 
         private IEnumerable<FormData> FindCorrectionDataById(FormDataImportLog importLog, string dataId, DynamicFilter dataScopeFilter)
@@ -1569,6 +1563,37 @@ namespace EIMSNext.ApiService
                 FieldType.TimeStamp => ExportColumnType.Date,
                 _ => ExportColumnType.String,
             };
+        }
+
+        private static bool IsDataSelectFieldPath(string? path, IList<FieldDef> fields)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+            {
+                return false;
+            }
+
+            var fieldPath = path.StartsWith("data.", StringComparison.OrdinalIgnoreCase)
+                ? path[5..]
+                : path;
+            var parts = fieldPath.Split('>', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 0)
+            {
+                return false;
+            }
+
+            var field = fields.FirstOrDefault(x => string.Equals(x.Field, parts[0], StringComparison.OrdinalIgnoreCase));
+            if (field == null)
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                return field.Type == FieldType.DataSelect;
+            }
+
+            var child = field.Columns?.FirstOrDefault(x => string.Equals(x.Field, parts[1], StringComparison.OrdinalIgnoreCase));
+            return child?.Type == FieldType.DataSelect;
         }
 
         private static string BuildDedupKey(object source)

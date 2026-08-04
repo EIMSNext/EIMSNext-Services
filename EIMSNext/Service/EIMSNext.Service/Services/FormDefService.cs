@@ -1,12 +1,20 @@
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
+using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
 {
@@ -38,6 +46,8 @@ namespace EIMSNext.Service
         {
             foreach (var entity in entities)
             {
+                entity.Content.FieldChangeLogs = [];
+                NormalizeFieldMetadata(entity);
                 ValidateFieldIds(entity);
             }
             return base.BeforeAdd(entities, session);
@@ -45,8 +55,134 @@ namespace EIMSNext.Service
 
         protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
         {
+            var old = ScopeCache.Get<FormDef>(entity.Id, Cache.DataVersion.Old)
+                ?? GetFromStore<FormDef>(entity.Id, Cache.DataVersion.Old);
+            ReconcileFieldChangeLogs(old?.Content, entity.Content, Context.Operator, DateTime.UtcNow.ToTimeStampMs());
+            NormalizeFieldMetadata(entity);
             ValidateFieldIds(entity);
             return base.BeforeReplace(entity, session);
+        }
+
+        public async Task PurgeFieldChangeLogsAsync(string formId, IReadOnlyCollection<string> fieldIds, bool clearAll)
+        {
+            var normalizedIds = fieldIds
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (!clearAll && normalizedIds.Count == 0)
+            {
+                throw new BadRequestException("请选择要彻底删除的字段");
+            }
+
+            var filter = FilterBuilder.And(
+                FilterBuilder.Eq(x => x.Id, formId),
+                FilterBuilder.Eq(x => x.CorpId, Context.CorpId),
+                FilterBuilder.Eq(x => x.DeleteFlag, false));
+            var update = clearAll
+                ? UpdateBuilder.Set(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>())
+                : UpdateBuilder.PullFilter(x => x.Content.FieldChangeLogs, x => normalizedIds.Contains(x.FieldId));
+
+            using var scope = NewTransactionScope();
+            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
+            scope.CommitTransaction();
+        }
+
+        internal static void ReconcileFieldChangeLogs(
+            FormContent? oldContent,
+            FormContent newContent,
+            Operator? deletedBy,
+            long deletedTime)
+        {
+            var oldFields = FlattenFields(oldContent?.Items);
+            var newFields = FlattenFields(newContent.Items);
+            var activeIds = newFields.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var logs = (oldContent?.FieldChangeLogs ?? [])
+                .Where(x => !string.IsNullOrWhiteSpace(x.FieldId) && !activeIds.Contains(x.FieldId))
+                .GroupBy(x => x.FieldId, StringComparer.OrdinalIgnoreCase)
+                .Select(x => x.OrderByDescending(log => log.DeletedTime).First())
+                .ToDictionary(x => x.FieldId, StringComparer.OrdinalIgnoreCase);
+
+            foreach (var oldField in oldFields.Values)
+            {
+                if (activeIds.Contains(oldField.FieldId) || logs.ContainsKey(oldField.FieldId))
+                {
+                    continue;
+                }
+
+                logs[oldField.FieldId] = new FieldChangeLog
+                {
+                    FieldId = oldField.FieldId,
+                    FieldType = oldField.FieldType,
+                    FieldLabel = oldField.FieldLabel,
+                    DeletedBy = deletedBy ?? Operator.Empty,
+                    DeletedTime = deletedTime
+                };
+            }
+
+            newContent.FieldChangeLogs = logs.Values
+                .OrderByDescending(x => x.DeletedTime)
+                .ThenBy(x => x.FieldId, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        internal static Dictionary<string, FieldChangeSnapshot> FlattenFields(IList<FieldDef>? fields)
+        {
+            var result = new Dictionary<string, FieldChangeSnapshot>(StringComparer.OrdinalIgnoreCase);
+            foreach (var field in fields ?? [])
+            {
+                if (string.IsNullOrWhiteSpace(field.Field))
+                {
+                    continue;
+                }
+
+                result.TryAdd(field.Field, new FieldChangeSnapshot(field.Field, field.Type, field.Title));
+                foreach (var column in field.Columns ?? [])
+                {
+                    if (string.IsNullOrWhiteSpace(column.Field))
+                    {
+                        continue;
+                    }
+
+                    var fieldId = $"{field.Field}>{column.Field}";
+                    var fieldLabel = $"{field.Title}.{column.Title}";
+                    result.TryAdd(fieldId, new FieldChangeSnapshot(fieldId, column.Type, fieldLabel));
+                }
+            }
+
+            return result;
+        }
+
+        internal sealed record FieldChangeSnapshot(string FieldId, string FieldType, string FieldLabel);
+
+        private static void NormalizeFieldMetadata(FormDef formDef)
+        {
+            if (formDef?.Content?.Items == null)
+            {
+                return;
+            }
+
+            foreach (var field in formDef.Content.Items)
+            {
+                NormalizeField(field);
+            }
+
+            static void NormalizeField(FieldDef field)
+            {
+                if (field.Props?.Required == true)
+                {
+                    field.Required = true;
+                }
+
+                if (field.Columns == null)
+                {
+                    return;
+                }
+
+                foreach (var column in field.Columns)
+                {
+                    NormalizeField(column);
+                }
+            }
         }
 
         /// <summary>
@@ -60,12 +196,18 @@ namespace EIMSNext.Service
                 return;
             }
 
+            var fieldIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var field in formDef.Content.Items)
             {
                 var err = FieldIdRules.ValidateFieldId(field.Field);
                 if (!string.IsNullOrEmpty(err))
                 {
                     throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 非法: {err}");
+                }
+
+                if (!fieldIds.Add(field.Field))
+                {
+                    throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 重复: {field.Field}");
                 }
 
                 if (field.Columns != null)
@@ -76,6 +218,11 @@ namespace EIMSNext.Service
                         if (!string.IsNullOrEmpty(subErr))
                         {
                             throw new BadRequestException($"表单 [{formDef.Name}] 子表列 ID 非法: {subErr}");
+                        }
+
+                        if (!fieldIds.Add(col.Field))
+                        {
+                            throw new BadRequestException($"表单 [{formDef.Name}] 字段 ID 重复: {col.Field}");
                         }
                     }
                 }
@@ -158,13 +305,60 @@ namespace EIMSNext.Service
             var flowFormIds = deletedForms.Where(x => x.UsingWorkflow).Select(x => x.Id);
             if (flowFormIds.Any())
             {
+                var flowFormIdList = flowFormIds.Distinct().ToList();
                 //删除所有待办
                 var todoRepo = Resolver.GetRepository<Wf_Todo>();
-                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIds), session);
+                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIdList), session);
 
                 //废弃所有流程实例
-                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIds }, Context.AccessToken);
+                await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIdList }, Context.AccessToken);
             }
+
+            var corpIds = deletedForms.Select(x => x.CorpId).Distinct().ToList();
+
+            // 表单删除后，所有直接引用和嵌入引用都必须失效，避免孤儿配置继续被读取。
+            var printRepo = Resolver.GetRepository<PrintDef>();
+            await printRepo.UpdateManyAsync(
+                printRepo.FilterBuilder.And(
+                    printRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    printRepo.FilterBuilder.In(x => x.FormId, formIds)),
+                printRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var bindingRepo = Resolver.GetRepository<CrossBinding>();
+            await bindingRepo.UpdateManyAsync(
+                bindingRepo.FilterBuilder.And(
+                    bindingRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    bindingRepo.FilterBuilder.In(x => x.SourceFormId, formIds)),
+                bindingRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var authGroupRepo = Resolver.GetRepository<AuthGroup>();
+            await authGroupRepo.UpdateManyAsync(
+                authGroupRepo.FilterBuilder.And(
+                    authGroupRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    authGroupRepo.FilterBuilder.In(x => x.FormId, formIds)),
+                authGroupRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
+
+            var itemRepo = Resolver.GetRepository<DashboardItemDef>();
+            var embeddedReferenceFilters = formIds
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Select(id => itemRepo.FilterBuilder.Regex(
+                    x => x.Details,
+                    new BsonRegularExpression(Regex.Escape(id), "i")))
+                .ToList();
+            if (embeddedReferenceFilters.Count > 0)
+            {
+                await itemRepo.UpdateManyAsync(
+                    itemRepo.FilterBuilder.And(
+                        itemRepo.FilterBuilder.In(x => x.CorpId, corpIds),
+                        itemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                        itemRepo.FilterBuilder.Or(embeddedReferenceFilters)),
+                    itemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                    session: session);
+            }
+
         }
 
     }

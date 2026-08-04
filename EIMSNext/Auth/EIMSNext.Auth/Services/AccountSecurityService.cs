@@ -2,16 +2,20 @@ using System.Text.RegularExpressions;
 using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Auth.Services
 {
     public class AccountSecurityService(
         IAuthDbContext dbContext,
-        IMemoryCache memoryCache) : IAccountSecurityService
+        IMemoryCache memoryCache,
+        IVerificationCodeProvider? codeProvider = null) : IAccountSecurityService
     {
-        private const string MockPinCode = "123456";
+        private readonly IVerificationCodeProvider verificationCodeProvider =
+            codeProvider ?? new MockVerificationCodeProvider();
+
         private static readonly TimeSpan VerifyTokenTtl = TimeSpan.FromMinutes(10);
         private static readonly Regex PhoneRegex = new("^1[3-9]\\d{9}$", RegexOptions.Compiled);
         private static readonly Regex EmailRegex = new(@"^\w[-\w.+]*@([A-Za-z0-9][-A-Za-z0-9]+\.)+[A-Za-z]{2,14}$", RegexOptions.Compiled);
@@ -20,16 +24,33 @@ namespace EIMSNext.Auth.Services
         private static readonly Regex DigitRegex = new("\\d", RegexOptions.Compiled);
         private static readonly Regex SpecialCharRegex = new("[^A-Za-z0-9]", RegexOptions.Compiled);
 
-        public Task SendRegCodeAsync(SendRegCodeRequest request)
+        public Task<VerificationCodeSendResult> SendRegCodeAsync(SendRegCodeRequest request)
         {
             if (!IsTargetType(request.Type))
             {
                 throw new InvalidOperationException("验证码类型无效");
             }
 
-            ValidateTarget(request.Type, request.Target);
-            EnsureTargetAvailable(request.Type, request.Target, string.Empty);
-            return Task.CompletedTask;
+            var target = NormalizeAndValidateTarget(request.Type, request.Target);
+            EnsureTargetAvailable(request.Type, target, string.Empty);
+            return Task.FromResult(verificationCodeProvider.Send(VerificationCodePurpose.Register, target));
+        }
+
+        public Task<VerificationCodeSendResult> SendLoginCodeAsync(SendRegCodeRequest request)
+        {
+            if (!IsTargetType(request.Type))
+            {
+                throw new InvalidOperationException("验证码类型无效");
+            }
+
+            var target = NormalizeAndValidateTarget(request.Type, request.Target);
+            var userExists = request.Type == PinCodeTargetType.Phone
+                ? dbContext.Users.Any(x => !x.Disabled && x.Phone == target)
+                : dbContext.Users.Any(x => !x.Disabled && x.Email == target);
+
+            return Task.FromResult(userExists
+                ? verificationCodeProvider.Send(VerificationCodePurpose.Login, target)
+                : new VerificationCodeSendResult(DateTimeOffset.UtcNow.AddMinutes(5), null));
         }
 
         public async Task RegisterAsync(RegisterRequest request)
@@ -37,11 +58,6 @@ namespace EIMSNext.Auth.Services
             if (!IsTargetType(request.Type))
             {
                 throw new InvalidOperationException("注册类型无效");
-            }
-
-            if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException("验证码错误");
             }
 
             ValidatePasswordStrength(request.Password, "密码");
@@ -54,17 +70,25 @@ namespace EIMSNext.Auth.Services
 
             if (request.Type == PinCodeTargetType.Phone)
             {
-                var phone = request.Phone?.Trim() ?? string.Empty;
-                ValidateTarget(request.Type, phone);
+                var phone = NormalizeAndValidateTarget(request.Type, request.Phone);
                 EnsureTargetAvailable(request.Type, phone, string.Empty);
+                if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.Register, phone, request.Code))
+                {
+                    throw new InvalidOperationException("验证码错误");
+                }
+
                 user.Phone = phone;
                 user.Name = phone;
             }
             else
             {
-                var email = request.Email?.Trim() ?? string.Empty;
-                ValidateTarget(request.Type, email);
+                var email = NormalizeAndValidateTarget(request.Type, request.Email);
                 EnsureTargetAvailable(request.Type, email, string.Empty);
+                if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.Register, email, request.Code))
+                {
+                    throw new InvalidOperationException("验证码错误");
+                }
+
                 user.Email = email;
                 user.Name = GetEmailName(email);
             }
@@ -72,7 +96,7 @@ namespace EIMSNext.Auth.Services
             await dbContext.AddUser(user);
         }
 
-        public Task SendPinCodeAsync(string userId, SendPinCodeRequest request)
+        public Task<VerificationCodeSendResult> SendPinCodeAsync(string userId, SendPinCodeRequest request)
         {
             var user = GetCurrentUser(userId);
 
@@ -88,7 +112,7 @@ namespace EIMSNext.Auth.Services
 
             if (request.Usage == PinCodeUsage.Verify)
             {
-                ValidateTarget(request.Type, request.Target);
+                var target = NormalizeAndValidateTarget(request.Type, request.Target);
                 if (request.Type == PinCodeTargetType.Phone)
                 {
                     if (string.IsNullOrWhiteSpace(user.Phone))
@@ -96,7 +120,7 @@ namespace EIMSNext.Auth.Services
                         throw new InvalidOperationException("当前账号未绑定手机");
                     }
 
-                    if (!string.Equals(user.Phone, request.Target, StringComparison.Ordinal))
+                    if (!string.Equals(user.Phone, target, StringComparison.Ordinal))
                     {
                         throw new InvalidOperationException("手机号与当前账号绑定手机号不一致");
                     }
@@ -108,7 +132,7 @@ namespace EIMSNext.Auth.Services
                         throw new InvalidOperationException("当前账号未绑定邮箱");
                     }
 
-                    if (!string.Equals(user.Email, request.Target, StringComparison.OrdinalIgnoreCase))
+                    if (!string.Equals(user.Email, target, StringComparison.OrdinalIgnoreCase))
                     {
                         throw new InvalidOperationException("邮箱与当前账号绑定邮箱不一致");
                     }
@@ -116,11 +140,15 @@ namespace EIMSNext.Auth.Services
             }
             else
             {
-                ValidateTarget(request.Type, request.Target);
-                EnsureTargetAvailable(request.Type, request.Target, user.Id);
+                var target = NormalizeAndValidateTarget(request.Type, request.Target);
+                EnsureTargetAvailable(request.Type, target, user.Id);
             }
 
-            return Task.CompletedTask;
+            var normalizedTarget = NormalizeAndValidateTarget(request.Type, request.Target);
+            var purpose = request.Usage == PinCodeUsage.Verify
+                ? VerificationCodePurpose.VerifyIdentity
+                : VerificationCodePurpose.Bind;
+            return Task.FromResult(verificationCodeProvider.Send(purpose, normalizedTarget));
         }
 
         public Task<VerifyIdentityResponse> VerifyIdentityAsync(string userId, VerifyIdentityRequest request)
@@ -141,7 +169,7 @@ namespace EIMSNext.Auth.Services
                         throw new InvalidOperationException("当前账号未绑定手机");
                     }
 
-                    if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
+                    if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.VerifyIdentity, user.Phone, request.Code))
                     {
                         throw new InvalidOperationException("手机验证码错误");
                     }
@@ -152,7 +180,7 @@ namespace EIMSNext.Auth.Services
                         throw new InvalidOperationException("当前账号未绑定邮箱");
                     }
 
-                    if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
+                    if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.VerifyIdentity, user.Email, request.Code))
                     {
                         throw new InvalidOperationException("邮箱验证码错误");
                     }
@@ -199,24 +227,14 @@ namespace EIMSNext.Auth.Services
         {
             var user = ConsumeVerifyTicket(userId, request.VerifyToken);
 
-            if (string.IsNullOrWhiteSpace(request.Phone))
-            {
-                throw new InvalidOperationException("手机号不能为空");
-            }
-
-            if (!PhoneRegex.IsMatch(request.Phone))
-            {
-                throw new InvalidOperationException("手机号格式不正确");
-            }
-
-            if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
+            var phone = NormalizeAndValidateTarget(PinCodeTargetType.Phone, request.Phone);
+            EnsureTargetAvailable(PinCodeTargetType.Phone, phone, user.Id);
+            if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.Bind, phone, request.Code))
             {
                 throw new InvalidOperationException("验证码错误");
             }
 
-            EnsureTargetAvailable(PinCodeTargetType.Phone, request.Phone, user.Id);
-
-            user.Phone = request.Phone;
+            user.Phone = phone;
             await dbContext.UpdateUser(user);
         }
 
@@ -224,24 +242,14 @@ namespace EIMSNext.Auth.Services
         {
             var user = ConsumeVerifyTicket(userId, request.VerifyToken);
 
-            if (string.IsNullOrWhiteSpace(request.Email))
-            {
-                throw new InvalidOperationException("邮箱不能为空");
-            }
-
-            if (!EmailRegex.IsMatch(request.Email))
-            {
-                throw new InvalidOperationException("邮箱格式不正确");
-            }
-
-            if (!string.Equals(request.Code, MockPinCode, StringComparison.Ordinal))
+            var email = NormalizeAndValidateTarget(PinCodeTargetType.Email, request.Email);
+            EnsureTargetAvailable(PinCodeTargetType.Email, email, user.Id);
+            if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.Bind, email, request.Code))
             {
                 throw new InvalidOperationException("验证码错误");
             }
 
-            EnsureTargetAvailable(PinCodeTargetType.Email, request.Email, user.Id);
-
-            user.Email = request.Email;
+            user.Email = email;
             await dbContext.UpdateUser(user);
         }
 
@@ -320,7 +328,7 @@ namespace EIMSNext.Auth.Services
 
         private static bool VerifyPassword(User user, string password)
         {
-            return password == Constants.NoPassword || HKH.Common.Security.BCrypt.Verify(password, user.Password);
+            return !string.IsNullOrWhiteSpace(user.Password) && HKH.Common.Security.BCrypt.Verify(password, user.Password);
         }
 
         private static void ValidatePasswordStrength(string password, string fieldName)
@@ -348,27 +356,31 @@ namespace EIMSNext.Auth.Services
             return atIndex > 0 ? email[..atIndex] : email;
         }
 
-        private static void ValidateTarget(string type, string target)
+        private static string NormalizeAndValidateTarget(string type, string? target)
         {
             if (string.IsNullOrWhiteSpace(target))
             {
                 throw new InvalidOperationException("手机号或邮箱不能为空");
             }
 
+            var normalizedTarget = target.Trim();
             if (type == PinCodeTargetType.Phone)
             {
-                if (!PhoneRegex.IsMatch(target))
+                if (!PhoneRegex.IsMatch(normalizedTarget))
                 {
                     throw new InvalidOperationException("手机号格式不正确");
                 }
 
-                return;
+                return normalizedTarget;
             }
 
-            if (!EmailRegex.IsMatch(target))
+            normalizedTarget = normalizedTarget.ToLowerInvariant();
+            if (!EmailRegex.IsMatch(normalizedTarget))
             {
                 throw new InvalidOperationException("邮箱格式不正确");
             }
+
+            return normalizedTarget;
         }
 
         private static bool IsUsage(string usage)

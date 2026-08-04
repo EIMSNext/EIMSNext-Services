@@ -3,7 +3,13 @@ using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Service.Contracts;
@@ -15,7 +21,6 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 
 using WorkflowCore.Interface;
-using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Flow.Host.Controllers
 {
@@ -43,7 +48,7 @@ namespace EIMSNext.Flow.Host.Controllers
         public IActionResult Load(DfLoadRequest request)
         {
             var def = _defservice.Find(x => x.ExternalId == request.DfDefinitionId && x.Version == request.Version).FirstOrDefault();
-            if (def == null)
+            if (def == null || def.FlowType != FlowType.Dataflow || def.DeleteFlag)
                 return BadRequest($"数据流程定义({request.DfDefinitionId}:{request.Version})不存在");
 
             _workflowLoader.LoadDefinition(def);
@@ -67,12 +72,22 @@ namespace EIMSNext.Flow.Host.Controllers
                 {
                     return BadRequest("数据流定义不存在或已禁用");
                 }
+
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(dataflow.CorpId))
+                {
+                    return NotFound("数据流定义不存在");
+                }
             }
 
             if (!string.IsNullOrEmpty(request.DataId))
             {
                 formData = _formDataservice.Get(request.DataId);
                 if (formData == null)
+                {
+                    return NotFound("数据不存在");
+                }
+
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(formData.CorpId))
                 {
                     return NotFound("数据不存在");
                 }
@@ -116,6 +131,14 @@ namespace EIMSNext.Flow.Host.Controllers
             return ApiResult.Success(new { Id = dfExecResult.DfInstance?.Id ?? "", Error = "" }).ToActionResult();
         }
 
+        private bool IsSystemIdentity => IdentityContext.IdentityType == ApiService.IdentityType.System;
+
+        private bool BelongsToCurrentCorp(string? corpId)
+        {
+            return !string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) &&
+                   string.Equals(corpId, IdentityContext.CurrentCorpId, StringComparison.Ordinal);
+        }
+
         private Operator? ResolveStarter(DfRunRequest request)
         {
             if (IdentityContext.IdentityType == ApiService.IdentityType.System)
@@ -135,7 +158,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var def = new Wf_Definition()
             {
                 Version = request.Version,
-                Content = "",
+                Content = request.Content,
                 ExternalId = request.DfDefinitionId,
                 FlowType = FlowType.Dataflow,
             };

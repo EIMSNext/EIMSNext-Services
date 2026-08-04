@@ -7,13 +7,14 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.MongoDb;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -126,11 +127,8 @@ namespace EIMSNext.Service.Tests
             Assert.IsTrue(relations[0].IsManager);
             Assert.AreEqual(deptB.Id, relations[1].DepartmentId);
 
-            var viewModel = new EmployeeViewModel { Id = employee.Id, CorpId = CorpId, Code = employee.Code, EmpName = employee.EmpName };
-            _employeeApiService.FillDepartments([viewModel]);
-
-            Assert.AreEqual(2, viewModel.Departments.Count);
-            CollectionAssert.AreEqual(new[] { "研发部", "运营部" }, viewModel.Departments.Select(x => x.Name).ToArray());
+            Assert.AreEqual(2, employee.Depts.Count);
+            CollectionAssert.AreEqual(new[] { "研发部", "运营部" }, employee.Depts.Select(x => x.DeptName).ToArray());
         }
 
         [TestMethod]
@@ -503,8 +501,8 @@ namespace EIMSNext.Service.Tests
             public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => new UpdateResult.Acknowledged(0, 0, new BsonDocument());
+            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => Task.FromResult<UpdateResult>(new UpdateResult.Acknowledged(0, 0, new BsonDocument()));
             public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null)
             {
                 _items[EnsureId(entity).Id] = entity;

@@ -5,6 +5,7 @@ using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;

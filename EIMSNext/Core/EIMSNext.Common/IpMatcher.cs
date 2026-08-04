@@ -74,6 +74,36 @@ namespace EIMSNext.Common
             return false;
         }
 
+        /// <summary>
+        /// 判断单条 IP 白名单规则是否为有效的 IPv4、末段通配符或 CIDR 规则。
+        /// </summary>
+        public static bool IsValidRule(string? rule)
+        {
+            if (string.IsNullOrWhiteSpace(rule))
+            {
+                return false;
+            }
+
+            rule = rule.Trim();
+            if (IPAddress.TryParse(rule, out var address))
+            {
+                return address.AddressFamily == AddressFamily.InterNetwork;
+            }
+
+            if (rule.EndsWith(".*", StringComparison.Ordinal))
+            {
+                var parts = rule[..^2].Split('.');
+                return parts.Length == 3 && parts.All(IsByte);
+            }
+
+            var cidr = rule.Split('/');
+            return cidr.Length == 2
+                && IPAddress.TryParse(cidr[0], out var network)
+                && network.AddressFamily == AddressFamily.InterNetwork
+                && int.TryParse(cidr[1], out var prefix)
+                && prefix is >= 0 and <= 32;
+        }
+
         private static bool MatchWildcard(string rule, string clientIp)
         {
             var prefix = rule[..^2];
@@ -122,5 +152,8 @@ namespace EIMSNext.Common
             }
             return true;
         }
+
+        private static bool IsByte(string value)
+            => byte.TryParse(value, out _);
     }
 }

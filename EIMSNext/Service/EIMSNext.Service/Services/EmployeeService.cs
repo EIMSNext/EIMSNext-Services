@@ -1,15 +1,21 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using HKH.Mef2.Integration;
 using EIMSNext.Core.Services;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Logging;
+using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
 {
@@ -26,7 +32,7 @@ namespace EIMSNext.Service
                 FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.Roles, r => r.RoleId == role.Id) // 排除已存在该RoleId的员工
     )           );
 
-            return Repository.UpdateManyAsync(filter, update);
+            return Repository.UpdateManyAsync(filter, update, upsert: false);
         }
 
         public Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds)
@@ -34,7 +40,7 @@ namespace EIMSNext.Service
             var update = UpdateBuilder.PullFilter(x => x.Roles, r => r.RoleId == roleId);
             var filter = FilterBuilder.In(x => x.Id, empIds);
 
-            return Repository.UpdateManyAsync(filter, update);
+            return Repository.UpdateManyAsync(filter, update, upsert: false);
         }
 
         public async Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved, string corpId)
@@ -171,13 +177,30 @@ namespace EIMSNext.Service
 
         public async Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted)
         {
-            var invites = Repository.Queryable
-                .Where(x => !x.DeleteFlag && x.Status == EmployeeStatus.Active && !x.UserBound)
-                .ToList()
-                .Where(x =>
-                    (!string.IsNullOrWhiteSpace(phone) && string.Equals(x.WorkPhone, phone, StringComparison.OrdinalIgnoreCase)) ||
-                    (!string.IsNullOrWhiteSpace(email) && string.Equals(x.WorkEmail, email, StringComparison.OrdinalIgnoreCase)))
-                .ToList();
+            var identityFilters = new List<FilterDefinition<Employee>>();
+            if (!string.IsNullOrWhiteSpace(phone))
+            {
+                identityFilters.Add(Repository.FilterBuilder.Regex(
+                    x => x.WorkPhone,
+                    new BsonRegularExpression($"^{Regex.Escape(phone.Trim())}$", "i")));
+            }
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                identityFilters.Add(Repository.FilterBuilder.Regex(
+                    x => x.WorkEmail,
+                    new BsonRegularExpression($"^{Regex.Escape(email.Trim())}$", "i")));
+            }
+            if (identityFilters.Count == 0)
+            {
+                throw new NotFoundException("未找到待处理的邀请");
+            }
+
+            var inviteFilter = Repository.FilterBuilder.And(
+                Repository.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                Repository.FilterBuilder.Eq(x => x.Status, EmployeeStatus.Active),
+                Repository.FilterBuilder.Eq(x => x.UserBound, false),
+                Repository.FilterBuilder.Or(identityFilters));
+            var invites = Repository.Collection.Find(inviteFilter).ToList();
             if (invites.Count == 0)
             {
                 throw new NotFoundException("未找到待处理的邀请");

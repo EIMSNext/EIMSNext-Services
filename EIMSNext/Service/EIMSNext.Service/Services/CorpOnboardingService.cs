@@ -1,8 +1,13 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -75,6 +80,12 @@ namespace EIMSNext.Service
                 UpdateTime = now,
             };
             EmployeeRepository.EnsureId(employee);
+
+            employee.Depts = new List<EmpDept>
+            {
+                new() { DeptId = rootDepartment.Id, HeriarchyId = rootDepartment.HeriarchyId, DeptName = rootDepartment.Name }
+            };
+
             var employeeDepartment = new EmployeeDepartment
             {
                 CorpId = corporate.Id,

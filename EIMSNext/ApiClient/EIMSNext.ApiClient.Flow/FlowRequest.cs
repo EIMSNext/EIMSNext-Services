@@ -13,6 +13,7 @@ namespace EIMSNext.ApiClient.Flow
         Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken);
         Task<WfResponse?> Urge(UrgeRequest req, string accessToken);
         Task<WfActionStatusResponse?> ActionStatus(ActionStatusRequest req, string accessToken);
+        Task<List<NodeActionResponse>?> NodeActions(ActionStatusRequest req, string accessToken);
         Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken);
         Task<WfResponse?> Status(StatusRequest req, string accessToken);
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
@@ -99,6 +100,20 @@ namespace EIMSNext.ApiClient.Flow
         public bool CanWithdraw { get; set; }
         public bool CanUrge { get; set; }
         public string? Error { get; set; }
+    }
+    public class NodeActionResponse
+    {
+        public string ActionType { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public string? Text { get; set; }
+        public List<ApprovalCandidateResponse>? Candidates { get; set; }
+    }
+    public class ApprovalCandidateResponse
+    {
+        public string CandidateId { get; set; } = string.Empty;
+        public int CandidateType { get; set; }
+        public string? CandidateName { get; set; }
+        public bool CascadedDept { get; set; }
     }
     public class ReturnTargetNode
     {

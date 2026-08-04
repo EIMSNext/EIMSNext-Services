@@ -7,11 +7,17 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
 using Microsoft.AspNetCore.OData.Results;
@@ -83,7 +89,7 @@ namespace EIMSNext.ApiHost.Controllers
 
         //private JsonObject? GetAccessToken(string userName)
         //{
-        //    RestClient restClient = new RestClient(AppSetting.OAuth_TokenEndPoint!);
+        //    RestClient restClient = new RestClient(AppSetting.OAuth.TokenEndPoint!);
         //    var request = new RestRequest("", Method.Post);
         //    request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
         //    request.AddParameter("application/x-www-form-urlencoded", $@"grant_type=password&client_id=1&username={userName}&password={UrlEncoder.Default.Encode("(!@#^&*$%) [,./';:>?<]")}", ParameterType.RequestBody);
@@ -99,7 +105,10 @@ namespace EIMSNext.ApiHost.Controllers
         /// <returns></returns>
         protected IActionResult Error(int errCode, string errMsg)
         {
-            return new ODataErrorResult(errCode.ToString(), errMsg);
+            var statusCode = errCode is >= 400 and <= 599
+                ? errCode
+                : StatusCodes.Status400BadRequest;
+            return new ODataErrorResult(statusCode.ToString(), errMsg);
         }
 
         /// <summary>

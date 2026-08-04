@@ -2,7 +2,7 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Serialization;
+using EIMSNext.Core.Mongo.Serialization;
 using EIMSNext.Json.Serialization;
 
 namespace EIMSNext.Core.Tests

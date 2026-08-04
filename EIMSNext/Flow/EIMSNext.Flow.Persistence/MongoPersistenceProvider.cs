@@ -6,23 +6,22 @@ namespace EIMSNext.Flow.Persistence
 {
     public class MongoPersistenceProvider : IMongoPersistenceProvider
     {
-        internal const string WorkflowCollectionName = "Wf_WorkflowInstance";
-        private readonly IMongoDatabase _database;
+        private readonly IWfDbContext _dbContext;
 
-        public MongoPersistenceProvider(IMongoDatabase database)
+        public MongoPersistenceProvider(IWfDbContext dbContext)
         {
-            _database = database;
+            _dbContext = dbContext;
         }
 
-        private IMongoCollection<WorkflowInstance> WorkflowInstances => _database.GetCollection<WorkflowInstance>(WorkflowCollectionName);
+        private IMongoCollection<WorkflowInstance> WorkflowInstances => _dbContext.WorkflowInstances;
 
-        private IMongoCollection<EventSubscription> EventSubscriptions => _database.GetCollection<EventSubscription>("Wf_Subscription");
+        private IMongoCollection<EventSubscription> EventSubscriptions => _dbContext.EventSubscriptions;
 
-        private IMongoCollection<Event> Events => _database.GetCollection<Event>("Wf_Event");
+        private IMongoCollection<Event> Events => _dbContext.Events;
 
-        private IMongoCollection<ExecutionError> ExecutionErrors => _database.GetCollection<ExecutionError>("Wf_ExecutionError");
+        private IMongoCollection<ExecutionError> ExecutionErrors => _dbContext.ExecutionErrors;
 
-        private IMongoCollection<ScheduledCommand> ScheduledCommands => _database.GetCollection<ScheduledCommand>("Wf_ScheduledCommand");
+        private IMongoCollection<ScheduledCommand> ScheduledCommands => _dbContext.ScheduledCommands;
 
         public async Task<string> CreateNewWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken = default)
         {
@@ -43,7 +42,7 @@ namespace EIMSNext.Flow.Persistence
                 return;
             }
 
-            using (var session = await _database.Client.StartSessionAsync(cancellationToken: cancellationToken))
+            using (var session = await _dbContext.StartSessionAsync(cancellationToken))
             {
                 session.StartTransaction();
                 await PersistWorkflow(workflow, cancellationToken);

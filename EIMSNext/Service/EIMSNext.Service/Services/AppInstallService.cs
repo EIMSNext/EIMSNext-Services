@@ -1,7 +1,15 @@
 using System.Text.Json.Nodes;
 using System.Text.Json;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core;
+using EIMSNext.Common;
+using EIMSNext.Component;
+using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -30,8 +38,18 @@ namespace EIMSNext.Service
             var authGroupTemplateRepo = _resolver.GetRepository<AuthGroupTemplate>();
             var authGroupRepo = _resolver.GetRepository<AuthGroup>();
 
-            var profile = profileRepo.Get(appProfileId) ?? throw new InvalidOperationException("应用档案不存在");
-            var appTemplate = appTemplateRepo.Get(profile.TemplateId) ?? throw new InvalidOperationException("应用模板不存在");
+            var profile = profileRepo.Get(appProfileId) ?? throw new NotFoundException("应用档案不存在");
+            if (profile.DeleteFlag || profile.Status != AppProfileStatus.Published)
+            {
+                throw new NotFoundException("应用已下架或不存在");
+            }
+
+            var appTemplate = appTemplateRepo.Get(profile.TemplateId) ?? throw new NotFoundException("应用模板不存在");
+            var context = _resolver.GetServiceContext();
+            if (string.IsNullOrWhiteSpace(context.CorpId))
+            {
+                throw new BadRequestException("当前用户未选择企业，无法安装应用");
+            }
 
             List<FormTemplate> formTemplates = formTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
             List<DashboardTemplate> dashboardTemplates = dashboardTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
@@ -41,20 +59,8 @@ namespace EIMSNext.Service
             List<PrintDefTemplate> printTemplateTemplates = printTemplateTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
             List<AuthGroupTemplate> authGroupTemplates = authGroupTemplateRepo.Queryable.Where(x => x.AppTemplateId == appTemplate.Id).ToList();
 
+            var now = DateTime.UtcNow.ToTimeStampMs();
             var newAppId = appDefRepo.NewId();
-            var appDef = new AppDef
-            {
-                Id = newAppId,
-                TemplateId = appTemplate.Id,
-                Name = profile.Name,
-                Description = profile.Summary,
-                Icon = profile.Icon,
-                IconColor = profile.ThemeColor,
-                AppMenus = []
-            };
-
-            await appDefRepo.InsertAsync(appDef);
-
             var formMap = formTemplates.ToDictionary(x => x.Id, _ => formDefRepo.NewId());
             var dashboardMap = dashboardTemplates.ToDictionary(x => x.Id, _ => dashboardDefRepo.NewId());
             var dashboardLayoutMap = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
@@ -63,116 +69,130 @@ namespace EIMSNext.Service
             var printMap = printTemplateTemplates.ToDictionary(x => x.Id, _ => printTemplateRepo.NewId());
             var authGroupMap = authGroupTemplates.ToDictionary(x => x.Id, _ => authGroupRepo.NewId());
 
-            foreach (var formTemplate in formTemplates)
+            var appDef = InitializeInstalledEntity(new AppDef
             {
-                var formDef = new FormDef
-                {
-                    Id = formMap[formTemplate.Id],
-                    AppId = newAppId,
-                    TemplateId = formTemplate.Id,
-                    Name = formTemplate.Name,
-                    Content = AppTemplateReferenceRewriter.RewriteFormContent(formTemplate, newAppId, formMap, dashboardMap),
-                    FormSettings = AppTemplateReferenceRewriter.RewriteFormSettings(formTemplate, formMap, dashboardMap),
-                    UsingWorkflow = formTemplate.UsingWorkflow
-                };
-                await formDefRepo.InsertAsync(formDef);
+                Id = newAppId,
+                TemplateId = appTemplate.Id,
+                Name = profile.Name,
+                Description = profile.Summary,
+                Icon = profile.Icon,
+                IconColor = profile.ThemeColor,
+                AppMenus = BuildInstalledMenus(appTemplate, formMap, dashboardMap)
+            }, context, now);
+
+            var formDefs = formTemplates.Select(formTemplate => InitializeInstalledEntity(new FormDef
+            {
+                Id = formMap[formTemplate.Id],
+                AppId = newAppId,
+                TemplateId = formTemplate.Id,
+                Name = formTemplate.Name,
+                Content = AppTemplateReferenceRewriter.RewriteFormContent(formTemplate, newAppId, formMap, dashboardMap),
+                FormSettings = AppTemplateReferenceRewriter.RewriteFormSettings(formTemplate, formMap, dashboardMap),
+                UsingWorkflow = formTemplate.UsingWorkflow
+            }, context, now)).ToList();
+            foreach (var formDef in formDefs)
+            {
+                formDef.PublicRelatedFormIds = FormRelatedSourceResolver.ResolveFormIds(formDef.Content.Layout).ToList();
             }
 
+            var dashboardDefs = new List<DashboardDef>();
             foreach (var dashboardTemplate in dashboardTemplates)
             {
-                var layout = AppTemplateReferenceRewriter.RewriteDashboardLayout(dashboardTemplate.Layout, dashboardLayoutMap);
-                var dashboardDef = new DashboardDef
+                dashboardDefs.Add(InitializeInstalledEntity(new DashboardDef
                 {
                     Id = dashboardMap[dashboardTemplate.Id],
                     AppId = newAppId,
                     TemplateId = dashboardTemplate.Id,
                     Name = dashboardTemplate.Name,
-                    Layout = layout
-                };
-                await dashboardDefRepo.InsertAsync(dashboardDef);
+                    Layout = AppTemplateReferenceRewriter.RewriteDashboardLayout(dashboardTemplate.Layout, dashboardLayoutMap)
+                }, context, now));
             }
 
-            foreach (var itemTemplate in dashboardItemTemplates)
+            var dashboardItemDefs = dashboardItemTemplates.Select(itemTemplate => InitializeInstalledEntity(new DashboardItemDef
             {
-                var dashboardItem = new DashboardItemDef
-                {
-                    Id = dashboardItemMap[itemTemplate.Id],
-                    AppId = newAppId,
-                    DashboardId = dashboardMap[itemTemplate.DashboardTemplateId],
-                    TemplateId = itemTemplate.Id,
-                    ItemType = itemTemplate.ItemType,
-                    LayoutId = dashboardLayoutMap.TryGetValue(itemTemplate.LayoutId, out var layoutId) ? layoutId : itemTemplate.LayoutId,
-                    Name = itemTemplate.Name,
-                    Details = AppTemplateReferenceRewriter.RewriteJsonReferences(itemTemplate.Details, newAppId, formMap, dashboardMap, wfMap, printMap)
-                };
-                await dashboardItemDefRepo.InsertAsync(dashboardItem);
-            }
+                Id = dashboardItemMap[itemTemplate.Id],
+                AppId = newAppId,
+                DashboardId = dashboardMap[itemTemplate.DashboardTemplateId],
+                TemplateId = itemTemplate.Id,
+                ItemType = itemTemplate.ItemType,
+                LayoutId = dashboardLayoutMap.TryGetValue(itemTemplate.LayoutId, out var layoutId) ? layoutId : itemTemplate.LayoutId,
+                Name = itemTemplate.Name,
+                Details = AppTemplateReferenceRewriter.RewriteJsonReferences(itemTemplate.Details, newAppId, formMap, dashboardMap, wfMap, printMap)
+            }, context, now)).ToList();
 
-            foreach (var wfTemplate in wfTemplates)
+            var wfDefs = wfTemplates.Select(wfTemplate => InitializeInstalledEntity(new Wf_Definition
             {
-                var wf = new Wf_Definition
-                {
-                    Id = wfMap[wfTemplate.Id],
-                    AppId = newAppId,
-                    TemplateId = wfTemplate.Id,
-                    Name = wfTemplate.Name,
-                    FlowType = wfTemplate.FlowType,
-                    ExternalId = formMap.TryGetValue(wfTemplate.ExternalTemplateId, out var mappedFormId) ? mappedFormId : wfTemplate.ExternalTemplateId,
-                    Description = wfTemplate.Description,
-                    Content = AppTemplateReferenceRewriter.RewriteJsonReferences(wfTemplate.Content, newAppId, formMap, dashboardMap, wfMap, printMap),
-                    Metadata = AppTemplateReferenceRewriter.RewriteWorkflowMetadata(wfTemplate.Metadata, formMap, dashboardMap, wfMap, printMap),
-                    EventSource = wfTemplate.EventSource,
-                    SourceId = AppTemplateReferenceRewriter.MapTemplateReference(wfTemplate.SourceTemplateId, formMap, dashboardMap, wfMap),
-                    EventSetting = AppTemplateReferenceRewriter.RewriteEventSetting(wfTemplate.EventSetting, formMap, dashboardMap, wfMap),
-                    Disabled = wfTemplate.Disabled,
-                    IsCurrent = true,
-                    Released = false,
-                    Version = 1
-                };
-                await wfDefRepo.InsertAsync(wf);
-            }
+                Id = wfMap[wfTemplate.Id],
+                AppId = newAppId,
+                TemplateId = wfTemplate.Id,
+                Name = wfTemplate.Name,
+                FlowType = wfTemplate.FlowType,
+                ExternalId = formMap.TryGetValue(wfTemplate.ExternalTemplateId, out var mappedFormId) ? mappedFormId : wfTemplate.ExternalTemplateId,
+                Description = wfTemplate.Description,
+                Content = AppTemplateReferenceRewriter.RewriteJsonReferences(wfTemplate.Content, newAppId, formMap, dashboardMap, wfMap, printMap),
+                Metadata = AppTemplateReferenceRewriter.RewriteWorkflowMetadata(wfTemplate.Metadata, formMap, dashboardMap, wfMap, printMap),
+                EventSource = wfTemplate.EventSource,
+                SourceId = AppTemplateReferenceRewriter.MapTemplateReference(wfTemplate.SourceTemplateId, formMap, dashboardMap, wfMap),
+                EventSetting = AppTemplateReferenceRewriter.RewriteEventSetting(wfTemplate.EventSetting, formMap, dashboardMap, wfMap),
+                Disabled = wfTemplate.Disabled,
+                IsCurrent = true,
+                Released = false,
+                Version = 1
+            }, context, now)).ToList();
 
-            foreach (var printTemplateTemplate in printTemplateTemplates)
+            var printDefs = printTemplateTemplates.Select(printTemplate => InitializeInstalledEntity(new PrintDef
             {
-                var printTemplate = new PrintDef
-                {
-                    Id = printMap[printTemplateTemplate.Id],
-                    AppId = newAppId,
-                    TemplateId = printTemplateTemplate.Id,
-                    FormId = formMap.TryGetValue(printTemplateTemplate.FormTemplateId, out var mappedFormId) ? mappedFormId : string.Empty,
-                    Name = printTemplateTemplate.Name,
-                    Content = AppTemplateReferenceRewriter.RewriteJsonReferences(printTemplateTemplate.Content, newAppId, formMap, dashboardMap, wfMap, printMap),
-                    PrintType = printTemplateTemplate.PrintType
-                };
-                await printTemplateRepo.InsertAsync(printTemplate);
-            }
+                Id = printMap[printTemplate.Id],
+                AppId = newAppId,
+                TemplateId = printTemplate.Id,
+                FormId = formMap.TryGetValue(printTemplate.FormTemplateId, out var mappedFormId) ? mappedFormId : string.Empty,
+                Name = printTemplate.Name,
+                Content = AppTemplateReferenceRewriter.RewriteJsonReferences(printTemplate.Content, newAppId, formMap, dashboardMap, wfMap, printMap),
+                PrintType = printTemplate.PrintType
+            }, context, now)).ToList();
 
-            foreach (var authGroupTemplate in authGroupTemplates)
+            var authGroups = authGroupTemplates.Select(authGroupTemplate => InitializeInstalledEntity(new AuthGroup
             {
-                var authGroup = new AuthGroup
-                {
-                    Id = authGroupMap[authGroupTemplate.Id],
-                    AppId = newAppId,
-                    TemplateId = authGroupTemplate.Id,
-                    FormId = formMap.TryGetValue(authGroupTemplate.FormTemplateId, out var formDefId) ? formDefId : authGroupTemplate.FormTemplateId,
-                    Name = authGroupTemplate.Name,
-                    Desc = authGroupTemplate.Desc,
-                    Type = authGroupTemplate.Type,
-                    DataPerms = authGroupTemplate.DataPerms,
-                    DataFilter = authGroupTemplate.DataFilter,
-                    FieldPerms = authGroupTemplate.FieldPerms,
-                    Disabled = authGroupTemplate.Disabled,
-                };
-                await authGroupRepo.InsertAsync(authGroup);
-            }
+                Id = authGroupMap[authGroupTemplate.Id],
+                AppId = newAppId,
+                TemplateId = authGroupTemplate.Id,
+                FormId = formMap.TryGetValue(authGroupTemplate.FormTemplateId, out var formDefId) ? formDefId : authGroupTemplate.FormTemplateId,
+                Name = authGroupTemplate.Name,
+                Desc = authGroupTemplate.Desc,
+                Type = authGroupTemplate.Type,
+                DataPerms = authGroupTemplate.DataPerms,
+                DataFilter = authGroupTemplate.DataFilter,
+                FieldPerms = authGroupTemplate.FieldPerms,
+                Disabled = authGroupTemplate.Disabled,
+            }, context, now)).ToList();
 
-            appDef.AppMenus = BuildInstalledMenus(appTemplate, formMap, dashboardMap);
-            await appDefRepo.ReplaceAsync(appDef);
+            using var scope = appDefRepo.NewTransactionScope();
+            await appDefRepo.InsertAsync(appDef);
+            if (formDefs.Count > 0) await formDefRepo.InsertAsync(formDefs);
+            if (dashboardDefs.Count > 0) await dashboardDefRepo.InsertAsync(dashboardDefs);
+            if (dashboardItemDefs.Count > 0) await dashboardItemDefRepo.InsertAsync(dashboardItemDefs);
+            if (wfDefs.Count > 0) await wfDefRepo.InsertAsync(wfDefs);
+            if (printDefs.Count > 0) await printTemplateRepo.InsertAsync(printDefs);
+            if (authGroups.Count > 0) await authGroupRepo.InsertAsync(authGroups);
 
-            profile.InstallCount += 1;
-            profileRepo.Replace(profile);
+            await profileRepo.UpdateAsync(
+                profile.Id,
+                profileRepo.UpdateBuilder.Inc(x => x.InstallCount, 1),
+                upsert: false);
+
+            scope.CommitTransaction();
 
             return newAppId;
+        }
+
+        private static T InitializeInstalledEntity<T>(T entity, IServiceContext context, long now) where T : CorpEntityBase
+        {
+            entity.CorpId = context.CorpId;
+            entity.CreateBy = context.Operator;
+            entity.UpdateBy = context.Operator;
+            entity.CreateTime = now;
+            entity.UpdateTime = now;
+            return entity;
         }
 
         private static List<AppMenu> BuildInstalledMenus(AppTemplate appTemplate, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
@@ -223,6 +243,9 @@ namespace EIMSNext.Service
                 IconColor = obj["iconColor"]?.GetValue<string>() ?? string.Empty,
                 MenuType = (FormType)menuType,
                 SortIndex = obj["sortIndex"]?.GetValue<float>() ?? 0,
+                Editable = obj["editable"]?.GetValue<bool>() ?? true,
+                Deletable = obj["deletable"]?.GetValue<bool>() ?? true,
+                ListComponent = obj["listComponent"]?.GetValue<string>() ?? string.Empty,
                 SubMenus = subMenus?.Select(x => MapMenu(x, formMap, dashboardMap)).Where(x => x != null).Cast<AppMenu>().ToList()
             };
         }

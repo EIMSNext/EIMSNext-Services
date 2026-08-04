@@ -1,7 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
 
-using MongoDB.Driver;
-
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -11,20 +9,20 @@ namespace EIMSNext.Flow.Persistence
     {       
         public static WorkflowOptions UseMongoDB(
             this WorkflowOptions options,
-            Func<IServiceProvider, IMongoDatabase> createDatabase)
+            Func<IServiceProvider, IWfDbContext> createDbContext)
         {
             if (options == null) throw new ArgumentNullException(nameof(options));
-            if (createDatabase == null) throw new ArgumentNullException(nameof(createDatabase));
+            if (createDbContext == null) throw new ArgumentNullException(nameof(createDbContext));
 
             options.UsePersistence(sp =>
             {
-                var db = createDatabase(sp);
-                return new MongoPersistenceProvider(db);
+                var dbContext = createDbContext(sp);
+                return new MongoPersistenceProvider(dbContext);
             });
             options.Services.AddTransient<IWorkflowInstancePurger>(sp =>
             {
-                var db = createDatabase(sp);
-                return new WorkflowPurger(db);
+                var dbContext = createDbContext(sp);
+                return new WorkflowPurger(dbContext);
             });
             options.Services.AddTransient<IWorkflowPurger>(sp => sp.GetRequiredService<IWorkflowInstancePurger>());
 

@@ -1,6 +1,7 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Services;
 
 namespace EIMSNext.Auth.Tests
@@ -124,6 +125,12 @@ namespace EIMSNext.Auth.Tests
             public IQueryable<IntegrationLoginSetting> IntegrationLoginSettings => _settings.AsQueryable();
 
             public IQueryable<UserIntegrationBinding> UserIntegrationBindings => _bindings.AsQueryable();
+
+            public IQueryable<EmployeeLookup> Employees => throw new NotImplementedException();
+
+            public IQueryable<PublicAccessSetting> PublicSettings => throw new NotImplementedException();
+
+            public IQueryable<CorporateSettingReadModel> CorporateSettings => throw new NotImplementedException();
 
             public Task AddClient(Client entity)
             {

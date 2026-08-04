@@ -1,20 +1,23 @@
-using System.Security.Cryptography.X509Certificates;
-using EIMSNext.Auth.Integrations.Abstractions;
+using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
 using EIMSNext.Auth.Persistence;
 using EIMSNext.Auth.Services;
+using EIMSNext.Auth.Utilities;
 using EIMSNext.DingTalk.Clients;
 using EIMSNext.Feishu.Clients;
 using EIMSNext.WeChat.Clients;
 using EIMSNext.WxWork.Clients;
-using EIMSNext.MongoDb;
+
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
+
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
-using OpenIddict.Server.AspNetCore;
+
+using System.Security.Cryptography.X509Certificates;
+
+using static OpenIddict.Abstractions.OpenIddictConstants;
 
 namespace EIMSNext.Auth.Extensions
 {
@@ -23,11 +26,11 @@ namespace EIMSNext.Auth.Extensions
         public static IServiceCollection AddAuthServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
             services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
-            services.AddAuthMongoCollections(configuration);
             services.AddScoped<IAuthDbContext, AuthDbContext>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
             services.AddScoped<PublicSettingLookupService>();
+            services.AddSingleton<IVerificationCodeProvider, MockVerificationCodeProvider>();
             services.AddScoped<IVerificationCodeService, VerificationCodeService>();
             services.AddScoped<ISingleSignOnService, SingleSignOnService>();
             services.AddScoped<IIntegrationAuthService, IntegrationAuthService>();
@@ -42,7 +45,7 @@ namespace EIMSNext.Auth.Extensions
             services.AddScoped<ITokenGrantHandler, SingleSignOnTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, IntegrationTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, PublicTokenGrantHandler>();
-            services.AddScoped<ITokenGrantHandler, SystemTaskTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, SystemTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, ClientCredentialsTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
@@ -51,16 +54,23 @@ namespace EIMSNext.Auth.Extensions
             var certificate = X509CertificateLoader.LoadPkcs12FromFile(
                 certificatePath,
                 certificatePassword,
-                X509KeyStorageFlags.DefaultKeySet);
+                X509KeyStorageFlags.EphemeralKeySet);
 
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
                     var issuerValue = configuration.GetSection("OAuth:Issuer").Value
-                        ?? configuration.GetSection("OAuth:Authority").Value
-                        ?? "https://auth.eimsnext.com";
-                    options.SetIssuer(new Uri(issuerValue));
-                    options.SetTokenEndpointUris("connect/token");
+                        ?? "https://auth.eimsnext.com/issuer";
+                    options.SetIssuer(issuerValue);
+                    options.SetTokenEndpointUris("connect/token", "auth/login", "public/token", "system/token");
+                    options.RegisterScopes(
+                        Scopes.OpenId,
+                        Scopes.Profile,
+                        "api.readwrite",
+                        nameof(EIMSNext.ApiService.PublicScope.DashLink),
+                        nameof(EIMSNext.ApiService.PublicScope.FormLink),
+                        nameof(EIMSNext.ApiService.PublicScope.DataLink),
+                        nameof(EIMSNext.ApiService.PublicScope.QueryLink));
 
                     options.AllowPasswordFlow();
                     options.AllowCustomFlow(EIMSNext.Auth.Entities.CustomGrantType.VerificationCode);
@@ -83,6 +93,43 @@ namespace EIMSNext.Auth.Extensions
                     {
                         builder.UseInlineHandler(context =>
                         {
+                            return default;
+                        });
+                    });
+                    options.AddEventHandler<OpenIddictServerEvents.ExtractTokenRequestContext>(builder =>
+                    {
+                        builder.SetOrder(int.MaxValue);
+                        builder.UseInlineHandler(context =>
+                        {
+                            var path = context.RequestUri?.AbsolutePath;
+                            if (!string.Equals(path, "/auth/login", StringComparison.OrdinalIgnoreCase) &&
+                                !string.Equals(path, "/public/token", StringComparison.OrdinalIgnoreCase))
+                            {
+                                return default;
+                            }
+
+                            var encrypted = context.Request?.GetParameter("encrypted")?.ToString();
+                            var parsed = TokenRequestHelper.ParseEncryptedFields(encrypted);
+                            if (!parsed.Succeeded)
+                            {
+                                context.Reject(parsed.Error!, parsed.ErrorDescription!, null);
+                                return default;
+                            }
+
+                            var fields = parsed.Fields!;
+                            if (string.Equals(path, "/auth/login", StringComparison.OrdinalIgnoreCase))
+                            {
+                                if (!fields.TryGetValue("grant_type", out var grantType) || string.IsNullOrWhiteSpace(grantType))
+                                {
+                                    fields["grant_type"] = GrantTypes.Password;
+                                }
+                            }
+                            else
+                            {
+                                fields["grant_type"] = EIMSNext.Auth.Entities.CustomGrantType.Public;
+                            }
+
+                            context.Request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)));
                             return default;
                         });
                     });

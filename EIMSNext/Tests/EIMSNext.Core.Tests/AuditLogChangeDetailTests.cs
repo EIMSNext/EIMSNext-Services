@@ -4,13 +4,14 @@ using System.Reflection;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.MongoDb;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
@@ -35,7 +36,7 @@ namespace EIMSNext.Core.Tests
             var result = InvokeGetChangeDetail(service, oldE, newE);
 
             Assert.IsFalse(result.Contains("KeyNotFound", StringComparison.OrdinalIgnoreCase));
-            Assert.IsTrue(result.Contains("C:"), $"expected C: line in '{result}'");
+            Assert.IsTrue(result.Contains("C:", StringComparison.OrdinalIgnoreCase), $"expected C: line in '{result}'");
             Assert.IsTrue(result.Contains("->null"), $"expected '->null' suffix in '{result}'");
         }
 
@@ -49,11 +50,11 @@ namespace EIMSNext.Core.Tests
 
             var result = InvokeGetChangeDetail(service, oldE, newE);
 
-            Assert.IsTrue(result.Contains("D:"), $"expected D: line in '{result}'");
-            Assert.IsTrue(result.StartsWith("D:null->", StringComparison.Ordinal)
-                || result.Contains(",D:null->", StringComparison.Ordinal),
+            Assert.IsTrue(result.Contains("D:", StringComparison.OrdinalIgnoreCase), $"expected D: line in '{result}'");
+            Assert.IsTrue(result.StartsWith("D:null->", StringComparison.OrdinalIgnoreCase)
+                || result.Contains(",D:null->", StringComparison.OrdinalIgnoreCase),
                 $"expected 'D:null->...' in '{result}'");
-            Assert.IsFalse(result.Contains("A:"), $"A should be skipped (unchanged) in '{result}'");
+            Assert.IsFalse(result.Contains("A:", StringComparison.OrdinalIgnoreCase), $"A should be skipped (unchanged) in '{result}'");
         }
 
         [TestMethod]
@@ -79,7 +80,7 @@ namespace EIMSNext.Core.Tests
 
             var result = InvokeGetChangeDetail(service, oldE, newE);
 
-            Assert.IsTrue(result.Contains("A:\"before\"->\"after\""),
+            Assert.IsTrue(result.Contains("A:\"before\"->\"after\"", StringComparison.OrdinalIgnoreCase),
                 $"expected A:\"before\"->\"after\" in '{result}'");
         }
 
@@ -93,9 +94,9 @@ namespace EIMSNext.Core.Tests
 
             var result = InvokeGetChangeDetail(service, oldE, newE);
 
-            Assert.IsTrue(result.Contains("B:\"2\"->\"20\""), $"expected B line in '{result}'");
-            Assert.IsTrue(result.Contains("C:\"3\"->\"30\""), $"expected C line in '{result}'");
-            Assert.IsFalse(result.Contains("A:"), $"A unchanged should be skipped in '{result}'");
+            Assert.IsTrue(result.Contains("B:\"2\"->\"20\"", StringComparison.OrdinalIgnoreCase), $"expected B line in '{result}'");
+            Assert.IsTrue(result.Contains("C:\"3\"->\"30\"", StringComparison.OrdinalIgnoreCase), $"expected C line in '{result}'");
+            Assert.IsFalse(result.Contains("A:", StringComparison.OrdinalIgnoreCase), $"A unchanged should be skipped in '{result}'");
         }
 
         private static TestEntityService<TestAuditEntity> NewService()

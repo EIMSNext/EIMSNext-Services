@@ -1,4 +1,5 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Auth.Entities
 {
@@ -28,6 +29,16 @@ namespace EIMSNext.Auth.Entities
         /// 已禁用/锁定
         /// </summary>
         public bool Disabled {  get; set; }
+
+        /// <summary>
+        /// 头像文件的相对存储路径
+        /// </summary>
+        public string? Avatar { get; set; }
+
+        /// <summary>
+        /// 显式用户身份。为空时由业务服务按企业和员工关系计算。
+        /// </summary>
+        public string? UserType { get; set; }
 
         public IList<UserCorp> Crops { get; set; } = new List<UserCorp>();
 

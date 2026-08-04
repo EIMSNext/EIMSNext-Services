@@ -3,15 +3,19 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using NanoidDotNet;
 using RestSharp;
-using System.Security.Cryptography;
-using System.Text;
 using System.Text.Json;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -39,8 +43,12 @@ namespace EIMSNext.Service.Host.Controllers
             if (string.IsNullOrWhiteSpace(request.Url))
                 return ApiResult.Fail(400, "服务器地址不能为空").ToActionResult();
 
-            if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var webhookUri))
-                return ApiResult.Fail(400, "服务器地址格式无效").ToActionResult();
+            if (!Uri.TryCreate(request.Url, UriKind.Absolute, out var webhookUri) ||
+                string.IsNullOrWhiteSpace(webhookUri.Host) ||
+                (webhookUri.Scheme != Uri.UriSchemeHttp && webhookUri.Scheme != Uri.UriSchemeHttps))
+            {
+                return ApiResult.Fail(400, "服务器地址必须是有效的 HTTP 或 HTTPS 地址").ToActionResult();
+            }
 
             try
             {
@@ -80,7 +88,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (!string.IsNullOrWhiteSpace(secret))
             {
-                request.AddHeader("X-EIMS-Signature", ComputeSignature(payloadJson, secret));
+                request.AddHeader("X-EIMS-Signature", WebhookSignature.Compute(payloadJson, secret));
             }
 
             request.AddStringBody(payloadJson, DataFormat.Json);
@@ -88,13 +96,5 @@ namespace EIMSNext.Service.Host.Controllers
             return request;
         }
 
-        private static string ComputeSignature(string payload, string secret)
-        {
-            var key = Encoding.UTF8.GetBytes(secret);
-            var body = Encoding.UTF8.GetBytes(payload);
-            using var hmac = new HMACSHA256(key);
-            var hash = hmac.ComputeHash(body);
-            return Convert.ToHexString(hash).ToLowerInvariant();
-        }
     }
 }

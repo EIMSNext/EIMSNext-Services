@@ -1,10 +1,7 @@
 using EIMSNext.ApiService;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
-using EIMSNext.MongoDb;
 using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Driver;
 
 namespace EIMSNext.Auth.Services
 {
@@ -12,88 +9,54 @@ namespace EIMSNext.Auth.Services
     {
         private const string UsernamePrefix = "public_";
 
-        private readonly IMongoCollection<PublicAccessSetting> _publicSettings;
-        private readonly IMongoCollection<FormRecord> _forms;
-        private readonly IMongoCollection<DashboardRecord> _dashboards;
+        private readonly IAuthDbContext _dbContext;
         private readonly string _secretKey;
 
         public PublicTokenService(
-            IMongoCollection<PublicAccessSetting> publicSettings,
-            IMongoDatabase database,
+            IAuthDbContext dbContext,
             IOptions<PublicAccessOptions> accessOptions)
         {
-            _publicSettings = publicSettings;
-            _forms = database.GetCollection<FormRecord>("FormDef");
-            _dashboards = database.GetCollection<DashboardRecord>("DashboardDef");
+            _dbContext = dbContext;
             _secretKey = accessOptions.Value.SecretKey;
         }
 
-        public PublicTokenSubject? Validate(string? username, string? password, PublicScope scope)
+        public PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope)
         {
             if (string.IsNullOrWhiteSpace(username) ||
                 !username.StartsWith(UsernamePrefix, StringComparison.Ordinal))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
             var targetId = username[UsernamePrefix.Length..];
             if (string.IsNullOrWhiteSpace(targetId))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
-            var setting = _publicSettings.AsQueryable()
+            var setting = _dbContext.PublicSettings
                 .Where(x => !x.DeleteFlag && x.TargetId == targetId)
                 .ToList()
                 .FirstOrDefault();
 
             if (setting == null || string.IsNullOrWhiteSpace(setting.CorpId))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
             var section = PublicAccessValidator.ResolveSection(setting, scope);
+            var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+            if (section?.ExpireTime is long expireTime && now > expireTime)
+            {
+                return PublicTokenValidationResult.Invalid("公开访问链接已过期");
+            }
+
             if (!PublicAccessValidator.ValidateSection(section, password, setting.TargetId, _secretKey))
             {
-                return null;
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
 
-            var name = ResolveName(setting);
-            return new PublicTokenSubject(targetId, setting.CorpId, setting.AppId, name);
-        }
-
-        private string ResolveName(PublicAccessSetting setting)
-        {
-            if (setting.TargetType == 1)
-            {
-                return _dashboards.AsQueryable()
-                    .Where(x => x.Id == setting.TargetId && !x.DeleteFlag)
-                    .Select(x => x.Name)
-                    .FirstOrDefault() ?? "public";
-            }
-
-            return _forms.AsQueryable()
-                .Where(x => x.Id == setting.TargetId && !x.DeleteFlag)
-                .Select(x => x.Name)
-                .FirstOrDefault() ?? "public";
-        }
-
-        private sealed class FormRecord
-        {
-            [MongoDB.Bson.Serialization.Attributes.BsonId]
-            [MongoDB.Bson.Serialization.Attributes.BsonRepresentation(BsonType.String)]
-            public string Id { get; set; } = string.Empty;
-            public bool DeleteFlag { get; set; }
-            public string Name { get; set; } = string.Empty;
-        }
-
-        private sealed class DashboardRecord
-        {
-            [MongoDB.Bson.Serialization.Attributes.BsonId]
-            [MongoDB.Bson.Serialization.Attributes.BsonRepresentation(BsonType.String)]
-            public string Id { get; set; } = string.Empty;
-            public bool DeleteFlag { get; set; }
-            public string Name { get; set; } = string.Empty;
+            return PublicTokenValidationResult.Success(new PublicTokenSubject(targetId, setting.CorpId, setting.AppId));
         }
     }
 }

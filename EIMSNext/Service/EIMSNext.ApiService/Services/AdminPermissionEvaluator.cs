@@ -1,7 +1,12 @@
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -90,7 +95,7 @@ namespace EIMSNext.ApiService
             var deptIds = memberScope.DepartmentIds.ToList();
             var ancestorDeptIds = memberScope.AncestorDepartmentIds.ToList();
 
-            return Resolver.GetService<AuthGroup>()
+            var authGroupAppIds = Resolver.GetService<AuthGroup>()
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
@@ -100,6 +105,9 @@ namespace EIMSNext.ApiService
                         (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
                 .Select(x => x.AppId)
                 .Distinct()
+                .ToList();
+
+            return authGroupAppIds
                 .Concat(GetPublishedDashboardAppIds(memberScope))
                 .Distinct()
                 .ToList();

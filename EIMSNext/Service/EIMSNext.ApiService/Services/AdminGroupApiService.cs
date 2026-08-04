@@ -1,7 +1,13 @@
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -190,6 +196,11 @@ namespace EIMSNext.ApiService
             if (original == null)
             {
                 throw new ArgumentException("系统管理员组只能由企业创建流程生成");
+            }
+
+            if (entity.EmployeeIds.Count == 0)
+            {
+                throw new ArgumentException("系统管理员组至少保留一名管理员");
             }
 
             if (entity.EmployeeIds.Count > 5)
@@ -393,7 +404,7 @@ namespace EIMSNext.ApiService
             EnsureIdsExist<Role>(entity.ContactRoleIds, "通讯录角色");
         }
 
-        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Entities.CorpEntityBase
+        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Mongo.Entities.CorpEntityBase
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             if (idList.Count == 0)

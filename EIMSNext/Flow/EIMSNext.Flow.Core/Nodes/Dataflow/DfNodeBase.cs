@@ -1,9 +1,13 @@
 using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Flow.Core.Nodes.Dataflow;
 using EIMSNext.Scripting;
@@ -264,6 +268,7 @@ namespace EIMSNext.Flow.Core.Nodes
         #region Filter
         protected void BuildDynamicFilter(DynamicFilter filter, Dictionary<string, object> data)
         {
+            filter.Value = DynamicValueNormalizer.Normalize(filter.Value);
             if (filter.ValueIsExp)
             {
                 filter.Value = EvalFilterValue(filter.ValueIsField, filter.Value!.ToString()!, data);
@@ -649,6 +654,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var valueExp = $"data.n_{valueField.Field.NodeId}[{mIndex}].{valueField.Field.Field}";
             subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
         }
+
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>

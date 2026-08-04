@@ -43,17 +43,23 @@ namespace EIMSNext.ApiService
             var sourceFormIds = bindings.Select(x => x.SourceFormId).Distinct().ToList();
             var sourceAppIds = bindings.Select(x => x.SourceAppId).Distinct().ToList();
 
+            var accessibleSourceFormIds = sourceAppIds
+                .SelectMany(sourceAppId => WorkbenchTargetResolver.GetAccessibleFormIds(Resolver, IdentityContext, sourceAppId))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
             var apps = Resolver.Resolve<IAppDefService>().All()
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && sourceAppIds.Contains(x.Id))
                 .ToDictionary(x => x.Id);
+            var activeSourceAppIds = apps.Keys.ToList();
 
             var externalForms = CoreService.All()
                 .Where(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    sourceFormIds.Contains(x.Id))
+                    sourceFormIds.Contains(x.Id) &&
+                    activeSourceAppIds.Contains(x.AppId) &&
+                    accessibleSourceFormIds.Contains(x.Id))
                 .ToList()
-                .Where(x => apps.ContainsKey(x.AppId))
                 .Select(x => BuildView(x, external: true))
                 .OrderBy(x => x.AppId)
                 .ThenBy(x => x.Name)
@@ -67,6 +73,8 @@ namespace EIMSNext.ApiService
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            ValidateFieldIds(entity.Content.Items);
+            PopulatePublicRelatedForms(entity);
             return base.AddAsync(entity);
         }
 
@@ -76,9 +84,32 @@ namespace EIMSNext.ApiService
             var existing = CoreService.Get(entity.Id);
             PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
+            ValidateFieldIds(entity.Content.Items);
+            PopulatePublicRelatedForms(entity);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 
             return base.ReplaceAsync(entity);
+        }
+
+        public async Task PurgeFieldChangeLogsAsync(string formId, IEnumerable<string>? fieldIds, bool clearAll)
+        {
+            var ids = fieldIds?
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? [];
+            if (clearAll == (ids.Count > 0))
+            {
+                throw new BadRequestException("彻底删除字段参数无效");
+            }
+
+            var form = CoreService.Get(formId);
+            if (form == null || form.DeleteFlag || form.CorpId != IdentityContext.CurrentCorpId)
+            {
+                throw new BadRequestException("表单不存在");
+            }
+
+            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(form.AppId);
+            await CoreService.PurgeFieldChangeLogsAsync(formId, ids, clearAll);
         }
 
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
@@ -100,6 +131,45 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private static void ValidateFieldIds(IEnumerable<FieldDef>? fields)
+        {
+            if (fields == null)
+            {
+                return;
+            }
+
+            foreach (var field in fields)
+            {
+                if (string.IsNullOrWhiteSpace(field.Field))
+                {
+                    throw new BadRequestException("字段 ID 不能为空");
+                }
+
+                ValidateFieldIds(field.Columns);
+            }
+        }
+
+        private void PopulatePublicRelatedForms(FormDef entity)
+        {
+            var relatedFormIds = FormRelatedSourceResolver.ResolveFormIds(entity.Content.Layout).ToList();
+            if (relatedFormIds.Count == 0)
+            {
+                entity.PublicRelatedFormIds = [];
+                return;
+            }
+
+            var accessibleFormIds = GetFormsIncludeCross(entity.AppId)
+                .Select(x => x.Id)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            var inaccessible = relatedFormIds.Where(x => !accessibleFormIds.Contains(x)).ToList();
+            if (inaccessible.Count > 0)
+            {
+                throw new BadRequestException($"关联数据源表单不可访问: {string.Join(',', inaccessible)}");
+            }
+
+            entity.PublicRelatedFormIds = relatedFormIds;
         }
 
         private static FormDefViewModel BuildView(FormDef form, bool external)

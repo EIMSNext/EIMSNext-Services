@@ -1,5 +1,5 @@
-using EIMSNext.Core.Entities;
-using EIMSNext.Plugin.Contracts;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Service.Entities
 {
@@ -78,55 +78,5 @@ namespace EIMSNext.Service.Entities
         /// <summary>模板示例 URL（用于快速试用）。</summary>
         public string TemplateUrl { get; set; } = string.Empty;
 
-        /// <summary>可选的定价方案（多个价格档位）。</summary>
-        public List<PluginPricingPlan> PricingPlans { get; set; } = [];
-
-        /// <summary>插件对外暴露的函数清单（含输入/输出字段定义）。</summary>
-        public List<PluginFunctionSnapshot> Functions { get; set; } = [];
-    }
-
-    /// <summary>
-    /// 插件的一个定价档位。
-    /// </summary>
-    public class PluginPricingPlan
-    {
-        /// <summary>方案唯一 ID（同插件内唯一）。</summary>
-        public string Id { get; set; } = string.Empty;
-
-        /// <summary>方案名称（"免费试用"/"月付" 等）。</summary>
-        public string Name { get; set; } = string.Empty;
-
-        /// <summary>价格（人民币元）。</summary>
-        public decimal Price { get; set; }
-
-        /// <summary>授权时长（天）。</summary>
-        public int DurationDays { get; set; }
-
-        /// <summary>时长单位（"天"/"月"/"年"，仅展示用）。</summary>
-        public string Unit { get; set; } = string.Empty;
-
-        /// <summary>是否为试用档位（试用到期后不自动续费）。</summary>
-        public bool IsTrial { get; set; }
-    }
-
-    /// <summary>
-    /// 插件函数快照：描述一个可被工作流/Dataflow 调用的函数及其输入/输出字段定义。
-    /// </summary>
-    public class PluginFunctionSnapshot
-    {
-        /// <summary>函数唯一 ID（插件内唯一）。</summary>
-        public string Id { get; set; } = string.Empty;
-
-        /// <summary>函数名称。</summary>
-        public string Name { get; set; } = string.Empty;
-
-        /// <summary>函数功能描述（Markdown）。</summary>
-        public string Description { get; set; } = string.Empty;
-
-        /// <summary>函数入参字段定义列表。</summary>
-        public List<PluginFieldDesc> InputFields { get; set; } = [];
-
-        /// <summary>函数结果字段定义列表。</summary>
-        public List<PluginResultFieldDesc> ResultFields { get; set; } = [];
     }
 }

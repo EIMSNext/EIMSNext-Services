@@ -2,6 +2,7 @@ using EIMSNext.Auth.AccountSecurity;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -13,15 +14,21 @@ namespace EIMSNext.Auth.Host.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly IUserService _userService;
         private readonly IAccountSecurityService _accountSecurityService;
         private readonly ILogoutTokenStore _logoutTokenStore;
+        private readonly ILogger<AuthController> _logger;
+        private readonly VerificationCodeRateLimiter _verificationCodeRateLimiter;
 
-        public AuthController(IUserService userService, IAccountSecurityService accountSecurityService, ILogoutTokenStore logoutTokenStore)
+        public AuthController(
+            IAccountSecurityService accountSecurityService,
+            ILogoutTokenStore logoutTokenStore,
+            ILogger<AuthController> logger,
+            VerificationCodeRateLimiter verificationCodeRateLimiter)
         {
-            _userService = userService;
             _accountSecurityService = accountSecurityService;
             _logoutTokenStore = logoutTokenStore;
+            _logger = logger;
+            _verificationCodeRateLimiter = verificationCodeRateLimiter;
         }
 
         /// <summary>
@@ -33,13 +40,17 @@ namespace EIMSNext.Auth.Host.Controllers
         {
             try
             {
-                await _accountSecurityService.SendRegCodeAsync(request);
-                return Ok(new { success = true });
+                if (request != null && (await IsCodeSendAllowedAsync("register", request.Target)).Allowed)
+                {
+                    await _accountSecurityService.SendRegCodeAsync(request);
+                }
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                _logger.LogWarning(ex, "Registration verification code request rejected");
             }
+
+            return Ok();
         }
 
         /// <summary>
@@ -86,13 +97,17 @@ namespace EIMSNext.Auth.Host.Controllers
         {
             try
             {
-                await _accountSecurityService.SendPinCodeAsync(GetCurrentUserId(), request);
-                return Ok(new { success = true });
+                if (request != null && (await IsCodeSendAllowedAsync(request.Usage, request.Target)).Allowed)
+                {
+                    await _accountSecurityService.SendPinCodeAsync(GetCurrentUserId(), request);
+                }
             }
-            catch (InvalidOperationException ex)
+            catch (Exception ex)
             {
-                return BadRequest(new { message = ex.Message });
+                _logger.LogWarning(ex, "PIN verification code request rejected");
             }
+
+            return Ok();
         }
 
         [Authorize]
@@ -112,17 +127,59 @@ namespace EIMSNext.Auth.Host.Controllers
 
         [Authorize]
         [Route("auth/changePassword"), HttpPost]
-        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request)
+        public async Task<IActionResult> ChangePassword([FromBody] ChangePasswordRequest request, CancellationToken cancellationToken)
         {
             try
             {
                 await _accountSecurityService.ChangePasswordAsync(GetCurrentUserId(), request);
+                await InvalidateCurrentTokenAsync(cancellationToken);
                 return Ok(new { success = true });
             }
             catch (InvalidOperationException ex)
             {
                 return BadRequest(new { message = ex.Message });
             }
+        }
+
+        [Route("auth/sendLoginCode"), HttpPost]
+        public async Task<IActionResult> SendLoginCode([FromBody] SendRegCodeRequest request)
+        {
+            try
+            {
+                if (request != null && (await IsCodeSendAllowedAsync("login", request.Target)).Allowed)
+                {
+                    await _accountSecurityService.SendLoginCodeAsync(request);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Login verification code request rejected");
+            }
+
+            return Ok();
+        }
+
+        private Task<VerificationCodeRateLimitResult> IsCodeSendAllowedAsync(string? purpose, string? target)
+        {
+            var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+            return _verificationCodeRateLimiter.CheckAsync(purpose ?? string.Empty, target ?? string.Empty, ip);
+        }
+
+        private async Task InvalidateCurrentTokenAsync(CancellationToken cancellationToken)
+        {
+            var token = LogoutTokenHelper.ReadBearerToken(Request);
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                return;
+            }
+
+            var expiresAt = LogoutTokenHelper.ReadExpirationUtc(token);
+            if (expiresAt is null || expiresAt <= DateTimeOffset.UtcNow)
+            {
+                return;
+            }
+
+            await _logoutTokenStore.MarkLoggedOutAsync(token, expiresAt.Value, cancellationToken);
         }
 
         [Authorize]
@@ -195,5 +252,7 @@ namespace EIMSNext.Auth.Host.Controllers
 
             return userId;
         }
+
     }
+
 }

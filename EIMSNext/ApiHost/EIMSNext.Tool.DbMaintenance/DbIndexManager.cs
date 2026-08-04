@@ -1,5 +1,6 @@
 using EIMSNext.Auth.Entities;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Entities;
 
 using MongoDB.Driver;
@@ -22,6 +23,7 @@ namespace EIMSNext.Auth.DbMaintenance
             var background = new CreateIndexOptions { Background = true };
 
             CreateAuthIndexes(background);
+            CreateCorporateSettingIndexes(background);
             CreateOrganizationIndexes(background);
             CreatePluginStoreIndexes(background);
             CreateDefinitionIndexes(background);
@@ -118,6 +120,24 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<PluginInstall>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.Enabled),
                 options,
                 "ix_plugininstall_corp_enabled");
+
+            CreateIndex(GetCollection<ECoinPrice>(),
+                Builders<ECoinPrice>.IndexKeys.Ascending(x => x.TargetType).Ascending(x => x.FeatureId),
+                CreateUniqueOptions(options),
+                "ix_ecoinprice_target_feature_unique");
+        }
+
+        private void CreateCorporateSettingIndexes(CreateIndexOptions options)
+        {
+            var indexOptions = CreateUniqueOptions(options);
+            CreateIndex(
+                GetCollection<CorporateSetting>(),
+                Builders<CorporateSetting>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.Name)
+                    .Ascending(x => x.DeleteFlag),
+                indexOptions,
+                "ix_corporatesetting_corp_name_unique");
         }
 
         private void CreateDefinitionIndexes(CreateIndexOptions options)
@@ -327,52 +347,52 @@ namespace EIMSNext.Auth.DbMaintenance
 
         private void CreateWorkflowRuntimeIndexes(CreateIndexOptions options)
         {
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.NextExecution),
                 options,
                 "ix_workflowinstance_status_nextexecution");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Reference).Ascending(x => x.Status).Descending(x => x.CreateTime),
                 options,
                 "ix_workflowinstance_reference_status_createtime");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.WorkflowDefinitionId).Ascending(x => x.Status),
                 options,
                 "ix_workflowinstance_definition_status");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CompleteTime),
                 options,
                 "ix_workflowinstance_status_completetime");
 
-            CreateIndex(GetCollection<EventSubscription>("Wf_Subscription"),
+            CreateIndex(_dbContext.WorkflowEventSubscriptions,
                 Builders<EventSubscription>.IndexKeys.Ascending(x => x.EventName).Ascending(x => x.EventKey).Ascending(x => x.SubscribeAsOf).Ascending(x => x.ExternalToken),
                 options,
                 "ix_subscription_event_lookup");
 
-            CreateIndex(GetCollection<EventSubscription>("Wf_Subscription"),
+            CreateIndex(_dbContext.WorkflowEventSubscriptions,
                 Builders<EventSubscription>.IndexKeys.Ascending(x => x.WorkflowId),
                 options,
                 "ix_subscription_workflowid");
 
-            CreateIndex(GetCollection<Event>("Wf_Event"),
+            CreateIndex(_dbContext.WorkflowEvents,
                 Builders<Event>.IndexKeys.Ascending(x => x.IsProcessed).Ascending(x => x.EventTime),
                 options,
                 "ix_event_processed_time");
 
-            CreateIndex(GetCollection<Event>("Wf_Event"),
+            CreateIndex(_dbContext.WorkflowEvents,
                 Builders<Event>.IndexKeys.Ascending(x => x.EventName).Ascending(x => x.EventKey).Ascending(x => x.EventTime),
                 options,
                 "ix_event_name_key_time");
 
-            CreateIndex(GetCollection<ScheduledCommand>("Wf_ScheduledCommand"),
+            CreateIndex(_dbContext.WorkflowScheduledCommands,
                 Builders<ScheduledCommand>.IndexKeys.Ascending(x => x.CommandName).Ascending(x => x.Data),
                 CreateUniqueOptions(options),
                 "ix_scheduledcommand_name_data_unique");
 
-            CreateIndex(GetCollection<ScheduledCommand>("Wf_ScheduledCommand"),
+            CreateIndex(_dbContext.WorkflowScheduledCommands,
                 Builders<ScheduledCommand>.IndexKeys.Ascending(x => x.ExecuteTime),
                 options,
                 "ix_scheduledcommand_executetime");
@@ -503,12 +523,12 @@ namespace EIMSNext.Auth.DbMaintenance
 
         private IMongoCollection<T> GetCollection<T>()
         {
-            return _dbContext.Database.GetCollection<T>(typeof(T).Name);
+            return _dbContext.GetCollection<T>();
         }
 
         private IMongoCollection<T> GetCollection<T>(string name)
         {
-            return _dbContext.Database.GetCollection<T>(name);
+            return _dbContext.GetCollection<T>(name);
         }
 
         private static CreateIndexOptions CreateUniqueOptions(CreateIndexOptions source)

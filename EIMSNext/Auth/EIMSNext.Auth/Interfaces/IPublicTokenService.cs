@@ -5,6 +5,6 @@ namespace EIMSNext.Auth.Interfaces
 {
     public interface IPublicTokenService
     {
-        PublicTokenSubject? Validate(string? username, string? password, PublicScope scope);
+        PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope);
     }
 }

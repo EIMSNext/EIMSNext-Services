@@ -51,11 +51,13 @@ namespace EIMSNext.Auth.Services
                 }
             }
 
-            var subject = _publicTokenService.Validate(request.Username, request.Password, publicScope);
-            if (subject == null)
+            var validation = _publicTokenService.Validate(request.Username, request.Password, publicScope);
+            if (!validation.Succeeded)
             {
-                return TokenRequestResult.Failure(OpenIddictConstants.Errors.InvalidGrant, "公开访问凭证无效");
+                return TokenRequestResult.Failure(validation.Error!, validation.ErrorDescription!);
             }
+
+            var subject = validation.Subject!;
 
             var authenticationTime = DateTimeOffset.UtcNow;
             var claims = new List<Claim>
@@ -66,7 +68,7 @@ namespace EIMSNext.Auth.Services
                 new(AuthClaimTypes.Corp, subject.CorpId),
                 new(AuthClaimTypes.IdentityType, "Public"),
                 new(AuthClaimTypes.PublicTargetId, subject.TargetId),
-                new(AuthClaimTypes.PublicScope, ((int)publicScope).ToString(), ClaimValueTypes.Integer32),
+                new(AuthClaimTypes.PublicScope, publicScope.ToString().ToLowerInvariant()),
                 new(AuthClaimTypes.AuthTime, authenticationTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64)
             };
 
@@ -78,15 +80,17 @@ namespace EIMSNext.Auth.Services
             var raw = request.GetParameter("scope")?.ToString();
             if (string.IsNullOrWhiteSpace(raw)) return PublicScope.None;
 
-            var flags = PublicScope.None;
-            foreach (var token in raw.Split(new[] { ' ', ',' }, StringSplitOptions.RemoveEmptyEntries))
-            {
-                if (Enum.TryParse<PublicScope>(token, ignoreCase: true, out var parsed))
-                {
-                    flags |= parsed;
-                }
-            }
-            return flags;
+            return Enum.TryParse<PublicScope>(raw, ignoreCase: true, out var parsed)
+                && parsed is not PublicScope.None
+                && IsSingleScope(parsed)
+                ? parsed
+                : PublicScope.None;
+        }
+
+        private static bool IsSingleScope(PublicScope scope)
+        {
+            var value = (int)scope;
+            return value > 0 && (value & (value - 1)) == 0;
         }
     }
 }

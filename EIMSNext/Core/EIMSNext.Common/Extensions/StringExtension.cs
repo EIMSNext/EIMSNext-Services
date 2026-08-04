@@ -74,11 +74,5 @@ namespace EIMSNext.Common.Extensions
         {
             return enumType.IsEnum && enumType.IsDefined(typeof(FlagsAttribute), false);
         }
-
-        public static T DeepClone<T>(this T src) where T : class
-        {
-            var json = JsonSerializer.Serialize(src);
-            return JsonSerializer.Deserialize<T>(json)!;
-        }
     }
 }

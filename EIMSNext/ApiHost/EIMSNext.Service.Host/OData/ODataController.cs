@@ -1,16 +1,10 @@
-using System.Buffers;
-using System.IO.Pipelines;
-using System.Reflection;
-using System.Text;
-
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 
@@ -23,8 +17,15 @@ using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.OData.UriParser;
 
 using MongoDB.AspNetCore.OData;
+
+using System.Buffers;
+using System.IO.Pipelines;
+using System.Reflection;
+using System.Text;
+using System.Text.Json;
 
 namespace EIMSNext.Service.Host.OData
 {
@@ -102,6 +103,11 @@ namespace EIMSNext.Service.Host.OData
         [MongoEnableQuery]
         public virtual IActionResult Get(ODataQueryOptions<V> options)
         {
+            if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
+            {
+                return BadRequest("过滤条件不允许使用常量谓词");
+            }
+
             var query = ApiService.All();
 
             query = FilterResult(query, options);
@@ -153,11 +159,57 @@ namespace EIMSNext.Service.Host.OData
         [MongoEnableQuery]
         public virtual SingleResult Get([FromODataUri] string key, ODataQueryOptions<V> options)
         {
+            if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
+            {
+                return SingleResult.Create(Enumerable.Empty<V>().AsQueryable());
+            }
+
             var query = ApiService.Query(x => x.Id == key);
 
+            query = FilterResult(query, options);
             query = Expand(query, options);
 
             return SingleResult.Create(query);
+        }
+
+        private static bool ContainsConstantPredicate(QueryNode? node)
+        {
+            if (node is not BinaryOperatorNode binary)
+            {
+                return node switch
+                {
+                    ConvertNode convert => ContainsConstantPredicate(convert.Source),
+                    UnaryOperatorNode unary => ContainsConstantPredicate(unary.Operand),
+                    _ => false,
+                };
+            }
+
+            var isComparison = binary.OperatorKind is
+                BinaryOperatorKind.Equal or
+                BinaryOperatorKind.NotEqual or
+                BinaryOperatorKind.GreaterThan or
+                BinaryOperatorKind.GreaterThanOrEqual or
+                BinaryOperatorKind.LessThan or
+                BinaryOperatorKind.LessThanOrEqual;
+
+            if (isComparison && IsConstantExpression(binary.Left) && IsConstantExpression(binary.Right))
+            {
+                return true;
+            }
+
+            return ContainsConstantPredicate(binary.Left) || ContainsConstantPredicate(binary.Right);
+        }
+
+        private static bool IsConstantExpression(QueryNode node)
+        {
+            return node switch
+            {
+                ConstantNode => true,
+                ConvertNode convert => IsConstantExpression(convert.Source),
+                UnaryOperatorNode unary => IsConstantExpression(unary.Operand),
+                BinaryOperatorNode binary => IsConstantExpression(binary.Left) && IsConstantExpression(binary.Right),
+                _ => false,
+            };
         }
 
         /// <summary>

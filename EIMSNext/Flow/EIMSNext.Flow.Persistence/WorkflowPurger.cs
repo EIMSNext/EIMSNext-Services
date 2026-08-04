@@ -7,13 +7,13 @@ namespace EIMSNext.Flow.Persistence
 {
     public class WorkflowPurger : IWorkflowInstancePurger
     {
-        private readonly IMongoDatabase _database;
+        private readonly IWfDbContext _dbContext;
 
-        private IMongoCollection<WorkflowInstance> WorkflowInstances => _database.GetCollection<WorkflowInstance>(MongoPersistenceProvider.WorkflowCollectionName);
+        private IMongoCollection<WorkflowInstance> WorkflowInstances => _dbContext.WorkflowInstances;
 
-        public WorkflowPurger(IMongoDatabase database)
+        public WorkflowPurger(IWfDbContext dbContext)
         {
-            _database = database;
+            _dbContext = dbContext;
         }
 
         public async Task PurgeWorkflows(WorkflowStatus status, DateTime olderThan, CancellationToken cancellationToken = default)
@@ -37,7 +37,7 @@ namespace EIMSNext.Flow.Persistence
 
             var workflowFilter = BuildWorkflowFilter(references, requestedIds);
 
-            using var session = await _database.Client.StartSessionAsync(cancellationToken: cancellationToken);
+            using var session = await _dbContext.StartSessionAsync(cancellationToken);
             session.StartTransaction();
             try
             {
@@ -54,7 +54,7 @@ namespace EIMSNext.Flow.Persistence
                 await WorkflowInstances.DeleteManyAsync(session, workflowFilter, cancellationToken: cancellationToken);
                 if (resolvedIds.Count > 0)
                 {
-                    var subscriptionCollection = _database.GetCollection<EventSubscription>("Wf_Subscription");
+                    var subscriptionCollection = _dbContext.EventSubscriptions;
                     await subscriptionCollection.DeleteManyAsync(
                         session,
                         Builders<EventSubscription>.Filter.In(x => x.WorkflowId, resolvedIds),

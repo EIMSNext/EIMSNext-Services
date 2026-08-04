@@ -9,9 +9,13 @@ using EIMSNext.Auth.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -329,6 +333,7 @@ namespace EIMSNext.Service.Tests
         {
             public override FormDef? Get(string id) => id == formDef.Id ? formDef : null;
             public override IQueryable<FormDef> All() => new[] { formDef }.AsQueryable();
+            public Task PurgeFieldChangeLogsAsync(string formId, IReadOnlyCollection<string> fieldIds, bool clearAll) => throw new NotSupportedException();
         }
 
         private sealed class FakeFormDataChangeLogService : FakeEntityService<FormDataChangeLog>, IFormDataChangeLogService

@@ -1,4 +1,4 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Auth.Entities
 {

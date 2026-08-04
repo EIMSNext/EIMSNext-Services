@@ -10,6 +10,8 @@ using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
+using System.Text.Json;
+
 namespace EIMSNext.Service.Host.Controllers
 {
     /// <summary>

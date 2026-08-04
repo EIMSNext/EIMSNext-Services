@@ -1,5 +1,6 @@
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Core.Tests
 {
@@ -8,7 +9,6 @@ namespace EIMSNext.Core.Tests
         public FormData()
         {
             CreateTime = DateTime.UtcNow.ToTimeStampMs();
-            UpdateTime = CreateTime;
         }
 
         public FormData(
@@ -16,7 +16,6 @@ namespace EIMSNext.Core.Tests
             : base(jsonData)
         {
             CreateTime = DateTime.UtcNow.ToTimeStampMs();
-            UpdateTime = CreateTime;
         }
 
         public string AppId { get; set; } = "";

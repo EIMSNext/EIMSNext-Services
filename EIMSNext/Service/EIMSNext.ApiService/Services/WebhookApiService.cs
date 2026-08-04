@@ -1,5 +1,11 @@
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
@@ -64,6 +70,11 @@ namespace EIMSNext.ApiService
         {
             Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
 
+            if (!IsAllowedWebhookUrl(entity.Url))
+            {
+                throw new BadRequestException("推送地址必须是有效的 HTTP 或 HTTPS 地址");
+            }
+
             if (string.IsNullOrWhiteSpace(entity.FormId))
             {
                 throw new BadRequestException("推送表单不能为空");
@@ -74,6 +85,13 @@ namespace EIMSNext.ApiService
             {
                 throw new BadRequestException("推送表单不存在");
             }
+        }
+
+        private static bool IsAllowedWebhookUrl(string? value)
+        {
+            return Uri.TryCreate(value, UriKind.Absolute, out var uri)
+                && !string.IsNullOrWhiteSpace(uri.Host)
+                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
         }
     }
 }

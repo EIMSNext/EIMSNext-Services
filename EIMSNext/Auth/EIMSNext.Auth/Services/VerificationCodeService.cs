@@ -1,27 +1,34 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
+using EIMSNext.Auth.AccountSecurity;
 
 namespace EIMSNext.Auth.Services
 {
     public class VerificationCodeService : IVerificationCodeService
     {
         private readonly IUserService _userService;
-        public VerificationCodeService(IUserService userService)
+        private readonly IVerificationCodeProvider _verificationCodeProvider;
+
+        public VerificationCodeService(
+            IUserService userService,
+            IVerificationCodeProvider? verificationCodeProvider = null)
         {
             _userService = userService;
+            _verificationCodeProvider = verificationCodeProvider ?? new MockVerificationCodeProvider();
         }
+
         public User? Validate(string? username, string? verifycode)
         {
-            if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(verifycode) || !VerifyCode(username, verifycode))
+            if (string.IsNullOrWhiteSpace(username) || string.IsNullOrWhiteSpace(verifycode))
             {
                 return null;
             }
 
-            return _userService.FindByEmailOrPhone(username);
-        }
-        private bool VerifyCode(string username, string? verifycode)
-        {
-            return true;
+            var user = _userService.FindByEmailOrPhone(username.Trim());
+            return user != null &&
+                   _verificationCodeProvider.TryConsume(VerificationCodePurpose.Login, username, verifycode)
+                ? user
+                : null;
         }
     }
 }

@@ -4,13 +4,15 @@ using System.Text.Json;
 
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Common;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.MongoDb;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 
@@ -83,6 +85,35 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void DeleteCore_ActiveWorkflowData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            var approving = NewFormData("approving-data", FlowStatus.Approving);
+            var suspended = NewFormData("suspended-data", FlowStatus.Suspended);
+
+            var approvingError = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeDeleteCore([approving]));
+            var suspendedError = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeDeleteCore([suspended]));
+
+            StringAssert.Contains(approvingError.Message, "不允许删除");
+            StringAssert.Contains(suspendedError.Message, "不允许删除");
+            Assert.AreEqual(0, service.LogicDeletedIds.Count);
+            Assert.AreEqual(0, service.HardDeletedIds.Count);
+        }
+
+        [TestMethod]
+        public async Task DeleteCoreAsync_ActiveWorkflowData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            var approving = NewFormData("approving-data-async", FlowStatus.Approving);
+
+            var error = await Assert.ThrowsExactlyAsync<BadRequestException>(() => service.InvokeDeleteCoreAsync([approving]));
+
+            StringAssert.Contains(error.Message, "不允许删除");
+            Assert.AreEqual(0, service.LogicDeletedIds.Count);
+            Assert.AreEqual(0, service.HardDeletedIds.Count);
+        }
+
+        [TestMethod]
         public async Task PurgeCore_DeletedTargets_HardDeletesDataAndStrongRelations()
         {
             var service = TestableFormDataService.Create();
@@ -110,6 +141,26 @@ namespace EIMSNext.Service.Tests
             Assert.IsFalse(service.HardDeletedIds.Contains("other-data"));
             Assert.IsFalse(service.RelatedDeletedIds.Contains("other-data"));
             Assert.IsFalse(service.WorkflowDeletedDataIds.Contains("other-data"));
+        }
+
+        [TestMethod]
+        public void EnsureCanEdit_WorkflowActiveOrTerminalData_IsRejected()
+        {
+            var service = TestableFormDataService.Create();
+            foreach (var status in new[] { FlowStatus.Approving, FlowStatus.Approved, FlowStatus.Suspended, FlowStatus.Discarded })
+            {
+                var error = Assert.ThrowsExactly<BadRequestException>(() => service.InvokeEnsureCanEdit(NewFormData($"workflow-{status}", status), usingWorkflow: true));
+                StringAssert.Contains(error.Message, "不允许修改");
+            }
+        }
+
+        [TestMethod]
+        public void EnsureCanEdit_DraftRejectedAndNonWorkflowApprovedData_AreAllowed()
+        {
+            var service = TestableFormDataService.Create();
+            service.InvokeEnsureCanEdit(NewFormData("workflow-draft", FlowStatus.Draft), usingWorkflow: true);
+            service.InvokeEnsureCanEdit(NewFormData("workflow-rejected", FlowStatus.Rejected), usingWorkflow: true);
+            service.InvokeEnsureCanEdit(NewFormData("plain-approved", FlowStatus.Approved), usingWorkflow: false);
         }
 
         private static AuditLog AssertHasSinglePhysicalDeleteLog(TestableFormDataService service, string dataId)
@@ -176,11 +227,22 @@ namespace EIMSNext.Service.Tests
                 return new TestableFormDataService(new RecordingRepository<AuditLog>());
             }
 
-            public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
-            {
-                _deleteTargets = targets;
-                DeleteCore(Builders<FormData>.Filter.Empty, null);
-            }
+        public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
+        {
+            _deleteTargets = targets;
+            DeleteCore(Builders<FormData>.Filter.Empty, null);
+        }
+
+        public Task<object> InvokeDeleteCoreAsync(IReadOnlyList<FormData> targets)
+        {
+            _deleteTargets = targets;
+            return DeleteCoreAsync(Builders<FormData>.Filter.Empty, null);
+        }
+
+        public void InvokeEnsureCanEdit(FormData entity, bool usingWorkflow)
+        {
+            EnsureCanEdit(entity, new FormDef { UsingWorkflow = usingWorkflow });
+        }
 
             public Task InvokePurgeCoreAsync(IEnumerable<string> requestedIds, IReadOnlyList<FormData> targets)
             {

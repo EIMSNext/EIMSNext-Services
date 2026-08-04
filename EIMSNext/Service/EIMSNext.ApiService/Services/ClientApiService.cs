@@ -2,7 +2,13 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -173,7 +179,7 @@ namespace EIMSNext.ApiService
 
         private void CachePlainSecret(string clientId, string plain)
         {
-            CacheClient.Set(
+            CacheClient.SetString(
                 PlainCacheKeyPrefix + clientId,
                 plain,
                 CacheScope.Client,

@@ -12,6 +12,15 @@ namespace EIMSNext.Component
                 .GroupBy(setting => GetSubTableName(setting.Field.Field))
                 .Where(group => !string.IsNullOrWhiteSpace(group.Key)))
             {
+                var hasMultiResultSubField = group.Any(setting =>
+                    setting.ValueField?.SingleResultNode == false
+                    && setting.ValueField.Field.IsSubField);
+                if (hasMultiResultSubField)
+                {
+                    throw new InvalidOperationException(
+                        $"{context} sub table fields cannot map multi-result subfields; map a multi-result main field or a single-result subfield instead.");
+                }
+
                 var sourceKeys = group
                     .Select(setting => GetIterableSourceKey(setting.ValueField))
                     .Where(item => !string.IsNullOrWhiteSpace(item))

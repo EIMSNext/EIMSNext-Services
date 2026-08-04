@@ -6,10 +6,14 @@ using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -25,10 +29,12 @@ namespace EIMSNext.Service
     {
         private FlowApiClient _flowClient;
         private ISerialNoSequenceService? _serialNoSvc;
+        private readonly AttachmentReferenceService _attachmentReferenceService;
         public FormDataService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
             _serialNoSvc = resolver.Resolve<ISerialNoSequenceService>();
+            _attachmentReferenceService = new AttachmentReferenceService(resolver);
         }
 
         protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update)
@@ -132,8 +138,14 @@ namespace EIMSNext.Service
         protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;
+            EnsureAddScope(entities, formDef);
+            foreach (var entity in entities)
+            {
+                _attachmentReferenceService.Apply(entity, null, session);
+            }
             if (Context.Action == DataAction.Submit)
             {
+                ValidateRequiredFields(entities.First(), formDef);
                 entities.ForEach(entity => ResolveSerialNumbers(entity, formDef, null));
             }
             if (!formDef.UsingWorkflow)
@@ -142,6 +154,32 @@ namespace EIMSNext.Service
                 entities.ForEach(entity => { entity.FlowStatus = FlowStatus.Approved; });
             }
             return base.BeforeAdd(entities, session);
+        }
+
+        private void EnsureAddScope(IEnumerable<FormData> entities, FormDef formDef)
+        {
+            if (formDef == null)
+            {
+                throw new BadRequestException("表单不存在");
+            }
+
+            if (!string.IsNullOrWhiteSpace(Context.CorpId) &&
+                !string.Equals(Context.CorpId, formDef.CorpId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ForbiddenException("不能向其他企业的表单新增数据");
+            }
+
+            foreach (var entity in entities)
+            {
+                if (!string.Equals(entity.FormId, formDef.Id, StringComparison.OrdinalIgnoreCase) ||
+                    !string.Equals(entity.AppId, formDef.AppId, StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new BadRequestException("请求新增数据的应用或表单不一致");
+                }
+
+                // FormDataRequest does not carry CorpId. Use the owning form as the authoritative source.
+                entity.CorpId = formDef.CorpId;
+            }
         }
 
         public override async Task AddAsync(IEnumerable<FormData> entities)
@@ -212,6 +250,7 @@ namespace EIMSNext.Service
             BeforeDelete(filter, session).Wait();
 
             var targets = FindDeleteTargets(filter, session);
+            EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
                 .Select(x => x.Id)
@@ -223,6 +262,8 @@ namespace EIMSNext.Service
                 .Where(x => !string.IsNullOrWhiteSpace(x) && !physicalIdSet.Contains(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
 
             var logicDeleted = DeleteFormDataByIds(logicIds, physical: false, session);
             if (logicIds.Count > 0)
@@ -247,6 +288,7 @@ namespace EIMSNext.Service
             await BeforeDelete(filter, session);
 
             var targets = await FindDeleteTargetsAsync(filter, session);
+            EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
                 .Select(x => x.Id)
@@ -258,6 +300,8 @@ namespace EIMSNext.Service
                 .Where(x => !string.IsNullOrWhiteSpace(x) && !physicalIdSet.Contains(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
+
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
 
             var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false, session);
             if (logicIds.Count > 0)
@@ -275,6 +319,14 @@ namespace EIMSNext.Service
             await AfterDelete(filter, session);
 
             return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+        }
+
+        private static void EnsureCanDeleteTargets(IEnumerable<FormData> targets)
+        {
+            if (targets.Any(x => !x.DeleteFlag && (x.FlowStatus == FlowStatus.Approving || x.FlowStatus == FlowStatus.Suspended)))
+            {
+                throw new BadRequestException("审批中的数据不允许删除");
+            }
         }
 
         public override Task<object> DeleteAsync(string id)
@@ -362,6 +414,8 @@ namespace EIMSNext.Service
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
             if (dataIds.Count == 0) return;
+
+            _attachmentReferenceService.Release(targets, session);
 
             await DeleteStronglyRelatedDataAsync(dataIds, session);
             await DeleteFormDataByIdsAsync(dataIds, physical: true, session);
@@ -525,21 +579,37 @@ namespace EIMSNext.Service
 
         protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)
         {
+            var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old) ?? GetFromStore<FormData>(entity.Id, DataVersion.Old);
+            var formDef = GetFromStore<FormDef>(entity.FormId)!;
+            EnsureCanEdit(entity, formDef);
+            _attachmentReferenceService.Apply(entity, old, session);
             if (Context.Action == DataAction.Submit)
             {
-                var formDef = GetFromStore<FormDef>(entity.FormId)!;
-                var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
+                ValidateRequiredFields(entity, formDef);
                 ResolveSerialNumbers(entity, formDef, old);
             }
 
             return base.BeforeReplace(entity, session);
         }
 
+        protected static void EnsureCanEdit(FormData entity, FormDef formDef)
+        {
+            if (!formDef.UsingWorkflow)
+            {
+                return;
+            }
+
+            if (entity.FlowStatus is FlowStatus.Approving or FlowStatus.Approved or FlowStatus.Suspended or FlowStatus.Discarded)
+            {
+                throw new BadRequestException("审批中的或已完成的流程数据不允许修改");
+            }
+        }
+
         public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, EIMSNext.Service.Entities.CascadeMode cascade, string? eventIds)
         {
             var entity = entities.First();
 
-            if (Context.Action == EIMSNext.Core.Entities.DataAction.Submit)
+            if (Context.Action == EIMSNext.Core.Abstractions.DataAction.Submit)
             {
                 var formDef = GetFromStore<FormDef>(entity.FormId)!;
 
@@ -653,6 +723,73 @@ namespace EIMSNext.Service
             });
 
             doc.Dispose();
+        }
+
+        private static void ValidateRequiredFields(FormData entity, FormDef formDef)
+        {
+            if (formDef.Content?.Items == null || formDef.Content.Items.Count == 0)
+            {
+                return;
+            }
+
+            using var document = JsonDocument.Parse(entity.Data.SerializeToJson());
+            foreach (var field in formDef.Content.Items)
+            {
+                ValidateField(field, document.RootElement, field.Field);
+            }
+
+            static void ValidateField(FieldDef field, JsonElement parent, string path)
+            {
+                var value = TryGetProperty(parent, field.Field, out var property)
+                    ? property
+                    : default;
+
+                if ((field.Required || field.Props?.Required == true) && IsEmpty(value))
+                {
+                    throw new BadRequestException($"字段 [{path}] 不能为空");
+                }
+
+                if (field.Columns == null || value.ValueKind != JsonValueKind.Array)
+                {
+                    return;
+                }
+
+                var rowIndex = 0;
+                foreach (var row in value.EnumerateArray())
+                {
+                    foreach (var column in field.Columns)
+                    {
+                        ValidateField(column, row, $"{path}[{rowIndex}].{column.Field}");
+                    }
+
+                    rowIndex++;
+                }
+            }
+
+            static bool TryGetProperty(JsonElement parent, string name, out JsonElement value)
+            {
+                if (parent.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var property in parent.EnumerateObject())
+                    {
+                        if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
+                        {
+                            value = property.Value;
+                            return true;
+                        }
+                    }
+                }
+
+                value = default;
+                return false;
+            }
+
+            static bool IsEmpty(JsonElement value)
+            {
+                return value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
+                    || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
+                    || value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0;
+            }
         }
 
         private void AppendSegment(JsonElement seg, StringBuilder sb, FormData entity, IDictionary<string, object?> dataDict, string serialNoField)
@@ -813,8 +950,8 @@ namespace EIMSNext.Service
 
                 yield return new FilterOptionItem
                 {
-                    Id = id,
-                    Label = label,
+                    Id = id!,
+                    Label = label!,
                     Value = BsonTypeMapper.MapToDotNetValue(value)
                 };
                 yield break;

@@ -1,5 +1,5 @@
 using EIMSNext.Async.Tasks.Consumers;
-using EIMSNext.Async.Tasks.SystemTask;
+using EIMSNext.Async.Tasks.System;
 
 using Microsoft.Extensions.DependencyInjection;
 
@@ -9,7 +9,7 @@ namespace EIMSNext.Async.Tasks
     {
         public static IServiceCollection AddAsyncTaskConsumers(this IServiceCollection services)
         {
-            services.AddSingleton<ISystemTaskTokenProvider, SystemTaskTokenProvider>();
+            services.AddSingleton<ISystemTokenProvider, SystemTokenProvider>();
             services.AddHostedService<NotifyDispatchConsumer>();
             services.AddHostedService<SystemMessageConsumer>();
             services.AddHostedService<EmailConsumer>();

@@ -4,8 +4,13 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Component;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
@@ -29,6 +34,7 @@ namespace EIMSNext.Async.Tasks.Export
             var fields = formDef.Content?.Items?.Where(x => !x.Hidden).ToList() ?? [];
             var filter = request.Filter?.ToFilterDefinition<FormData>() ?? Builders<FormData>.Filter.Empty;
             var fileNamePrefix = SanitizeFileName(formDef.Name);
+            var dataTitleResolver = resolver.Resolve<DataTitleResolver>();
 
             var result = await (exportLog.ActualFormat == ExportFormat.Excel
                 ? ExportExcelByBatchAsync<FormData>(
@@ -38,7 +44,9 @@ namespace EIMSNext.Async.Tasks.Export
                     resolver,
                     ct,
                     1000,
-                    (sheet, styles, exportColumns, rows, rowIndex) => WriteExcelRows(sheet, styles, exportColumns, fields, rows, rowIndex))
+                    (sheet, styles, exportColumns, rows, rowIndex) => WriteExcelRows(
+                        sheet, styles, exportColumns, fields, rows, rowIndex,
+                        data => dataTitleResolver.ResolveDataTitle(data, formDef)))
                 : ExportCsvByBatchAsync<FormData>(
                     $"{fileNamePrefix}-{Guid.NewGuid():N}.csv",
                     columns,
@@ -46,7 +54,9 @@ namespace EIMSNext.Async.Tasks.Export
                     resolver,
                     ct,
                     1000,
-                    (writer, exportColumns, rows) => WriteCsvRows(writer, exportColumns, fields, rows)));
+                    (writer, exportColumns, rows) => WriteCsvRows(
+                        writer, exportColumns, fields, rows,
+                        data => dataTitleResolver.ResolveDataTitle(data, formDef))));
 
             result.FormName = formDef.Name;
             return result;
@@ -74,19 +84,32 @@ namespace EIMSNext.Async.Tasks.Export
             public bool IsPlaceholder { get; init; }
         }
 
-        internal static void WriteCsvRows(HKH.CSV.CSVWriter writer, List<ExportColumn> columns, List<FieldDef> fields, IEnumerable<FormData> rows)
+        internal static void WriteCsvRows(
+            HKH.CSV.CSVWriter writer,
+            List<ExportColumn> columns,
+            List<FieldDef> fields,
+            IEnumerable<FormData> rows,
+            Func<FormData, string>? dataTitleResolver = null)
         {
             var bindings = BuildColumnBindings(columns, fields);
             foreach (var item in rows)
             {
                 foreach (var row in FlattenRows(item, bindings))
                 {
+                    row.Values[Fields.DataTitle] = dataTitleResolver?.Invoke(item) ?? string.Empty;
                     writer.Write(columns.Select(column => ExportFileBuilder.FormatCsvCell(GetCellValue(bindings, column, row))), false);
                 }
             }
         }
 
-        internal static int WriteExcelRows(NPOI.SS.UserModel.ISheet sheet, ExportFileBuilder.ExcelStyles styles, List<ExportColumn> columns, List<FieldDef> fields, IEnumerable<FormData> rows, int startRowIndex)
+        internal static int WriteExcelRows(
+            NPOI.SS.UserModel.ISheet sheet,
+            ExportFileBuilder.ExcelStyles styles,
+            List<ExportColumn> columns,
+            List<FieldDef> fields,
+            IEnumerable<FormData> rows,
+            int startRowIndex,
+            Func<FormData, string>? dataTitleResolver = null)
         {
             var bindings = BuildColumnBindings(columns, fields);
             var rowIndex = startRowIndex;
@@ -102,6 +125,7 @@ namespace EIMSNext.Async.Tasks.Export
                 var start = rowIndex;
                 foreach (var flatRow in flattenedRows)
                 {
+                    flatRow.Values[Fields.DataTitle] = dataTitleResolver?.Invoke(item) ?? string.Empty;
                     var row = sheet.CreateRow(rowIndex++);
                     for (var colIndex = 0; colIndex < columns.Count; colIndex++)
                     {
@@ -330,7 +354,7 @@ namespace EIMSNext.Async.Tasks.Export
 
         private static IEnumerable<object?> EnumerateItems(object value)
         {
-            if (value is System.Collections.IEnumerable enumerable and not string)
+            if (value is global::System.Collections.IEnumerable enumerable and not string)
             {
                 foreach (var item in enumerable)
                 {

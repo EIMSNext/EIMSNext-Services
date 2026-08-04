@@ -2,9 +2,14 @@ using HKH.Mef2.Integration;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Core;
-using MongoDB.Driver;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using MongoDB.Driver;
 
 namespace EIMSNext.Service
 {
@@ -91,6 +96,15 @@ namespace EIMSNext.Service
             {
                 return;
             }
+
+            var dashboardIds = deletedDashboards.Select(x => x.Id).ToList();
+            var dashboardItemRepo = Resolver.GetRepository<DashboardItemDef>();
+            await dashboardItemRepo.UpdateManyAsync(
+                dashboardItemRepo.FilterBuilder.And(
+                    dashboardItemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
+                    dashboardItemRepo.FilterBuilder.In(x => x.DashboardId, dashboardIds)),
+                dashboardItemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
+                session: session);
 
             var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();

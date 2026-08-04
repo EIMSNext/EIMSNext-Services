@@ -5,7 +5,13 @@ using HKH.Mef2.Integration;
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 
 using Microsoft.AspNetCore.OData.Query;
@@ -49,9 +55,11 @@ namespace EIMSNext.Service.Host.Controllers.OData
                           UpdateBy = x.UpdateBy,
                           UpdateTime = x.UpdateTime,
                            FormName = y.Name,
-                           Starter = x.Starter,
-                           DataBrief = x.DataBrief,
-                           ApproveNodeStartTime = x.ApproveNodeStartTime,
+                          Starter = x.Starter,
+                          DataBrief = x.DataBrief,
+                          ApproveNodeStartTime = x.ApproveNodeStartTime,
+                          ExpireTime = x.ExpireTime,
+                          ExpireHandled = x.ExpireHandled,
                         }
 
                    );

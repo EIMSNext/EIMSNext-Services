@@ -1,7 +1,12 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
@@ -14,6 +19,42 @@ namespace EIMSNext.Service
 {
     public class CorporateService(IResolver resolver) : EntityServiceBase<Corporate>(resolver), ICorporateService
     {
+        private static readonly SemaphoreSlim CreateGate = new(1, 1);
+
+        public override Task AddAsync(Corporate entity) => AddWithGateAsync([entity]);
+
+        public override Task AddAsync(IEnumerable<Corporate> entities) => AddWithGateAsync(entities);
+
+        public override void Add(Corporate entity) => AddWithGate([entity]);
+
+        public override void Add(IEnumerable<Corporate> entities) => AddWithGate(entities);
+
+        private async Task AddWithGateAsync(IEnumerable<Corporate> entities)
+        {
+            await CreateGate.WaitAsync();
+            try
+            {
+                await base.AddAsync(entities);
+            }
+            finally
+            {
+                CreateGate.Release();
+            }
+        }
+
+        private void AddWithGate(IEnumerable<Corporate> entities)
+        {
+            CreateGate.Wait();
+            try
+            {
+                base.Add(entities);
+            }
+            finally
+            {
+                CreateGate.Release();
+            }
+        }
+
         protected override async Task AddCoreAsync(IEnumerable<Corporate> entities, IClientSessionHandle? session)
         {
             var entity = entities.First();
@@ -53,6 +94,11 @@ namespace EIMSNext.Service
             };
             empRepo.EnsureId(emp);
 
+            emp.Depts = new List<EmpDept>
+            {
+                new() { DeptId = dept.Id, HeriarchyId = dept.HeriarchyId, DeptName = dept.Name }
+            };
+
             dept.CreateBy = Context.Operator;
             dept.CreateTime = DateTime.UtcNow.ToTimeStampMs();
             dept.UpdateBy = dept.CreateBy;
@@ -63,7 +109,15 @@ namespace EIMSNext.Service
             emp.UpdateBy = emp.CreateBy;
             emp.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
 
-            user!.Crops.Add(new UserCorp { CorpId = entity.Id, CorpType = "internal", IsCorpOwner = true, IsDefault = true });
+            if (!user!.Crops.Any(x => x.CorpId == entity.Id))
+            {
+                foreach (var corp in user.Crops)
+                {
+                    corp.IsDefault = false;
+                }
+
+                user.Crops.Add(new UserCorp { CorpId = entity.Id, CorpType = "internal", IsCorpOwner = true, IsDefault = true });
+            }
 
             var empDepartments = new List<EmployeeDepartment>
             {

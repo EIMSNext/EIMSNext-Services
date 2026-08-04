@@ -6,6 +6,7 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
+using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
 
@@ -57,7 +58,7 @@ namespace EIMSNext.Flow.Host.Controllers
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
 
-            var result = await _resolver.Resolve<DataflowHookApiService>().HandleAsync(
+            var result = await _resolver.Resolve<IDataflowHookService>().HandleAsync(
                 corpId,
                 dataflowId,
                 clientIp,

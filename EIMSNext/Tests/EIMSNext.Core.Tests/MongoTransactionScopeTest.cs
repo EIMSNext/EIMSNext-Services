@@ -1,7 +1,9 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using MongoDB.Driver;
 
 namespace EIMSNext.Core.Tests
 {
@@ -67,6 +69,7 @@ namespace EIMSNext.Core.Tests
         public void Init()
         {
             _dbContext = DbContext.Create();
+            _dbContext.GetCollection<EntityData>().DeleteMany(Builders<EntityData>.Filter.Empty);
         }
 
         [TestCleanup]

@@ -3,8 +3,13 @@ using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
@@ -100,6 +105,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> StartAsync(WfStartRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "发起流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data != null)
             {
                 var approvalLogService = this.Resolver.GetService<Wf_ApprovalLog>();
@@ -147,11 +154,15 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Approve(WfApproveRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "审批流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data != null)
             {
                 var todoService = Resolver.GetService<Wf_Todo>();
                 var currentEmployeeId = IdentityContext.CurrentEmployee?.Id;
-                var todo = todoService.Query(x => x.DataId == request.DataId && x.EmployeeId == currentEmployeeId).FirstOrDefault();
+                var todo = todoService.Query(x => x.DataId == request.DataId &&
+                    x.EmployeeId == currentEmployeeId &&
+                    x.CorpId == IdentityContext.CurrentCorpId).FirstOrDefault();
                 if (todo != null)
                 {
                     var approveReq = new ApproveRequest
@@ -173,7 +184,7 @@ namespace EIMSNext.Service.Host.Controllers
                 }
                 else
                 {
-                    return Error(-1, "审批流程失败：没有审批权限");
+                    return Error(StatusCodes.Status403Forbidden, "审批流程失败：没有审批权限");
                 }
             }
             else
@@ -200,6 +211,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Return(WfReturnRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "回退流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "回退流程失败：数据不存在");
@@ -227,6 +240,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> AddSign(WfAddSignRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "加签流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "加签流程失败：数据不存在");
@@ -254,6 +269,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Transfer(WfTransferRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "转交流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "转交流程失败：数据不存在");
@@ -281,6 +298,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Withdraw(WfWithdrawRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "撤回流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "撤回流程失败：数据不存在");
@@ -308,6 +327,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Urge(WfUrgeRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "催办流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "催办流程失败：数据不存在");
@@ -330,6 +351,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> ActionStatus([FromQuery] WfActionStatusRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "获取流程操作状态失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "获取流程操作状态失败：数据不存在");
@@ -348,10 +371,33 @@ namespace EIMSNext.Service.Host.Controllers
             return Error(-1, $"获取流程操作状态失败：{resp?.Error}");
         }
 
+        [HttpGet("NodeActions")]
+        public async Task<IActionResult> NodeActions([FromQuery] WfActionStatusRequest request)
+        {
+            var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "获取流程节点操作失败：数据不存在");
+            if (dataError != null) return dataError;
+            if (data == null)
+            {
+                return Error(-1, "获取流程节点操作失败：数据不存在");
+            }
+
+            var flowClient = Resolver.Resolve<FlowApiClient>();
+            var actions = await flowClient.NodeActions(new ActionStatusRequest
+            {
+                WfInstanceId = request.WfInstanceId,
+                DataId = data.Id,
+            }, IdentityContext.AccessToken);
+
+            return Ok(actions ?? []);
+        }
+
         [HttpGet("ReturnNodes")]
         public async Task<IActionResult> ReturnNodes([FromQuery] WfActionStatusRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "获取回退节点失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "获取回退节点失败：数据不存在");
@@ -372,6 +418,8 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Terminate(WfTerminateRequest request)
         {
             var data = ApiService.Get(request.DataId);
+            var dataError = EnsureWorkflowData(data, "废弃流程失败：数据不存在");
+            if (dataError != null) return dataError;
             if (data == null)
             {
                 return Error(-1, "废弃流程失败：数据不存在");
@@ -398,6 +446,9 @@ namespace EIMSNext.Service.Host.Controllers
         [IdentityType(IdentityType.CorpAdmin)]
         public async Task<IActionResult> ChangeApprover(WfChangeApproverRequest request)
         {
+            var dataError = EnsureWorkflowData(ApiService.Get(request.DataId), "变更审批人失败：数据不存在");
+            if (dataError != null) return dataError;
+
             var flowClient = Resolver.Resolve<FlowApiClient>();
             var resp = await flowClient.ChangeApprover(new ChangeApproverRequest
             {
@@ -414,6 +465,23 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             return Error(-1, $"变更审批人失败：{resp?.Error}");
+        }
+
+        private IActionResult? EnsureWorkflowData(FormData? data, string message)
+        {
+            if (data == null)
+            {
+                return NotFound(message);
+            }
+
+            if (IdentityContext.IdentityType != global::EIMSNext.ApiService.IdentityType.System &&
+                (string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) ||
+                 !string.Equals(data.CorpId, IdentityContext.CurrentCorpId, StringComparison.Ordinal)))
+            {
+                return NotFound(message);
+            }
+
+            return null;
         }
     }
 }

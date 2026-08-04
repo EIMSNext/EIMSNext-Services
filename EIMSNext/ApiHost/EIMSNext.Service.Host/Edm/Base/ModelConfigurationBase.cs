@@ -2,7 +2,8 @@ using Asp.Versioning;
 using Asp.Versioning.OData;
 
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 using Microsoft.OData.ModelBuilder;
 

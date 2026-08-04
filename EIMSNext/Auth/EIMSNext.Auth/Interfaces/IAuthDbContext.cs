@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Auth.Models;
 
 namespace EIMSNext.Auth.Interfaces
 {
@@ -8,6 +9,9 @@ namespace EIMSNext.Auth.Interfaces
         IQueryable<User> Users { get; }
         IQueryable<IntegrationLoginSetting> IntegrationLoginSettings { get; }
         IQueryable<UserIntegrationBinding> UserIntegrationBindings { get; }
+        IQueryable<EmployeeLookup> Employees { get; }
+        IQueryable<PublicAccessSetting> PublicSettings { get; }
+        IQueryable<CorporateSettingReadModel> CorporateSettings { get; }
 
         Task AddClient(Client entity);
         Task UpdateClient(Client entity);

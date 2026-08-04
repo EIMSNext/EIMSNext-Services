@@ -3,9 +3,14 @@ using Asp.Versioning;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Service.Entities;
 
 using Microsoft.OData.ModelBuilder;
@@ -30,7 +35,6 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<FormType>();
             builder.EnumType<FlowType>();
             builder.EnumType<EventSourceType>();
-            builder.EnumType<FieldChangeType>();
             builder.EnumType<PlatformType>();
             builder.EnumType<CandidateType>();
             builder.EnumType<WfNodeType>();
@@ -51,6 +55,7 @@ namespace EIMSNext.Service.Host.Edm
 
             builder.ComplexType<UserCorp>();
             builder.ComplexType<EmpRole>();
+            builder.ComplexType<EmpDept>();
             builder.ComplexType<Operator>();
             builder.ComplexType<DepartmentRef>();
             builder.ComplexType<EmployeeDepartmentRequest>();

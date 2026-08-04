@@ -20,4 +20,9 @@
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
   </ItemGroup>
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>EIMSNext.Auth.Tests</_Parameter1>
+    </AssemblyAttribute>
+  </ItemGroup>
 </Project>

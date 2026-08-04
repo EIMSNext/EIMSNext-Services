@@ -1,8 +1,13 @@
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
 using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Http;
@@ -81,7 +86,7 @@ namespace EIMSNext.ApiHost.Authorization
                     var client = resolver.GetService<EIMSNext.Auth.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
-                        CurrentCorpId = client.CorpId;
+                        CurrentCorpId = client.CorpId??string.Empty;
                         CurrentUserID = "system";
                         _type = IdentityType.Client;
                         _retrieved = true;
@@ -103,8 +108,17 @@ namespace EIMSNext.ApiHost.Authorization
         private static PublicScope ParsePublicScope(string? value)
         {
             if (string.IsNullOrWhiteSpace(value)) return PublicScope.None;
-            if (int.TryParse(value, out var num)) return (PublicScope)num;
-            return PublicScope.None;
+            return Enum.TryParse<PublicScope>(value.Trim(), ignoreCase: true, out var parsed)
+                && parsed is not PublicScope.None
+                && IsSingleScope(parsed)
+                ? parsed
+                : PublicScope.None;
+        }
+
+        private static bool IsSingleScope(PublicScope scope)
+        {
+            var value = (int)scope;
+            return value > 0 && (value & (value - 1)) == 0;
         }
 
         /// <summary>
@@ -145,17 +159,25 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetService<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
-                    if (string.IsNullOrWhiteSpace(CurrentCorpId))
-                    {
-                        CurrentCorpId = _user.Crops.FirstOrDefault(x => x.IsDefault)?.CorpId
-                            ?? _user.Crops.FirstOrDefault()?.CorpId
-                            ?? string.Empty;
-                    }
+                    CurrentCorpId = ResolveCurrentCorpId(_user, CurrentCorpId);
 
                     _employee = _resolver.GetService<Employee>().Query(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
                 }
                 _retrieved = true;
             }
+        }
+
+        internal static string ResolveCurrentCorpId(User user, string claimedCorpId)
+        {
+            var defaultCorpId = user.Crops.FirstOrDefault(x => x.IsDefault && !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId;
+            if (!string.IsNullOrWhiteSpace(defaultCorpId))
+            {
+                return defaultCorpId;
+            }
+
+            return !string.IsNullOrWhiteSpace(claimedCorpId)
+                ? claimedCorpId
+                : user.Crops.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId ?? string.Empty;
         }
 
         /// <summary>
@@ -167,6 +189,13 @@ namespace EIMSNext.ApiHost.Authorization
             {
                 if (_type == IdentityType.None && CurrentUser != null && CurrentUser is User)
                 {
+                    var explicitIdentityType = ResolveExplicitIdentityType(_user!);
+                    if (explicitIdentityType.HasValue)
+                    {
+                        _type = explicitIdentityType.Value;
+                        return _type;
+                    }
+
                     var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
                     if (corp != null)
                     {
@@ -176,11 +205,7 @@ namespace EIMSNext.ApiHost.Authorization
                         }
                         else
                         {
-                            if (_user!.Disabled)
-                            {
-                                _type = IdentityType.Disabled;
-                            }
-                            else if (_employee != null)
+                            if (_employee != null)
                             {
                                 var adminGroups = _resolver.GetService<AdminGroup>().All()
                                     .Where(x =>
@@ -216,6 +241,22 @@ namespace EIMSNext.ApiHost.Authorization
 
                 return _type;
             }
+        }
+
+        internal static IdentityType? ResolveExplicitIdentityType(User user)
+        {
+            if (user.Disabled)
+            {
+                return IdentityType.Disabled;
+            }
+            if (string.IsNullOrWhiteSpace(user.UserType))
+            {
+                return null;
+            }
+
+            return Enum.TryParse<IdentityType>(user.UserType.Trim(), true, out var explicitType)
+                ? explicitType
+                : IdentityType.None;
         }
 
         /// <summary>

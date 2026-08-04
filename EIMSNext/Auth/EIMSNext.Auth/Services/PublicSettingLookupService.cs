@@ -1,23 +1,23 @@
 using EIMSNext.ApiService;
+using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
-using MongoDB.Driver;
 
 namespace EIMSNext.Auth.Services
 {
     public sealed class PublicSettingLookupService
     {
-        private readonly IMongoCollection<PublicAccessSetting> _publicSettings;
+        private readonly IAuthDbContext _dbContext;
 
-        public PublicSettingLookupService(IMongoCollection<PublicAccessSetting> publicSettings)
+        public PublicSettingLookupService(IAuthDbContext dbContext)
         {
-            _publicSettings = publicSettings;
+            _dbContext = dbContext;
         }
 
         public bool IsAnySectionEnabled(string targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId)) return false;
 
-            var setting = _publicSettings.AsQueryable()
+            var setting = _dbContext.PublicSettings
                 .Where(x => !x.DeleteFlag && x.TargetId == targetId)
                 .ToList()
                 .FirstOrDefault();

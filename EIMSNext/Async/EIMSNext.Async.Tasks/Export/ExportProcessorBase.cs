@@ -1,7 +1,9 @@
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Mongo.Repositories;
 using HKH.CSV;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;

@@ -1,10 +1,14 @@
 using EIMSNext.Component;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Extensions;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Entities;
@@ -18,6 +22,8 @@ namespace EIMSNext.Service
 {
     public class FormNotifyService(IResolver resolver) : EntityServiceBase<FormNotify>(resolver), IFormNotifyService
     {
+        private const int ScheduleInsertBatchSize = 500;
+
         private IRepository<FormNotifyScheduleItem> ScheduleRepository => Resolver.GetRepository<FormNotifyScheduleItem>();
 
         protected override Task BeforeAdd(IEnumerable<FormNotify> entities, IClientSessionHandle? session)
@@ -221,36 +227,49 @@ namespace EIMSNext.Service
             var formDataRepo = Resolver.GetRepository<FormData>();
             var filter = BuildTimeFieldDataFilter(entity);
             var items = new List<FormNotifyScheduleItem>();
-            await formDataRepo.Find(new MongoFindOptions<FormData> { Filter = filter }).ForEachAsync(data =>
+            var find = session == null
+                ? formDataRepo.Collection.Find(filter)
+                : formDataRepo.Collection.Find(session, filter);
+            using var cursor = await find.ToCursorAsync();
+            while (await cursor.MoveNextAsync())
             {
-                var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
-                if (!rawAnchor.HasValue)
+                foreach (var data in cursor.Current)
                 {
-                    return;
-                }
+                    var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
+                    if (!rawAnchor.HasValue)
+                    {
+                        continue;
+                    }
 
-                var anchor = FormNotifyRuntime.ResolveAdjustedAnchor(entity, rawAnchor.Value) ?? rawAnchor.Value;
-                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchor);
-                if (!nextTriggerTime.HasValue)
-                {
-                    return;
-                }
+                    var anchor = FormNotifyRuntime.ResolveAdjustedAnchor(entity, rawAnchor.Value) ?? rawAnchor.Value;
+                    var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchor);
+                    if (!nextTriggerTime.HasValue)
+                    {
+                        continue;
+                    }
 
-                items.Add(new FormNotifyScheduleItem
-                {
-                    NotifyId = entity.Id,
-                    CorpId = entity.CorpId,
-                    AppId = entity.AppId,
-                    FormId = entity.FormId,
-                    TargetType = entity.TargetType,
-                    DataId = data.Id,
-                    TriggerMode = entity.TriggerMode,
-                    ScheduleVersion = entity.ScheduleVersion,
-                    TriggerTime = nextTriggerTime.Value,
-                    AnchorTime = anchor,
-                    TimeField = entity.TimeField
-                });
-            });
+                    items.Add(new FormNotifyScheduleItem
+                    {
+                        NotifyId = entity.Id,
+                        CorpId = entity.CorpId,
+                        AppId = entity.AppId,
+                        FormId = entity.FormId,
+                        TargetType = entity.TargetType,
+                        DataId = data.Id,
+                        TriggerMode = entity.TriggerMode,
+                        ScheduleVersion = entity.ScheduleVersion,
+                        TriggerTime = nextTriggerTime.Value,
+                        AnchorTime = anchor,
+                        TimeField = entity.TimeField
+                    });
+
+                    if (items.Count >= ScheduleInsertBatchSize)
+                    {
+                        await ScheduleRepository.InsertAsync(items, session);
+                        items.Clear();
+                    }
+                }
+            }
 
             if (items.Count > 0)
             {
@@ -276,24 +295,8 @@ namespace EIMSNext.Service
                 }
             }
 
-            return ToMongoFilter(new DynamicFilter { Rel = FilterRel.And, Items = filters });
-        }
-
-        private static FilterDefinition<FormData> ToMongoFilter(DynamicFilter filter)
-        {
-            if (filter.Items?.Count > 0)
-            {
-                var subFilters = filter.Items.Select(ToMongoFilter).ToList();
-                return string.Equals(filter.Rel, FilterRel.Or, StringComparison.OrdinalIgnoreCase)
-                    ? Builders<FormData>.Filter.Or(subFilters)
-                    : Builders<FormData>.Filter.And(subFilters);
-            }
-
-            return filter.Op switch
-            {
-                FilterOp.Eq => Builders<FormData>.Filter.Eq(filter.Field, BsonValue.Create(filter.Value)),
-                _ => Builders<FormData>.Filter.Empty
-            };
+            return new DynamicFilter { Rel = FilterRel.And, Items = filters }
+                .ToFilterDefinition<FormData>();
         }
 
         private static FieldDef? ResolveTimeFieldDef(FormDef? formDef, string timeField)

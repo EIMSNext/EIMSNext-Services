@@ -3,7 +3,7 @@ using Autofac;
 
 using EIMSNext.ApiHost.Authorization;
 using EIMSNext.Common;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Services;
 using HKH.Mef2.Integration;
 

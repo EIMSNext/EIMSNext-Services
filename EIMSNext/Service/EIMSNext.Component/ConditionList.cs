@@ -1,5 +1,6 @@
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Scripting;
 using EIMSNext.Service.Entities;
 
@@ -54,7 +55,7 @@ namespace EIMSNext.Component
                         exp = "null";
                         break;
                     default:// FieldValueType.Custom:
-                        exp = value.Value;
+                        exp = DynamicValueNormalizer.Normalize(value.Value);
                         break;
                 }
             }
@@ -260,14 +261,16 @@ namespace EIMSNext.Component
             {
                 var fType = fieldType.ToLower();
                 var valStr = "";
+                var normalizedValue = DynamicValueNormalizer.Normalize(value.Value);
                 if (fType == FieldType.Number)
-                    valStr = $"{value?.Value ?? "0"}";
+                    valStr = $"{normalizedValue ?? "0"}";
                 else
-                    valStr = $"'{value?.Value}'";
+                    valStr = $"'{normalizedValue}'";
 
                 return valStr;
             }
         }
+
     }
 
     public class ConditionValue

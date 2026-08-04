@@ -8,6 +8,7 @@ namespace EIMSNext.Common
         public const string Id = "id";
         public const string DataTitle = "dataTitle";
         public const string CreateBy = "createBy";
+        public const string CreateById = $"{CreateBy}.{BsonId}";
         public const string CreateTime = "createTime";
         public const string UpdateBy = "updateBy";
         public const string UpdateTime = "updateTime";
@@ -90,6 +91,7 @@ namespace EIMSNext.Common
         public const string ImageUpload = "imageupload";
         public const string FileUpload = "fileupload";
         public const string Signature = "signature";
+        public const string DataSelect = "dataselect";
         public const string TableForm = "tableform";
         public const string Employee1 = "employee1";
         public const string Employee2 = "employee2";
@@ -100,7 +102,7 @@ namespace EIMSNext.Common
         /// </summary>
         public const string SerialNo = "serialno";
 
-        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, Signature, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, Signature, DataSelect, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
         public static bool IsInputField(string type)
         {
             return AllFieldTypes.Contains(type);

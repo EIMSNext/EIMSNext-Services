@@ -2,6 +2,8 @@ using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Integrations.Abstractions;
 using EIMSNext.Auth.Interfaces;
 using EIMSNext.Auth.Models;
+using EIMSNext.Core.Abstractions;
+
 using HKH.Common.Security;
 
 namespace EIMSNext.Auth.Services
@@ -123,7 +125,7 @@ namespace EIMSNext.Auth.Services
             var user = new User
             {
                 Name = string.IsNullOrWhiteSpace(authResult.DisplayName) ? capability.DefaultUserName : authResult.DisplayName,
-                Platform = EIMSNext.Core.Entities.PlatformType.Public,
+                Platform = PlatformType.Public,
                 Password = BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Email = string.Empty,
                 Phone = string.Empty,

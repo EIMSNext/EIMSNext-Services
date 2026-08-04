@@ -5,7 +5,13 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OData;
@@ -14,6 +20,8 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
 using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
+
+using System.Text.Json;
 
 namespace EIMSNext.Service.Host.Controllers.OData
 {
@@ -25,48 +33,23 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeViewModel, EmployeeRequest>(resolver)
     {
         [HttpGet]
-        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
+        [Permission(
+            ResourceCode = Resources.Employee,
+            Operation = Operation.Read,
+            AccessControlLevel = AccessControlLevel.Allow)]
         public override IActionResult Get(ODataQueryOptions<EmployeeViewModel> options)
         {
-            var query = ApiService.All();
-            query = FilterResult(query, options);
-            var service = (EmployeeApiService)ApiService;
-            query = service.FilterByDepartment(query, Request.Query["departmentId"].FirstOrDefault(), ReadBoolQuery("cascadedDept"));
-
-            if (Request.Path.Value?.EndsWith("/$count", StringComparison.OrdinalIgnoreCase) == true)
-            {
-                var countQuery = options.Filter == null ? query : options.Filter.ApplyTo(query, new ODataQuerySettings());
-                return Ok(countQuery.Cast<EmployeeViewModel>().Count());
-            }
-
-            var hasSelectExpand = !string.IsNullOrWhiteSpace(options.SelectExpand?.RawSelect)
-                || !string.IsNullOrWhiteSpace(options.SelectExpand?.RawExpand);
-            if (hasSelectExpand)
-            {
-                return Ok(options.ApplyTo(query, new ODataQuerySettings()));
-            }
-
-            var applied = options.ApplyTo(query, new ODataQuerySettings()).Cast<EmployeeViewModel>().ToList();
-            service.FillDepartments(applied);
-
-            return Ok(new { value = applied });
+            return base.Get(options);
         }
 
         [HttpGet]
-        [Permission(ResourceCode = Resources.Employee, Operation = Operation.Read)]
+        [Permission(
+            ResourceCode = Resources.Employee,
+            Operation = Operation.Read,
+            AccessControlLevel = AccessControlLevel.Allow)]
         public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<EmployeeViewModel> options)
         {
-            var employee = ApiService.Query(x => x.Id == key).FirstOrDefault();
-            if (employee != null)
-            {
-                ((EmployeeApiService)ApiService).FillDepartments([employee]);
-            }
-
-            var result = employee == null
-                ? Array.Empty<EmployeeViewModel>().AsQueryable()
-                : new[] { employee }.AsQueryable();
-
-            return Microsoft.AspNetCore.OData.Results.SingleResult.Create(result);
+            return base.Get(key, options);
         }
 
         [HttpPost]
@@ -88,7 +71,6 @@ namespace EIMSNext.Service.Host.Controllers.OData
             await service.AddAsync(entity, model.Departments);
 
             var result = entity.CastTo<Employee, EmployeeViewModel>();
-            service.FillDepartments([result]);
             return Ok(result);
         }
 
@@ -117,7 +99,6 @@ namespace EIMSNext.Service.Host.Controllers.OData
             await service.ReplaceAsync(entity, model.Departments, syncDepartments: true);
 
             var result = entity.CastTo<Employee, EmployeeViewModel>();
-            service.FillDepartments([result]);
             return Ok(result);
         }
 
@@ -161,26 +142,9 @@ namespace EIMSNext.Service.Host.Controllers.OData
             await service.ReplaceAsync(entity, model.Departments, syncDepartments);
 
             var result = entity.CastTo<Employee, EmployeeViewModel>();
-            service.FillDepartments([result]);
             return Ok(result);
         }
 
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="query"></param>
-        /// <param name="options"></param>
-        /// <returns></returns>
-        protected override IQueryable<EmployeeViewModel> Expand(IQueryable<EmployeeViewModel> query, ODataQueryOptions<EmployeeViewModel> options)
-        {
-            return base.Expand(query, options);
-        }
-
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="query"></param>
-        /// <returns></returns>
         protected override IQueryable<EmployeeViewModel> FilterResult(IQueryable<EmployeeViewModel> query, ODataQueryOptions<EmployeeViewModel> options)
         {
             query = base.FilterResult(query, options);
@@ -219,12 +183,6 @@ namespace EIMSNext.Service.Host.Controllers.OData
         {
             return Request.Query.TryGetValue("adminScope", out var value) &&
                 string.Equals(value.FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
-        }
-
-        private bool ReadBoolQuery(string key)
-        {
-            var value = Request.Query[key].FirstOrDefault();
-            return bool.TryParse(value, out var result) && result;
         }
     }
 }

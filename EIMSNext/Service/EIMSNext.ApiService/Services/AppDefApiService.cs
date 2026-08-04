@@ -1,7 +1,13 @@
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
@@ -284,6 +290,9 @@ namespace EIMSNext.ApiService
                     IconColor = existing.IconColor,
                     MenuType = existing.MenuType,
                     SortIndex = existing.SortIndex,
+                    Editable = existing.Editable,
+                    Deletable = existing.Deletable,
+                    ListComponent = existing.ListComponent,
                     SubMenus = existing.MenuType == FormType.Group
                         ? CloneSortableMenuTree(submitted.SubMenus ?? [], existingById)
                         : null,

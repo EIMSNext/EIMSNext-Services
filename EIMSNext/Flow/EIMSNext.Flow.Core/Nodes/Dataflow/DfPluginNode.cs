@@ -4,7 +4,7 @@ using System.Collections;
 
 using EIMSNext.ApiCore.Plugin;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Entities;
 

@@ -1,6 +1,7 @@
 using EIMSNext.Auth.Entities;
 using EIMSNext.Auth.Interfaces;
-using EIMSNext.MongoDb;
+using EIMSNext.Auth.Models;
+using EIMSNext.Core.Mongo;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 
@@ -10,18 +11,24 @@ namespace EIMSNext.Auth.Persistence
     {
         private readonly IMongoCollection<Client> _clients;
         private readonly IMongoCollection<User> _users;
+        private readonly IMongoCollection<EmployeeLookup> _employees;
         private readonly IMongoCollection<AuditLogin> _auditLogin;
         private readonly IMongoCollection<IntegrationLoginSetting> _integrationLoginSettings;
         private readonly IMongoCollection<UserIntegrationBinding> _userIntegrationBindings;
+        private readonly IMongoCollection<PublicAccessSetting> _publicSettings;
+        private readonly IMongoCollection<CorporateSettingReadModel> _corporateSettings;
 
         public AuthDbContext(IOptions<MongoDbConfiguration> settings)
             : base(settings)
         {
             _clients = Database.GetCollection<Client>(nameof(Client));
             _users = Database.GetCollection<User>(nameof(User));
+            _employees = Database.GetCollection<EmployeeLookup>("Employee");
             _auditLogin = Database.GetCollection<AuditLogin>(nameof(AuditLogin));
             _integrationLoginSettings = Database.GetCollection<IntegrationLoginSetting>(nameof(IntegrationLoginSetting));
             _userIntegrationBindings = Database.GetCollection<UserIntegrationBinding>(nameof(UserIntegrationBinding));
+            _publicSettings = Database.GetCollection<PublicAccessSetting>("PublicSetting");
+            _corporateSettings = Database.GetCollection<CorporateSettingReadModel>("CorporateSetting");
         }
 
         #region IConfigurationDbContext
@@ -30,6 +37,9 @@ namespace EIMSNext.Auth.Persistence
         public IQueryable<User> Users => _users.AsQueryable();
         public IQueryable<IntegrationLoginSetting> IntegrationLoginSettings => _integrationLoginSettings.AsQueryable();
         public IQueryable<UserIntegrationBinding> UserIntegrationBindings => _userIntegrationBindings.AsQueryable();
+        public IQueryable<EmployeeLookup> Employees => _employees.AsQueryable();
+        public IQueryable<PublicAccessSetting> PublicSettings => _publicSettings.AsQueryable();
+        public IQueryable<CorporateSettingReadModel> CorporateSettings => _corporateSettings.AsQueryable();
 
         public async Task AddClient(Client entity)
         {

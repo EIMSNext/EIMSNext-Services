@@ -1,4 +1,5 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Service.Entities
 {
@@ -73,7 +74,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>是否仅允许每个访问者提交一次。</summary>
         public bool OneSubmit { get; set; }
 
-        /// <summary>访问者是否只能查看自己提交的数据（仅当 <see cref="DataLink"/> 同时启用时有效）。</summary>
+        /// <summary>访问者是否只能查看自己提交的数据（仅当FormLink> 同时启用时有效）。</summary>
         public bool ViewOwnData { get; set; }
 
         /// <summary>访问者是否能修改自己提交的数据。</summary>

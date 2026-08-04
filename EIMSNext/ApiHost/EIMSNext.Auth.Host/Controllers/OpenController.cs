@@ -48,17 +48,17 @@ namespace EIMSNext.Auth.Host.Controllers
         }
 
         [Route("api/public/challenge"), HttpGet]
-        public async Task<IActionResult> GetPublicChallenge([FromQuery] string targetId)
+        public async Task<IActionResult> GetPublicChallenge([FromQuery] string? targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId))
             {
-                return BadRequest(new { errcode = "invalid_request", errmsg = "targetId 不能为空" });
+                return BadRequest(new { message = "targetId 不能为空" });
             }
 
             if (string.IsNullOrWhiteSpace(_publicAccessOptions.SecretKey))
             {
                 _logger.LogError("PublicAccess:SecretKey 未配置");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { errcode = "server_misconfigured", errmsg = "PublicAccess:SecretKey 未配置" });
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "PublicAccess:SecretKey 未配置" });
             }
 
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -66,12 +66,12 @@ namespace EIMSNext.Auth.Host.Controllers
             if (!rate.Allowed)
             {
                 _logger.LogWarning("公开 challenge 限流命中 ip={Ip} targetId={TargetId} count={Count}", ip, targetId, rate.Count);
-                return StatusCode(StatusCodes.Status429TooManyRequests, new { errcode = "rate_limited", errmsg = "请求过于频繁", limit = rate.Limit, window = (int)rate.Window.TotalSeconds });
+                return StatusCode(StatusCodes.Status429TooManyRequests, new { message = "请求过于频繁", limit = rate.Limit, window = (int)rate.Window.TotalSeconds });
             }
 
             if (!_publicSettingLookup.IsAnySectionEnabled(targetId))
             {
-                return NotFound(new { errcode = "not_found", errmsg = "公开资源未启用" });
+                return NotFound(new { message = "公开资源未启用" });
             }
 
             var timestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
@@ -85,7 +85,7 @@ namespace EIMSNext.Auth.Host.Controllers
         {
             var appId = GetWeChatAppIdFromConfiguration();
             return string.IsNullOrWhiteSpace(appId)
-                ? BadRequest(new { errcode = "wechat_not_configured", errmsg = "微信 AppId 未配置" })
+                ? BadRequest(new { message = "微信 AppId 未配置" })
                 : Ok(new { appId });
         }
                 
@@ -93,24 +93,24 @@ namespace EIMSNext.Auth.Host.Controllers
         /// 获取微信用户信息
         /// </summary>
         [Route("WeChat/UserInfo"), HttpPost]
-        public async Task<IActionResult> GetWeChatUserInfo([FromBody] WeChatUserInfoRequest request)
+        public async Task<IActionResult> GetWeChatUserInfo([FromBody] WeChatUserInfoRequest? request)
         {
             if (request == null)
             {
-                return BadRequest(new { errcode = "invalid_request", errmsg = "请求不能为空" });
+                return BadRequest(new { message = "请求不能为空" });
             }
 
             var appId = GetWeChatAppIdFromConfiguration();
             var secret = _configuration["WeChat:Secret"] ?? _configuration["Wechat:Secret"] ?? "";
             if (string.IsNullOrWhiteSpace(appId))
             {
-                return BadRequest(new { errcode = "wechat_not_configured", errmsg = "微信 AppId 未配置" });
+                return BadRequest(new { message = "微信 AppId 未配置" });
             }
 
             if (string.IsNullOrWhiteSpace(request.RefreshToken) &&
                 (string.IsNullOrWhiteSpace(request.Code) || string.IsNullOrWhiteSpace(secret)))
             {
-                return BadRequest(new { errcode = "invalid_request", errmsg = "缺少 code 或微信 Secret 未配置" });
+                return BadRequest(new { message = "缺少 code 或微信 Secret 未配置" });
             }
 
             try
@@ -118,7 +118,7 @@ namespace EIMSNext.Auth.Host.Controllers
                 var token = await GetWeChatAccessTokenAsync(request, appId, secret);
                 if (token == null || !string.IsNullOrEmpty(token.errcode))
                 {
-                    return BadRequest(new { errcode = token?.errcode ?? "", errmsg = token?.errmsg ?? "获取微信 AccessToken 失败" });
+                    return BadRequest(new { message = token?.errmsg ?? "获取微信 AccessToken 失败" });
                 }
 
                 if (request.ScopeType == 1)
@@ -131,7 +131,7 @@ namespace EIMSNext.Auth.Host.Controllers
             catch (Exception ex)
             {
                 _logger.LogError(ex, "查询微信用户信息失败");
-                return BadRequest(new { errcode = "wechat_request_failed", errmsg = "查询微信用户信息失败" });
+                return BadRequest(new { message = "查询微信用户信息失败" });
             }
         }
 
@@ -176,7 +176,7 @@ namespace EIMSNext.Auth.Host.Controllers
             }
             else
             {
-                return new { token.openid, errcode = userInfo == null ? "" : userInfo.errcode, errmsg = userInfo == null ? "" : userInfo.errmsg };
+                return new { token.openid, message = userInfo?.errmsg ?? "获取微信用户信息失败" };
             }
         }
 

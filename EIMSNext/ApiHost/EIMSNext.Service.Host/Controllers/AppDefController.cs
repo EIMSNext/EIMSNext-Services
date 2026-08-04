@@ -51,7 +51,6 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="id">应用定义 Id。</param>
         /// <returns>新创建或已更新的 <see cref="AppProfile"/> Id。</returns>
         [HttpPost("{id}/publish")]
-        [Authorize]
         [IdentityType(IdentityTypeDefaults.PlatAdmin)]
         public async Task<ActionResult<string>> Publish([FromRoute] string id)
         {

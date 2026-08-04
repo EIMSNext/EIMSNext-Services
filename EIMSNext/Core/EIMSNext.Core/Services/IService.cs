@@ -1,7 +1,9 @@
 using System.Linq.Expressions;
 
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 
 using MongoDB.Driver;
 
