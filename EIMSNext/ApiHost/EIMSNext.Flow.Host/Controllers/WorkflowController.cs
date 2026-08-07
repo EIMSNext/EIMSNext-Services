@@ -479,6 +479,12 @@ namespace EIMSNext.Flow.Host.Controllers
 
                 if (!result)
                     return ApiResult.Fail(-1, "指定数程实例中止失败", new { id = request.WfInstanceId }).ToActionResult();
+
+                _todoservice.Delete(new DynamicFilter
+                {
+                    Rel = "and",
+                    Items = [new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = wfInst.Id }]
+                });
             }
 
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
@@ -518,9 +524,15 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可变更审批人");
             }
 
-            var todo = _todoservice.Query(x => x.DataId == request.DataId)
-                .ToList()
-                .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
+            var todos = _todoservice.Query(x => x.CorpId == IdentityContext.CurrentCorpId
+                && x.DataId == request.DataId
+                && x.WfInstanceId == wfInst.Id);
+            if (!string.IsNullOrEmpty(request.WfNodeId))
+            {
+                todos = todos.Where(x => x.ApproveNodeId == request.WfNodeId);
+            }
+
+            var todo = todos.FirstOrDefault();
             if (todo == null)
             {
                 return BadRequest("当前节点待办不存在");

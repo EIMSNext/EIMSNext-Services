@@ -50,10 +50,11 @@ namespace EIMSNext.Service.Host.Controllers
             }
 
             var total = query.LongCount();
-            var todos = query
+            var pagedTodos = query
                 .OrderByDescending(x => x.ApproveNodeStartTime)
+                .Skip((pageNum - 1) * pageSize)
+                .Take(pageSize)
                 .ToList();
-            var pagedTodos = todos.Skip((pageNum - 1) * pageSize).Take(pageSize).ToList();
 
             var employeeIds = pagedTodos.Select(x => x.EmployeeId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var employeeMap = employeeService.Query(x => employeeIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x);
@@ -77,6 +78,7 @@ namespace EIMSNext.Service.Host.Controllers
 
                 return new FlowManageTodoItem
                 {
+                    TodoId = todo.Id,
                     WfInstanceId = todo.WfInstanceId,
                     DataId = todo.DataId,
                     FormName = formDefRepo.Get(todo.FormId)?.Name ?? string.Empty,
@@ -434,8 +436,11 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (resp != null && string.IsNullOrEmpty(resp.Error))
             {
-                data.FlowStatus = FlowStatus.Discarded;
-                await ApiService.ReplaceAsync(data, DataAction.Save);
+                Resolver.GetRepository<FormData>().Update(
+                    data.Id,
+                    Builders<FormData>.Update
+                        .Set(x => x.FlowStatus, FlowStatus.Discarded)
+                        .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
                 return Ok(resp);
             }
 

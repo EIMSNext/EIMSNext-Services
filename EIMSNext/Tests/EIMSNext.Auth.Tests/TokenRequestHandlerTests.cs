@@ -209,6 +209,34 @@ namespace EIMSNext.Auth.Tests
             Assert.AreEqual(0, auditLoginService.Entries.Count);
         }
 
+        [TestMethod]
+        public async Task PublicTokenGrant_Failure_DoesNotWriteLoginAudit()
+        {
+            var auditLoginService = new FakeAuditLoginService();
+            var handler = new PublicTokenGrantHandler(
+                new FakePublicTokenService(PublicTokenValidationResult.Invalid("公开访问凭证无效")),
+                auditLoginService,
+                CreateHttpContextAccessor());
+            var client = new Client
+            {
+                Id = InternalClients.PublicClientId,
+                Enabled = true,
+                AccessTokenLifetime = 300
+            };
+            var request = new OpenIddictRequest
+            {
+                GrantType = CustomGrantType.Public,
+                Username = "public_form-001",
+                Password = "invalid-challenge",
+                Scope = PublicScope.FormLink.ToString()
+            };
+
+            var result = await handler.HandleAsync(client, request, [PublicScope.FormLink.ToString()]);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(0, auditLoginService.Entries.Count);
+        }
+
         private static IHttpContextAccessor CreateHttpContextAccessor()
         {
             var context = new DefaultHttpContext();
@@ -257,11 +285,11 @@ namespace EIMSNext.Auth.Tests
             public User? Validate(string? corp_empno, string? secret) => null;
         }
 
-        private sealed class FakePublicTokenService : IPublicTokenService
+        private sealed class FakePublicTokenService(PublicTokenValidationResult? result = null) : IPublicTokenService
         {
             public PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope)
             {
-                return PublicTokenValidationResult.Success(new PublicTokenSubject("form-001", "corp-001", "app-001"));
+                return result ?? PublicTokenValidationResult.Success(new PublicTokenSubject("form-001", "corp-001", "app-001"));
             }
         }
 

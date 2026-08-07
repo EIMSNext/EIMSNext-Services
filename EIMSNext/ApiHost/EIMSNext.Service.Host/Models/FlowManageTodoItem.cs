@@ -5,6 +5,7 @@ namespace EIMSNext.Service.Host.Models
 {
     public class FlowManageTodoItem
     {
+        public string TodoId { get; set; } = string.Empty;
         public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public string FormName { get; set; } = string.Empty;

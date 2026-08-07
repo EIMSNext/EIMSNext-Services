@@ -2,13 +2,17 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.ApiService
 {
@@ -29,19 +33,12 @@ namespace EIMSNext.ApiService
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return null;
-
-            if (IdentityContext.IdentityType == IdentityType.Public)
-            {
-                var validator = Resolver.Resolve<IPublicAccessValidator>();
-                if (!validator.CanReadDashboardItem(request.ItemId ?? string.Empty))
-                    return null;
-                if (!validator.CanReadDashboardForm(request.DataSource.Id))
-                    return null;
-                corpId = validator.GetCurrentSetting()?.CorpId ?? string.Empty;
-            }
+            var authorization = Authorize(request, corpId);
+            if (!authorization.Allowed) return null;
 
             var collection = AggregateService.GetCollection("FormData");
-            var filter = WrapFilter(request.Filter, request.DataSource.Id, corpId);
+            var filter = WrapFilter(request.Filter, request.DataSource.Id, authorization.CorpId);
+            filter = filter.And(authorization.DataFilter)!;
             request.Filter = filter;
 
             var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(
@@ -57,21 +54,136 @@ namespace EIMSNext.ApiService
         public async Task<long> Count(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return 0;
+            var authorization = Authorize(request, corpId);
+            if (!authorization.Allowed) return 0;
 
+            var collection = AggregateService.GetCollection("FormData");
+            var filter = WrapFilter(request.Filter, request.DataSource.Id, authorization.CorpId);
+            filter = filter.And(authorization.DataFilter)!;
+            var filterDef = filter.ToFilterDefinition<BsonDocument>();
+            return await collection.CountDocumentsAsync(filterDef);
+        }
+
+        private AggregateAuthorization Authorize(AggCalcRequest request, string corpId)
+        {
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 var validator = Resolver.Resolve<IPublicAccessValidator>();
-                if (!validator.CanReadDashboardItem(request.ItemId ?? string.Empty))
-                    return 0;
-                if (!validator.CanReadDashboardForm(request.DataSource.Id))
-                    return 0;
-                corpId = validator.GetCurrentSetting()?.CorpId ?? string.Empty;
+                if (!validator.CanReadDashboardItem(request.ItemId ?? string.Empty) ||
+                    !validator.CanReadDashboardForm(request.DataSource.Id) ||
+                    !IsRequestBoundToDashboardItem(request))
+                {
+                    return AggregateAuthorization.Denied;
+                }
+
+                return new AggregateAuthorization(true, validator.GetCurrentSetting()?.CorpId ?? string.Empty, null);
             }
 
-            var collection = AggregateService.GetCollection("FormData");
-            var filter = WrapFilter(request.Filter, request.DataSource.Id, corpId);
-            var filterDef = filter.ToFilterDefinition<BsonDocument>();
-            return await collection.CountDocumentsAsync(filterDef);
+            if (!string.IsNullOrWhiteSpace(request.ItemId) && !IsRequestBoundToDashboardItem(request))
+            {
+                return AggregateAuthorization.Denied;
+            }
+
+            var scope = Resolver.Resolve<FormDataReadScopeResolver>().Resolve(request.DataSource.Id);
+            if (!scope.CanRead || !AreRequestedFieldsVisible(request, scope.FieldPerms))
+            {
+                return AggregateAuthorization.Denied;
+            }
+
+            return new AggregateAuthorization(true, corpId, scope.DataFilter);
+        }
+
+        private bool IsRequestBoundToDashboardItem(AggCalcRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.ItemId))
+            {
+                return false;
+            }
+
+            var item = Resolver.GetRepository<DashboardItemDef>().Get(request.ItemId);
+            if (item == null || item.DeleteFlag)
+            {
+                return false;
+            }
+
+            try
+            {
+                using var details = JsonDocument.Parse(item.Details);
+                return details.RootElement.TryGetProperty("datasource", out var source) &&
+                    source.TryGetProperty("id", out var formId) &&
+                    formId.ValueKind == JsonValueKind.String &&
+                    string.Equals(formId.GetString(), request.DataSource.Id, StringComparison.OrdinalIgnoreCase);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static bool AreRequestedFieldsVisible(AggCalcRequest request, IReadOnlyCollection<FieldPerm>? fieldPerms)
+        {
+            if (fieldPerms == null)
+            {
+                return true;
+            }
+
+            var requestedFields = (request.Dimensions ?? []).Select(x => x.Id)
+                .Concat((request.Metrics ?? []).Select(x => x.Id))
+                .Concat(request.DisplayFields ?? [])
+                .Concat((request.Sort ?? []).Select(x => x.Id))
+                .Concat(EnumerateFilterFields(request.Filter));
+
+            return requestedFields.All(field => IsFieldVisible(field, fieldPerms, request));
+        }
+
+        private static IEnumerable<string> EnumerateFilterFields(DynamicFilter? filter)
+        {
+            if (filter == null)
+            {
+                yield break;
+            }
+
+            if (!string.IsNullOrWhiteSpace(filter.Field))
+            {
+                yield return filter.Field;
+            }
+
+            if (filter.ValueIsField && filter.Value is string valueField)
+            {
+                yield return valueField;
+            }
+
+            foreach (var item in filter.Items ?? [])
+            {
+                foreach (var field in EnumerateFilterFields(item))
+                {
+                    yield return field;
+                }
+            }
+        }
+
+        private static bool IsFieldVisible(string? field, IReadOnlyCollection<FieldPerm> fieldPerms, AggCalcRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(field))
+            {
+                return true;
+            }
+
+            var normalized = field.StartsWith("data.", StringComparison.OrdinalIgnoreCase) ? field[5..] : field;
+            var root = normalized.Split('.', 2)[0];
+            if (Fields.IsSystemField(root))
+            {
+                return true;
+            }
+
+            if (fieldPerms.Any(x => x.Visible && string.Equals(x.Id, normalized, StringComparison.OrdinalIgnoreCase)))
+            {
+                return true;
+            }
+
+            return (request.Metrics ?? []).Any(metric =>
+                string.Equals($"{metric.Id}_{metric.AggFun}", normalized, StringComparison.OrdinalIgnoreCase) &&
+                fieldPerms.Any(permission => permission.Visible && string.Equals(permission.Id, metric.Id, StringComparison.OrdinalIgnoreCase)));
         }
 
         private DynamicFilter WrapFilter(DynamicFilter? filter, string formId, string corpId)
@@ -99,6 +211,11 @@ namespace EIMSNext.ApiService
                 Rel = FilterRel.And,
                 Items = [scopeFilter, filter],
             };
+        }
+
+        private sealed record AggregateAuthorization(bool Allowed, string CorpId, DynamicFilter? DataFilter)
+        {
+            public static AggregateAuthorization Denied { get; } = new(false, string.Empty, null);
         }
     }
 
