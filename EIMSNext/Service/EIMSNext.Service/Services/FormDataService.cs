@@ -749,6 +749,13 @@ namespace EIMSNext.Service
                     throw new BadRequestException($"字段 [{path}] 不能为空");
                 }
 
+                if (string.Equals(field.Type, FieldType.TimeStamp, StringComparison.OrdinalIgnoreCase)
+                    && !IsEmpty(value)
+                    && !IsTimestamp(value))
+                {
+                    throw new BadRequestException($"字段 [{path}] 必须为毫秒时间戳");
+                }
+
                 if (field.Columns == null || value.ValueKind != JsonValueKind.Array)
                 {
                     return;
@@ -789,6 +796,12 @@ namespace EIMSNext.Service
                 return value.ValueKind is JsonValueKind.Undefined or JsonValueKind.Null
                     || value.ValueKind == JsonValueKind.String && string.IsNullOrWhiteSpace(value.GetString())
                     || value.ValueKind == JsonValueKind.Array && value.GetArrayLength() == 0;
+            }
+
+            static bool IsTimestamp(JsonElement value)
+            {
+                return value.ValueKind == JsonValueKind.Number && value.TryGetInt64(out _)
+                    || value.ValueKind == JsonValueKind.String && long.TryParse(value.GetString(), out _);
             }
         }
 

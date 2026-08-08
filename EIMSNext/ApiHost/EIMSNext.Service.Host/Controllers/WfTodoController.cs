@@ -3,6 +3,8 @@ using Asp.Versioning;
 using HKH.Mef2.Integration;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Query;
 using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -14,6 +16,9 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiVersion(1.0)]
 	public class WfTodoController(IResolver resolver) : ApiControllerBase<WfTodoApiService, Wf_Todo, WfTodoViewModel>(resolver)
 	{
-		
+		protected override DynamicFindOptions<Wf_Todo> FilterResult(DynamicFindOptions<Wf_Todo> query)
+		{
+			return FilterByPermission(FilterByCorpId(query));
+		}
 	}
 }

@@ -24,8 +24,13 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WfTodoController(IResolver resolver) : ODataController<WfTodoApiService, Wf_Todo, WfTodoViewModel, WfTodoRequest>(resolver)
+        public class WfTodoController(IResolver resolver) : ODataController<WfTodoApiService, Wf_Todo, WfTodoViewModel, WfTodoRequest>(resolver)
     {
+        protected override IQueryable<WfTodoViewModel> FilterResult(IQueryable<WfTodoViewModel> query, ODataQueryOptions<WfTodoViewModel> options)
+        {
+            return FilterByPermission(query, options);
+        }
+
         /// <summary>
         /// 
         /// </summary>

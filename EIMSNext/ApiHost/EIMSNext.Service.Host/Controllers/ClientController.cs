@@ -3,7 +3,6 @@ using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
-using EIMSNext.Common;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OpenPlatform;
 
@@ -36,7 +35,7 @@ namespace EIMSNext.Service.Host.Controllers
         public async Task<IActionResult> Reveal([FromRoute] string id)
         {
             var creds = await ClientApi.RevealAsync(id);
-            return ApiResult.Success(creds).ToActionResult();
+            return Ok(creds);
         }
 
         /// <summary>重新生成 ClientSecret。返回新明文 + 命中 5 分钟缓存。</summary>
@@ -45,7 +44,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var creds = await ClientApi.GenerateSecretAsync(id);
             await WarmCacheForClientAsync(creds.ClientId);
-            return ApiResult.Success(creds).ToActionResult();
+            return Ok(creds);
         }
 
         private async Task WarmCacheForClientAsync(string clientId)
