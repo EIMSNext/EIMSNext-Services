@@ -57,6 +57,7 @@ namespace EIMSNext.Service.Tests
             const string sourceWorkflowId = "workflow-source";
             const string sourcePrintId = "print-source";
             const string sourceLayoutId = "layout-source";
+            const string sourceChildLayoutId = "layout-child-source";
 
             await appRepo.InsertAsync(new AppDef
             {
@@ -100,7 +101,7 @@ namespace EIMSNext.Service.Tests
                 Id = sourceDashboardId,
                 AppId = sourceAppId,
                 Name = "Source Dashboard",
-                Layout = $"[{{\"i\":\"{sourceLayoutId}\",\"x\":0,\"y\":0,\"w\":4,\"h\":3}}]"
+                Layout = $"[{{\"i\":\"{sourceLayoutId}\",\"x\":0,\"y\":0,\"w\":4,\"h\":3}},{{\"i\":\"{sourceChildLayoutId}\",\"parentLayoutId\":\"{sourceLayoutId}\",\"x\":0,\"y\":0,\"w\":4,\"h\":3}}]"
             });
 
             await workflowRepo.InsertAsync(new Wf_Definition
@@ -182,7 +183,9 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual("custom/orders/index", templateFormMenu["listComponent"]!.GetValue<string>());
 
             var templateLayoutId = JsonNode.Parse(dashboardTemplate.Layout)![0]!["i"]!.GetValue<string>();
+            var templateChildParentLayoutId = JsonNode.Parse(dashboardTemplate.Layout)![1]!["parentLayoutId"]!.GetValue<string>();
             Assert.AreNotEqual(sourceLayoutId, templateLayoutId);
+            Assert.AreEqual(templateLayoutId, templateChildParentLayoutId);
             Assert.AreEqual(templateLayoutId, dashboardItemTemplate.LayoutId);
             StringAssert.Contains(dashboardItemTemplate.Details, sourceForm.TemplateId!);
             StringAssert.Contains(dashboardItemTemplate.Details, sourceDashboard.TemplateId!);
@@ -237,7 +240,9 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(installedForm.Id, installedPrint.FormId);
 
             var installedLayoutId = JsonNode.Parse(installedDashboard.Layout)![0]!["i"]!.GetValue<string>();
+            var installedChildParentLayoutId = JsonNode.Parse(installedDashboard.Layout)![1]!["parentLayoutId"]!.GetValue<string>();
             Assert.AreNotEqual(sourceLayoutId, installedLayoutId);
+            Assert.AreEqual(installedLayoutId, installedChildParentLayoutId);
             Assert.AreEqual(installedLayoutId, installedDashboardItem.LayoutId);
 
             StringAssert.Contains(installedDashboardItem.Details, installedForm.Id);

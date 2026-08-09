@@ -10,6 +10,7 @@ namespace EIMSNext.Service
         public static string RewriteDashboardLayout(string layout, Dictionary<string, string> layoutMap)
         {
             var node = JsonNode.Parse(string.IsNullOrWhiteSpace(layout) ? "[]" : layout);
+            CollectLayoutIds(node, layoutMap);
             RewriteLayoutNode(node, layoutMap);
             return node?.ToJsonString() ?? "[]";
         }
@@ -105,9 +106,44 @@ namespace EIMSNext.Service
                         }
                         obj["i"] = newId;
                     }
+                    if (obj["parentLayoutId"] is JsonValue parentValue)
+                    {
+                        var oldParentId = parentValue.GetValue<string>();
+                        if (layoutMap.TryGetValue(oldParentId, out var newParentId))
+                        {
+                            obj["parentLayoutId"] = newParentId;
+                        }
+                    }
                     foreach (var property in obj.ToList())
                     {
                         RewriteLayoutNode(property.Value, layoutMap);
+                    }
+                    break;
+            }
+        }
+
+        private static void CollectLayoutIds(JsonNode? node, Dictionary<string, string> layoutMap)
+        {
+            switch (node)
+            {
+                case JsonArray array:
+                    foreach (var item in array)
+                    {
+                        CollectLayoutIds(item, layoutMap);
+                    }
+                    break;
+                case JsonObject obj:
+                    if (obj["i"] is JsonValue idValue)
+                    {
+                        var oldId = idValue.GetValue<string>();
+                        if (!layoutMap.ContainsKey(oldId))
+                        {
+                            layoutMap[oldId] = Guid.NewGuid().ToString("N");
+                        }
+                    }
+                    foreach (var property in obj.ToList())
+                    {
+                        CollectLayoutIds(property.Value, layoutMap);
                     }
                     break;
             }

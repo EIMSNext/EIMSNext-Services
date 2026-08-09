@@ -364,6 +364,14 @@ namespace EIMSNext.Service
                             obj["i"] = templateLayoutId;
                         }
                     }
+                    if (obj["parentLayoutId"] is JsonValue parentValue)
+                    {
+                        var parentLayoutId = parentValue.GetValue<string>();
+                        if (layoutMap.TryGetValue(parentLayoutId, out var templateParentLayoutId))
+                        {
+                            obj["parentLayoutId"] = templateParentLayoutId;
+                        }
+                    }
 
                     foreach (var property in obj.ToList())
                     {
