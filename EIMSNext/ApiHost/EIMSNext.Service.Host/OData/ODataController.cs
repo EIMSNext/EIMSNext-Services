@@ -100,7 +100,7 @@ namespace EIMSNext.Service.Host.OData
         /// <returns></returns>
         [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [MongoEnableQuery]
+        [MongoEnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize)]
         public virtual IActionResult Get(ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
