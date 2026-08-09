@@ -265,6 +265,7 @@ namespace EIMSNext.ApiService
                 Name = entity.EmpName,
                 Platform = platform,
                 Password = BCrypt.HashPassword("123456"),
+                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                 Crops = new List<UserCorp> { new() { CorpId = IdentityContext.CurrentCorpId, CorpType = "internal", IsDefault = true } }
             };
         }

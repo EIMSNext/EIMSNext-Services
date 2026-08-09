@@ -66,6 +66,7 @@ namespace EIMSNext.Auth.Services
             {
                 Password = HKH.Common.Security.BCrypt.HashPassword(request.Password),
                 Platform = PlatformType.Public,
+                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             };
 
             if (request.Type == PinCodeTargetType.Phone)

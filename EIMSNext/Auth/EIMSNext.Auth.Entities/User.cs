@@ -6,6 +6,11 @@ namespace EIMSNext.Auth.Entities
     public class User : MongoEntityBase, IUser
     {
         /// <summary>
+        /// 注册时间（Unix 毫秒时间戳）
+        /// </summary>
+        public long CreateTime { get; set; }
+
+        /// <summary>
         /// 昵称
         /// </summary>
         public string Name { get; set; } = string.Empty;

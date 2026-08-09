@@ -139,7 +139,8 @@ async Task EnsureSeedData(IResolver resolver)
                 Name = "Admin",
                 Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
                 Email = "admin@eimsnext.com",
-                Phone = "12345678901"
+                Phone = "12345678901",
+                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
             await userRepo.InsertAsync(adminUser);
         }
