@@ -17,7 +17,8 @@ namespace EIMSNext.ApiService
     {
         public FormDataReadScope Resolve(string formId, string? authGroupId = null)
         {
-            if (Resolver.Resolve<AdminPermissionEvaluator>().HasUnrestrictedManagementIdentity)
+            if (Resolver.Resolve<AdminPermissionEvaluator>().HasUnrestrictedManagementIdentity &&
+                string.IsNullOrWhiteSpace(authGroupId))
             {
                 return new FormDataReadScope(true, null, null);
             }

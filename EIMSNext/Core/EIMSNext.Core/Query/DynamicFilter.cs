@@ -2,6 +2,9 @@ using System.Text.Json.Serialization;
 
 namespace EIMSNext.Core.Query
 {
+    /// <summary>
+    /// 动态筛选条件。设置 Field 时表示叶子条件，设置 Items 时表示条件组。
+    /// </summary>
     public class DynamicFilter
     {
         private static readonly DynamicFilter _empty = new DynamicFilter();
@@ -11,16 +14,24 @@ namespace EIMSNext.Core.Query
         {
         }
 
+        /// <summary>条件关系：and、or 或 not。</summary>
         public string Rel { get; set; } = FilterRel.And;
+        /// <summary>嵌套条件组。</summary>
         public List<DynamicFilter>? Items { get; set; }
 
         #region Filter Field
 
+        /// <summary>字段路径。</summary>
         public string? Field { get; set; }
+        /// <summary>动态字段类型，影响选项、人员和部门字段的实际存储路径。</summary>
         public string? Type { get; set; }
+        /// <summary>筛选运算符。</summary>
         public string? Op { get; set; }
+        /// <summary>比较值或值数组。</summary>
         public object? Value { get; set; }
+        /// <summary>是否将 Value 作为表达式。</summary>
         public bool ValueIsExp { get; set; }
+        /// <summary>是否将 Value 作为字段路径。</summary>
         public bool ValueIsField {  get; set; }
 
         #endregion

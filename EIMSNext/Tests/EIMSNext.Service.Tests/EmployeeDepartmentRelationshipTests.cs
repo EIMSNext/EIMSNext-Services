@@ -45,6 +45,7 @@ namespace EIMSNext.Service.Tests
         private EmployeeApiService _employeeApiService = null!;
         private TestableDepartmentService _departmentService = null!;
         private AdminPermissionEvaluator _permissionEvaluator = null!;
+        private FormDataReadScopeResolver _readScopeResolver = null!;
 
         [TestInitialize]
         public void Init()
@@ -96,6 +97,7 @@ namespace EIMSNext.Service.Tests
             var resolver = new TestResolver(services);
             _permissionEvaluator = new AdminPermissionEvaluator(resolver);
             services[typeof(AdminPermissionEvaluator)] = _permissionEvaluator;
+            _readScopeResolver = new FormDataReadScopeResolver(resolver);
             _employeeApiService = new EmployeeApiService(resolver);
             _departmentService = new TestableDepartmentService(resolver);
         }
@@ -218,6 +220,59 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void UsageAuthGroups_ForAppAdmin_MatchesCurrentEmployeeMembershipOnly()
+        {
+            var parent = SeedDepartment("dept-auth-scope-parent", "总部");
+            var child = SeedDepartment("dept-auth-scope-child", "研发部", parent.Id);
+            var employee = SeedEmployee("emp-auth-scope", "Scoped Admin", child.Id);
+            employee.Roles.Add(new EmpRole { RoleId = "role-auth-scope", RoleName = "业务角色" });
+            _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
+            _identityContext.CurrentEmployeeValue = employee;
+
+            _authGroupRepo.Insert(
+            [
+                CreateAuthGroup("auth-by-employee", new Member { Id = employee.Id, Type = MemberType.Employee }),
+                CreateAuthGroup("auth-by-role", new Member { Id = "role-auth-scope", Type = MemberType.Role }),
+                CreateAuthGroup("auth-by-direct-dept", new Member { Id = child.Id, Type = MemberType.Department }),
+                CreateAuthGroup("auth-by-cascaded-dept", new Member { Id = parent.Id, Type = MemberType.Department, CascadedDept = true }),
+                CreateAuthGroup("auth-unassigned", new Member { Id = "another-employee", Type = MemberType.Employee }),
+                CreateAuthGroup("auth-disabled", new Member { Id = employee.Id, Type = MemberType.Employee }, disabled: true),
+                CreateAuthGroup("auth-other-form", new Member { Id = employee.Id, Type = MemberType.Employee }, formId: "form-002")
+            ]);
+
+            var result = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee("form-001")
+                .Select(x => x.Id)
+                .ToList();
+
+            CollectionAssert.AreEquivalent(
+                new[] { "auth-by-employee", "auth-by-role", "auth-by-direct-dept", "auth-by-cascaded-dept" },
+                result);
+        }
+
+        [TestMethod]
+        public void FormDataReadScope_ForUnrestrictedAdmin_HonorsExplicitAuthGroup()
+        {
+            var department = SeedDepartment("dept-auth-read-scope", "研发部");
+            var employee = SeedEmployee("emp-auth-read-scope", "Corp Admin", department.Id);
+            _identityContext.IdentityTypeValue = IdentityType.CorpAdmin;
+            _identityContext.CurrentEmployeeValue = employee;
+            _authGroupRepo.Insert(CreateAuthGroup(
+                "auth-read-scope",
+                new Member { Id = employee.Id, Type = MemberType.Employee }));
+
+            var unrestrictedScope = _readScopeResolver.Resolve("form-001");
+            var selectedGroupScope = _readScopeResolver.Resolve("form-001", "auth-read-scope");
+            var unassignedGroupScope = _readScopeResolver.Resolve("form-001", "auth-unassigned");
+
+            Assert.IsTrue(unrestrictedScope.CanRead);
+            Assert.IsNull(unrestrictedScope.DataFilter);
+            Assert.IsTrue(selectedGroupScope.CanRead);
+            Assert.AreEqual(Fields.CreateById, selectedGroupScope.DataFilter?.Field);
+            Assert.AreEqual(employee.Id, selectedGroupScope.DataFilter?.Value);
+            Assert.IsFalse(unassignedGroupScope.CanRead);
+        }
+
+        [TestMethod]
         public async Task AddEmployee_NormalAdminWithParentManageScope_AllowsChildDepartment()
         {
             var parent = SeedDepartment("dept-manage-parent", "总部");
@@ -303,6 +358,19 @@ namespace EIMSNext.Service.Tests
             };
             _departmentRepo.Insert(department);
             return department;
+        }
+
+        private static AuthGroup CreateAuthGroup(string id, Member member, bool disabled = false, string formId = "form-001")
+        {
+            return new AuthGroup
+            {
+                Id = id,
+                CorpId = CorpId,
+                AppId = "app-001",
+                FormId = formId,
+                Members = [member],
+                Disabled = disabled
+            };
         }
 
         private Employee SeedEmployee(string id, string name, string departmentId)

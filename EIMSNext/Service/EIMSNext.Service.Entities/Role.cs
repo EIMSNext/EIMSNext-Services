@@ -17,11 +17,11 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public string Description { get; set; } = "";
         /// <summary>
-        /// 
+        /// 角色所属角色组 ID
         /// </summary>
         public string RoleGroupId { get; set; } = "";
         /// <summary>
-        /// 
+        /// 角色排序值
         /// </summary>
         public int SortValue { get; set; }
     }

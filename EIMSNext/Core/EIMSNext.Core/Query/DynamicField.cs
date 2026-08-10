@@ -2,6 +2,9 @@ using EIMSNext.Common;
 
 namespace EIMSNext.Core.Query
 {
+    /// <summary>
+    /// 动态查询投影字段。
+    /// </summary>
     public class DynamicField
     {
         public DynamicField() { }
@@ -11,7 +14,9 @@ namespace EIMSNext.Core.Query
             Visible = visible;
         }
 
+        /// <summary>字段路径。</summary>
         public string Field { get; set; } = "";
+        /// <summary>是否返回该字段。</summary>
         public bool Visible { get; set; } = true;
 
         public static DynamicField Create(string field, bool visible = true)
