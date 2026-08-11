@@ -13,7 +13,7 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string WfNodeId { get; set; } = string.Empty;
 
-        public List<string> TodoIds { get; set; } = [];
+        public List<string> TaskIds { get; set; } = [];
 
         public WfExpireActionType ActionType { get; set; }
     }

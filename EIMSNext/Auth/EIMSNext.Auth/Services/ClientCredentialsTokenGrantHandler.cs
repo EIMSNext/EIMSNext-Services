@@ -23,18 +23,16 @@ namespace EIMSNext.Auth.Services
     /// <item>触发 <c>ClientPermissionCache.Refresh</c>（让新发 token 立即生效）。</item>
     /// </list>
     /// </summary>
-    public sealed class ClientCredentialsTokenGrantHandler : ITokenGrantHandler
+    public sealed class ClientCredentialsTokenGrantHandler : TokenGrantHandlerBase, ITokenGrantHandler
     {
-        private readonly IHttpContextAccessor _contextAccessor;
-
-        public ClientCredentialsTokenGrantHandler(IHttpContextAccessor contextAccessor)
+        public ClientCredentialsTokenGrantHandler(IAuditLoginService auditLoginService, IHttpContextAccessor contextAccessor)
+            : base(auditLoginService, contextAccessor)
         {
-            _contextAccessor = contextAccessor;
         }
 
         public string GrantType => CustomGrantType.ClientCredentials;
 
-        public Task<TokenRequestResult> HandleAsync(
+        public async Task<TokenRequestResult> HandleAsync(
             Client client,
             OpenIddictRequest request,
             IReadOnlyList<string> scopes,
@@ -42,8 +40,8 @@ namespace EIMSNext.Auth.Services
         {
             if (!client.Enabled)
             {
-                return Task.FromResult(TokenRequestResult.Failure(
-                    Errors.UnauthorizedClient, "Client 已被禁用"));
+                return TokenRequestResult.Failure(
+                    Errors.UnauthorizedClient, "Client 已被禁用");
             }
 
             // scope 必须是 AllowedScopes 的子集
@@ -54,8 +52,8 @@ namespace EIMSNext.Auth.Services
                 {
                     if (!allowed.Contains(s))
                     {
-                        return Task.FromResult(TokenRequestResult.Failure(
-                            Errors.InvalidScope, $"scope '{s}' 不在 Client 的允许列表中"));
+                        return TokenRequestResult.Failure(
+                            Errors.InvalidScope, $"scope '{s}' 不在 Client 的允许列表中");
                     }
                 }
             }
@@ -72,7 +70,8 @@ namespace EIMSNext.Auth.Services
                 new(AuthClaimTypes.AuthTime, authenticationTime.ToUnixTimeSeconds().ToString(), ClaimValueTypes.Integer64),
             };
 
-            return Task.FromResult(TokenRequestResult.Success(client.Id, GrantType, client.AccessTokenLifetime, scopes, claims));
+            await AddAuditLogin(CreateSuccessAudit(client.Id, client.CorpId, client.Id, client.Name, GrantType));
+            return TokenRequestResult.Success(client.Id, GrantType, client.AccessTokenLifetime, scopes, claims);
         }
     }
 }

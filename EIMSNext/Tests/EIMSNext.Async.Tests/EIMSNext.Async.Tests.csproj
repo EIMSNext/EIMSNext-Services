@@ -11,6 +11,8 @@
     <PackageReference Include="MSTest" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" />
+    <PackageReference Include="Quartz.Serialization.Json" />
+    <PackageReference Include="quartz-store-mongodb" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />

@@ -33,11 +33,13 @@ namespace EIMSNext.ApiService
         private IFormDefService _formDefService;
         private IFormDataChangeLogService _formDataChangeLogService;
         private AdminPermissionEvaluator _permissionEvaluator;
+        private FormDataReadScopeResolver _readScopeResolver;
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _formDefService = resolver.Resolve<IFormDefService>();
             _formDataChangeLogService = resolver.Resolve<IFormDataChangeLogService>();
             _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
+            _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         }
 
         public override Task AddAsync(FormData entity)
@@ -460,23 +462,8 @@ namespace EIMSNext.ApiService
 
         private DynamicFilter ApplyFilterOptionsPermission(FormDataFilterOptionsRequest request, DynamicFilter filter)
         {
-            if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
-            {
-                return filter;
-            }
-
-            var authGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(request.FormId)
-                .Where(HasInheritedDataAccess)
-                .Where(group => string.IsNullOrWhiteSpace(request.AuthGroupId) ||
-                    string.Equals(group.Id, request.AuthGroupId, StringComparison.OrdinalIgnoreCase))
-                .Where(group => GetEffectiveDataPerms(group).HasFlag(DataPerms.View))
-                .ToList();
-            if (authGroups.Count == 0)
-            {
-                return filter.And(CreateNoMatchFilter())!;
-            }
-
-            return filter.And(BuildDataScopeFilter(authGroups))!;
+            var scope = _readScopeResolver.Resolve(request.FormId, request.AuthGroupId);
+            return filter.And(scope.DataFilter)!;
         }
 
         private Task<long> CountExportAsync(FormDataExportRequest request)

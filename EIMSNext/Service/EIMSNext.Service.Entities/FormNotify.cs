@@ -223,7 +223,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 待办提醒
         /// </summary>
-        WfTodoNotify,
+        WfTaskNotify,
         /// <summary>
         /// 待办超时提醒
         /// </summary>

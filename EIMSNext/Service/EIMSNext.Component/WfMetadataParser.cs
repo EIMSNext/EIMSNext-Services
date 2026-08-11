@@ -46,14 +46,14 @@ namespace EIMSNext.Component
                 if (string.IsNullOrWhiteSpace(sourceId)
                     || !nodes.TryGetValue(sourceId, out var sourceNode))
                 {
-                    throw new ArgumentException($"Print node [{printNode.Id}] 的打印来源节点不存在");
+                    throw new BadRequestException($"Print node [{printNode.Id}] 的打印来源节点不存在");
                 }
 
                 if (sourceNode.NodeType is WfNodeType.Print or WfNodeType.Plugin
                     || !string.Equals(GetFormId(sourceNode), printNode.Metadata.PrintMeta?.FormId, StringComparison.OrdinalIgnoreCase)
                     || !IsPreviousNode(printNode, sourceNode, nodes))
                 {
-                    throw new ArgumentException($"Print node [{printNode.Id}] 的打印来源节点不合法");
+                    throw new BadRequestException($"Print node [{printNode.Id}] 的打印来源节点不合法");
                 }
             }
         }

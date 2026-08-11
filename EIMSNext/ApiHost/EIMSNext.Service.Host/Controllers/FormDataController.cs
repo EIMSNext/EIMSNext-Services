@@ -48,6 +48,40 @@ namespace EIMSNext.Service.Host.Controllers
 
 
         /// <summary>
+        /// 获取当前用户在指定表单中实际所属的权限组。
+        /// </summary>
+        [Permission(Operation = Operation.Read)]
+        [HttpGet("authgroups")]
+        public ActionResult GetAssignedAuthGroups([FromQuery] string formId)
+        {
+            if (string.IsNullOrWhiteSpace(formId))
+            {
+                return BadRequest("表单ID不能为空");
+            }
+
+            var groups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+                .OrderBy(x => x.CreateTime)
+                .ThenBy(x => x.Id)
+                .Select(x => new
+                {
+                    x.Id,
+                    x.AppId,
+                    x.FormId,
+                    x.Name,
+                    x.Desc,
+                    x.Type,
+                    x.DataPerms,
+                    x.FieldPerms,
+                    x.Disabled,
+                    x.CreateTime,
+                })
+                .ToList();
+
+            return Ok(groups);
+        }
+
+
+        /// <summary>
         /// 动态查询总数
         /// </summary>
         /// <param name="filter"></param>
@@ -302,11 +336,11 @@ namespace EIMSNext.Service.Host.Controllers
 
                 if (!string.IsNullOrEmpty(query.Scope.AuthGroupId))
                 {
-                    var authGrp = Resolver.GetService<AuthGroup>().Get(query.Scope.AuthGroupId);
-                    if (authGrp != null)
-                    {
-                        query.Filter = query.Filter.And(BuildAuthGroupDataFilter(authGrp));
-                    }
+                    var formId = query.Scope.FormId ?? FindFormId(query.Filter);
+                    var readScope = string.IsNullOrWhiteSpace(formId)
+                        ? new FormDataReadScope(false, CreateNoMatchFilter(), [])
+                        : Resolver.Resolve<FormDataReadScopeResolver>().Resolve(formId, query.Scope.AuthGroupId);
+                    query.Filter = query.Filter.And(readScope.DataFilter);
                 }
             }
 
@@ -380,46 +414,9 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (!string.IsNullOrEmpty(request.AuthGroupId))
             {
-                var authGrp = Resolver.GetService<AuthGroup>().Get(request.AuthGroupId);
-                if (authGrp != null)
-                {
-                    var filter = request.Filter;
-                    if (filter == null) { filter = new DynamicFilter(); }
-
-                    if (authGrp.Type == AuthGroupType.ManageSelfData)
-                    {
-                        if (filter.IsGroup && filter.Rel == FilterRel.And)
-                        {
-                            filter.Items!.Add(new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id });
-                        }
-                        else
-                        {
-                            filter = new DynamicFilter() { Rel = FilterRel.And, Items = [new DynamicFilter() { Field = Fields.CreateById, Op = FilterOp.Eq, Value = IdentityContext.CurrentEmployee!.Id }, filter] };
-                        }
-                    }
-                    else if (authGrp.Type == AuthGroupType.Custom)
-                    {
-                        if (!string.IsNullOrEmpty(authGrp.DataFilter))
-                        {
-                            var condList = authGrp.DataFilter.DeserializeFromJson<ConditionList>();
-                            if (condList != null)
-                            {
-                                var dataFilter = condList.ToDynamicFilter();
-
-                                if (filter.IsGroup && filter.Rel == FilterRel.And)
-                                {
-                                    filter.Items!.Add(dataFilter);
-                                }
-                                else
-                                {
-                                    filter = new DynamicFilter() { Rel = FilterRel.And, Items = [dataFilter, filter] };
-                                }
-                            }
-                        }
-                    }
-
-                    request.Filter = filter;
-                }
+                var readScope = Resolver.Resolve<FormDataReadScopeResolver>()
+                    .Resolve(request.FormId, request.AuthGroupId);
+                request.Filter = request.Filter.And(readScope.DataFilter);
             }
 
             return request;

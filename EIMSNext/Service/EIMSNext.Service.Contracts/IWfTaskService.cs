@@ -5,7 +5,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-	public interface IWfTodoService : IService<Wf_Todo>
+	public interface IWfTaskService : IService<Wf_Task>
 	{
  
     }

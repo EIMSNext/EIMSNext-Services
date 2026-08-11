@@ -36,7 +36,7 @@ namespace EIMSNext.Flow.Host.Controllers
         private readonly IWfDefinitionService _defservice;
         private readonly IFormDataService _formDataservice;
         private readonly IWfExecLogService _execlogservice;
-        private readonly IWfTodoService _todoservice;
+        private readonly IWfTaskService _taskService;
         private readonly IWorkflowActionService _workflowActionService;
         private readonly IWorkflowInstancePurger _workflowPurger;
         private readonly IMongoPersistenceProvider _store;
@@ -49,7 +49,7 @@ namespace EIMSNext.Flow.Host.Controllers
             _logger = resolver.GetLogger<WorkflowController>();
             _formDataservice = resolver.Resolve<IFormDataService>();
             _execlogservice = resolver.Resolve<IWfExecLogService>();
-            _todoservice = resolver.Resolve<IWfTodoService>();
+            _taskService = resolver.Resolve<IWfTaskService>();
             _workflowActionService = resolver.Resolve<IWorkflowActionService>();
             _workflowPurger = resolver.Resolve<IWorkflowInstancePurger>();
             _store = (IMongoPersistenceProvider)_wfHost.PersistenceStore;
@@ -118,16 +118,16 @@ namespace EIMSNext.Flow.Host.Controllers
 
             var workerId = IdentityContext.CurrentEmployee.Id;
             var workerCode = IdentityContext.CurrentEmployee.Code;
-            var todo = _todoservice.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
+            var task = _taskService.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
-            if (todo == null)
+            if (task == null)
             {
                 return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
             }
 
-            request.WfNodeId = todo.ApproveNodeId;
-            request.WfInstanceId = string.IsNullOrEmpty(request.WfInstanceId) ? todo.WfInstanceId : request.WfInstanceId;
+            request.WfNodeId = task.ApproveNodeId;
+            request.WfInstanceId = string.IsNullOrEmpty(request.WfInstanceId) ? task.WfInstanceId : request.WfInstanceId;
 
             var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
             if (wfInst == null)
@@ -137,12 +137,12 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (request.Action == ApproveAction.Approve)
             {
-                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, todo, NodeActionType.Submit);
-                await _workflowActionService.ValidateSubmitConditionAsync(wfInst, todo);
+                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, task, NodeActionType.Submit);
+                await _workflowActionService.ValidateSubmitConditionAsync(wfInst, task);
             }
             else if (request.Action == ApproveAction.Reject)
             {
-                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, todo, NodeActionType.Reject);
+                await _workflowActionService.ValidateNodeActionEnabledAsync(wfInst, task, NodeActionType.Reject);
             }
 
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
@@ -187,8 +187,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可转交");
             }
 
-            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
-            if (todo == null)
+            var task = ResolveCurrentTask(request.DataId, request.WfNodeId);
+            if (task == null)
             {
                 return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
             }
@@ -198,7 +198,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
                 CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
-            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+            }, wfInst, task, request.TargetEmployeeId, request.Comment);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
@@ -217,8 +217,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可加签");
             }
 
-            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
-            if (todo == null)
+            var task = ResolveCurrentTask(request.DataId, request.WfNodeId);
+            if (task == null)
             {
                 return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
             }
@@ -228,7 +228,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
                 CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
-            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+            }, wfInst, task, request.TargetEmployeeId, request.Comment);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
@@ -247,8 +247,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可回退");
             }
 
-            var todo = ResolveCurrentTodo(request.DataId, request.WfNodeId);
-            if (todo == null)
+            var task = ResolveCurrentTask(request.DataId, request.WfNodeId);
+            if (task == null)
             {
                 return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有审批权限");
             }
@@ -258,7 +258,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
                 CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
-            }, wfInst, todo, request.TargetNodeId, request.Comment);
+            }, wfInst, task, request.TargetNodeId, request.Comment);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
@@ -277,8 +277,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可撤回");
             }
 
-            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
-            if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可撤回");
             }
@@ -293,13 +293,13 @@ namespace EIMSNext.Flow.Host.Controllers
             if (withdrawRule == WorkflowWithdrawRule.StarterOnly)
             {
                 var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
-                if (!string.IsNullOrWhiteSpace(firstApproveNodeId) && todo?.ApproveNodeId != firstApproveNodeId)
+                if (!string.IsNullOrWhiteSpace(firstApproveNodeId) && task?.ApproveNodeId != firstApproveNodeId)
                 {
                     return BadRequest("当前节点不允许撤回");
                 }
             }
 
-            var formDef = Resolver.GetRepository<FormDef>().Get(todo.FormId);
+            var formDef = Resolver.GetRepository<FormDef>().Get(task.FormId);
             var result = await _workflowActionService.WithdrawAsync(
                 new WorkflowActionDataContext
                 {
@@ -308,7 +308,7 @@ namespace EIMSNext.Flow.Host.Controllers
                     CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
                 },
                 wfInst,
-                todo,
+                task,
                 formDef?.Name ?? string.Empty,
                 request.Comment);
 
@@ -329,8 +329,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可催办");
             }
 
-            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
-            if (todo?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可催办");
             }
@@ -349,7 +349,7 @@ namespace EIMSNext.Flow.Host.Controllers
                     CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
                 },
                 wfInst,
-                todo,
+                task,
                 request.DataId);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
@@ -369,9 +369,9 @@ namespace EIMSNext.Flow.Host.Controllers
                 return Ok(new WorkflowActionStatusResponse());
             }
 
-            var todo = _todoservice.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
             var definition = _defservice.Query(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
-            var status = _workflowActionService.GetActionStatus(IdentityContext.CurrentEmployee.Id, todo, definition);
+            var status = _workflowActionService.GetActionStatus(IdentityContext.CurrentEmployee.Id, task, definition);
 
             return Ok(new WorkflowActionStatusResponse
             {
@@ -388,9 +388,9 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("审批人和数据Id不能为空");
             }
 
-            var todo = ResolveCurrentTodo(request.DataId, string.Empty);
+            var task = ResolveCurrentTask(request.DataId, string.Empty);
             var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
-            if (todo == null || wfInst == null || !string.Equals(todo.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            if (task == null || wfInst == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
             {
                 return Ok(new List<NodeActionResponse>());
             }
@@ -401,7 +401,7 @@ namespace EIMSNext.Flow.Host.Controllers
                     x.Version == wfInst.Version)
                 .FirstOrDefault();
             var actions = definition?.Metadata?.Steps
-                .FirstOrDefault(x => x.Id == todo.ApproveNodeId)?
+                .FirstOrDefault(x => x.Id == task.ApproveNodeId)?
                 .WfNodeSetting?.ApproveSetting?.NodeActions;
 
             return Ok(actions?.Select(action => new NodeActionResponse
@@ -433,8 +433,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return Ok(new List<ReturnTargetNode>());
             }
 
-            var todo = ResolveCurrentTodo(request.DataId, string.Empty);
-            if (todo == null)
+            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            if (task == null)
             {
                 return Ok(new List<ReturnTargetNode>());
             }
@@ -444,7 +444,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
                 CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
-            }, wfInst, todo);
+            }, wfInst, task);
 
             return Ok(targets.Select(x => new ReturnTargetNode
             {
@@ -479,6 +479,12 @@ namespace EIMSNext.Flow.Host.Controllers
 
                 if (!result)
                     return ApiResult.Fail(-1, "指定数程实例中止失败", new { id = request.WfInstanceId }).ToActionResult();
+
+                _taskService.Delete(new DynamicFilter
+                {
+                    Rel = "and",
+                    Items = [new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = wfInst.Id }]
+                });
             }
 
             return ApiResult.Success(new { id = request.WfInstanceId }).ToActionResult();
@@ -518,10 +524,16 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可变更审批人");
             }
 
-            var todo = _todoservice.Query(x => x.DataId == request.DataId)
-                .ToList()
-                .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
-            if (todo == null)
+            var tasks = _taskService.Query(x => x.CorpId == IdentityContext.CurrentCorpId
+                && x.DataId == request.DataId
+                && x.WfInstanceId == wfInst.Id);
+            if (!string.IsNullOrEmpty(request.WfNodeId))
+            {
+                tasks = tasks.Where(x => x.ApproveNodeId == request.WfNodeId);
+            }
+
+            var task = tasks.FirstOrDefault();
+            if (task == null)
             {
                 return BadRequest("当前节点待办不存在");
             }
@@ -531,7 +543,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 CorpId = IdentityContext.CurrentCorpId,
                 CurrentEmployeeId = IdentityContext.CurrentEmployee.Id,
                 CurrentEmployee = IdentityContext.CurrentEmployee.ToOperator(),
-            }, wfInst, todo, request.TargetEmployeeId, request.Comment);
+            }, wfInst, task, request.TargetEmployeeId, request.Comment);
 
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
@@ -550,13 +562,13 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可执行超时动作");
             }
 
-            var todo = _todoservice.Query(x => x.WfInstanceId == request.WfInstanceId && x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId).FirstOrDefault();
-            if (todo == null)
+            var task = _taskService.Query(x => x.WfInstanceId == request.WfInstanceId && x.DataId == request.DataId && x.ApproveNodeId == request.WfNodeId).FirstOrDefault();
+            if (task == null)
             {
                 return BadRequest("当前节点待办不存在");
             }
 
-            var result = await _workflowActionService.HandleExpiredTodoAsync(wfInst, todo);
+            var result = await _workflowActionService.HandleExpiredTaskAsync(wfInst, task);
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
 
@@ -601,7 +613,7 @@ namespace EIMSNext.Flow.Host.Controllers
             return _store.GetWorkflowInstances().FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
         }
 
-        private Wf_Todo? ResolveCurrentTodo(string dataId, string? wfNodeId)
+        private Wf_Task? ResolveCurrentTask(string dataId, string? wfNodeId)
         {
             var workerId = IdentityContext.CurrentEmployee?.Id;
             if (string.IsNullOrWhiteSpace(workerId))
@@ -609,7 +621,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 return null;
             }
 
-            return _todoservice.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
+            return _taskService.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
                 .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }

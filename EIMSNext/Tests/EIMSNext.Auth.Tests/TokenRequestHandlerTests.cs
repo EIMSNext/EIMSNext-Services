@@ -121,9 +121,10 @@ namespace EIMSNext.Auth.Tests
                 AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
             };
 
+            var auditLoginService = new FakeAuditLoginService();
             var handler = new TokenRequestHandler(
                 new FakeUserService(new User { Id = "noop", Name = "noop" }, [client]),
-                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }));
+                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }, auditLoginService));
 
             var request = new OpenIddictRequest
             {
@@ -143,6 +144,7 @@ namespace EIMSNext.Auth.Tests
             Assert.AreEqual("wf_wf-inst-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Name).Value);
             Assert.AreEqual("corp-001", result.Claims.Single(x => x.Type == AuthClaimTypes.Corp).Value);
             Assert.AreEqual(IdentityType.System.ToString(), result.Claims.Single(x => x.Type == AuthClaimTypes.IdentityType).Value);
+            Assert.AreEqual(0, auditLoginService.Entries.Count);
         }
 
         [TestMethod]
@@ -180,6 +182,62 @@ namespace EIMSNext.Auth.Tests
             Assert.AreEqual(Errors.InvalidRequest, result.Error);
         }
 
+        [TestMethod]
+        public async Task PublicTokenGrant_DoesNotWriteLoginAudit()
+        {
+            var auditLoginService = new FakeAuditLoginService();
+            var handler = new PublicTokenGrantHandler(
+                new FakePublicTokenService(),
+                auditLoginService,
+                CreateHttpContextAccessor());
+            var client = new Client
+            {
+                Id = InternalClients.PublicClientId,
+                Enabled = true,
+                AccessTokenLifetime = 300
+            };
+            var request = new OpenIddictRequest
+            {
+                GrantType = CustomGrantType.Public,
+                Username = "public_form-001",
+                Password = "challenge",
+                Scope = PublicScope.FormLink.ToString()
+            };
+
+            var result = await handler.HandleAsync(client, request, [PublicScope.FormLink.ToString()]);
+
+            Assert.IsTrue(result.Succeeded);
+            Assert.AreEqual(0, auditLoginService.Entries.Count);
+        }
+
+        [TestMethod]
+        public async Task PublicTokenGrant_Failure_DoesNotWriteLoginAudit()
+        {
+            var auditLoginService = new FakeAuditLoginService();
+            var handler = new PublicTokenGrantHandler(
+                new FakePublicTokenService(PublicTokenValidationResult.Invalid("公开访问凭证无效")),
+                auditLoginService,
+                CreateHttpContextAccessor());
+            var client = new Client
+            {
+                Id = InternalClients.PublicClientId,
+                Enabled = true,
+                AccessTokenLifetime = 300
+            };
+            var request = new OpenIddictRequest
+            {
+                GrantType = CustomGrantType.Public,
+                Username = "public_form-001",
+                Password = "invalid-challenge",
+                Scope = PublicScope.FormLink.ToString()
+            };
+
+            var result = await handler.HandleAsync(client, request, [PublicScope.FormLink.ToString()]);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(0, auditLoginService.Entries.Count);
+        }
+
         private static IHttpContextAccessor CreateHttpContextAccessor()
         {
             var context = new DefaultHttpContext();
@@ -187,17 +245,17 @@ namespace EIMSNext.Auth.Tests
             return new HttpContextAccessor { HttpContext = context };
         }
 
-        private static IReadOnlyList<ITokenGrantHandler> CreateGrantHandlers(User user)
+        private static IReadOnlyList<ITokenGrantHandler> CreateGrantHandlers(User user, FakeAuditLoginService? auditLoginService = null)
         {
             var contextAccessor = CreateHttpContextAccessor();
-            var auditLoginService = new FakeAuditLoginService();
+            auditLoginService ??= new FakeAuditLoginService();
             return
             [
                 new PasswordTokenGrantHandler(new FakeUserService(user), auditLoginService, contextAccessor),
                 new VerificationCodeTokenGrantHandler(new FakeVerificationCodeService(), auditLoginService, contextAccessor),
                 new SingleSignOnTokenGrantHandler(new FakeSingleSignOnService(), auditLoginService, contextAccessor),
                 new IntegrationTokenGrantHandler(new FakeIntegrationAuthService(), auditLoginService, contextAccessor),
-                new SystemTokenGrantHandler(contextAccessor)
+                new SystemTokenGrantHandler(auditLoginService, contextAccessor)
             ];
         }
 
@@ -229,9 +287,23 @@ namespace EIMSNext.Auth.Tests
             public User? Validate(string? corp_empno, string? secret) => null;
         }
 
+        private sealed class FakePublicTokenService(PublicTokenValidationResult? result = null) : IPublicTokenService
+        {
+            public PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope)
+            {
+                return result ?? PublicTokenValidationResult.Success(new PublicTokenSubject("form-001", "corp-001", "app-001"));
+            }
+        }
+
         private sealed class FakeAuditLoginService : IAuditLoginService
         {
-            public Task AddAuditLogin(AuditLogin entity) => Task.CompletedTask;
+            public List<AuditLogin> Entries { get; } = [];
+
+            public Task AddAuditLogin(AuditLogin entity)
+            {
+                Entries.Add(entity);
+                return Task.CompletedTask;
+            }
         }
 
         private sealed class FakeIntegrationAuthService : IIntegrationAuthService

@@ -510,7 +510,7 @@ namespace EIMSNext.Flow.Core.Nodes
                         else
                             insertData.Data.AddOrUpdate(mainField, arrData);
 
-                        if (fieldSetting.ValueType == FieldValueType.Field && fieldSetting.ValueField!.Field.IsSubField)
+                        if (fieldSetting.ValueIsSubField())
                         {
                             // S->S
                             if (dataContext.NodeDatas.ContainsKey(fieldSetting.ValueField!.Field.NodeId!))

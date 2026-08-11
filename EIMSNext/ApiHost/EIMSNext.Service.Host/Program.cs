@@ -21,6 +21,7 @@ using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
+using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
@@ -69,6 +70,7 @@ builder.Services.AddApiVersioning(opt =>
 {
     services.AddSingleton<ODataEnumDeserializer, LowercaseODataEnumDeserializer>();
     services.AddSingleton<ODataEnumSerializer, LowercaseODataEnumSerializer>();
+    services.AddSingleton<SkipTokenHandler, CustomSkipTokenHandler>();
 })).AddODataApiExplorer(opt =>
 {
     opt.GroupNameFormat = "'v'VVV";
@@ -139,7 +141,8 @@ async Task EnsureSeedData(IResolver resolver)
                 Name = "Admin",
                 Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
                 Email = "admin@eimsnext.com",
-                Phone = "12345678901"
+                Phone = "12345678901",
+                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
             await userRepo.InsertAsync(adminUser);
         }

@@ -1,11 +1,14 @@
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Async.Host;
 using EIMSNext.Async.Host.Extensions;
 using EIMSNext.Async.Quartz;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Async.Tasks;
 using EIMSNext.Component;
 using Quartz;
+using Quartz.Impl;
+using Quartz.Store.MongoDb;
 using Serilog;
 
 Directory.SetCurrentDirectory(AppDomain.CurrentDomain.BaseDirectory);
@@ -39,19 +42,33 @@ try
         services.AddRabbitMqMessaging(hostContext.Configuration);
         services.AddAsyncTaskConsumers();
         services.AddAsyncQuartzJobs();
+        services.AddSingleton<QuartzMongoIndexInitializer>();
 
         services.AddQuartz(q =>
         {
-            q.UsePersistentStore(store =>
+            var quartzConfiguration = hostContext.Configuration.GetSection("Quartz");
+            var connectionString = quartzConfiguration.GetValue<string>("ConnectionString")
+                ?? throw new InvalidOperationException("Missing Quartz MongoDB connection string");
+
+            q.UsePersistentStore<MongoDbJobStore>(store =>
             {
-                store.RetryInterval = TimeSpan.FromSeconds(15);
-                store.UseSystemTextJsonSerializer();
-                store.UseSqlServer(sqlServer =>
-                {
-                    sqlServer.ConnectionString = hostContext.Configuration.GetSection("Quartz")?.GetValue<string>("ConnectionString")
-                        ?? throw new InvalidOperationException("Missing Quartz connection string");
-                    sqlServer.TablePrefix = "QRTZ_";
-                });
+                store.SetProperty(
+                    StdSchedulerFactory.PropertySchedulerInstanceName,
+                    quartzConfiguration.GetValue<string>("InstanceName") ?? "EIMSNextAsync");
+                store.SetProperty(
+                    StdSchedulerFactory.PropertySchedulerInstanceId,
+                    quartzConfiguration.GetValue<string>("InstanceId") ?? "AUTO");
+                store.SetProperty("quartz.jobStore.connectionString", connectionString);
+                store.SetProperty(
+                    "quartz.jobStore.collectionPrefix",
+                    quartzConfiguration.GetValue<string>("CollectionPrefix") ?? "quartz");
+                store.SetProperty(
+                    "quartz.jobStore.misfireThreshold",
+                    quartzConfiguration.GetValue<string>("MisfireThreshold") ?? "60000");
+                store.SetProperty(
+                    "quartz.jobStore.dbRetryInterval",
+                    quartzConfiguration.GetValue<string>("DbRetryInterval") ?? "15000");
+                store.UseNewtonsoftJsonSerializer();
             });
             q.AddAsyncQuartzTriggers(hostContext.Configuration);
         });
@@ -63,6 +80,7 @@ try
     });
 
     var host = builder.Build();
+    await host.Services.GetRequiredService<QuartzMongoIndexInitializer>().InitializeAsync();
     await host.RunAsync();
 }
 catch (Exception ex)

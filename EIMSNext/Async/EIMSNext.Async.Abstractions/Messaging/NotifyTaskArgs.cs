@@ -28,7 +28,7 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string DataId { get; set; } = string.Empty;
 
-        public string? TodoId { get; set; }
+        public string? TaskId { get; set; }
 
         public string? WfInstanceId { get; set; }
 
@@ -73,9 +73,17 @@ namespace EIMSNext.Async.Abstractions.Messaging
     [Queue("email")]
     public class EmailNotifyTaskArgs : NotifyTaskArgsBase
     {
+        public EmailTaskType TaskType { get; set; }
+
         public string NotifyId { get; set; } = string.Empty;
 
         public string Detail { get; set; } = string.Empty;
+    }
+
+    public enum EmailTaskType
+    {
+        None,
+        PlatWork,
     }
 
     [Queue("webhook")]

@@ -50,12 +50,12 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            if (args.TodoIds.Count > 0)
+            if (args.TaskIds.Count > 0)
             {
-                var todoRepo = resolver.GetRepository<Wf_Todo>();
-                todoRepo.UpdateMany(
-                    Builders<Wf_Todo>.Filter.In(x => x.Id, args.TodoIds),
-                    Builders<Wf_Todo>.Update
+                var taskRepo = resolver.GetRepository<Wf_Task>();
+                taskRepo.UpdateMany(
+                    Builders<Wf_Task>.Filter.In(x => x.Id, args.TaskIds),
+                    Builders<Wf_Task>.Update
                         .Set(x => x.ExpireHandled, true)
                         .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
                     upsert: false);

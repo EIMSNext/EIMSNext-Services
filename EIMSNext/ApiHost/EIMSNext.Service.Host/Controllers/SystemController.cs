@@ -48,7 +48,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("CurrentUser")]
-        [IdentityType(IdentityTypeDefaults.BusinessUser)]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult CurrentUser()
         {
             var user = IdentityContext.CurrentUser;

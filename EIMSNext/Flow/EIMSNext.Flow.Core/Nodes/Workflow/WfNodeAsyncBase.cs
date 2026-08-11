@@ -23,9 +23,9 @@ namespace EIMSNext.Flow.Core.Nodes
     {
         protected WfNodeAsyncBase(IResolver resolver) : base(resolver)
         {
-            TodoRepository = resolver.GetRepository<Wf_Todo>();
+            TaskRepository = resolver.GetRepository<Wf_Task>();
             ExecLogRepository = resolver.GetRepository<Wf_ExecLog>();
-            ApprovalLogRepository = resolver.GetRepository<Wf_ApprovalLog>();
+            TaskLogRepository = resolver.GetRepository<Wf_TaskLog>();
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             EmployeeRepository = resolver.GetRepository<Employee>();
@@ -34,9 +34,9 @@ namespace EIMSNext.Flow.Core.Nodes
             Logger = resolver.GetLogger<T>();
         }
 
-        protected IRepository<Wf_Todo> TodoRepository { get; private set; }
+        protected IRepository<Wf_Task> TaskRepository { get; private set; }
         protected IRepository<Wf_ExecLog> ExecLogRepository { get; private set; }
-        protected IRepository<Wf_ApprovalLog> ApprovalLogRepository { get; private set; }
+        protected IRepository<Wf_TaskLog> TaskLogRepository { get; private set; }
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IRepository<Employee> EmployeeRepository { get; private set; }
@@ -53,16 +53,16 @@ namespace EIMSNext.Flow.Core.Nodes
             return WfDataContext.FromExpando((ExpandoObject)context.Workflow.Data);
         }
 
-        protected void AddApprovalLog(WorkflowInstance wfInst, Wf_Todo todoTask, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
+        protected void AddTaskLog(WorkflowInstance wfInst, Wf_Task task, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
         {
-            var log = new Wf_ApprovalLog()
+            var log = new Wf_TaskLog()
             {
                 CorpId = dataContext.CorpId,
                 AppId = dataContext.AppId,
                 FormId = dataContext.FormId,
                 FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
-                DataBrief = todoTask.DataBrief,
+                DataBrief = task.DataBrief,
                 Approver = new Operator(approveData.WorkerId, approveData.WorkerCode, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,
@@ -75,7 +75,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 Round = dataContext.Round
             };
 
-            ApprovalLogRepository.Insert(log, session);
+            TaskLogRepository.Insert(log, session);
         }
 
         protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
@@ -86,7 +86,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 return;
             }
 
-            var existedEmpIds = ApprovalLogRepository.Find(x =>
+            var existedEmpIds = TaskLogRepository.Find(x =>
                 x.DataId == dataContext.DataId
                 && x.NodeId == wfStep.Id
                 && x.Result == ApproveAction.CopyTo
@@ -99,9 +99,9 @@ namespace EIMSNext.Flow.Core.Nodes
                 .Distinct()
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-            var logs = new List<Wf_ApprovalLog>();
+            var logs = new List<Wf_TaskLog>();
             await EmployeeRepository.Find(x => targetEmpIds.Contains(x.Id))
-             .ForEachAsync(emp => logs.Add(new Wf_ApprovalLog()
+             .ForEachAsync(emp => logs.Add(new Wf_TaskLog()
              {
                  CorpId = dataContext.CorpId,
                  AppId = dataContext.AppId,
@@ -123,7 +123,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (logs.Any())
             {
-                ApprovalLogRepository.Insert(logs, session);
+                TaskLogRepository.Insert(logs, session);
             }
         }
 
@@ -135,7 +135,7 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.WaitForActivity(context.ExecutionPointer.EventKey, context.Workflow.Data, DateTime.Now);
         }
 
-        protected async Task<List<Wf_Todo>> CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
+        protected async Task<List<Wf_Task>> CreateTasks(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
         {
             var approveSetting = wfStep.WfNodeSetting?.ApproveSetting;
             var empIds = (await PopulateEmpIds(dataContext, approveSetting?.Candidates)).ToList();
@@ -144,12 +144,12 @@ namespace EIMSNext.Flow.Core.Nodes
                 empIds = (await PopulateEmpIds(dataContext, approveSetting.NoApproverSetting.Candidates)).ToList();
             }
 
-            var todos = new List<Wf_Todo>();
+            var tasks = new List<Wf_Task>();
             var now = DateTime.UtcNow.ToTimeStampMs();
             var expireTime = GetExpireTime(approveSetting);
             empIds.ForEach(empId =>
             {
-                todos.Add(new Wf_Todo
+                tasks.Add(new Wf_Task
                 {
                     CorpId = dataContext.CorpId,
                     AppId = dataContext.AppId,
@@ -169,12 +169,12 @@ namespace EIMSNext.Flow.Core.Nodes
                 });
             });
 
-            if ((todos.Any()))
+            if ((tasks.Any()))
             {
-                TodoRepository.Insert(todos, session);
+                TaskRepository.Insert(tasks, session);
             }
 
-            return todos;
+            return tasks;
         }
 
         private static long? GetExpireTime(ApproveSetting? approveSetting)
@@ -203,7 +203,7 @@ namespace EIMSNext.Flow.Core.Nodes
             return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 
-        public DeleteResult DeleteTodos(string corpId, string dataId, string nodeId, IClientSessionHandle? session)
+        public DeleteResult DeleteTasks(string corpId, string dataId, string nodeId, IClientSessionHandle? session)
         {
             var filter = new DynamicFilter()
             {
@@ -214,7 +214,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             };
 
-            return TodoRepository.Delete(filter, session);
+            return TaskRepository.Delete(filter, session);
         }
 
         public UpdateResult UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
@@ -245,7 +245,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)
             {
-                var lastApproval = ApprovalLogRepository
+                var lastApproval = TaskLogRepository
                     .Find(x => x.DataId == dataContext.DataId
                         && x.Result != ApproveAction.CopyTo
                         && x.Result != ApproveAction.Transfer

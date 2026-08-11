@@ -24,21 +24,26 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WfTodoController(IResolver resolver) : ODataController<WfTodoApiService, Wf_Todo, WfTodoViewModel, WfTodoRequest>(resolver)
+        public class WfTaskController(IResolver resolver) : ODataController<WfTaskApiService, Wf_Task, WfTaskViewModel, WfTaskRequest>(resolver)
     {
+        protected override IQueryable<WfTaskViewModel> FilterResult(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
+        {
+            return FilterByPermission(query, options);
+        }
+
         /// <summary>
         /// 
         /// </summary>
         /// <param name="query"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        protected override IQueryable<WfTodoViewModel> Expand(IQueryable<WfTodoViewModel> query, ODataQueryOptions<WfTodoViewModel> options)
+        protected override IQueryable<WfTaskViewModel> Expand(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
         {
             var formDefs = Resolver.GetService<FormDef>().All();
             query = query.Join(formDefs, x => x.FormId, y => y.Id,
-                   //ObjectConvert.ProjExp<WfTodoViewModel, FormDef, string>(x => x.FormName, y => y.Name)               
+                   //ObjectConvert.ProjExp<WfTaskViewModel, FormDef, string>(x => x.FormName, y => y.Name)
                    (x, y) =>
-                      new WfTodoViewModel
+                      new WfTaskViewModel
                       {
                           Id = x.Id,
                           WfInstanceId = x.WfInstanceId,
@@ -67,7 +72,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
             return base.Expand(query, options);
         }
 
-        protected override IQueryable<WfTodoViewModel> FilterByPermission(IQueryable<WfTodoViewModel> query, ODataQueryOptions<WfTodoViewModel> options)
+        protected override IQueryable<WfTaskViewModel> FilterByPermission(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
         {
             if (IdentityContext.CurrentEmployee != null)
             {

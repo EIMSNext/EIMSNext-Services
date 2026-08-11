@@ -13,9 +13,9 @@ namespace EIMSNextt.API.ODataControllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WfApprovalLogController(IResolver resolver) : ReadOnlyODataController<WfApprovalLogApiService, Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
+    public class WfTaskLogController(IResolver resolver) : ReadOnlyODataController<WfTaskLogApiService, Wf_TaskLog, WfTaskLogViewModel>(resolver)
     {
-        protected override IQueryable<WfApprovalLogViewModel> FilterByPermission(IQueryable<WfApprovalLogViewModel> query, ODataQueryOptions<WfApprovalLogViewModel> options)
+        protected override IQueryable<WfTaskLogViewModel> FilterByPermission(IQueryable<WfTaskLogViewModel> query, ODataQueryOptions<WfTaskLogViewModel> options)
         {
             if (IdentityContext.CurrentEmployee != null)
             {

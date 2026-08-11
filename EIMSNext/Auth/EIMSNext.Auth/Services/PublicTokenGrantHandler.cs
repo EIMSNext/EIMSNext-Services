@@ -18,8 +18,8 @@ namespace EIMSNext.Auth.Services
         private readonly IPublicTokenService _publicTokenService;
         private readonly IHttpContextAccessor _httpContextAccessor;
 
-        public PublicTokenGrantHandler(IPublicTokenService publicTokenService, IHttpContextAccessor contextAccessor)
-            : base(contextAccessor)
+        public PublicTokenGrantHandler(IPublicTokenService publicTokenService, IAuditLoginService auditLoginService, IHttpContextAccessor contextAccessor)
+            : base(auditLoginService, contextAccessor)
         {
             _publicTokenService = publicTokenService;
             _httpContextAccessor = contextAccessor;
