@@ -8,7 +8,7 @@ var sourceRoot = GetArgument("--source") ?? throw new ArgumentException("--sourc
 var output = GetArgument("--output") ?? throw new ArgumentException("--output is required");
 var modelNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
-    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "RoleRequest", "RoleGroupRequest", "DynamicFindOptions", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "Role", "RoleGroup"
+    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "RoleRequest", "RoleGroupRequest", "DynamicFindOptions", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "Role", "RoleGroup", "Wf_Task", "Wf_TaskLog", "WfTaskViewModel", "BriefField"
 };
 var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
