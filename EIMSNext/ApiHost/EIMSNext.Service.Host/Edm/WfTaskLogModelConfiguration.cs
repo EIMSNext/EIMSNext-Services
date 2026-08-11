@@ -6,7 +6,7 @@ namespace EIMSNext.API.EdmModelConfiguration
     /// <summary>
     /// 
     /// </summary>
-    public class WfApprovallogModelConfiguration : CorpModelConfigurationBase<WfApprovalLogViewModel>
+    public class WfTaskLogModelConfiguration : CorpModelConfigurationBase<WfTaskLogViewModel>
     {
     }
 }

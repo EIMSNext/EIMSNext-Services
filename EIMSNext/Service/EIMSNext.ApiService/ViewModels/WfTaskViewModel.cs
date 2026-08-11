@@ -2,8 +2,9 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.ApiService.ViewModels
 {
-    public class WfApprovalLogViewModel : Wf_ApprovalLog
+    public class WfTaskViewModel : Wf_Task
     {
+        public string? FormName {  get; set; }
     }
 }
 

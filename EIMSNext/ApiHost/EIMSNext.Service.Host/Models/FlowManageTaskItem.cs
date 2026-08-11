@@ -3,9 +3,9 @@ using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.Service.Host.Models
 {
-    public class FlowManageTodoItem
+    public class FlowManageTaskItem
     {
-        public string TodoId { get; set; } = string.Empty;
+        public string TaskId { get; set; } = string.Empty;
         public string WfInstanceId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public string FormName { get; set; } = string.Empty;
@@ -17,9 +17,9 @@ namespace EIMSNext.Service.Host.Models
         public long ApproveNodeStartTime { get; set; }
     }
 
-    public class FlowManageTodoQueryResult
+    public class FlowManageTaskQueryResult
     {
-        public List<FlowManageTodoItem> Items { get; set; } = [];
+        public List<FlowManageTaskItem> Items { get; set; } = [];
         public long Total { get; set; }
     }
 }

@@ -14,9 +14,9 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfTodoController(IResolver resolver) : ApiControllerBase<WfTodoApiService, Wf_Todo, WfTodoViewModel>(resolver)
+	public class WfTaskController(IResolver resolver) : ApiControllerBase<WfTaskApiService, Wf_Task, WfTaskViewModel>(resolver)
 	{
-		protected override DynamicFindOptions<Wf_Todo> FilterResult(DynamicFindOptions<Wf_Todo> query)
+		protected override DynamicFindOptions<Wf_Task> FilterResult(DynamicFindOptions<Wf_Task> query)
 		{
 			return FilterByPermission(FilterByCorpId(query));
 		}

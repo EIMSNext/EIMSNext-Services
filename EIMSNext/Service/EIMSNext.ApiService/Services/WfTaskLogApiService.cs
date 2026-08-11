@@ -5,7 +5,7 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
-	public class WfApprovalLogApiService(IResolver resolver) : ApiServiceBase<Wf_ApprovalLog, WfApprovalLogViewModel, IWfApprovalLogService>(resolver)
+	public class WfTaskLogApiService(IResolver resolver) : ApiServiceBase<Wf_TaskLog, WfTaskLogViewModel, IWfTaskLogService>(resolver)
 	{
 	}
 }

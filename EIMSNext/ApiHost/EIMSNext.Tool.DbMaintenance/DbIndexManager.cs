@@ -304,45 +304,45 @@ namespace EIMSNext.Auth.DbMaintenance
 
         private void CreateWorkflowBusinessIndexes(CreateIndexOptions options)
         {
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.EmployeeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_wftodo_data_employee");
+                "ix_wftask_data_employee");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.ApproveNodeId).Ascending(x => x.EmployeeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.ApproveNodeId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_wftodo_data_node_employee");
+                "ix_wftask_data_node_employee");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.WfInstanceId).Ascending(x => x.ApproveNodeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.WfInstanceId).Ascending(x => x.ApproveNodeId),
                 options,
-                "ix_wftodo_instance_node");
+                "ix_wftask_instance_node");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.CorpId).Descending(x => x.ApproveNodeStartTime),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.CorpId).Descending(x => x.ApproveNodeStartTime),
                 options,
-                "ix_wftodo_corp_starttime");
+                "ix_wftask_corp_starttime");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.ExpireHandled).Ascending(x => x.ExpireTime),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.ExpireHandled).Ascending(x => x.ExpireTime),
                 options,
-                "ix_wftodo_expire");
+                "ix_wftask_expire");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.Round).Ascending(x => x.ApprovalTime),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.Round).Ascending(x => x.ApprovalTime),
                 options,
-                "ix_wfapprovallog_data_round_time");
+                "ix_wftasklog_data_round_time");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Descending(x => x.ApprovalTime),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Descending(x => x.ApprovalTime),
                 options,
-                "ix_wfapprovallog_data_time");
+                "ix_wftasklog_data_time");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.NodeType),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.NodeType),
                 options,
-                "ix_wfapprovallog_data_nodetype");
+                "ix_wftasklog_data_nodetype");
         }
 
         private void CreateWorkflowRuntimeIndexes(CreateIndexOptions options)

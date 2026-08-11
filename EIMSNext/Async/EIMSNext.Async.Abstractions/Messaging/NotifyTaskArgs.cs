@@ -28,7 +28,7 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string DataId { get; set; } = string.Empty;
 
-        public string? TodoId { get; set; }
+        public string? TaskId { get; set; }
 
         public string? WfInstanceId { get; set; }
 

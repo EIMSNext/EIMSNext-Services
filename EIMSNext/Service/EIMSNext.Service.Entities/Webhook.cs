@@ -80,7 +80,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 流程待办变更
         /// </summary>
-        WfTodo_Updated = 1 << 4,
+        WfTask_Updated = 1 << 4,
     }
 
     /// <summary>

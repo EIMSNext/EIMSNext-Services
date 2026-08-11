@@ -6,7 +6,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.Service
 {
-    public class WfTodoService(IResolver resolver) : EntityServiceBase<Wf_Todo>(resolver), IWfTodoService
+    public class WfTaskService(IResolver resolver) : EntityServiceBase<Wf_Task>(resolver), IWfTaskService
 	{
     }
 }

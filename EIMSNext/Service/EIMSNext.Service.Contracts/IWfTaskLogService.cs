@@ -3,7 +3,7 @@ using EIMSNext.Service.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
-	public interface IWfApprovalLogService : IService<Wf_ApprovalLog>
+	public interface IWfTaskLogService : IService<Wf_TaskLog>
 	{
 	}
 }

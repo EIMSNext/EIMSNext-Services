@@ -307,8 +307,8 @@ namespace EIMSNext.Service
             {
                 var flowFormIdList = flowFormIds.Distinct().ToList();
                 //删除所有待办
-                var todoRepo = Resolver.GetRepository<Wf_Todo>();
-                await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.FormId, flowFormIdList), session);
+                var taskRepo = Resolver.GetRepository<Wf_Task>();
+                await taskRepo.DeleteAsync(taskRepo.FilterBuilder.In(x => x.FormId, flowFormIdList), session);
 
                 //废弃所有流程实例
                 await _flowClient.DeleteDef(new DeleteRequest { DeleteDef = true, FormIds = flowFormIdList }, Context.AccessToken);

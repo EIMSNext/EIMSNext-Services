@@ -33,7 +33,7 @@ namespace EIMSNext.Service.Tests
     public class FormDataServiceDeleteTests
     {
         [TestMethod]
-        public void DeleteCore_DraftWithoutApprovalLog_HardDeletesInsteadOfRecycling()
+        public void DeleteCore_DraftWithoutTaskLog_HardDeletesInsteadOfRecycling()
         {
             var service = TestableFormDataService.Create();
             var data = NewFormData("draft-no-log", FlowStatus.Draft);
@@ -56,7 +56,7 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
-        public void DeleteCore_DraftWithApprovalLog_HardDeletesInsteadOfRecycling()
+        public void DeleteCore_DraftWithTaskLog_HardDeletesInsteadOfRecycling()
         {
             var service = TestableFormDataService.Create();
             var data = NewFormData("draft-with-log", FlowStatus.Draft);

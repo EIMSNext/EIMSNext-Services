@@ -504,8 +504,8 @@ namespace EIMSNext.Service
         {
             if (dataIds.Count == 0) return;
 
-            var todoRepo = Resolver.GetRepository<Wf_Todo>();
-            todoRepo.Delete(todoRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            var taskRepo = Resolver.GetRepository<Wf_Task>();
+            taskRepo.Delete(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
             var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
             dataflowScheduleRepo.Delete(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
@@ -518,8 +518,8 @@ namespace EIMSNext.Service
         {
             if (dataIds.Count == 0) return;
 
-            var todoRepo = Resolver.GetRepository<Wf_Todo>();
-            await todoRepo.DeleteAsync(todoRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            var taskRepo = Resolver.GetRepository<Wf_Task>();
+            await taskRepo.DeleteAsync(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
             var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
             await dataflowScheduleRepo.DeleteAsync(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);

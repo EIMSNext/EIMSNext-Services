@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfApprovalLogController(IResolver resolver) : ApiControllerBase<WfApprovalLogApiService, Wf_ApprovalLog, WfApprovalLogViewModel>(resolver)
+	public class WfTaskLogController(IResolver resolver) : ApiControllerBase<WfTaskLogApiService, Wf_TaskLog, WfTaskLogViewModel>(resolver)
 	{
 		
 	}

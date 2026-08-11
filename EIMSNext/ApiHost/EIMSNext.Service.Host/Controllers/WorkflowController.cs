@@ -29,34 +29,34 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiVersion(1.0)]
     public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
-        [HttpGet("ManageTodos")]
+        [HttpGet("ManageTasks")]
         [IdentityType(IdentityType.CorpAdmin)]
-        public IActionResult ManageTodos([FromQuery] FlowManageQueryRequest request)
+        public IActionResult ManageTasks([FromQuery] FlowManageQueryRequest request)
         {
             var pageNum = request.PageNum <= 0 ? 1 : request.PageNum;
             var pageSize = request.PageSize <= 0 ? 20 : Math.Min(request.PageSize, 100);
             var keyword = request.Keyword?.Trim() ?? string.Empty;
 
-            var todoService = Resolver.GetService<Wf_Todo>();
+            var taskService = Resolver.GetService<Wf_Task>();
             var employeeService = Resolver.GetService<Employee>();
             var departmentService = Resolver.GetService<Department>();
             var employeeDepartmentRepo = Resolver.GetRepository<EmployeeDepartment>();
             var formDefRepo = Resolver.GetRepository<FormDef>();
 
-            var query = todoService.Query(x => x.CorpId == IdentityContext.CurrentCorpId);
+            var query = taskService.Query(x => x.CorpId == IdentityContext.CurrentCorpId);
             if (!string.IsNullOrWhiteSpace(keyword))
             {
                 query = query.Where(x => x.DataId.Contains(keyword));
             }
 
             var total = query.LongCount();
-            var pagedTodos = query
+            var pagedTasks = query
                 .OrderByDescending(x => x.ApproveNodeStartTime)
                 .Skip((pageNum - 1) * pageSize)
                 .Take(pageSize)
                 .ToList();
 
-            var employeeIds = pagedTodos.Select(x => x.EmployeeId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            var employeeIds = pagedTasks.Select(x => x.EmployeeId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var employeeMap = employeeService.Query(x => employeeIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x);
 
             var employeeDepartments = employeeDepartmentRepo.Queryable
@@ -69,29 +69,29 @@ namespace EIMSNext.Service.Host.Controllers
                 .GroupBy(x => x.EmployeeId)
                 .ToDictionary(x => x.Key, x => x.Select(y => y.DepartmentId).ToList());
 
-            var items = pagedTodos.Select(todo =>
+            var items = pagedTasks.Select(task =>
             {
-                employeeMap.TryGetValue(todo.EmployeeId, out var employee);
-                var departmentName = employeeDepartmentMap.TryGetValue(todo.EmployeeId, out var employeeDeptIds)
+                employeeMap.TryGetValue(task.EmployeeId, out var employee);
+                var departmentName = employeeDepartmentMap.TryGetValue(task.EmployeeId, out var employeeDeptIds)
                     ? string.Join(", ", employeeDeptIds.Where(deptMap.ContainsKey).Select(x => deptMap[x]))
                     : string.Empty;
 
-                return new FlowManageTodoItem
+                return new FlowManageTaskItem
                 {
-                    TodoId = todo.Id,
-                    WfInstanceId = todo.WfInstanceId,
-                    DataId = todo.DataId,
-                    FormName = formDefRepo.Get(todo.FormId)?.Name ?? string.Empty,
-                    Starter = todo.Starter,
+                    TaskId = task.Id,
+                    WfInstanceId = task.WfInstanceId,
+                    DataId = task.DataId,
+                    FormName = formDefRepo.Get(task.FormId)?.Name ?? string.Empty,
+                    Starter = task.Starter,
                     CurrentApproverName = employee?.EmpName ?? string.Empty,
                     DepartmentName = departmentName,
-                    ApproveNodeId = todo.ApproveNodeId,
-                    ApproveNodeName = todo.ApproveNodeName,
-                    ApproveNodeStartTime = todo.ApproveNodeStartTime,
+                    ApproveNodeId = task.ApproveNodeId,
+                    ApproveNodeName = task.ApproveNodeName,
+                    ApproveNodeStartTime = task.ApproveNodeStartTime,
                 };
             }).ToList();
 
-            return ApiResult.Success(new FlowManageTodoQueryResult
+            return ApiResult.Success(new FlowManageTaskQueryResult
             {
                 Items = items,
                 Total = total,
@@ -111,12 +111,12 @@ namespace EIMSNext.Service.Host.Controllers
             if (dataError != null) return dataError;
             if (data != null)
             {
-                var approvalLogService = this.Resolver.GetService<Wf_ApprovalLog>();
+                var taskLogService = this.Resolver.GetService<Wf_TaskLog>();
                 var wfDefinitionService = this.Resolver.Resolve<IWfDefinitionService>();
-                var approvalLog = approvalLogService.Query(x => x.DataId == request.DataId).FirstOrDefault();
+                var taskLog = taskLogService.Query(x => x.DataId == request.DataId).FirstOrDefault();
                 var currentDef = wfDefinitionService.Find(data.FormId);
 
-                if (currentDef == null && approvalLog == null)
+                if (currentDef == null && taskLog == null)
                 {
                     return Error(-1, "发起流程失败：未找到已启用流程版本");
                 }
@@ -129,9 +129,9 @@ namespace EIMSNext.Service.Host.Controllers
                 };
 
                 //此处有可能是重新发起流程，应使用之前的流程版本
-                if (approvalLog != null)
+                if (taskLog != null)
                 {
-                    startReq.Version = approvalLog.WfVersion;
+                    startReq.Version = taskLog.WfVersion;
                 }
 
                 var flowClient = Resolver.Resolve<FlowApiClient>();
@@ -160,18 +160,18 @@ namespace EIMSNext.Service.Host.Controllers
             if (dataError != null) return dataError;
             if (data != null)
             {
-                var todoService = Resolver.GetService<Wf_Todo>();
+                var taskService = Resolver.GetService<Wf_Task>();
                 var currentEmployeeId = IdentityContext.CurrentEmployee?.Id;
-                var todo = todoService.Query(x => x.DataId == request.DataId &&
+                var task = taskService.Query(x => x.DataId == request.DataId &&
                     x.EmployeeId == currentEmployeeId &&
                     x.CorpId == IdentityContext.CurrentCorpId).FirstOrDefault();
-                if (todo != null)
+                if (task != null)
                 {
                     var approveReq = new ApproveRequest
                     {
-                        WfInstanceId = todo.WfInstanceId,
-                        DataId = todo.DataId,
-                        WfNodeId = todo.ApproveNodeId,
+                        WfInstanceId = task.WfInstanceId,
+                        DataId = task.DataId,
+                        WfNodeId = task.ApproveNodeId,
                         Action = request.Action,
                         Comment = request.Comment,
                         Signature = request.Signature,

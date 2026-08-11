@@ -33,7 +33,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             return args.MessageType switch
             {
                 MessageType.FormNotify => HandleFormNotifyAsync(args, ct, resolver),
-                MessageType.WfTodoNotify => HandleWfTodoNotifyAsync(args, ct, resolver),
+                MessageType.WfTaskNotify => HandleWfTaskNotifyAsync(args, ct, resolver),
                 MessageType.WfExpireNotify => HandleWfExpireNotifyAsync(args, ct, resolver),
                 MessageType.WfUrgeNotify => HandleWfUrgeNotifyAsync(args, ct, resolver),
                 _ => Task.CompletedTask
@@ -166,21 +166,21 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
         }
 
-        private static async Task HandleWfTodoNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
+        private static async Task HandleWfTaskNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
         {
             if (string.IsNullOrWhiteSpace(args.WfInstanceId) || string.IsNullOrWhiteSpace(args.ApproveNodeId))
             {
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var step = GetWorkflowStep(resolver, sample.WfInstanceId, sample.ApproveNodeId);
             var channels = step?.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
             if (channels == NotifyChannel.None)
@@ -193,16 +193,16 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var receivers = await ResolveTodoReceiversAsync(resolver, todos.Select(x => x.EmployeeId));
+            var receivers = await ResolveTaskReceiversAsync(resolver, tasks.Select(x => x.EmployeeId));
             if (receivers.Count == 0)
             {
                 return;
             }
 
             var title = $"你有一条新的审批待办：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
-            var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:todo";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
+            var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:task";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
 
@@ -216,14 +216,14 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var step = GetWorkflowStep(resolver, sample.WfInstanceId, sample.ApproveNodeId);
             var expireSetting = step?.WfNodeSetting?.ApproveSetting?.ExpireSetting;
             if (expireSetting?.ActionType != WfExpireActionType.AutoNotify)
@@ -254,8 +254,8 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var title = $"审批待办已超时：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:expire";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
@@ -270,14 +270,14 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var definition = GetWorkflowDefinition(resolver, sample.WfInstanceId);
             var channels = definition?.Metadata?.WorkflowSetting?.NotifyChannels ?? NotifyChannel.System;
             if (channels == NotifyChannel.None)
@@ -285,15 +285,15 @@ namespace EIMSNext.Async.Tasks.Consumers
                 channels = NotifyChannel.System;
             }
 
-            var receivers = await ResolveTodoReceiversAsync(resolver, todos.Select(x => x.EmployeeId));
+            var receivers = await ResolveTaskReceiversAsync(resolver, tasks.Select(x => x.EmployeeId));
             if (receivers.Count == 0)
             {
                 return;
             }
 
             var title = $"流程发起人催办：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:urge";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
             var publisher = resolver.Resolve<IMessagePublisher>();
@@ -301,7 +301,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
         }
 
-        private static async Task<List<NotifyReceiver>> ResolveTodoReceiversAsync(IResolver resolver, IEnumerable<string> empIds)
+        private static async Task<List<NotifyReceiver>> ResolveTaskReceiversAsync(IResolver resolver, IEnumerable<string> empIds)
         {
             var targetEmpIds = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (targetEmpIds.Count == 0)
@@ -347,15 +347,15 @@ namespace EIMSNext.Async.Tasks.Consumers
                 .FirstOrDefault();
         }
 
-        private static string BuildTodoDetail(Wf_Todo todo)
+        private static string BuildTaskDetail(Wf_Task task)
         {
             var lines = new List<string>();
-            if (!string.IsNullOrWhiteSpace(todo.Starter?.Label))
+            if (!string.IsNullOrWhiteSpace(task.Starter?.Label))
             {
-                lines.Add($"发起人: {todo.Starter.Label}");
+                lines.Add($"发起人: {task.Starter.Label}");
             }
 
-            foreach (var item in todo.DataBrief.Take(5))
+            foreach (var item in task.DataBrief.Take(5))
             {
                 if (item.Value == null || string.IsNullOrWhiteSpace(item.Value.ToString()))
                 {

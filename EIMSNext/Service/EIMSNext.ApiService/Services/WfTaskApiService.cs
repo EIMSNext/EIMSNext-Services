@@ -6,7 +6,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
 {
-	public class WfTodoApiService(IResolver resolver) : ApiServiceBase<Wf_Todo, WfTodoViewModel, IWfTodoService>(resolver)
+	public class WfTaskApiService(IResolver resolver) : ApiServiceBase<Wf_Task, WfTaskViewModel, IWfTaskService>(resolver)
 	{
 	}
 }

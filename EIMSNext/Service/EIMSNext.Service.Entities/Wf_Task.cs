@@ -6,7 +6,7 @@ namespace EIMSNext.Service.Entities
     /// <summary>
     /// 工作流待办事项实体
     /// </summary>
-    public class Wf_Todo : CorpEntityBase
+    public class Wf_Task : CorpEntityBase
     {
         /// <summary>
         /// 工作流实例ID

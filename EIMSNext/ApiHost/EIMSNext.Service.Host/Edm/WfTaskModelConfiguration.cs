@@ -7,7 +7,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// 
     /// </summary>
-    public class WfTodoModelConfiguration : CorpModelConfigurationBase<WfTodoViewModel, WfTodoRequest>
+    public class WfTaskModelConfiguration : CorpModelConfigurationBase<WfTaskViewModel, WfTaskRequest>
     {
     }
 }
