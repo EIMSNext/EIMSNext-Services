@@ -34,10 +34,6 @@ namespace EIMSNext.Service.Host.Controllers
             if (IdentityContext.IdentityType == IdentityType.Public && string.IsNullOrWhiteSpace(request.ItemId))
                 return Forbid();
 
-            bool isAggregate = (request.Dimensions?.Count > 0 || request.Metrics?.Count > 0);
-            if (isAggregate && (request.Dimensions == null || request.Dimensions.Count == 0))
-                return BadRequest("聚合请求缺少维度");
-
             var cursor = await ApiService.Calucate(request);
             if ((cursor == null))
             {
