@@ -284,6 +284,19 @@ namespace EIMSNext.Service.Host.Controllers
         {
             query.Take = query.GetEffectiveTake();
             query.Skip = query.GetEffectiveSkip();
+            if (IdentityContext.IdentityType == IdentityType.Public)
+            {
+                query.Filter.ClearValueExpressions();
+            }
+            // QueryLink is intentionally a constrained public search form. Validate the original
+            // client filter before server scope conditions are appended below.
+            if (IdentityContext.IdentityType == IdentityType.Public &&
+                IdentityContext.PublicScope == PublicScope.QueryLink &&
+                !IsQueryLinkRelatedSourceQuery(query) &&
+                !IsPublicQueryLinkFilterValid(query.Filter))
+            {
+                query.Filter = CreateNoMatchFilter();
+            }
             query = FilterByCorpId(query);
             if (!query.IncludeDeleted)
             {
@@ -934,6 +947,10 @@ namespace EIMSNext.Service.Host.Controllers
 
         private DynamicFilter? RestrictPublicQueryFilter(IPublicAccessValidator validator, string? formId, DynamicFilter? filter)
         {
+            if (IdentityContext.PublicScope == PublicScope.QueryLink)
+            {
+                return filter;
+            }
             if (string.IsNullOrWhiteSpace(formId) || IsPublicSingleReadRequest())
             {
                 return filter;
@@ -952,6 +969,121 @@ namespace EIMSNext.Service.Host.Controllers
 
             var allowedFields = new HashSet<string>(setting.Form.QueryLink.QueryFields ?? [], StringComparer.OrdinalIgnoreCase);
             return IsFilterAllowed(filter, allowedFields) ? filter : CreateNoMatchFilter();
+        }
+
+        private bool IsQueryLinkRelatedSourceQuery(DynamicFindOptions<FormData> query)
+        {
+            if (IdentityContext.PublicScope != PublicScope.QueryLink)
+            {
+                return false;
+            }
+
+            var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
+            var validator = Resolver.Resolve<IPublicAccessValidator>();
+            return !string.IsNullOrWhiteSpace(formId) && validator.IsRelatedForm(formId);
+        }
+
+        private bool IsPublicQueryLinkFilterValid(DynamicFilter? filter)
+        {
+            var setting = Resolver.Resolve<IPublicAccessValidator>().GetCurrentSetting();
+            var queryFields = setting?.TargetType == PublicTargetType.Form
+                ? setting.Form.QueryLink.QueryFields ?? []
+                : [];
+            if (setting == null || string.IsNullOrWhiteSpace(setting.TargetId) || queryFields.Count == 0 ||
+                queryFields.Distinct(StringComparer.OrdinalIgnoreCase).Count() != queryFields.Count ||
+                filter == null || !filter.IsGroup || !string.Equals(filter.Rel, FilterRel.And, StringComparison.OrdinalIgnoreCase))
+            {
+                return false;
+            }
+
+            var items = filter.Items ?? [];
+            if (items.Count != queryFields.Count + 1 || items.Any(item => item.IsGroup || string.IsNullOrWhiteSpace(item.Field))) return false;
+            var formItems = items.Where(item => string.Equals(item.Field, Fields.FormId, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (formItems.Count != 1 || !string.Equals(formItems[0].Op, FilterOp.Eq, StringComparison.OrdinalIgnoreCase) ||
+                !string.Equals(formItems[0].Value?.ToString(), setting.TargetId, StringComparison.OrdinalIgnoreCase)) return false;
+
+            var fields = FlattenPublicQueryFields(_formDefService.Get(setting.TargetId)?.Content?.Items ?? [])
+                .ToDictionary(item => item.Path, item => item.Definition, StringComparer.OrdinalIgnoreCase);
+            var leaves = items.Where(item => !ReferenceEquals(item, formItems[0])).ToList();
+            return leaves.Count == queryFields.Count && queryFields.All(fieldId =>
+            {
+                if (!fields.TryGetValue(fieldId, out var definition)) return false;
+                var expectedPath = Fields.IsSystemField(fieldId) ? fieldId : $"{Fields.Data}.{fieldId}";
+                var matched = leaves.Where(item => string.Equals(item.Field, expectedPath, StringComparison.OrdinalIgnoreCase)).ToList();
+                return matched.Count == 1 && IsValidPublicQueryLeaf(matched[0], definition.Type);
+            });
+        }
+
+        private static IEnumerable<(string Path, FieldDef Definition)> FlattenPublicQueryFields(IEnumerable<FieldDef> fields, string? parent = null)
+        {
+            foreach (var field in fields)
+            {
+                if (field.Hidden && !IsPublicSystemField(field)) continue;
+                var path = string.IsNullOrWhiteSpace(parent) ? field.Field : $"{parent}>{field.Field}";
+                if (field.Type == FieldType.TableForm)
+                {
+                    foreach (var sub in FlattenPublicQueryFields(field.Columns ?? [], path)) yield return sub;
+                    continue;
+                }
+                if (!IsSupportedPublicQueryField(field.Type)) continue;
+                yield return (path, field);
+            }
+        }
+
+        private static bool IsSupportedPublicQueryField(string? type) =>
+            type == FieldType.Input || type == FieldType.TextArea || type == FieldType.SerialNo ||
+            type == FieldType.Radio || type == FieldType.Select1 || type == FieldType.Number ||
+            type == FieldType.TimeStamp;
+
+        private static bool IsValidPublicQueryLeaf(DynamicFilter leaf, string type)
+        {
+            if (leaf.ValueIsExp || leaf.ValueIsField || !HasPublicFilterValue(leaf.Value)) return false;
+            if (type == FieldType.Number) return string.Equals(leaf.Op, FilterOp.Between, StringComparison.OrdinalIgnoreCase) && IsNumericRange(leaf.Value);
+            if (type == FieldType.TimeStamp) return string.Equals(leaf.Op, FilterOp.Between, StringComparison.OrdinalIgnoreCase) && IsTimestampRange(leaf.Value);
+            return string.Equals(leaf.Op, FilterOp.Eq, StringComparison.OrdinalIgnoreCase) && leaf.Value is not JsonElement { ValueKind: JsonValueKind.Array or JsonValueKind.Object };
+        }
+
+        private static bool HasPublicFilterValue(object? value)
+        {
+            if (value is null) return false;
+            if (value is JsonElement element)
+            {
+                return element.ValueKind switch
+                {
+                    JsonValueKind.String => !string.IsNullOrWhiteSpace(element.GetString()),
+                    JsonValueKind.Array => element.GetArrayLength() > 0 && element.EnumerateArray().All(item => HasPublicFilterValue(item)),
+                    JsonValueKind.Null or JsonValueKind.Undefined => false,
+                    _ => true,
+                };
+            }
+            if (value is System.Collections.IEnumerable enumerable && value is not string)
+                return enumerable.Cast<object?>().Any(HasPublicFilterValue);
+            return !string.IsNullOrWhiteSpace(value.ToString());
+        }
+
+        private static bool IsNumericRange(object? value)
+        {
+            if (value is not JsonElement element || element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 2) return false;
+            var values = element.EnumerateArray().ToArray();
+            return values.All(item => item.ValueKind == JsonValueKind.Number && item.TryGetDecimal(out _)) &&
+                values[0].GetDecimal() <= values[1].GetDecimal();
+        }
+
+        private static bool IsTimestampRange(object? value)
+        {
+            if (value is not JsonElement element || element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 2) return false;
+            var values = element.EnumerateArray().ToArray();
+            if (!values.All(item => TryGetTimestamp(item, out _))) return false;
+            TryGetTimestamp(values[0], out var start);
+            TryGetTimestamp(values[1], out var end);
+            return start <= end;
+        }
+
+        private static bool TryGetTimestamp(JsonElement element, out long value)
+        {
+            value = 0;
+            if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out value)) return true;
+            return element.ValueKind == JsonValueKind.String && long.TryParse(element.GetString(), out value);
         }
 
         private static bool IsFilterAllowed(DynamicFilter? filter, IReadOnlySet<string> allowedFields)

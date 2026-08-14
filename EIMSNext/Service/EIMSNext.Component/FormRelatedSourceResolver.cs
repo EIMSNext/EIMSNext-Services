@@ -8,8 +8,6 @@ namespace EIMSNext.Component
     {
         private static readonly HashSet<string> RemoteOptionTypes =
         [
-            FieldType.Radio,
-            FieldType.CheckBox,
             FieldType.Select1,
             FieldType.Select2,
         ];

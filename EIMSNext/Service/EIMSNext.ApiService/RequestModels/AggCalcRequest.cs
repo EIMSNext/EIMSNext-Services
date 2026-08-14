@@ -48,6 +48,32 @@ namespace EIMSNext.ApiService.RequestModels
     }
 
     /// <summary>
+    /// 仪表盘查看聚合请求。组件的数据定义由服务端按 ItemId 读取，客户端仅能追加运行时条件。
+    /// </summary>
+    public class DashboardAggregateRequest
+    {
+        /// <summary>仪表盘组件 ID</summary>
+        public required string ItemId { get; set; }
+        /// <summary>运行时附加筛选</summary>
+        public DynamicFilter? Filter { get; set; }
+        /// <summary>运行时排序</summary>
+        public List<SortItem>? Sort { get; set; }
+        /// <summary>返回数量</summary>
+        public int? Take { get; set; }
+        /// <summary>跳过数量</summary>
+        public int? Skip { get; set; }
+    }
+
+    /// <summary>
+    /// 仪表盘设计器聚合预览请求。
+    /// </summary>
+    public class DashboardAggregatePreviewRequest : DashboardAggregateRequest
+    {
+        /// <summary>设计器中尚未保存的组件配置</summary>
+        public required string Details { get; set; }
+    }
+
+    /// <summary>
     /// 聚合数据源
     /// </summary>
     public class AgDataSource
