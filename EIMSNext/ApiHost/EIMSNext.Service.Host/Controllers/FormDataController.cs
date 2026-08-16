@@ -1063,27 +1063,48 @@ namespace EIMSNext.Service.Host.Controllers
 
         private static bool IsNumericRange(object? value)
         {
-            if (value is not JsonElement element || element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 2) return false;
-            var values = element.EnumerateArray().ToArray();
-            return values.All(item => item.ValueKind == JsonValueKind.Number && item.TryGetDecimal(out _)) &&
-                values[0].GetDecimal() <= values[1].GetDecimal();
+            if (!TryGetRangeValues(value, out var values) || values.Length != 2) return false;
+            if (!TryGetDecimal(values[0], out var start) || !TryGetDecimal(values[1], out var end)) return false;
+            return start <= end;
         }
 
         private static bool IsTimestampRange(object? value)
         {
-            if (value is not JsonElement element || element.ValueKind != JsonValueKind.Array || element.GetArrayLength() != 2) return false;
-            var values = element.EnumerateArray().ToArray();
+            if (!TryGetRangeValues(value, out var values) || values.Length != 2) return false;
             if (!values.All(item => TryGetTimestamp(item, out _))) return false;
             TryGetTimestamp(values[0], out var start);
             TryGetTimestamp(values[1], out var end);
             return start <= end;
         }
 
-        private static bool TryGetTimestamp(JsonElement element, out long value)
+        private static bool TryGetRangeValues(object? value, out object?[] values)
         {
-            value = 0;
-            if (element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out value)) return true;
-            return element.ValueKind == JsonValueKind.String && long.TryParse(element.GetString(), out value);
+            values = [];
+            var normalized = DynamicValueNormalizer.Normalize(value);
+            if (normalized is not System.Collections.IEnumerable enumerable || normalized is string) return false;
+            values = enumerable.Cast<object?>().ToArray();
+            return true;
+        }
+
+        private static bool TryGetDecimal(object? value, out decimal result)
+        {
+            var normalized = DynamicValueNormalizer.Normalize(value);
+            try
+            {
+                result = Convert.ToDecimal(normalized);
+                return true;
+            }
+            catch (Exception)
+            {
+                result = 0;
+                return false;
+            }
+        }
+
+        private static bool TryGetTimestamp(object? value, out long result)
+        {
+            var normalized = DynamicValueNormalizer.Normalize(value);
+            return long.TryParse(normalized?.ToString(), out result);
         }
 
         private static bool IsFilterAllowed(DynamicFilter? filter, IReadOnlySet<string> allowedFields)
@@ -1367,6 +1388,10 @@ namespace EIMSNext.Service.Host.Controllers
                 || type == FieldType.CheckBox
                 || type == FieldType.Select1
                 || type == FieldType.Select2
+                || type == FieldType.Employee1
+                || type == FieldType.Employee2
+                || type == FieldType.Department1
+                || type == FieldType.Department2
                 || type == FieldType.SerialNo;
         }
 

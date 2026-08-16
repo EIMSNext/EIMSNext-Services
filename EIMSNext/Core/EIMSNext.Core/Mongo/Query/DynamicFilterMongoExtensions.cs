@@ -42,16 +42,16 @@ namespace EIMSNext.Core.Mongo.Query
                         field = FormatTextSearchField(field, filter.Type);
                     }
                     var filterValues = new List<object>();
-                    if (filter.Value is List<object>)
+                    var normalizedValue = DynamicValueNormalizer.Normalize(filter.Value);
+                    if (normalizedValue is IEnumerable values && normalizedValue is not string && normalizedValue is not IDictionary)
                     {
-                        filterValues = (filter.Value as List<object>)!
+                        filterValues = values.Cast<object?>()
                             .Select(value => DynamicValueNormalizer.Normalize(value)!)
                             .ToList();
                     }
-                    else
+                    else if (normalizedValue != null)
                     {
-                        if (filter.Value != null)
-                            filterValues.Add(DynamicValueNormalizer.Normalize(filter.Value)!);
+                        filterValues.Add(normalizedValue);
                     }
 
                     EnsureSafeValues(filterValues);
