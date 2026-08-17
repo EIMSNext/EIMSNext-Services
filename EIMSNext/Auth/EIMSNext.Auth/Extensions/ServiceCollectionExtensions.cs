@@ -19,7 +19,16 @@ namespace EIMSNext.Auth.Extensions
         public static IServiceCollection AddAuthServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
             services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
-            services.AddScoped<IAuthDbContext, AuthDbContext>();
+            services.AddOptions<AuditLoginQueueOptions>()
+                .Bind(configuration.GetSection(AuditLoginQueueOptions.SectionName))
+                .Validate(options => options.Capacity > 0, "AuditLoginQueue:Capacity must be greater than zero.")
+                .Validate(options => options.BatchSize > 0, "AuditLoginQueue:BatchSize must be greater than zero.")
+                .Validate(options => options.FlushIntervalMs >= 10, "AuditLoginQueue:FlushIntervalMs must be at least 10.")
+                .Validate(options => options.ShutdownDrainSeconds > 0, "AuditLoginQueue:ShutdownDrainSeconds must be greater than zero.")
+                .ValidateOnStart();
+            services.AddSingleton<IAuthDbContext, AuthDbContext>();
+            services.AddSingleton<AuditLoginQueue>();
+            services.AddHostedService<AuditLoginWriterService>();
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
             services.AddScoped<PublicSettingLookupService>();

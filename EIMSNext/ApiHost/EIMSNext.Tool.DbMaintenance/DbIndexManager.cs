@@ -78,6 +78,23 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_employeedepartment_department_employee");
 
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.SortValue),
+                options,
+                "ix_employeedepartment_corp_employee_sort");
+
+            CreateIndex(GetCollection<AdminGroup>(),
+                Builders<AdminGroup>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Ascending(x => x.EmployeeIds)
+                    .Ascending(x => x.Type),
+                options,
+                "ix_admingroup_corp_delete_employee_type");
+
             CreateIndex(GetCollection<Employee>(),
                 Builders<Employee>.IndexKeys.Ascending("Roles.RoleId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
                 options,
