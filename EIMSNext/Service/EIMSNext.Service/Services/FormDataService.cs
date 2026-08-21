@@ -28,7 +28,7 @@ namespace EIMSNext.Service
     public class FormDataService : EntityServiceBase<FormData>, IFormDataService
     {
         private FlowApiClient _flowClient;
-        private ISerialNoSequenceService? _serialNoSvc;
+        private readonly ISerialNoSequenceService _serialNoSvc;
         private readonly AttachmentReferenceService _attachmentReferenceService;
         public FormDataService(IResolver resolver) : base(resolver)
         {
@@ -675,7 +675,8 @@ namespace EIMSNext.Service
         /// </summary>
         private void ResolveSerialNumbers(FormData entity, FormDef formDef, FormData? oldEntity)
         {
-            if (_serialNoSvc == null || formDef?.Content == null) return;
+            if (formDef?.Content == null) return;
+            entity.Data ??= new ExpandoObject();
             var layout = formDef.Content.Layout;
             if (string.IsNullOrWhiteSpace(layout)) return;
 
@@ -684,9 +685,9 @@ namespace EIMSNext.Service
             {
                 doc = JsonDocument.Parse(layout);
             }
-            catch
+            catch (JsonException)
             {
-                return;
+                throw new BadRequestException("表单布局配置无效，无法生成流水号");
             }
 
             var dataDict = (IDictionary<string, object?>)entity.Data!;
@@ -852,7 +853,7 @@ namespace EIMSNext.Service
                                 _ => SerialNoResetCycle.Never
                             };
                         }
-                        var seq = _serialNoSvc!.NextFormSerialNo(
+                        var seq = _serialNoSvc.NextFormSerialNo(
                             entity.CorpId ?? string.Empty,
                             entity.AppId,
                             entity.FormId,
