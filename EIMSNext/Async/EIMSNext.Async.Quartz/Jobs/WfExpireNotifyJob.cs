@@ -64,7 +64,8 @@ namespace EIMSNext.Async.Quartz.Jobs
                         FormId = sample.FormId,
                         DataId = sample.DataId,
                         WfInstanceId = sample.WfInstanceId,
-                        ApproveNodeId = sample.ApproveNodeId
+                        ApproveNodeId = sample.ApproveNodeId,
+                        EventStamp = now,
                     });
 
                     // The notification task is now durably queued. Mark the source tasks

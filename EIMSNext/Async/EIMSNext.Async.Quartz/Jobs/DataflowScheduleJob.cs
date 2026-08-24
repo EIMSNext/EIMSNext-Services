@@ -21,7 +21,7 @@ using Quartz;
 namespace EIMSNext.Async.Quartz.Jobs
 {
     /// <summary>
-    /// 数据流定时调度扫描作业。扫描到到期项后通过 IMessagePublisher 投递 DataflowRunTaskArgs，
+    /// 数据流定时调度扫描作业。扫描到到期项后通过 IMessagePublisher 发布 DataflowRunTaskArgs，
     /// 由 Async.Tasks 中的 DataflowRunConsumer 调 FlowApiClient.RunDataflow 触发一次执行。
     /// </summary>
     [DisallowConcurrentExecution]

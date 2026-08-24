@@ -93,6 +93,7 @@ namespace EIMSNext.Flow.Core
                 DataId = dataId,
                 WfInstanceId = workflowInstance.Id,
                 ApproveNodeId = task.ApproveNodeId,
+                EventStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
             });
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };

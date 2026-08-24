@@ -195,9 +195,12 @@ namespace EIMSNext.Service
 
         protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
         {
+            var outboxPublisher = Resolver.Resolve<IOutboxPublisher>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var entity = entities.First();
-            await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Created);
+            var webhookEventId = Guid.NewGuid().ToString("N");
+            var webhookPayload = (entity).SerializeToJson();
+            MongoTransactionScope.RegisterAfterCommit(() => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId));
 
             await EnqueueFormNotify(messagePublisher, entity, null, FormNotifyTriggerMode.DataAdded);
             await RebuildTimeFieldNotifySchedulesAsync(entity, session);
@@ -530,6 +533,7 @@ namespace EIMSNext.Service
 
         protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
         {
+            var outboxPublisher = Resolver.Resolve<IOutboxPublisher>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
             var oriValue = new ExpandoObject();
@@ -543,7 +547,8 @@ namespace EIMSNext.Service
 
             var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
             formExp.TryAdd("oridata", oriValue);
-            await EnqueueWebhookAsync(messagePublisher, entity, WebHookTrigger.Data_Updated, formExp);
+            var webhookEventId = Guid.NewGuid().ToString("N");
+            MongoTransactionScope.RegisterAfterCommit(() => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId));
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);
             await RebuildTimeFieldNotifySchedulesAsync(entity, session);
@@ -984,9 +989,9 @@ namespace EIMSNext.Service
             }
         }
 
-        private Task EnqueueFormNotify(IMessagePublisher messagePublisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
+        private Task EnqueueFormNotify(IMessagePublisher publisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
         {
-            return messagePublisher.PublishAsync(new NotifyDispatchTaskArgs
+            return publisher.PublishAsync(new NotifyDispatchTaskArgs
             {
                 CorpId = Context.CorpId,
                 MessageType = MessageType.FormNotify,
@@ -996,20 +1001,23 @@ namespace EIMSNext.Service
                 DataId = newData.Id,
                 FormTriggerMode = triggerMode,
                 Operator = Context.Operator,
+                EventStamp = newData.UpdateTime ?? newData.CreateTime,
                 NewData = newData.SerializeToJson().DeserializeFromJson<FormData>()!,
                 OldData = oldData?.SerializeToJson().DeserializeFromJson<FormData>()
             });
         }
 
-        private static Task EnqueueWebhookAsync(IMessagePublisher messagePublisher, FormData entity, WebHookTrigger trigger, object? payload = null)
+        private static Task EnqueueWebhookAsync(IOutboxPublisher publisher, FormData entity, WebHookTrigger trigger, string payloadJson, string eventId)
         {
-            return messagePublisher.PublishAsync(new WebhookTaskArgs
+            return publisher.EnqueueAsync(new WebhookTaskArgs
             {
                 CorpId = entity.CorpId ?? string.Empty,
                 AppId = entity.AppId,
                 FormId = entity.FormId,
                 Trigger = trigger,
-                PayloadJson = (payload ?? entity).SerializeToJson()
+                PayloadJson = payloadJson,
+                DataId = entity.Id,
+                EventId = eventId
             });
         }
 

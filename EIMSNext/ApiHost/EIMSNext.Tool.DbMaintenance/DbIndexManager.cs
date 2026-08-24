@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Service.Persistence.Outbox;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Entities;
@@ -36,6 +37,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
             CreateDataflowLogIndexes(background);
+            CreateOutboxIndexes(background);
         }
 
         private void CreateAuthIndexes(CreateIndexOptions options)
@@ -533,6 +535,45 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_workbenchrecent_lastvisit");
         }
 
+        private void CreateOutboxIndexes(CreateIndexOptions options)
+        {
+            // OutboxMessage：投递层幂等唯一键（防重复入队）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.IdempotencyKey),
+                CreateUniqueOptions(options),
+                "ix_outboxmessage_idempotencykey_unique");
+
+            // OutboxMessage：扫描待投递（Pending 且 OutAt 已到期）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.OutAt),
+                options,
+                "ix_outboxmessage_status_outat");
+
+            // OutboxMessage：取死信补偿窗口（Failed 且 LastAttemptTime 最旧）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LastAttemptTime),
+                options,
+                "ix_outboxmessage_status_lastattempt");
+
+            // 仅 Sent 记录会写 SentAt，TTL 不会删除 Pending/Failed 记录。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.SentAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_outboxmessage_sentat_ttl");
+
+            // ProcessedMessage：一个业务事件可投递给多个目标，按事件 + 目标去重。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.EventKey).Ascending(x => x.Target),
+                CreateUniqueOptions(options),
+                "ix_processedmessage_event_target_unique");
+
+            // MongoDB TTL 仅支持 BSON Date；保留 30 天，覆盖正常重投和人工补偿窗口。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.ProcessedAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_processedmessage_processedat_ttl");
+        }
+
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase
         {
             CreateIndex(GetCollection<T>(), Builders<T>.IndexKeys.Ascending(x => x.CorpId), options, name);
@@ -559,6 +600,7 @@ namespace EIMSNext.Auth.DbMaintenance
             {
                 Background = options.Background,
                 Unique = options.Unique,
+                ExpireAfter = options.ExpireAfter,
                 Name = name
             };
             collection.Indexes.CreateOne(new CreateIndexModel<T>(keys, indexOptions));

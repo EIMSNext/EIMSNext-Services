@@ -4,6 +4,6 @@ namespace EIMSNext.CloudEvent
 {
     public interface IEventHub
     {
-        Task SendAsync(Webhook webhook, WebHookTrigger trigger, object data);
+        Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data);
     }
 }

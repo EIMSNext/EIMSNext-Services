@@ -1,0 +1,6 @@
+# 各项目的 GenerateDocumentationFile 会把 *.xml 写到源码目录（非输出目录）；
+# 这些是构建副产物，不应提交。
+Core/EIMSNext.Common/EIMSNext.Common.xml
+Core/EIMSNext.Core/EIMSNext.Core.xml
+Service/EIMSNext.ApiService/EIMSNext.ApiService.xml
+Service/EIMSNext.Service.Entities/EIMSNext.Service.Entities.xml

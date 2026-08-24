@@ -11,12 +11,14 @@
     <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Abstractions" />
     <PackageReference Include="Nanoid" />
     <PackageReference Include="NPOI" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
+    <ProjectReference Include="..\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />

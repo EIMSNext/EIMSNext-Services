@@ -9,6 +9,7 @@
     <Version>1.1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Service\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />
     <ProjectReference Include="..\..\Auth\EIMSNext.Auth.Entities\EIMSNext.Auth.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />

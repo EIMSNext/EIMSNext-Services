@@ -78,7 +78,7 @@ public class CorporateApiServiceNotificationTests
         {
             [typeof(ICorporateService)] = new RecordingCorporateService(),
             [typeof(IService<User>)] = new RecordingEntityService<User>(owner),
-            [typeof(IMessagePublisher)] = publisher,
+            [typeof(IOutboxPublisher)] = publisher,
             [typeof(IConfiguration)] = new ConfigurationBuilder().AddInMemoryCollection(
                 new Dictionary<string, string?> { ["ServiceContracts"] = serviceContracts }).Build(),
             [typeof(ICacheClient)] = new NullCacheClient(),
@@ -89,11 +89,19 @@ public class CorporateApiServiceNotificationTests
         return new TestResolver(services);
     }
 
-    private sealed class RecordingPublisher : IMessagePublisher
+    private sealed class RecordingPublisher : IOutboxPublisher
     {
         public List<object> Messages { get; } = [];
 
-        public Task PublishAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default) where TMessage : class
+        public Task EnqueueAsync<TMessage>(TMessage message, CancellationToken cancellationToken = default)
+            where TMessage : class, IOutboxMessage
+        {
+            Messages.Add(message);
+            return Task.CompletedTask;
+        }
+
+        public Task EnqueueAsync<TMessage>(string idempotencyKey, TMessage message, CancellationToken cancellationToken = default)
+            where TMessage : class, IOutboxMessage
         {
             Messages.Add(message);
             return Task.CompletedTask;

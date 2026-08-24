@@ -1,6 +1,7 @@
-using EIMSNext.Async.Abstractions.Messaging;
-using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Async.RabbitMQ.Messaging;
+using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common.Extensions;
+using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Mongo.Entities;
@@ -53,6 +54,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var recipients = emails
                 .Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(x => x, StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             if (recipients.Count == 0)
@@ -63,6 +65,15 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var channelId = GetChannelId(args.TaskType);
             var provider = GetProvider(resolver, channelId);
+            var baseKey = resolver.Resolve<IOutboxIdempotencyKeyFactory>().Create(args);
+            var target = string.Join(',', recipients).ToLowerInvariant();
+            var processingRepository = resolver.Resolve<IMessageProcessingRepository>();
+            var leaseToken = await processingRepository.TryAcquireAsync(baseKey, target, DateTime.UtcNow.AddMinutes(5), ct);
+            if (leaseToken == null)
+            {
+                Logger.LogInformation("Email notify dedup: key={Key}, target={Target}, skipped", baseKey, target);
+                return;
+            }
 
             Logger.LogInformation("Email notify consumed for NotifyId={NotifyId}, Subject={Title}, RecipientCount={RecipientCount}, Channel={Channel}",
                 args.NotifyId,
@@ -70,7 +81,20 @@ namespace EIMSNext.Async.Tasks.Consumers
                 recipients.Count,
                 channelId);
 
-            await provider.SendAsync(args, recipients, resolver, ct);
+            try
+            {
+                await provider.SendAsync(args, recipients, resolver, ct);
+                await processingRepository.MarkCompletedAsync(baseKey, target, leaseToken, DateTime.UtcNow.ToTimeStampMs(), ct);
+            }
+            catch (TaskRequeueException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Logger.LogWarning(ex, "Email external effect failed; message will be requeued. key={Key}, target={Target}", baseKey, target);
+                throw new TaskRequeueException("Email external effect failed.", TimeSpan.FromSeconds(30));
+            }
         }
 
         private IEmailChannelProvider GetProvider(IResolver resolver, string channelId)

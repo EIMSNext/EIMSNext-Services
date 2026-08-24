@@ -2,6 +2,9 @@ using Autofac;
 
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Async.Quartz.Jobs;
+using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.CloudEvent;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
@@ -27,6 +30,9 @@ namespace EIMSNext.Async.Host.Extensions
             builder.RegisterType<EventHub>().AsImplementedInterfaces().SingleInstance();
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterType<FlowApiClient>().AsSelf().SingleInstance();
+
+            builder.RegisterOutboxConsumers();
+            builder.RegisterType<OutboxDeliveryJob>().AsSelf().InstancePerDependency();
         }
     }
 }

@@ -67,7 +67,7 @@ namespace EIMSNext.Async.Tests
 
         private sealed class FakeEventHub : IEventHub
         {
-            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, object data) => Task.CompletedTask;
+            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data) => Task.CompletedTask;
         }
 
         private sealed class TestResolver(IServiceProvider serviceProvider) : IResolver

@@ -118,6 +118,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                     DataId = string.Empty,
                     FormTriggerMode = FormNotifyTriggerMode.CustomScheduled,
                     Operator = Operator.Empty,
+                    EventStamp = item.TriggerTime,
                     NewData = new FormData
                     {
                         AppId = notify.AppId,
@@ -138,6 +139,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 DataId = item.DataId ?? string.Empty,
                 FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                 Operator = Operator.Empty,
+                EventStamp = item.TriggerTime,
                 NewData = new FormData
                 {
                     Id = item.DataId ?? string.Empty,

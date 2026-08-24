@@ -19,6 +19,8 @@
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

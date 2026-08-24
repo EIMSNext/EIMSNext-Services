@@ -213,6 +213,7 @@ namespace EIMSNext.Service.Tests
 
             var resolver = new TestResolver(services);
             services[typeof(AdminPermissionEvaluator)] = new AdminPermissionEvaluator(resolver);
+            services[typeof(FormDataReadScopeResolver)] = new FormDataReadScopeResolver(resolver);
             return new FormDataApiService(resolver);
         }
 

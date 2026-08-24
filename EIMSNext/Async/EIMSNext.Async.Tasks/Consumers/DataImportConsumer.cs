@@ -148,7 +148,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            await resolver.Resolve<IMessagePublisher>().PublishAsync(new SystemMessageTaskArgs
+            await resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new SystemMessageTaskArgs
             {
                 CorpId = importLog.CorpId ?? string.Empty,
                 NotifyId = importLog.Id,
@@ -158,6 +158,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ExpireTime = DateTime.UtcNow.AddDays(30).ToTimeStampMs(),
                 Category = MessageCategory.DataNotify,
                 MessageType = MessageType.ImportNotify,
+                EventStamp = importLog.CreateTime,
                 Receivers =
                 [
                     new NotifyReceiver

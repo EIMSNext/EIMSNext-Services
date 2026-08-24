@@ -240,7 +240,8 @@ namespace EIMSNext.Flow.Core.Nodes
                         FormId = dataContext.FormId,
                         DataId = dataContext.DataId,
                         WfInstanceId = context.Workflow.Id,
-                        ApproveNodeId = meta.Id
+                        ApproveNodeId = meta.Id,
+                        EventStamp = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
                     });
                 }
 
