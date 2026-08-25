@@ -33,9 +33,9 @@ namespace EIMSNext.Common
     /// 设计器在保存表单时调用 <see cref="ValidateFieldId"/> 拒绝不合规的字段名。
     /// 不变量：
     ///  - 不允许出现 ASCII 控制字符；
-    ///  - 不允许出现 <c>$</c>（与 dataflow 公式占位符 <c>$F1</c>/<c>$F2</c> 冲突；
+    ///  - 不允许出现 <c>$</c>（与 eventFlow 公式占位符 <c>$F1</c>/<c>$F2</c> 冲突；
     ///    避免子表单字段引用 <c>{parent}>{child}</c> 之外的意外替换）；
-    ///  - 不允许出现 <c>&gt;</c>（dataflow 公式的子表分隔符 <c>parent&gt;child</c>）；
+    ///  - 不允许出现 <c>&gt;</c>（eventFlow 公式的子表分隔符 <c>parent&gt;child</c>）；
     ///  - 不允许出现 ASCII 控制字符与空白。
     /// </para>
     /// <para>

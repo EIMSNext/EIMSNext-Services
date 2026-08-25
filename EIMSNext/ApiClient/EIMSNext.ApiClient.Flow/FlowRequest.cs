@@ -22,7 +22,7 @@ namespace EIMSNext.ApiClient.Flow
         Task<WfResponse?> DeleteWorkflowInstances(DeleteWorkflowInstancesRequest req, string accessToken);
         Task<WfResponse?> ExpireAction(ExpireActionRequest req, string accessToken);
 
-        Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken);
+        Task<WfResponse?> RunEventFlow(EfRunRequest req, string accessToken);
     }
 
     public class LoadDefRequest()
@@ -35,7 +35,7 @@ namespace EIMSNext.ApiClient.Flow
         public string WfDefinitionId { get; set; } = string.Empty;
         public int Version { get; set; }
         public string DataId { get; set; } = string.Empty;
-        public CascadeMode DfCascade { get; set; }
+        public CascadeMode EfCascade { get; set; }
         public string? EventIds { get; set; }
     }
     public class ApproveRequest
@@ -121,15 +121,15 @@ namespace EIMSNext.ApiClient.Flow
         public string NodeName { get; set; } = string.Empty;
         public int Round { get; set; }
     }
-    public class DfRunRequest
+    public class EfRunRequest
     {
-        public string DataflowId { get; set; } = string.Empty;
+        public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
         public string WfNodeId { get; set; } = string.Empty;
         public string? NodeAction { get; set; }
-        public CascadeMode DfCascade { get; set; }
+        public CascadeMode EfCascade { get; set; }
         public string? EventIds { get; set; }
         public List<string>? ChangeFields { get; set; }
     }

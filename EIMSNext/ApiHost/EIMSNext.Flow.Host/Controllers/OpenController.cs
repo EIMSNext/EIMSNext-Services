@@ -48,8 +48,8 @@ namespace EIMSNext.Flow.Host.Controllers
         /// 通过HTTP触发智能助手。
         /// </summary>
         [HttpPost]
-        [Route("api/v{version:apiVersion}/tenant/{corpId}/dataflow/{dataflowId}")]
-        public async Task<IActionResult> TriggerDataflowAsync([FromRoute] string corpId, [FromRoute] string dataflowId)
+        [Route("api/v{version:apiVersion}/tenant/{corpId}/eventflow/{eventFlowId}")]
+        public async Task<IActionResult> TriggerEventFlowAsync([FromRoute] string corpId, [FromRoute] string eventFlowId)
         {
             var accessor = _resolver.Resolve<IHttpContextAccessor>();
             var clientIp = IpHelper.GetClientIp(accessor);
@@ -58,9 +58,9 @@ namespace EIMSNext.Flow.Host.Controllers
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
 
-            var result = await _resolver.Resolve<IDataflowHookService>().HandleAsync(
+            var result = await _resolver.Resolve<IEventFlowHookService>().HandleAsync(
                 corpId,
-                dataflowId,
+                eventFlowId,
                 clientIp,
                 Request.Method,
                 Request.ContentType ?? string.Empty,

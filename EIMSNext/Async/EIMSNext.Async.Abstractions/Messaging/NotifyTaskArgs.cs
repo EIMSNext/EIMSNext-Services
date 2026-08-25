@@ -41,6 +41,12 @@ namespace EIMSNext.Async.Abstractions.Messaging
         public FormData? NewData { get; set; }
 
         public FormData? OldData { get; set; }
+
+        /// <summary>
+        /// 事件产生时间戳（Unix 毫秒）。同一 DataId 的数据可能被多次修改/多次触发，
+        /// 投递层幂等键据此区分不同的事件实例，防止后续事件被唯一索引去重吞掉。
+        /// </summary>
+        public long EventStamp { get; set; }
     }
 
     public abstract class NotifyTaskArgsBase
@@ -55,10 +61,17 @@ namespace EIMSNext.Async.Abstractions.Messaging
         public MessageType MessageType { get; set; }
 
         public List<NotifyReceiver> Receivers { get; set; } = new();
+
+        /// <summary>
+        /// 事件产生时间戳（Unix 毫秒）。同一通知配置/同一条数据可能被多次触发，
+        /// 投递层幂等键据此区分不同的事件实例，防止后续触发被唯一索引去重吞掉。
+        /// </summary>
+        public long EventStamp { get; set; }
     }
 
     [Queue("system-message")]
-    public class SystemMessageTaskArgs : NotifyTaskArgsBase
+    [OutboxQueue("system-message")]
+    public class SystemMessageTaskArgs : NotifyTaskArgsBase, IOutboxMessage
     {
         public string NotifyId { get; set; } = string.Empty;
 
@@ -71,7 +84,8 @@ namespace EIMSNext.Async.Abstractions.Messaging
     }
 
     [Queue("email")]
-    public class EmailNotifyTaskArgs : NotifyTaskArgsBase
+    [OutboxQueue("email")]
+    public class EmailNotifyTaskArgs : NotifyTaskArgsBase, IOutboxMessage
     {
         public EmailTaskType TaskType { get; set; }
 
@@ -87,7 +101,8 @@ namespace EIMSNext.Async.Abstractions.Messaging
     }
 
     [Queue("webhook")]
-    public class WebhookTaskArgs
+    [OutboxQueue("webhook")]
+    public class WebhookTaskArgs : IOutboxMessage
     {
         public string CorpId { get; set; } = string.Empty;
 
@@ -95,8 +110,13 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         public string FormId { get; set; } = string.Empty;
 
+        public string DataId { get; set; } = string.Empty;
+
         public WebHookTrigger Trigger { get; set; }
 
         public string PayloadJson { get; set; } = string.Empty;
+
+        /// <summary>Stable event identifier supplied by the business event source.</summary>
+        public string EventId { get; set; } = string.Empty;
     }
 }

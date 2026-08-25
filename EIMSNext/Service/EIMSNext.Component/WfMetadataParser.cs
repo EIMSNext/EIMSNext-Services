@@ -20,7 +20,7 @@ namespace EIMSNext.Component
             meta.Id = def.ExternalId;
             meta.Version = def.Version;
             var flowData = def.Content.DeserializeFromJson<FlowData>()!;
-            if (def.FlowType == FlowType.Dataflow)
+            if (def.FlowType == FlowType.EventFlow)
             {
                 ValidatePrintSources(flowData);
             }
@@ -110,7 +110,7 @@ namespace EIMSNext.Component
             flowData.Nodes.ForEach(node => { ParseFlowNode(corpId, steps, flowType, node, flowData.EndNode.Id, otherformIds); });
             ParseFlowNode(corpId, steps, flowType, flowData.EndNode, flowData.EndNode.Id, otherformIds);
 
-            if (flowType == FlowType.Dataflow)
+            if (flowType == FlowType.EventFlow)
             {
                 var triggerMeta = flowData.StartNode.Metadata.TriggerMeta!;
 
@@ -121,7 +121,7 @@ namespace EIMSNext.Component
                 eventSetting.NodeAction = triggerMeta.NodeAction;
                 eventSetting.SourceFormId = triggerMeta.FormId;
                 eventSetting.OtherFormIds = otherformIds;
-                eventSetting.CascadeMode = flowData.DfCascade;
+                eventSetting.CascadeMode = flowData.EfCascade;
                 if (flowData.EventIds?.Count > 0)
                 {
                     eventSetting.SpecifiedEvents = $",{string.Join(',', flowData.EventIds)},";
@@ -143,7 +143,7 @@ namespace EIMSNext.Component
         }
         private string GetStepType(FlowType flowType, WfNodeType nodeType)
         {
-            var prefix = flowType == FlowType.Dataflow ? "Df" : "Wf";
+            var prefix = flowType == FlowType.EventFlow ? "Ef" : "Wf";
             return $"{prefix}{nodeType}Node";
         }
 
@@ -163,9 +163,9 @@ namespace EIMSNext.Component
 
             step.StepType = GetStepType(flowType, flowNode.NodeType);
 
-            if (flowType == FlowType.Dataflow)
+            if (flowType == FlowType.EventFlow)
             {
-                step.DfNodeSetting = GetDfNodeSetting(corpId, flowNode, otherFormIds);
+                step.EfNodeSetting = GetEfNodeSetting(corpId, flowNode, otherFormIds);
             }
             else
             {
@@ -231,15 +231,15 @@ namespace EIMSNext.Component
 
             return wfNodeSetting;
         }
-        private DfNodeSetting GetDfNodeSetting(string corpId, FlowNodeData flowNode, List<string> otherFormIds)
+        private EfNodeSetting GetEfNodeSetting(string corpId, FlowNodeData flowNode, List<string> otherFormIds)
         {
-            var dfNodeSetting = new DfNodeSetting() { NodeType = flowNode.NodeType };
+            var efNodeSetting = new EfNodeSetting() { NodeType = flowNode.NodeType };
 
             switch (flowNode.NodeType)
             {
                 case WfNodeType.Start:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.TriggerMeta!.SingleResult;
-                    dfNodeSetting.TriggerSetting = new TriggerSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.TriggerMeta!.SingleResult;
+                    efNodeSetting.TriggerSetting = new TriggerSetting
                     {
                         EventType = flowNode.Metadata.TriggerMeta?.EventType,
                         ChangeFields = flowNode.Metadata.TriggerMeta?.ChangeFields,
@@ -247,27 +247,27 @@ namespace EIMSNext.Component
                         FormId = flowNode.Metadata.TriggerMeta?.FormId,
                         WfNodeId = flowNode.Metadata.TriggerMeta?.WfNodeId,
                         NodeAction = flowNode.Metadata.TriggerMeta?.NodeAction,
-                        TriggerKind = flowNode.Metadata.TriggerMeta?.TriggerKind ?? DataflowTriggerKind.Form,
+                        TriggerKind = flowNode.Metadata.TriggerMeta?.TriggerKind ?? EventFlowTriggerKind.Form,
                         TimeTrigger = flowNode.Metadata.TriggerMeta?.TimeSettings,
                         HttpTrigger = flowNode.Metadata.TriggerMeta?.HttpSettings,
                     };
 
                     break;
                 case WfNodeType.Insert:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.InsertMeta!.SingleResult;
-                    dfNodeSetting.InsertSetting = new InsertSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.InsertMeta!.SingleResult;
+                    efNodeSetting.InsertSetting = new InsertSetting
                     {
                         FormId = flowNode.Metadata.InsertMeta!.FormId,
-                        FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.InsertMeta!.FormFieldList)
+                        FieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.InsertMeta!.FormFieldList)
                     };
-                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
-                        dfNodeSetting.InsertSetting.FieldSettings,
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.InsertSetting.FieldSettings,
                         $"Insert node [{flowNode.Id}]");
-                    otherFormIds.TryAdd(dfNodeSetting.InsertSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.InsertSetting.FormId);
                     break;
                 case WfNodeType.QueryOne:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.QueryOneMeta!.SingleResult;
-                    dfNodeSetting.QueryOneSetting = new QueryOneSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.QueryOneMeta!.SingleResult;
+                    efNodeSetting.QueryOneSetting = new QueryOneSetting
                     {
                         FormId = flowNode.Metadata.QueryOneMeta!.FormId,
                         DynamicFindOptions = new DynamicFindOptions<FormData>
@@ -284,11 +284,11 @@ namespace EIMSNext.Component
                             Take = 1
                         }.SerializeToJson()
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.QueryOneSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.QueryOneSetting.FormId);
                     break;
                 case WfNodeType.QueryMany:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.QueryManyMeta!.SingleResult;
-                    dfNodeSetting.QueryManySetting = new QueryManySetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.QueryManyMeta!.SingleResult;
+                    efNodeSetting.QueryManySetting = new QueryManySetting
                     {
                         FormId = flowNode.Metadata.QueryManyMeta!.FormId,
                         DynamicFindOptions = new DynamicFindOptions<FormData>
@@ -305,11 +305,11 @@ namespace EIMSNext.Component
                             Take = flowNode.Metadata.QueryManyMeta.Take,
                         }.SerializeToJson()
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.QueryManySetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.QueryManySetting.FormId);
                     break;
                 case WfNodeType.Delete:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.DeleteMeta!.SingleResult;
-                    dfNodeSetting.DeleteSetting = new DeleteSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.DeleteMeta!.SingleResult;
+                    efNodeSetting.DeleteSetting = new DeleteSetting
                     {
                         DeleteMode = flowNode.Metadata.DeleteMeta!.DeleteMode,
                         NodeId = flowNode.Metadata.DeleteMeta.NodeId,
@@ -326,16 +326,16 @@ namespace EIMSNext.Component
                             }
                         }.SerializeToJson() : null
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.DeleteSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.DeleteSetting.FormId);
                     break;
                 case WfNodeType.Update:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.UpdateMeta!.SingleResult;
-                    dfNodeSetting.UpdateSetting = new UpdateSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.UpdateMeta!.SingleResult;
+                    efNodeSetting.UpdateSetting = new UpdateSetting
                     {
                         UpdateMode = flowNode.Metadata.UpdateMeta!.UpdateMode,
                         NodeId = flowNode.Metadata.UpdateMeta.NodeId,
                         FormId = flowNode.Metadata.UpdateMeta!.FormId,
-                        FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.FormFieldList),
+                        FieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.UpdateMeta.FormFieldList),
                         UpdateMatch = flowNode.Metadata.UpdateMeta!.SubCondition?.ToDataMatchSetting() ?? new DataMatchSetting(),
                         DynamicFindOptions = flowNode.Metadata.UpdateMeta.UpdateMode == UpdateMode.Form ? new DynamicFindOptions<FormData>
                         {
@@ -351,16 +351,16 @@ namespace EIMSNext.Component
                         InsertIfNoData = flowNode.Metadata.UpdateMeta.InsertIfNoData,
                     };
 
-                    if (dfNodeSetting.UpdateSetting.InsertIfNoData)
-                        dfNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList);
+                    if (efNodeSetting.UpdateSetting.InsertIfNoData)
+                        efNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.UpdateMeta.InsertFieldList);
 
-                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
-                        dfNodeSetting.UpdateSetting.FieldSettings,
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.UpdateSetting.FieldSettings,
                         $"Update node [{flowNode.Id}]");
-                    DataflowFieldMappingValidator.ValidateFormFieldSettings(
-                        dfNodeSetting.UpdateSetting.InsertFieldSettings,
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.UpdateSetting.InsertFieldSettings,
                         $"Update node [{flowNode.Id}] insert-if-no-data");
-                    otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.UpdateSetting.FormId);
                     break;
                 case WfNodeType.Print:
                     var printMeta = flowNode.Metadata.PrintMeta;
@@ -372,18 +372,18 @@ namespace EIMSNext.Component
                         throw new ArgumentException($"Print node [{flowNode.Id}] is not configured");
                     }
 
-                    dfNodeSetting.SingleResult = true;
-                    dfNodeSetting.PrintSetting = new PrintSetting
+                    efNodeSetting.SingleResult = true;
+                    efNodeSetting.PrintSetting = new PrintSetting
                     {
                         SourceNodeId = printMeta.SourceNodeId,
                         FormId = printMeta.FormId,
                         PrintDefId = printMeta.PrintDefId,
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.PrintSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.PrintSetting.FormId);
                     break;
                 case WfNodeType.Plugin:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
-                    dfNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
+                    efNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
                     {
                         PluginId = flowNode.Metadata.PluginMeta.PluginId,
                         FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
@@ -393,7 +393,7 @@ namespace EIMSNext.Component
                     break;
             }
 
-            return dfNodeSetting;
+            return efNodeSetting;
         }
         private void ParseBranchNode(string corpId, List<WfStep> steps, FlowType flowType, FlowNodeData flowNode, string endNodeId, List<string> otherFormIds)
         {
@@ -691,7 +691,7 @@ namespace EIMSNext.Component
                 };
             }
 
-            DataflowFieldMappingValidator.ValidatePluginFieldSetting(fieldSetting, isSubFieldSetting);
+            EventFlowFieldMappingValidator.ValidatePluginFieldSetting(fieldSetting, isSubFieldSetting);
             return fieldSetting;
         }
 
@@ -722,7 +722,7 @@ namespace EIMSNext.Component
             public List<FlowNodeData> Nodes { get; set; } = new List<FlowNodeData>();
             public FlowNodeData EndNode { get; set; } = new FlowNodeData();
             public WorkflowMeta? WorkflowMeta { get; set; }
-            public CascadeMode DfCascade { get; set; }
+            public CascadeMode EfCascade { get; set; }
             public List<string>? EventIds { get; set; }
         }
         private class WorkflowMeta
@@ -856,9 +856,9 @@ namespace EIMSNext.Component
             /// </summary>
             public List<string>? ChangeFields { get; set; }
             public bool SingleResult { get; set; }
-            public DataflowTriggerKind TriggerKind { get; set; } = DataflowTriggerKind.Form;
-            public DataflowTimeTriggerSetting? TimeSettings { get; set; }
-            public DataflowHttpTriggerSetting? HttpSettings { get; set; }
+            public EventFlowTriggerKind TriggerKind { get; set; } = EventFlowTriggerKind.Form;
+            public EventFlowTimeTriggerSetting? TimeSettings { get; set; }
+            public EventFlowHttpTriggerSetting? HttpSettings { get; set; }
         }
 
         private class InsertMeta

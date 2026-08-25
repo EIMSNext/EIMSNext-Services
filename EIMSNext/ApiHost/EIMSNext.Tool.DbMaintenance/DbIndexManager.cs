@@ -1,4 +1,5 @@
 using EIMSNext.Auth.Entities;
+using EIMSNext.Service.Persistence.Outbox;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Entities;
@@ -32,10 +33,11 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWebhookIndexes(background);
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
-            CreateDataflowScheduleIndexes(background);
+            CreateEventFlowScheduleIndexes(background);
             CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
-            CreateDataflowLogIndexes(background);
+            CreateEventFlowLogIndexes(background);
+            CreateOutboxIndexes(background);
         }
 
         private void CreateAuthIndexes(CreateIndexOptions options)
@@ -77,6 +79,23 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<EmployeeDepartment>.IndexKeys.Ascending(x => x.DepartmentId).Ascending(x => x.EmployeeId),
                 options,
                 "ix_employeedepartment_department_employee");
+
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.SortValue),
+                options,
+                "ix_employeedepartment_corp_employee_sort");
+
+            CreateIndex(GetCollection<AdminGroup>(),
+                Builders<AdminGroup>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Ascending(x => x.EmployeeIds)
+                    .Ascending(x => x.Type),
+                options,
+                "ix_admingroup_corp_delete_employee_type");
 
             CreateIndex(GetCollection<Employee>(),
                 Builders<Employee>.IndexKeys.Ascending("Roles.RoleId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
@@ -411,71 +430,71 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_auditlog_corp_entity_action_createtime");
         }
 
-        private void CreateDataflowLogIndexes(CreateIndexOptions options)
+        private void CreateEventFlowLogIndexes(CreateIndexOptions options)
         {
-            // Df_RunLog
-            CreateIndex(GetCollection<Df_RunLog>(),
-                Builders<Df_RunLog>.IndexKeys
+            // Ef_RunLog
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
                     .Ascending(x => x.CorpId)
-                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.DeleteFlag)
                     .Descending(x => x.TriggerTime),
                 options,
-                "ix_dfrunlog_corp_dataflow_delete_triggertime");
+                "ix_efrunlog_corp_eventflow_delete_triggertime");
 
-            CreateIndex(GetCollection<Df_RunLog>(),
-                Builders<Df_RunLog>.IndexKeys
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.AppId)
                     .Ascending(x => x.DeleteFlag)
                     .Descending(x => x.TriggerTime),
                 options,
-                "ix_dfrunlog_corp_app_delete_triggertime");
+                "ix_efrunlog_corp_app_delete_triggertime");
 
-            // Df_RunLogNode
-            CreateIndex(GetCollection<Df_RunLogNode>(),
-                Builders<Df_RunLogNode>.IndexKeys
+            // Ef_RunLogNode
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.RunLogId)
                     .Ascending(x => x.StartTime),
                 options,
-                "ix_dfrunlognode_corp_runlog_starttime");
+                "ix_efrunlognode_corp_runlog_starttime");
 
-            CreateIndex(GetCollection<Df_RunLogNode>(),
-                Builders<Df_RunLogNode>.IndexKeys
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
                     .Ascending(x => x.RunLogId)
                     .Ascending(x => x.StartTime),
                 options,
-                "ix_dfrunlognode_runlog_starttime");
+                "ix_efrunlognode_runlog_starttime");
         }
 
-        private void CreateDataflowScheduleIndexes(CreateIndexOptions options)
+        private void CreateEventFlowScheduleIndexes(CreateIndexOptions options)
         {
-            CreateCorpIdIndex<DataflowScheduleItem>(options, "ix_dataflowscheduleitem_corpid");
+            CreateCorpIdIndex<EventFlowScheduleItem>(options, "ix_eventflowscheduleitem_corpid");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
                     .Ascending(x => x.CorpId)
-                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_corp_dataflow_triggertime");
+                "ix_eventflowscheduleitem_corp_eventflow_triggertime");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
-                    .Ascending(x => x.DataflowId)
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.SourceType)
                     .Ascending(x => x.FormId)
                     .Ascending(x => x.DataId),
                 CreateUniqueOptions(options),
-                "ix_dataflowscheduleitem_dataflow_source_form_data_unique");
+                "ix_eventflowscheduleitem_eventflow_source_form_data_unique");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
                     .Ascending(x => x.ScheduleVersion)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_version_triggertime");
+                "ix_eventflowscheduleitem_version_triggertime");
         }
 
         private void CreateWorkbenchIndexes(CreateIndexOptions options)
@@ -516,6 +535,45 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_workbenchrecent_lastvisit");
         }
 
+        private void CreateOutboxIndexes(CreateIndexOptions options)
+        {
+            // OutboxMessage：投递层幂等唯一键（防重复入队）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.IdempotencyKey),
+                CreateUniqueOptions(options),
+                "ix_outboxmessage_idempotencykey_unique");
+
+            // OutboxMessage：扫描待投递（Pending 且 OutAt 已到期）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.OutAt),
+                options,
+                "ix_outboxmessage_status_outat");
+
+            // OutboxMessage：取死信补偿窗口（Failed 且 LastAttemptTime 最旧）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LastAttemptTime),
+                options,
+                "ix_outboxmessage_status_lastattempt");
+
+            // 仅 Sent 记录会写 SentAt，TTL 不会删除 Pending/Failed 记录。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.SentAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_outboxmessage_sentat_ttl");
+
+            // ProcessedMessage：一个业务事件可投递给多个目标，按事件 + 目标去重。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.EventKey).Ascending(x => x.Target),
+                CreateUniqueOptions(options),
+                "ix_processedmessage_event_target_unique");
+
+            // MongoDB TTL 仅支持 BSON Date；保留 30 天，覆盖正常重投和人工补偿窗口。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.ProcessedAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_processedmessage_processedat_ttl");
+        }
+
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase
         {
             CreateIndex(GetCollection<T>(), Builders<T>.IndexKeys.Ascending(x => x.CorpId), options, name);
@@ -542,6 +600,7 @@ namespace EIMSNext.Auth.DbMaintenance
             {
                 Background = options.Background,
                 Unique = options.Unique,
+                ExpireAfter = options.ExpireAfter,
                 Name = name
             };
             collection.Indexes.CreateOne(new CreateIndexModel<T>(keys, indexOptions));

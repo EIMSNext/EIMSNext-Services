@@ -30,71 +30,59 @@ namespace EIMSNext.Service
         {
             if (parameter.SerialNoType == SerialNoType.Corporate)
             {
-                var utcToday = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, 0, 0, 0, DateTimeKind.Utc);
-                var currentSerialNo = Repository.Queryable.FirstOrDefault(x => x.SerialNoType == SerialNoType.Corporate);
-                if (currentSerialNo == null)
-                {
-                    currentSerialNo = new SerialNoSequence
-                    {
-                        SerialNoType = SerialNoType.Corporate,
-                        CurrDate = utcToday,
-                        CurrId = 1
-                    };
-                    Repository.Insert(currentSerialNo);
-                }
-                else
-                {
-                    if (currentSerialNo.CurrDate != utcToday)
-                    {
-                        currentSerialNo.CurrDate = utcToday;
-                        currentSerialNo.CurrId = 1;
-                    }
-                    else
-                    {
-                        currentSerialNo.CurrId += 1;
-                    }
-                    Repository.Replace(currentSerialNo);
-                }
-
+                var utcToday = UtcDay();
+                var sequence = NextCorporateSerialNo(utcToday);
                 var fmt = defaultSNFormats[SerialNoType.Corporate];
-                return string.Format(fmt, utcToday, (int)parameter.Platform, currentSerialNo.CurrId);
+                return string.Format(fmt, utcToday, (int)parameter.Platform, sequence);
             }
-            else if (parameter.SerialNoType == SerialNoType.Form)
-            {
-                var utcToday = new DateTime(DateTime.UtcNow.Year, DateTime.UtcNow.Month, DateTime.UtcNow.Day, 0, 0, 0, DateTimeKind.Utc);
-                var currentSerialNo = Repository.Queryable.FirstOrDefault(x => x.SerialNoType == SerialNoType.Form && x.CorpId == parameter.CorpId && x.AppId == parameter.AppId && x.FormId == parameter.FormId);
-                if (currentSerialNo == null)
-                {
-                    currentSerialNo = new SerialNoSequence
-                    {
-                        SerialNoType = SerialNoType.Form,
-                        CorpId = parameter.CorpId,
-                        AppId = parameter.AppId,
-                        FormId = parameter.FormId,
-                        CurrDate = utcToday,
-                        CurrId = 1
-                    };
-                    Repository.Insert(currentSerialNo);
-                }
-                else
-                {
-                    if (currentSerialNo.CurrDate != utcToday)
-                    {
-                        currentSerialNo.CurrDate = utcToday;
-                        currentSerialNo.CurrId = 1;
-                    }
-                    else
-                    {
-                        currentSerialNo.CurrId += 1;
-                    }
-                    Repository.Replace(currentSerialNo);
-                }
+            throw new NotSupportedException("Unknown SerialNoType");
+        }
 
-                var fmt = defaultSNFormats[SerialNoType.Form];
-                return string.Format(fmt, utcToday, currentSerialNo.CurrId);
+        private int NextCorporateSerialNo(DateTime utcToday)
+        {
+            var filter = Builders<SerialNoSequence>.Filter.Eq(x => x.SerialNoType, SerialNoType.Corporate);
+            var resetFilter = Builders<SerialNoSequence>.Filter.And(
+                filter,
+                Builders<SerialNoSequence>.Filter.Ne(x => x.CurrDate, utcToday));
+            var resetUpdate = Builders<SerialNoSequence>.Update
+                .Set(x => x.CurrDate, utcToday)
+                .Set(x => x.CurrId, 1);
+
+            if (FindOneAndUpdate(resetFilter, resetUpdate, false, null) != null)
+            {
+                return 1;
             }
-            else
-                throw new NotSupportedException("Unknown SerialNoType");
+
+            var update = Builders<SerialNoSequence>.Update
+                .SetOnInsert(x => x.Id, Repository.NewId())
+                .SetOnInsert(x => x.SerialNoType, SerialNoType.Corporate)
+                .SetOnInsert(x => x.CurrDate, utcToday)
+                .Inc(x => x.CurrId, 1);
+
+            for (var attempt = 0; attempt < 5; attempt++)
+            {
+                try
+                {
+                    var current = FindOneAndUpdate(filter, update, true, null);
+                    if (current != null) return current.CurrId ?? 1;
+                }
+                catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+                {
+                    // Another request created the singleton; retry the atomic increment.
+                }
+                catch (MongoException ex) when (IsWriteConflict(ex) && attempt < 4)
+                {
+                    Thread.Sleep(10 * (attempt + 1));
+                }
+            }
+
+            throw new InvalidOperationException("企业编号生成冲突，请重试");
+        }
+
+        private static DateTime UtcDay()
+        {
+            var now = DateTime.UtcNow;
+            return new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc);
         }
 
         /// <summary>

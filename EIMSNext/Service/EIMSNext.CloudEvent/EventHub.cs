@@ -20,11 +20,12 @@ namespace EIMSNext.CloudEvent
     {
         private static string domain = "eimsnext.com";
 
-        public async Task SendAsync(Webhook webhook, WebHookTrigger trigger, object data)
+        public async Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data)
         {
+            ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
             var cloudEvent = new CloudNative.CloudEvents.CloudEvent
             {
-                Id = Guid.NewGuid().ToString(),
+                Id = eventId,
                 Type = $"{webhook.SourceType}.{trigger}".ToLower(),
                 Source = new Uri($"http://{domain}/events/{webhook.SourceType}"),
                 DataContentType = MediaTypeNames.Application.Json,
@@ -77,6 +78,11 @@ namespace EIMSNext.CloudEvent
             };
 
             await WebPushLogRepo.InsertAsync(log);
+
+            if (!success)
+            {
+                throw new InvalidOperationException($"Webhook delivery failed for event {eventId}.");
+            }
         }
 
         private object FormatData(object data)

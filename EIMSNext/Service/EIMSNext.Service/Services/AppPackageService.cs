@@ -574,7 +574,7 @@ namespace EIMSNext.Service
                             {
                                 "formid" or "sourceformid" or "externalid" => formIds.Contains(id),
                                 "dashboardid" or "dashid" => dashboardIds.Contains(id),
-                                "workflowid" or "dataflowid" => workflowIds.Contains(id),
+                                "workflowid" or "eventflowid" => workflowIds.Contains(id),
                                 "printid" => printIds.Contains(id),
                                 "sourceid" => formIds.Contains(id) || dashboardIds.Contains(id) || workflowIds.Contains(id),
                                 _ => true,

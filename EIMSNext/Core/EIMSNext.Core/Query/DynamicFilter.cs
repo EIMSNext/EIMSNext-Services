@@ -82,6 +82,25 @@ namespace EIMSNext.Core.Query
 
     public static class DynamicFilterCompositionExtensions
     {
+        /// <summary>
+        /// Removes expression and field-reference semantics from a client supplied filter tree.
+        /// Public tokens must only be able to submit literal values.
+        /// </summary>
+        public static void ClearValueExpressions(this DynamicFilter? filter)
+        {
+            if (filter == null)
+            {
+                return;
+            }
+
+            filter.ValueIsExp = false;
+            filter.ValueIsField = false;
+            foreach (var item in filter.Items ?? [])
+            {
+                item.ClearValueExpressions();
+            }
+        }
+
         public static DynamicFilter? And(this DynamicFilter? current, DynamicFilter? additional)
         {
             if (current == null || current.IsEmpty)

@@ -207,17 +207,19 @@ namespace EIMSNext.ApiHost.Authorization
                         {
                             if (_employee != null)
                             {
-                                var adminGroups = _resolver.GetService<AdminGroup>().All()
+                                var adminGroupTypes = _resolver.GetService<AdminGroup>().All()
                                     .Where(x =>
                                         x.CorpId == CurrentCorpId &&
                                         !x.DeleteFlag &&
-                                        x.EmployeeIds.Contains(_employee.Id));
+                                        x.EmployeeIds.Contains(_employee.Id))
+                                    .Select(x => x.Type)
+                                    .ToList();
 
-                                if (adminGroups.Any(x => x.Type == AdminGroupType.System))
+                                if (adminGroupTypes.Contains(AdminGroupType.System))
                                 {
                                     _type = IdentityType.CorpAdmin;
                                 }
-                                else if (adminGroups.Any(x => x.Type == AdminGroupType.Normal))
+                                else if (adminGroupTypes.Contains(AdminGroupType.Normal))
                                 {
                                     _type = IdentityType.AppAdmin;
                                 }

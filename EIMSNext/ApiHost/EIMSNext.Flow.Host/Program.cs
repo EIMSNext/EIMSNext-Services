@@ -40,7 +40,7 @@ builder.Services.AddWorkflow(opt =>
 
 builder.Services.AddStepBodys();
 builder.Services.AddWorkflowServices();
-builder.Services.AddScoped<IDataflowScheduleService, DataflowScheduleService>();
+builder.Services.AddScoped<IEventFlowScheduleService, EventFlowScheduleService>();
 
 builder.Services.AddApiVersioning(opt =>
 {

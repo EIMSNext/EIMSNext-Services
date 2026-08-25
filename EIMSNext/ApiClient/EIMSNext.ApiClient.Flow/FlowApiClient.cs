@@ -127,9 +127,9 @@ namespace EIMSNext.ApiClient.Flow
             return HandleResponse(await PostAsyncAllowError<WfResponse>("Workflow/Start", req, accessToken));
         }
 
-        public async Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken)
+        public async Task<WfResponse?> RunEventFlow(EfRunRequest req, string accessToken)
         {
-            return HandleResponse(await PostAsyncAllowError<WfResponse>("Dataflow/Run", req, accessToken));
+            return HandleResponse(await PostAsyncAllowError<WfResponse>("EventFlow/Run", req, accessToken));
         }
 
         private WfResponse HandleResponse(RestResponse<WfResponse> response)

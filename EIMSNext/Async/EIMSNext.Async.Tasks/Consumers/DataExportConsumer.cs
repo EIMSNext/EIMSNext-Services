@@ -73,7 +73,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            await resolver.Resolve<IMessagePublisher>().PublishAsync(new SystemMessageTaskArgs
+            await resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new SystemMessageTaskArgs
             {
                 CorpId = exportLog.CorpId ?? string.Empty,
                 NotifyId = exportLog.Id,
@@ -83,6 +83,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ExpireTime = DateTime.UtcNow.AddDays(30).ToTimeStampMs(),
                 Category = MessageCategory.SystemNotify,
                 MessageType = MessageType.ExportNotify,
+                EventStamp = exportLog.CreateTime,
                 Receivers =
                 [
                     new NotifyReceiver
@@ -103,7 +104,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            await resolver.Resolve<IMessagePublisher>().PublishAsync(new SystemMessageTaskArgs
+            await resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new SystemMessageTaskArgs
             {
                 CorpId = exportLog.CorpId ?? string.Empty,
                 NotifyId = exportLog.Id,
@@ -113,6 +114,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ExpireTime = DateTime.UtcNow.AddDays(30).ToTimeStampMs(),
                 Category = MessageCategory.SystemNotify,
                 MessageType = MessageType.ExportNotify,
+                EventStamp = exportLog.CreateTime,
                 Receivers =
                 [
                     new NotifyReceiver

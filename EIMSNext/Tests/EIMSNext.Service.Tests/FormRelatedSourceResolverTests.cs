@@ -9,7 +9,7 @@ namespace EIMSNext.Service.Tests
     public class FormRelatedSourceResolverTests
     {
         [TestMethod]
-        public void ResolveFormIds_CollectsDataSelectAndRemoteOptionSourcesRecursively()
+        public void ResolveFormIds_CollectsOnlySupportedRemoteOptionSourcesRecursively()
         {
             const string layout = """
             [
@@ -41,6 +41,17 @@ namespace EIMSNext.Service.Tests
                 }
               },
               {
+                "type": "select",
+                "field": "remoteSingleSelect",
+                "effect": {
+                  "source": {
+                    "formId": "form-select1",
+                    "label": { "field": "name" },
+                    "value": { "field": "code" }
+                  }
+                }
+              },
+              {
                 "type": "select2",
                 "field": "remoteSelect",
                 "effect": {
@@ -50,6 +61,13 @@ namespace EIMSNext.Service.Tests
                     "value": { "field": "id" }
                   }
                 }
+              },
+              {
+                "type": "checkbox",
+                "field": "remoteCheckbox",
+                "effect": {
+                  "source": { "formId": "form-checkbox" }
+                }
               }
             ]
             """;
@@ -57,7 +75,7 @@ namespace EIMSNext.Service.Tests
             var result = FormRelatedSourceResolver.ResolveFormIds(layout);
 
             CollectionAssert.AreEquivalent(
-                new[] { "form-data-select", "form-options", "form-select2" },
+                new[] { "form-data-select", "form-select1", "form-select2" },
                 result.ToArray());
         }
 

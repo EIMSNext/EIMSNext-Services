@@ -66,6 +66,6 @@ namespace EIMSNext.Core.Abstractions
         /// <summary>
         /// 数据流内部写入
         /// </summary>
-        Dataflow
+        EventFlow
     }
 }

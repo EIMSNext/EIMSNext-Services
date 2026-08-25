@@ -42,7 +42,7 @@ namespace EIMSNext.Flow.Core.Nodes
         protected IRepository<Employee> EmployeeRepository { get; private set; }
         protected IRepository<EmployeeDepartment> EmployeeDepartmentRepository { get; private set; }
         protected IRepository<Department> DepartmentRepository { get; private set; }
-        protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
+        protected IEventFlowRunner EventFlowRunner => Resolver.Resolve<IEventFlowRunner>();
 
         protected ILogger<T> Logger { get; private set; }
         private FormData? FormData { get; set; }
@@ -308,12 +308,12 @@ namespace EIMSNext.Flow.Core.Nodes
             return brief;
         }
 
-        protected async Task RunDataflow(DfRunParamter paramter)
+        protected async Task RunEventFlow(EfRunParameter paramter)
         {
-            var dfExecResult = await DataflowRunner.RunAsync(paramter);
-            if (!dfExecResult.Success)
+            var efExecResult = await EventFlowRunner.RunAsync(paramter);
+            if (!efExecResult.Success)
             {
-                throw new UnLogException(dfExecResult.Error);
+                throw new UnLogException(efExecResult.Error);
             }
         }
     }

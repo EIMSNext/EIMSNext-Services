@@ -34,7 +34,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 AddTaskLog(context.Workflow, new Wf_Task(), dataContext, Metadata!, approveData, scope.SessionHandle);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(new DfRunParamter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
+                await RunEventFlow(new EfRunParameter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds));
 
                 scope.CommitTransaction();
             }

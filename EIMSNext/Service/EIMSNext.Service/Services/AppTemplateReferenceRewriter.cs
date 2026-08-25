@@ -192,7 +192,7 @@ namespace EIMSNext.Service
                             {
                                 obj[property.Key] = newDashboardId;
                             }
-                            else if ((property.Key.Equals("workflowId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("dataflowId", StringComparison.OrdinalIgnoreCase))
+                            else if ((property.Key.Equals("workflowId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("eventFlowId", StringComparison.OrdinalIgnoreCase))
                                 && workflowMap != null
                                 && workflowMap.TryGetValue(text, out var newWorkflowId))
                             {

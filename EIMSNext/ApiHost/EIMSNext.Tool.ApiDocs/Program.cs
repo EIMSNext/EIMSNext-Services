@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -8,7 +9,7 @@ var sourceRoot = GetArgument("--source") ?? throw new ArgumentException("--sourc
 var output = GetArgument("--output") ?? throw new ArgumentException("--output is required");
 var modelNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
-    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "RoleRequest", "RoleGroupRequest", "DynamicFindOptions", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "Role", "RoleGroup", "Wf_Task", "Wf_TaskLog", "WfTaskViewModel", "BriefField"
+    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "RoleRequest", "RoleGroupRequest", "DynamicFindOptions", "DynamicFilter", "DynamicField", "DynamicSort", "DataScope", "SortItem", "DashboardAggregateRequest", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "Role", "RoleGroup", "Wf_Task", "Wf_TaskLog", "WfTaskViewModel", "BriefField"
 };
 var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
@@ -43,6 +44,7 @@ foreach (var modelName in modelNames)
     if (!declarations.TryGetValue(modelName, out var declaration)) continue;
     var fields = CollectFields(declaration, declarations, new HashSet<string>(StringComparer.OrdinalIgnoreCase))
             .Where(property => property.Modifiers.Any(SyntaxKind.PublicKeyword))
+            .Where(property => !property.Modifiers.Any(SyntaxKind.StaticKeyword))
             .Where(property => !IsIgnored(property, ignored))
             .Select(property =>
             {
@@ -60,7 +62,12 @@ if (missing.Count > 0)
 }
 
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-var json = JsonSerializer.Serialize(models, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+var json = JsonSerializer.Serialize(models, new JsonSerializerOptions
+{
+    WriteIndented = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+});
 File.WriteAllText(output, "window.EIMS_API_MODELS = " + json + ";\n");
 Console.WriteLine($"Generated {models.Count} public API models to {output}");
 return 0;
@@ -70,7 +77,7 @@ static bool IsIgnored(PropertyDeclarationSyntax property, ISet<string> ignored)
         .Any(attribute => Regex.IsMatch(attribute.Name.ToString(), "^(JsonIgnore|IgnoreDataMember)(Attribute)?$", RegexOptions.IgnoreCase));
 
 static bool IsRequired(PropertyDeclarationSyntax property)
-    => property.AttributeLists.SelectMany(x => x.Attributes).Any(attribute =>
+    => property.Modifiers.Any(SyntaxKind.RequiredKeyword) || property.AttributeLists.SelectMany(x => x.Attributes).Any(attribute =>
         attribute.Name.ToString().Equals("Required", StringComparison.OrdinalIgnoreCase) ||
         attribute.Name.ToString().EndsWith("RequiredAttribute", StringComparison.OrdinalIgnoreCase));
 

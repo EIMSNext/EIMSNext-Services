@@ -114,8 +114,10 @@ namespace EIMSNext.ApiService
                     return IsSectionAvailable(setting.Form.QueryLink);
                 }
 
-                return IdentityContext.PublicScope == PublicScope.FormLink &&
-                       IsSectionAvailable(setting.Form.FormLink) &&
+                return (IdentityContext.PublicScope == PublicScope.FormLink &&
+                        IsSectionAvailable(setting.Form.FormLink) ||
+                        IdentityContext.PublicScope == PublicScope.QueryLink &&
+                        IsSectionAvailable(setting.Form.QueryLink)) &&
                        IsRelatedForm(formId);
             }
 

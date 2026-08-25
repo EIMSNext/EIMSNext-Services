@@ -12,7 +12,7 @@ namespace EIMSNext.Flow.Core.Nodes
     /// 条件/分支节点。继承自 WorkflowCore 的 <see cref="Decide"/>，行为差异如下：
     /// <list type="bullet">
     ///   <item>
-    ///     重置 <see cref="DfDataContext.MatchedResult"/> 与 <see cref="DfDataContext.MatchParallel"/>，
+    ///     重置 <see cref="EfDataContext.MatchedResult"/> 与 <see cref="EfDataContext.MatchParallel"/>，
     ///     供下游 <c>WfStartNode</c> 在 SelectNextStep 时读取。
     ///   </item>
     ///   <item>
@@ -34,10 +34,10 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            if (context.Workflow.Data is DfDataContext dfDataContext)
+            if (context.Workflow.Data is EfDataContext efDataContext)
             {
-                dfDataContext.MatchedResult = false;
-                dfDataContext.MatchParallel = Metadata!.NodeType== WfNodeType.Branch;
+                efDataContext.MatchedResult = false;
+                efDataContext.MatchParallel = Metadata!.NodeType== WfNodeType.Branch;
             }
             else
             {

@@ -23,5 +23,9 @@ namespace EIMSNext.Auth.Interfaces
         Task AddUserIntegrationBinding(UserIntegrationBinding entity);
         Task UpdateUserIntegrationBinding(UserIntegrationBinding entity);
         Task AddAuditLogin(AuditLogin entity);
+        Task AddAuditLogins(IReadOnlyCollection<AuditLogin> entities, CancellationToken cancellationToken = default)
+        {
+            return Task.WhenAll(entities.Select(AddAuditLogin));
+        }
     }
 }

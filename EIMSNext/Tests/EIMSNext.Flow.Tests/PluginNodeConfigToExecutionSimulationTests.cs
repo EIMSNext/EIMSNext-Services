@@ -53,7 +53,7 @@ namespace EIMSNext.Flow.Tests
             Assert.AreEqual("u1", ((IDictionary<string, object?>)outputData["echoOwner"]!)["id"]);
             Assert.AreEqual("/files/receipt.pdf", outputData["echoAttachment"]);
 
-            var restoredNodeData = new DfNodeData
+            var restoredNodeData = new EfNodeData
             {
                 NodeId = "plugin",
                 SingleResult = true,
@@ -396,14 +396,14 @@ namespace EIMSNext.Flow.Tests
             var definition = new Wf_Definition
             {
                 CorpId = "corp-plugin",
-                ExternalId = "dataflow-plugin-simulation",
+                ExternalId = "eventFlow-plugin-simulation",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = content,
             };
 
             var (metadata, _) = parser.Parse(definition);
-            return metadata.Steps.Single(x => x.Id == "plugin").DfNodeSetting!.PluginSetting!;
+            return metadata.Steps.Single(x => x.Id == "plugin").EfNodeSetting!.PluginSetting!;
         }
 
         private static string BuildWorkflowContent(bool useNumericStrings)
@@ -707,33 +707,33 @@ namespace EIMSNext.Flow.Tests
             var node = CreateUninitializedPluginNode();
             if (scriptEngine != null)
             {
-                typeof(DfNodeBase<DfPluginNode>)
+                typeof(EfNodeBase<EfPluginNode>)
                     .GetField("<ScriptEngine>k__BackingField", BindingFlags.Instance | BindingFlags.NonPublic)!
                     .SetValue(node, scriptEngine);
             }
 
-            var method = typeof(DfPluginNode).GetMethod("BuildPayload", BindingFlags.Instance | BindingFlags.NonPublic)!;
-            return (Dictionary<string, object?>)method.Invoke(node, new object[] { new DfDataContext(), pluginSetting })!;
+            var method = typeof(EfPluginNode).GetMethod("BuildPayload", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            return (Dictionary<string, object?>)method.Invoke(node, new object[] { new EfDataContext(), pluginSetting })!;
         }
 
-        private static DfDataContext InvokeSavePluginNodeResult(object? pluginResult, PluginSetting pluginSetting)
+        private static EfDataContext InvokeSavePluginNodeResult(object? pluginResult, PluginSetting pluginSetting)
         {
             var node = CreateUninitializedPluginNode();
             node.Metadata = new WfStep { Id = "plugin", Name = "plugin", NodeType = WfNodeType.Plugin };
-            var dataContext = new DfDataContext
+            var dataContext = new EfDataContext
             {
                 AppId = "app",
                 CorpId = "corp-plugin",
             };
-            var method = typeof(DfPluginNode).GetMethod("SavePluginNodeResult", BindingFlags.Instance | BindingFlags.NonPublic)!;
+            var method = typeof(EfPluginNode).GetMethod("SavePluginNodeResult", BindingFlags.Instance | BindingFlags.NonPublic)!;
             method.Invoke(node, new[] { dataContext, pluginResult, pluginSetting });
             return dataContext;
         }
 
-        private static DfPluginNode CreateUninitializedPluginNode()
+        private static EfPluginNode CreateUninitializedPluginNode()
         {
 #pragma warning disable SYSLIB0050
-            return (DfPluginNode)FormatterServices.GetUninitializedObject(typeof(DfPluginNode));
+            return (EfPluginNode)FormatterServices.GetUninitializedObject(typeof(EfPluginNode));
 #pragma warning restore SYSLIB0050
         }
 

@@ -61,7 +61,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             var notifyRepo = resolver.GetRepository<FormNotify>();
             var formDefRepo = resolver.GetRepository<FormDef>();
             var formDataRepo = resolver.GetRepository<FormData>();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
             var detailBuilder = resolver.Resolve<IFormNotifyDetailBuilder>();
             var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
             var templateResolver = resolver.Resolve<DataTitleResolver>();
@@ -115,7 +115,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;
 
-                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
             }
         }
 
@@ -128,7 +128,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var notifyRepo = resolver.GetRepository<FormNotify>();
             var dashboardRepo = resolver.GetRepository<DashboardDef>();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
             var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
 
             var dashboard = dashboardRepo.Get(args.FormId);
@@ -162,7 +162,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;
 
-                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
             }
         }
 
@@ -204,9 +204,9 @@ namespace EIMSNext.Async.Tasks.Consumers
             var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:task";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
         private static async Task HandleWfExpireNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -258,9 +258,9 @@ namespace EIMSNext.Async.Tasks.Consumers
             var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:expire";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
         private static async Task HandleWfUrgeNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -296,9 +296,9 @@ namespace EIMSNext.Async.Tasks.Consumers
             var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:urge";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
         private static async Task<List<NotifyReceiver>> ResolveTaskReceiversAsync(IResolver resolver, IEnumerable<string> empIds)

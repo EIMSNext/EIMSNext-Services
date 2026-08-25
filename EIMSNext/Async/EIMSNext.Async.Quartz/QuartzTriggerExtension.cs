@@ -12,7 +12,8 @@ namespace EIMSNext.Async.Quartz
         {
             var formNotifyJobKey = new JobKey("FormNotifyScheduleJob", "Notify");
             var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Notify");
-            var dataflowJobKey = new JobKey("DataflowScheduleJob", "Dataflow");
+            var eventFlowJobKey = new JobKey("EventFlowScheduleJob", "EventFlow");
+            var outboxDeliveryJobKey = new JobKey("OutboxDeliveryJob", "Outbox");
             qz.AddJob<FormNotifyScheduleJob>(opts => opts
                 .WithIdentity(formNotifyJobKey)
                 .StoreDurably()
@@ -23,10 +24,15 @@ namespace EIMSNext.Async.Quartz
                 .StoreDurably()
                 .WithDescription("流程待办超时扫描作业"));
 
-            qz.AddJob<DataflowScheduleJob>(opts => opts
-                .WithIdentity(dataflowJobKey)
+            qz.AddJob<EventFlowScheduleJob>(opts => opts
+                .WithIdentity(eventFlowJobKey)
                 .StoreDurably()
                 .WithDescription("数据流定时触发扫描作业"));
+
+            qz.AddJob<OutboxDeliveryJob>(opts => opts
+                .WithIdentity(outboxDeliveryJobKey)
+                .StoreDurably()
+                .WithDescription("出箱扫描投递作业"));
 
             qz.AddTrigger(opts => opts
                 .ForJob(formNotifyJobKey)
@@ -47,12 +53,21 @@ namespace EIMSNext.Async.Quartz
                 .StartNow());
 
             qz.AddTrigger(opts => opts
-                .ForJob(dataflowJobKey)
-                .WithIdentity("DataflowScheduleTrigger", "Dataflow")
+                .ForJob(eventFlowJobKey)
+                .WithIdentity("EventFlowScheduleTrigger", "EventFlow")
                 .WithCronSchedule(
-                    configuration["Quartz:DataflowScheduleJob:Cron"] ?? "0 0/1 * * * ?",
+                    configuration["Quartz:EventFlowScheduleJob:Cron"] ?? "0 0/1 * * * ?",
                     cs => cs.InTimeZone(TimeZoneInfo.Local))
                 .WithDescription("每分钟扫描数据流定时调度")
+                .StartNow());
+
+            qz.AddTrigger(opts => opts
+                .ForJob(outboxDeliveryJobKey)
+                .WithIdentity("OutboxDeliveryTrigger", "Outbox")
+                .WithCronSchedule(
+                    configuration["Quartz:OutboxDeliveryJob:Cron"] ?? "0/10 * * * * ?",
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
+                .WithDescription("按 Cron 扫描出箱投递（默认每10秒，可配置 Quartz:OutboxDeliveryJob:Cron）")
                 .StartNow());
 
             return qz;

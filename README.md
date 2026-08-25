@@ -83,7 +83,7 @@ EIMSNext（又名东风低代码）是一款开源企业级信息管理解决方
 ### 4. 流程服务
 - 通过 `/api/v1/workflow/start` 启动流程。
 - 通过 `/api/v1/workflow/approve` 提交审批。
-- 通过 `/api/v1/dataflow/run` 触发数据流操作。
+- 通过 `/api/v1/EventFlow/Run` 触发 EventFlow 操作。
 
 ### 5. 文件上传
 - 使用 `/api/v1/upload` 接口上传文件。

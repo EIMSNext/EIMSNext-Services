@@ -29,7 +29,7 @@ namespace EIMSNext.ApiService
 			var ownerRegistrationTime = string.IsNullOrWhiteSpace(owner?.Id)
 				? string.Empty
 				: FormatRegistrationTime(Resolver.GetService<User>().Get(owner.Id)?.CreateTime);
-			await Resolver.Resolve<IMessagePublisher>().PublishAsync(new EmailNotifyTaskArgs
+			await Resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new EmailNotifyTaskArgs
 			{
 				TaskType = EmailTaskType.PlatWork,
 				CorpId = entity.Id,
@@ -40,7 +40,8 @@ namespace EIMSNext.ApiService
 				{
 					Email = email,
 					EmpName = "ServiceContracts"
-				}).ToList()
+				}).ToList(),
+				EventStamp = entity.CreateTime
 			});
 		}
 

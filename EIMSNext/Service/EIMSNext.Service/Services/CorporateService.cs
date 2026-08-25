@@ -135,17 +135,12 @@ namespace EIMSNext.Service
             };
             adminGroupRepo.EnsureId(systemAdminGroup);
 
-            var tasks = new List<Task>
-            {
-                base.AddCoreAsync(entities, session),
-                deptRepo.InsertAsync(dept, session),
-                empRepo.InsertAsync(new List<Employee>{emp}, session),
-                empDeptRepo.InsertAsync(empDepartments, session),
-                adminGroupRepo.InsertAsync(systemAdminGroup, session),
-                userRepo.ReplaceAsync(user, session)
-            };
-
-            await Task.WhenAll(tasks);
+            await base.AddCoreAsync(entities, session);
+            await deptRepo.InsertAsync(dept, session);
+            await empRepo.InsertAsync(new List<Employee> { emp }, session);
+            await empDeptRepo.InsertAsync(empDepartments, session);
+            await adminGroupRepo.InsertAsync(systemAdminGroup, session);
+            await userRepo.ReplaceAsync(user, session);
         }
     }
 }

@@ -86,6 +86,29 @@ namespace EIMSNext.Auth.Persistence
             await this._auditLogin.InsertOneAsync(entity);
         }
 
+        public Task AddAuditLogins(IReadOnlyCollection<AuditLogin> entities, CancellationToken cancellationToken = default)
+        {
+            if (entities.Count == 0)
+            {
+                return Task.CompletedTask;
+            }
+
+            var writes = entities
+                .Select(entity => new ReplaceOneModel<AuditLogin>(
+                    Builders<AuditLogin>.Filter.Eq(x => x.Id, entity.Id),
+                    entity)
+                {
+                    IsUpsert = true
+                })
+                .Cast<WriteModel<AuditLogin>>()
+                .ToList();
+
+            return _auditLogin.BulkWriteAsync(
+                writes,
+                new BulkWriteOptions { IsOrdered = false },
+                cancellationToken);
+        }
+
         #endregion
     }
 }

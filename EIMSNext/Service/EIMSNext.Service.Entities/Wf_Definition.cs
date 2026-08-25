@@ -56,7 +56,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public WfMetadata Metadata { get; set; } = new WfMetadata();
 
-        //Dataflow
+        //EventFlow
         /// <summary>
         /// 事件来源类型（表单或按钮）
         /// </summary>
@@ -248,7 +248,7 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 数据流节点设置
         /// </summary>
-        public DfNodeSetting? DfNodeSetting { get; set; }
+        public EfNodeSetting? EfNodeSetting { get; set; }
     }
 
     /// <summary>
@@ -592,7 +592,7 @@ namespace EIMSNext.Service.Entities
     /// <summary>
     /// 数据流节点设置，包含数据操作相关配置
     /// </summary>
-    public class DfNodeSetting
+    public class EfNodeSetting
     {
         /// <summary>
         /// 节点类型
@@ -669,17 +669,17 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 触发类型。
         /// </summary>
-        public DataflowTriggerKind TriggerKind { get; set; } = DataflowTriggerKind.Form;
+        public EventFlowTriggerKind TriggerKind { get; set; } = EventFlowTriggerKind.Form;
 
         /// <summary>
         /// 定时触发设置。
         /// </summary>
-        public DataflowTimeTriggerSetting? TimeTrigger { get; set; }
+        public EventFlowTimeTriggerSetting? TimeTrigger { get; set; }
 
         /// <summary>
         /// HTTP触发设置。
         /// </summary>
-        public DataflowHttpTriggerSetting? HttpTrigger { get; set; }
+        public EventFlowHttpTriggerSetting? HttpTrigger { get; set; }
 
     }
 
@@ -954,11 +954,11 @@ namespace EIMSNext.Service.Entities
         /// <summary>
         /// 工作流（审批流程）
         /// </summary>
-        Workflow,
+        Workflow = 0,
         /// <summary>
-        /// 数据流（数据自动化处理流程）
+        /// EventFlow（事件自动化处理流程）。
         /// </summary>
-        Dataflow
+        EventFlow = 1
     }
 
     /// <summary>
@@ -1268,7 +1268,7 @@ namespace EIMSNext.Service.Entities
         /// </summary>
         public CascadeMode CascadeMode { get; set; }
         /// <summary>
-        /// 指定触发的DataflowId
+        /// 指定触发的EventFlowId
         /// </summary>
         public string? SpecifiedEvents { get; set; }
     }

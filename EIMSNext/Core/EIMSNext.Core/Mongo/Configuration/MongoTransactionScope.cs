@@ -9,6 +9,8 @@ namespace EIMSNext.Core.Mongo
         private static readonly AsyncLocal<IClientSessionHandle?> _currentSession = new AsyncLocal<IClientSessionHandle?>();
         private bool _isRootScope;
         private bool _completed = false;
+        private readonly List<Func<Task>> _afterCommit = [];
+        private static readonly AsyncLocal<List<Func<Task>>?> _afterCommitCallbacks = new();
 
         public MongoTransactionScope(IMongoDbContex dbContex, TransactionOptions? transOptions = null)
         {
@@ -19,6 +21,7 @@ namespace EIMSNext.Core.Mongo
                 SessionHandle.StartTransaction(options);
 
                 _currentSession.Value = SessionHandle;
+                _afterCommitCallbacks.Value = _afterCommit;
                 _isRootScope = true;
             }
             else
@@ -40,7 +43,33 @@ namespace EIMSNext.Core.Mongo
             {
                 SessionHandle.CommitTransaction();
                 _completed = true;
+                var callbacks = _afterCommit.ToArray();
+                _afterCommit.Clear();
+                _afterCommitCallbacks.Value = null;
+                foreach (var callback in callbacks)
+                {
+                    try
+                    {
+                        callback().GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                        // After-commit work must not turn a committed business transaction into a failure.
+                    }
+                }
             }
+        }
+
+        public static void RegisterAfterCommit(Func<Task> callback)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+            if (_afterCommitCallbacks.Value is { } callbacks)
+            {
+                callbacks.Add(callback);
+                return;
+            }
+
+            callback().GetAwaiter().GetResult();
         }
 
         public void AbortTransaction()
@@ -61,6 +90,7 @@ namespace EIMSNext.Core.Mongo
                 finally
                 {
                     _currentSession.Value = null;
+                    _afterCommitCallbacks.Value = null;
                     SessionHandle.Dispose();
                 }
             }

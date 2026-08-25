@@ -7,3 +7,5 @@ Logs/
 EIMSNext/ApiHost/EIMSNext.File.Host/wwwroot/Export/
 EIMSNext/ApiHost/EIMSNext.File.Host/wwwroot/Upload/*/
 *.log
+EIMSNext/.reasonix
+EIMSNext/reasonix.toml
