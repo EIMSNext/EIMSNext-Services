@@ -37,13 +37,13 @@ namespace EIMSNext.Workflow.Repository
             var wrapData = new ExpandoObject();
             var matchedResult = false;
             var needEval = true;
-            if (data is DfDataContext dfDataContext)
+            if (data is EfDataContext efDataContext)
             {
-                matchedResult = dfDataContext.MatchedResult;
+                matchedResult = efDataContext.MatchedResult;
 
-                if (dfDataContext.MatchParallel || !matchedResult)
+                if (efDataContext.MatchParallel || !matchedResult)
                 {
-                    foreach (var item in dfDataContext.NodeDatas)
+                    foreach (var item in efDataContext.NodeDatas)
                     {
                         if (item.Value.ActionDatas.Count > 0)
                         {
@@ -95,9 +95,9 @@ namespace EIMSNext.Workflow.Repository
                 });
                 bool result = Convert.ToBoolean(resolvedValue.Value);
 
-                if (data is DfDataContext)
+                if (data is EfDataContext)
                 {
-                    ((DfDataContext)data).MatchedResult = matchedResult || result;
+                    ((EfDataContext)data).MatchedResult = matchedResult || result;
                 }
                 else
                 {

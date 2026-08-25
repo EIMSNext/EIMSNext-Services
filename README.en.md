@@ -83,7 +83,7 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 ### 4. Process Service
 - through `/api/v1/workflow/start` Start the process.
 - through `/api/v1/workflow/approve` Submit for approval.
-- through `/api/v1/dataflow/run` Trigger data flow operation.
+- through `/api/v1/EventFlow/Run` Trigger EventFlow operation.
 
 ### 5. File Upload
 - Use `/api/v1/upload` Upload file through the interface.

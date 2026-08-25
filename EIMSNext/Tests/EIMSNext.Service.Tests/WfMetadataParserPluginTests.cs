@@ -16,9 +16,9 @@ namespace EIMSNext.Service.Tests
             var definition = new Wf_Definition
             {
                 CorpId = "corp-plugin",
-                ExternalId = "dataflow-001",
+                ExternalId = "eventFlow-001",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = new
                 {
                     StartNode = new
@@ -129,7 +129,7 @@ namespace EIMSNext.Service.Tests
 
             var (metadata, _) = parser.Parse(definition);
 
-            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").DfNodeSetting!.PluginSetting!;
+            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").EfNodeSetting!.PluginSetting!;
             Assert.AreEqual("sampleplugin", pluginSetting.PluginId);
             Assert.AreEqual("classifyReceipt", pluginSetting.FunctionId);
             Assert.AreEqual(2, pluginSetting.FieldSettings.Count);
@@ -152,9 +152,9 @@ namespace EIMSNext.Service.Tests
             var definition = new Wf_Definition
             {
                 CorpId = "corp-plugin",
-                ExternalId = "dataflow-invalid-sublist",
+                ExternalId = "eventFlow-invalid-sublist",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = new
                 {
                     StartNode = new
@@ -242,7 +242,7 @@ namespace EIMSNext.Service.Tests
 
             var (metadata, _) = parser.Parse(definition);
 
-            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").DfNodeSetting!.PluginSetting!;
+            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").EfNodeSetting!.PluginSetting!;
             Assert.AreEqual(2, pluginSetting.FieldSettings.Count);
             Assert.AreEqual("paymentDetails", pluginSetting.FieldSettings[0].FieldKey);
             Assert.AreEqual("otherDetails", pluginSetting.FieldSettings[1].FieldKey);
@@ -262,7 +262,7 @@ namespace EIMSNext.Service.Tests
 
             var (metadata, _) = parser.Parse(definition);
 
-            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").DfNodeSetting!.PluginSetting!;
+            var pluginSetting = metadata.Steps.Single(x => x.Id == "plugin").EfNodeSetting!.PluginSetting!;
             var subFields = pluginSetting.FieldSettings.Single().SubFieldSettings;
             Assert.AreEqual(2, subFields.Count);
             Assert.AreEqual(false, subFields[0].ValueField!.SingleResultNode);
@@ -366,7 +366,7 @@ namespace EIMSNext.Service.Tests
 
             var (metadata, _) = parser.Parse(definition);
 
-            var insertSetting = metadata.Steps.Single(x => x.Id == "form-node").DfNodeSetting!.InsertSetting!;
+            var insertSetting = metadata.Steps.Single(x => x.Id == "form-node").EfNodeSetting!.InsertSetting!;
             Assert.AreEqual(2, insertSetting.FieldSettings.Count);
         }
 
@@ -405,9 +405,9 @@ namespace EIMSNext.Service.Tests
             return new Wf_Definition
             {
                 CorpId = "corp-plugin",
-                ExternalId = "dataflow-plugin-source-rules",
+                ExternalId = "eventFlow-plugin-source-rules",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = new
                 {
                     StartNode = new
@@ -466,9 +466,9 @@ namespace EIMSNext.Service.Tests
             return new Wf_Definition
             {
                 CorpId = "corp-plugin",
-                ExternalId = $"dataflow-{nodeType}-source-rules",
+                ExternalId = $"eventFlow-{nodeType}-source-rules",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = new
                 {
                     StartNode = new

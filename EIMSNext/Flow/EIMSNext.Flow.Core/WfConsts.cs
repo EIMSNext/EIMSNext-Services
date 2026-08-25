@@ -29,7 +29,7 @@ namespace EIMSNext.Flow.Core
         public const string ApproveLogId = "approve_log_id";
         public const string MatchedResult = "matched_result";
         public const string MatchParallel = "match_parallel";
-        public const string DfCascade = "df_cascade";
+        public const string EfCascade = "ef_cascade";
         public const string EventIds = "event_ids";
         public const string ApprovalRounnd = "approval_round";
     }

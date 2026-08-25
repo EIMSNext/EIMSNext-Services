@@ -16,9 +16,9 @@ namespace EIMSNext.Service.Tests
             var definition = new Wf_Definition
             {
                 CorpId = "corp-print-validation",
-                ExternalId = "dataflow-invalid-print",
+                ExternalId = "eventFlow-invalid-print",
                 Version = 1,
-                FlowType = FlowType.Dataflow,
+                FlowType = FlowType.EventFlow,
                 Content = new
                 {
                     StartNode = new

@@ -12,7 +12,7 @@ namespace EIMSNext.Async.Quartz
             services.AddTransient<IFormNotifyScheduleJob>(sp => sp.GetRequiredService<FormNotifyScheduleJob>());
             services.AddTransient<WfExpireNotifyJob>();
             services.AddTransient<IWfExpireNotifyJob>(sp => sp.GetRequiredService<WfExpireNotifyJob>());
-            services.AddTransient<DataflowScheduleJob>();
+            services.AddTransient<EventFlowScheduleJob>();
 
             return services;
         }

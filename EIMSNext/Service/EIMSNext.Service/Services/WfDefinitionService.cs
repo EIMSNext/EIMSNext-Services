@@ -14,12 +14,12 @@ namespace EIMSNext.Service
     public class WfDefinitionService : EntityServiceBase<Wf_Definition>, IWfDefinitionService
     {
         private WfMetadataParser metadataParser;
-        private readonly IDataflowScheduleService _dataflowScheduleService;
+        private readonly IEventFlowScheduleService _eventFlowScheduleService;
 
         public WfDefinitionService(IResolver resolver) : base(resolver)
         {
             metadataParser = resolver.Resolve<WfMetadataParser>();
-            _dataflowScheduleService = resolver.Resolve<IDataflowScheduleService>();
+            _eventFlowScheduleService = resolver.Resolve<IEventFlowScheduleService>();
         }
 
         public Wf_Definition? Find(string wfExternalId, int? version = null)
@@ -74,7 +74,7 @@ namespace EIMSNext.Service
 
             var content = metadataParser.Parse(entity);
             entity.Metadata = content.Metadata;
-            if (entity.FlowType == FlowType.Dataflow)
+            if (entity.FlowType == FlowType.EventFlow)
             {
                 //数据流有多种流程定义，所以不使用FormId
                 entity.ExternalId = Repository.NewId();
@@ -103,7 +103,7 @@ namespace EIMSNext.Service
 
             var content = metadataParser.Parse(entity);
             entity.Metadata = content.Metadata;
-            if (entity.FlowType == FlowType.Dataflow)
+            if (entity.FlowType == FlowType.EventFlow)
             {
                 entity.EventSetting = content.EventSetting;
             }
@@ -113,9 +113,9 @@ namespace EIMSNext.Service
 
         protected override async Task AfterAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)
         {
-            foreach (var entity in entities.Where(x => x.FlowType == FlowType.Dataflow))
+            foreach (var entity in entities.Where(x => x.FlowType == FlowType.EventFlow))
             {
-                await _dataflowScheduleService.RebuildScheduleAsync(entity, session);
+                await _eventFlowScheduleService.RebuildScheduleAsync(entity, session);
             }
 
             await base.AfterAdd(entities, session);
@@ -123,9 +123,9 @@ namespace EIMSNext.Service
 
         protected override async Task AfterReplace(Wf_Definition entity, IClientSessionHandle? session)
         {
-            if (entity.FlowType == FlowType.Dataflow)
+            if (entity.FlowType == FlowType.EventFlow)
             {
-                await _dataflowScheduleService.RebuildScheduleAsync(entity, session);
+                await _eventFlowScheduleService.RebuildScheduleAsync(entity, session);
             }
 
             await base.AfterReplace(entity, session);

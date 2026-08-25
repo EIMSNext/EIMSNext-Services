@@ -35,29 +35,32 @@ namespace EIMSNext.Service.Host.Controllers
 	    /// 获取数据流最近一次HTTP触发样例。
 	    /// </summary>
 	    [HttpGet("HttpSample")]
-	    public async Task<IActionResult> GetHttpSampleAsync([FromQuery] string dataflowId, [FromQuery] string corpId)
+	    public async Task<IActionResult> GetHttpSampleAsync([FromQuery] string eventFlowId, [FromQuery] string corpId)
 	    {
-	        if (string.IsNullOrWhiteSpace(dataflowId) || string.IsNullOrWhiteSpace(corpId))
+	        if (string.IsNullOrWhiteSpace(eventFlowId) || string.IsNullOrWhiteSpace(corpId))
 	        {
-	            return BadRequest("dataflowId和corpId不能为空");
+	            return BadRequest("eventFlowId和corpId不能为空");
 	        }
 
-	        var def = Resolver.Resolve<IWfDefinitionService>().Get(dataflowId);
-	        if (def == null || !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
+	        var def = Resolver.Resolve<IWfDefinitionService>().Get(eventFlowId);
+        if (def == null ||
+            def.FlowType != FlowType.EventFlow ||
+            def.DeleteFlag ||
+            !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
 	        {
 	            return NotFound("智能助手不存在");
 	        }
 
 	        Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(def.AppId);
 
-	        var hookApi = Resolver.Resolve<DataflowHookApiService>();
-	        var sample = await hookApi.GetLatestSampleAsync(corpId, dataflowId);
+	        var hookApi = Resolver.Resolve<EventFlowHookApiService>();
+	        var sample = await hookApi.GetLatestSampleAsync(corpId, eventFlowId);
 	        if (sample == null)
 	        {
 	            return ApiResult.Success(new { hasSample = false }).ToActionResult();
 	        }
 
-	        var triggerSetting = def.Metadata.Steps.FirstOrDefault()?.DfNodeSetting?.TriggerSetting;
+	        var triggerSetting = def.Metadata.Steps.FirstOrDefault()?.EfNodeSetting?.TriggerSetting;
 	        var capturedAt = triggerSetting?.HttpTrigger?.SampleCapturedAt ?? sample.CapturedAt;
 
 	        return ApiResult.Success(new

@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 using System.Text.RegularExpressions;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
@@ -61,7 +62,12 @@ if (missing.Count > 0)
 }
 
 Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(output))!);
-var json = JsonSerializer.Serialize(models, new JsonSerializerOptions { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+var json = JsonSerializer.Serialize(models, new JsonSerializerOptions
+{
+    WriteIndented = true,
+    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+});
 File.WriteAllText(output, "window.EIMS_API_MODELS = " + json + ";\n");
 Console.WriteLine($"Generated {models.Count} public API models to {output}");
 return 0;

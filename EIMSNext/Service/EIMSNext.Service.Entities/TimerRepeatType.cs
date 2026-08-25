@@ -2,7 +2,7 @@ namespace EIMSNext.Service.Entities
 {
     /// <summary>
     /// 时间触发器的重复类型。
-    /// 该枚举是 FormNotify（提醒助手）、DataflowScheduleItem（智能助手）、WfExpireNotifyJob（流程超时）
+    /// 该枚举是 FormNotify（提醒助手）、EventFlowScheduleItem（智能助手）、WfExpireNotifyJob（流程超时）
     /// 三方共用的"定时器协议"，对应 <see cref="EIMSNext.Service.Entities.RepeatScheduleCalculator"/>。
     /// 数值顺序必须保持稳定，已落库到 MongoDB，变更需做数据迁移。
     /// </summary>

@@ -62,8 +62,8 @@ namespace EIMSNext.Flow.Service
 
         private WorkflowDefinition Convert(WfMetadata metadata, FlowType flowType)
         {
-            var dataType = flowType == FlowType.Dataflow
-                ? typeof(DfDataContext)
+            var dataType = flowType == FlowType.EventFlow
+                ? typeof(EfDataContext)
                 : typeof(ExpandoObject);
 
             var result = new WorkflowDefinition
@@ -244,10 +244,10 @@ namespace EIMSNext.Flow.Service
         {
             foreach (var nextStep in source.SelectNextStep)
             {
-                if (dataType == typeof(DfDataContext))
+                if (dataType == typeof(EfDataContext))
                 {
-                    Expression<Func<DfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(nextStep.Value, data, outcome);
-                    step.Outcomes.Add(new ExpressionOutcome<DfDataContext>(sourceExpr)
+                    Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(nextStep.Value, data, outcome);
+                    step.Outcomes.Add(new ExpressionOutcome<EfDataContext>(sourceExpr)
                     {
                         ExternalNextStepId = $"{nextStep.Key}"
                     });
@@ -266,10 +266,10 @@ namespace EIMSNext.Flow.Service
             {
                 if (step.Outcomes.Count > 0)
                 {
-                    if (dataType == typeof(DfDataContext))
+                    if (dataType == typeof(EfDataContext))
                     {
-                        Expression<Func<DfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
-                        step.Outcomes.Add(new ExpressionOutcome<DfDataContext>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
+                        Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
+                        step.Outcomes.Add(new ExpressionOutcome<EfDataContext>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
                     }
                     else
                     {

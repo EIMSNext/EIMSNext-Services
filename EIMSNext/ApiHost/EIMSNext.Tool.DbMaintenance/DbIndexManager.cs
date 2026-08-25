@@ -33,10 +33,10 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWebhookIndexes(background);
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
-            CreateDataflowScheduleIndexes(background);
+            CreateEventFlowScheduleIndexes(background);
             CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
-            CreateDataflowLogIndexes(background);
+            CreateEventFlowLogIndexes(background);
             CreateOutboxIndexes(background);
         }
 
@@ -430,71 +430,71 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_auditlog_corp_entity_action_createtime");
         }
 
-        private void CreateDataflowLogIndexes(CreateIndexOptions options)
+        private void CreateEventFlowLogIndexes(CreateIndexOptions options)
         {
-            // Df_RunLog
-            CreateIndex(GetCollection<Df_RunLog>(),
-                Builders<Df_RunLog>.IndexKeys
+            // Ef_RunLog
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
                     .Ascending(x => x.CorpId)
-                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.DeleteFlag)
                     .Descending(x => x.TriggerTime),
                 options,
-                "ix_dfrunlog_corp_dataflow_delete_triggertime");
+                "ix_efrunlog_corp_eventflow_delete_triggertime");
 
-            CreateIndex(GetCollection<Df_RunLog>(),
-                Builders<Df_RunLog>.IndexKeys
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.AppId)
                     .Ascending(x => x.DeleteFlag)
                     .Descending(x => x.TriggerTime),
                 options,
-                "ix_dfrunlog_corp_app_delete_triggertime");
+                "ix_efrunlog_corp_app_delete_triggertime");
 
-            // Df_RunLogNode
-            CreateIndex(GetCollection<Df_RunLogNode>(),
-                Builders<Df_RunLogNode>.IndexKeys
+            // Ef_RunLogNode
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.RunLogId)
                     .Ascending(x => x.StartTime),
                 options,
-                "ix_dfrunlognode_corp_runlog_starttime");
+                "ix_efrunlognode_corp_runlog_starttime");
 
-            CreateIndex(GetCollection<Df_RunLogNode>(),
-                Builders<Df_RunLogNode>.IndexKeys
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
                     .Ascending(x => x.RunLogId)
                     .Ascending(x => x.StartTime),
                 options,
-                "ix_dfrunlognode_runlog_starttime");
+                "ix_efrunlognode_runlog_starttime");
         }
 
-        private void CreateDataflowScheduleIndexes(CreateIndexOptions options)
+        private void CreateEventFlowScheduleIndexes(CreateIndexOptions options)
         {
-            CreateCorpIdIndex<DataflowScheduleItem>(options, "ix_dataflowscheduleitem_corpid");
+            CreateCorpIdIndex<EventFlowScheduleItem>(options, "ix_eventflowscheduleitem_corpid");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
                     .Ascending(x => x.CorpId)
-                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_corp_dataflow_triggertime");
+                "ix_eventflowscheduleitem_corp_eventflow_triggertime");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
-                    .Ascending(x => x.DataflowId)
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.SourceType)
                     .Ascending(x => x.FormId)
                     .Ascending(x => x.DataId),
                 CreateUniqueOptions(options),
-                "ix_dataflowscheduleitem_dataflow_source_form_data_unique");
+                "ix_eventflowscheduleitem_eventflow_source_form_data_unique");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
                     .Ascending(x => x.ScheduleVersion)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_version_triggertime");
+                "ix_eventflowscheduleitem_version_triggertime");
         }
 
         private void CreateWorkbenchIndexes(CreateIndexOptions options)

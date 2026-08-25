@@ -18,7 +18,7 @@ namespace EIMSNext.Flow.Core
             FormId = formId;
             DataId = dataId;
             WfStarter = starter;
-            DfCascade = cascade;
+            EfCascade = cascade;
             EventIds = eventIds;
         }
 
@@ -41,7 +41,7 @@ namespace EIMSNext.Flow.Core
                 ctx.WfStarter = new Operator(empId, empCode, empName);
             }
 
-            ctx.DfCascade = (CascadeMode)expando.GetValue<int>(WfConsts.DfCascade, 0);
+            ctx.EfCascade = (CascadeMode)expando.GetValue<int>(WfConsts.EfCascade, 0);
             ctx.EventIds = expando.GetValue<string?>(WfConsts.EventIds, null);
             ctx.Round = expando.GetValue<int>(WfConsts.ApprovalRounnd, 1);
 
@@ -55,7 +55,7 @@ namespace EIMSNext.Flow.Core
         public string FormId { get; private set; } = string.Empty;
         public string DataId { get; private set; } = string.Empty;
         public Operator? WfStarter { get; private set; }
-        public CascadeMode DfCascade { get; private set; }
+        public CascadeMode EfCascade { get; private set; }
         public string? EventIds { get; private set; }
         public bool MatchedResult { get; set; }
         public bool MatchParallel { get; set; }
@@ -83,7 +83,7 @@ namespace EIMSNext.Flow.Core
             data.AddOrUpdate(WfConsts.WfStarter, empdo);
             data.AddOrUpdate(WfConsts.MatchedResult, MatchedResult);
             data.AddOrUpdate(WfConsts.MatchParallel, MatchParallel);
-            data.AddOrUpdate(WfConsts.DfCascade, (int)DfCascade);
+            data.AddOrUpdate(WfConsts.EfCascade, (int)EfCascade);
             data.AddOrUpdate(WfConsts.EventIds, EventIds);
             data.AddOrUpdate(WfConsts.ApprovalRounnd, Round);
 

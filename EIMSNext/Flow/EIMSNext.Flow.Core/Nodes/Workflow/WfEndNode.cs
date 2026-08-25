@@ -30,7 +30,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approved, scope.SessionHandle);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(new DfRunParamter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
+                await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds));
 
                 scope.CommitTransaction();
             }

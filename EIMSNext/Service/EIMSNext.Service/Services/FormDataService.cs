@@ -210,7 +210,7 @@ namespace EIMSNext.Service
         public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
         {
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
-            if (old == null && ShouldTriggerFormDataChangeDataflow())
+            if (old == null && ShouldTriggerFormDataChangeEventFlow())
             {
                 old = Get(entity.Id);
                 if (old != null)
@@ -230,9 +230,9 @@ namespace EIMSNext.Service
             var result = await base.ReplaceAsync(entity);
             await SubmitAsync([entity], null, EIMSNext.Service.Entities.CascadeMode.NotSet, null);
 
-            if (ShouldTriggerFormDataChangeDataflow() && changeFields.Count > 0)
+            if (ShouldTriggerFormDataChangeEventFlow() && changeFields.Count > 0)
             {
-                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Modified, EIMSNext.Service.Entities.CascadeMode.NotSet, null, changeFields);
+                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Modified, EIMSNext.Service.Entities.CascadeMode.NotSet, null, changeFields);
             }
 
             return result;
@@ -343,7 +343,7 @@ namespace EIMSNext.Service
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
-            var deleting = ShouldTriggerFormDataChangeDataflow() && idList.Count > 0
+            var deleting = ShouldTriggerFormDataChangeEventFlow() && idList.Count > 0
                 ? Find(x => idList.Contains(x.Id)).ToList()
                 : [];
 
@@ -351,7 +351,7 @@ namespace EIMSNext.Service
 
             foreach (var entity in deleting)
             {
-                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
             }
 
             return result;
@@ -389,7 +389,7 @@ namespace EIMSNext.Service
 
         public override async Task<object> DeleteAsync(DynamicFilter filter)
         {
-            var deleting = ShouldTriggerFormDataChangeDataflow()
+            var deleting = ShouldTriggerFormDataChangeEventFlow()
                 ? Repository.Collection.Find(filter.ToFilterDefinition<FormData>()).ToList()
                 : [];
 
@@ -397,7 +397,7 @@ namespace EIMSNext.Service
 
             foreach (var entity in deleting)
             {
-                await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
+                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Service.Entities.CascadeMode.NotSet, null, null);
             }
 
             return result;
@@ -510,8 +510,8 @@ namespace EIMSNext.Service
             var taskRepo = Resolver.GetRepository<Wf_Task>();
             taskRepo.Delete(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
-            var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
-            dataflowScheduleRepo.Delete(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            var eventFlowScheduleRepo = Resolver.GetRepository<EventFlowScheduleItem>();
+            eventFlowScheduleRepo.Delete(eventFlowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
             var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
             notifyScheduleRepo.Delete(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
@@ -524,8 +524,8 @@ namespace EIMSNext.Service
             var taskRepo = Resolver.GetRepository<Wf_Task>();
             await taskRepo.DeleteAsync(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
-            var dataflowScheduleRepo = Resolver.GetRepository<DataflowScheduleItem>();
-            await dataflowScheduleRepo.DeleteAsync(dataflowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            var eventFlowScheduleRepo = Resolver.GetRepository<EventFlowScheduleItem>();
+            await eventFlowScheduleRepo.DeleteAsync(eventFlowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
 
             var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
             await notifyScheduleRepo.DeleteAsync(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
@@ -632,17 +632,17 @@ namespace EIMSNext.Service
                 }
                 else
                 {
-                    await RunFormDataflowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
+                    await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
                 }
             }
         }
 
-        private bool ShouldTriggerFormDataChangeDataflow()
+        private bool ShouldTriggerFormDataChangeEventFlow()
         {
             return Context.Action == DataAction.None || Context.Action == DataAction.Save;
         }
 
-        private async Task RunFormDataflowAsync(
+        private async Task RunFormEventFlowAsync(
             FormData entity,
             ApiClient.Flow.EventType eventType,
             EIMSNext.Service.Entities.CascadeMode cascade,
@@ -654,21 +654,21 @@ namespace EIMSNext.Service
                 return;
             }
 
-            var dfResp = await _flowClient.RunDataflow(new DfRunRequest
+            var efResp = await _flowClient.RunEventFlow(new EfRunRequest
             {
                 DataId = entity.Id,
                 EventSource = ApiClient.Flow.EventSourceType.Form,
                 EventType = eventType,
-                DfCascade = (ApiClient.Flow.CascadeMode)cascade,
+                EfCascade = (ApiClient.Flow.CascadeMode)cascade,
                 EventIds = eventIds,
                 ChangeFields = changeFields?
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList()
             }, Context.AccessToken);
-            if (dfResp != null && !string.IsNullOrEmpty(dfResp.Error))
+            if (efResp != null && !string.IsNullOrEmpty(efResp.Error))
             {
-                throw new UnLogException(dfResp.Error);
+                throw new UnLogException(efResp.Error);
             }
         }
 

@@ -78,7 +78,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var cascade = request.DfCascade == CascadeMode.NotSet ? CascadeMode.All : request.DfCascade;
+                var cascade = request.EfCascade == CascadeMode.NotSet ? CascadeMode.All : request.EfCascade;
                 var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), cascade, request.EventIds);
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
@@ -645,7 +645,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 data.FormId,
                 data.DataId,
                 data.WfStarter,
-                data.DfCascade,
+                data.EfCascade,
                 data.EventIds)
             {
                 Round = existingData.Round
@@ -768,7 +768,7 @@ namespace EIMSNext.Flow.Host.Controllers
         public string WfDefinitionId { get; set; } = string.Empty;
         public int? Version { get; set; }
         public string DataId { get; set; } = string.Empty;
-        public CascadeMode DfCascade { get; set; }
+        public CascadeMode EfCascade { get; set; }
         public string? EventIds { get; set; }
     }
     public class ApproveRequest
