@@ -14,7 +14,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 

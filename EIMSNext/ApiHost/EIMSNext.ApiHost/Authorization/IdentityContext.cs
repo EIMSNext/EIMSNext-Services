@@ -1,6 +1,6 @@
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Mongo.Entities;
@@ -8,7 +8,6 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Http;
 
@@ -37,13 +36,13 @@ namespace EIMSNext.ApiHost.Authorization
             _resolver = resolver;
             IHttpContextAccessor httpContextAccessor = resolver.Resolve<IHttpContextAccessor>();
             AccessToken = httpContextAccessor.HttpContext?.Request.Headers.Authorization.FirstOrDefault() ?? "";
-            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Id);
+            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.Id);
             var corpClaim = httpContextAccessor.HttpContext?.User.FindFirst("corp");
-            var identityTypeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.IdentityType);
-            var nameClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Name);
-            var dashboardIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.DashboardId);
-            var publicTargetIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicTargetId);
-            var publicScopeClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.PublicScope);
+            var identityTypeClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.IdentityType);
+            var nameClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.Name);
+            var dashboardIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.DashboardId);
+            var publicTargetIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.PublicTargetId);
+            var publicScopeClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.PublicScope);
             CurrentUserID = idClaim?.Value ?? string.Empty;
             CurrentCorpId = corpClaim?.Value ?? string.Empty;
             CurrentDashboardId = publicTargetIdClaim?.Value ?? dashboardIdClaim?.Value ?? string.Empty;
@@ -83,7 +82,7 @@ namespace EIMSNext.ApiHost.Authorization
                 var clientId = client_idClaim?.Value ?? string.Empty;
                 if (!string.IsNullOrEmpty(clientId))
                 {
-                    var client = resolver.GetService<EIMSNext.Auth.Entities.Client>().Get(clientId);
+                    var client = resolver.GetService<EIMSNext.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
                         CurrentCorpId = client.CorpId??string.Empty;
@@ -207,7 +206,7 @@ namespace EIMSNext.ApiHost.Authorization
                         {
                             if (_employee != null)
                             {
-                                var adminGroupTypes = _resolver.GetService<AdminGroup>().All()
+                                var adminGroupTypes = _resolver.GetService<TenantAdminGroup>().All()
                                     .Where(x =>
                                         x.CorpId == CurrentCorpId &&
                                         !x.DeleteFlag &&
@@ -215,11 +214,11 @@ namespace EIMSNext.ApiHost.Authorization
                                     .Select(x => x.Type)
                                     .ToList();
 
-                                if (adminGroupTypes.Contains(AdminGroupType.System))
+                                if (adminGroupTypes.Contains(TenantAdminGroupType.System))
                                 {
                                     _type = IdentityType.CorpAdmin;
                                 }
-                                else if (adminGroupTypes.Contains(AdminGroupType.Normal))
+                                else if (adminGroupTypes.Contains(TenantAdminGroupType.Normal))
                                 {
                                     _type = IdentityType.AppAdmin;
                                 }

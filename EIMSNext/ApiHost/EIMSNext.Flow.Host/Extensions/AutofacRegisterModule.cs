@@ -7,7 +7,7 @@ using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Persistence;
+using EIMSNext.Persistence.Mongo;
 
 namespace EIMSNext.Flow.Host.Extensions
 {

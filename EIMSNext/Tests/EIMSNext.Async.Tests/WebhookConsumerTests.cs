@@ -1,12 +1,12 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
-using EIMSNext.CloudEvent;
+using EIMSNext.Notification;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 

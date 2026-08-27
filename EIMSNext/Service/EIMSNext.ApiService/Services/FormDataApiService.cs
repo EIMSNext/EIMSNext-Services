@@ -15,7 +15,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Storage.Abstractions;
 using HKH.Common;
@@ -32,13 +32,13 @@ namespace EIMSNext.ApiService
         private const int ImportPreviewRowLimit = 30;
         private IFormDefService _formDefService;
         private IFormDataChangeLogService _formDataChangeLogService;
-        private AdminPermissionEvaluator _permissionEvaluator;
+        private TenantAccessEvaluator _permissionEvaluator;
         private FormDataReadScopeResolver _readScopeResolver;
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _formDefService = resolver.Resolve<IFormDefService>();
             _formDataChangeLogService = resolver.Resolve<IFormDataChangeLogService>();
-            _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
+            _permissionEvaluator = resolver.Resolve<TenantAccessEvaluator>();
             _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         }
 
@@ -73,7 +73,7 @@ namespace EIMSNext.ApiService
                 request.Format,
                 ActualFormat = actualFormat,
                 request.FormId,
-                request.AuthGroupId,
+                request.PermissionGroupId,
                 request.Columns,
                 request.Filter,
             });
@@ -128,7 +128,7 @@ namespace EIMSNext.ApiService
                 throw new ArgumentException("表单ID不能为空");
             }
 
-            BuildImportPermissionContext(formId, authGroupId: null);
+            BuildImportPermissionContext(formId, permissionGroupId: null);
             _ = _formDefService.Get(formId) ?? throw new ArgumentException("表单不存在或已被删除");
 
             using var workbook = WorkbookFactory.Create(source);
@@ -168,10 +168,10 @@ namespace EIMSNext.ApiService
         public async Task<FormDataImportStartResponse> StartImportAsync(FormDataImportStartRequest request, Stream source, string fileName, long fileSize)
         {
             ValidateImportRequest(request, fileName, fileSize);
-            var permission = BuildImportPermissionContext(request.FormId, request.AuthGroupId);
+            var permission = BuildImportPermissionContext(request.FormId, request.PermissionGroupId);
 
             var formDef = _formDefService.Get(request.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
-            var fieldSnapshot = BuildImportFieldSnapshot(formDef, permission.FieldPerms);
+            var fieldSnapshot = BuildImportFieldSnapshot(formDef, permission.FormFieldPermissions);
             ValidateImportMappings(request, fieldSnapshot);
             var importLogService = Resolver.Resolve<IFormDataImportLogService>();
             var storage = Resolver.Resolve<IStorageProvider>();
@@ -194,7 +194,7 @@ namespace EIMSNext.ApiService
                 AppId = formDef.AppId,
                 FormId = formDef.Id,
                 FormName = formDef.Name,
-                AuthGroupId = request.AuthGroupId,
+                PermissionGroupId = request.PermissionGroupId,
                 FormUsingWorkflow = formDef.UsingWorkflow,
                 Mode = request.Mode,
                 TriggerValidation = request.TriggerValidation,
@@ -263,7 +263,7 @@ namespace EIMSNext.ApiService
         {
             var importLog = GetAccessibleImportLog(id);
             EnsureImportErrorsEditable(importLog);
-            var permission = BuildImportPermissionContext(importLog.FormId, importLog.AuthGroupId);
+            var permission = BuildImportPermissionContext(importLog.FormId, importLog.PermissionGroupId);
             var rows = request.Rows ?? [];
             if (rows.Count == 0 || rows.Count > EIMSNext.Common.Constants.FormDataImportMaxEditableErrors)
             {
@@ -462,7 +462,7 @@ namespace EIMSNext.ApiService
 
         private DynamicFilter ApplyFilterOptionsPermission(FormDataFilterOptionsRequest request, DynamicFilter filter)
         {
-            var scope = _readScopeResolver.Resolve(request.FormId, request.AuthGroupId);
+            var scope = _readScopeResolver.Resolve(request.FormId, request.PermissionGroupId);
             return filter.And(scope.DataFilter)!;
         }
 
@@ -600,18 +600,18 @@ namespace EIMSNext.ApiService
             }
         }
 
-        private FormImportPermissionContext BuildImportPermissionContext(string formId, string? authGroupId)
+        private FormImportPermissionContext BuildImportPermissionContext(string formId, string? permissionGroupId)
         {
             if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
             {
                 return new FormImportPermissionContext(null, null);
             }
 
-            var groups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+            var groups = _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee(formId)
                 .Where(HasInheritedDataAccess)
-                .Where(group => string.IsNullOrWhiteSpace(authGroupId) ||
-                    string.Equals(group.Id, authGroupId, StringComparison.OrdinalIgnoreCase))
-                .Where(group => GetEffectiveDataPerms(group).HasFlag(DataPerms.Import))
+                .Where(group => string.IsNullOrWhiteSpace(permissionGroupId) ||
+                    string.Equals(group.Id, permissionGroupId, StringComparison.OrdinalIgnoreCase))
+                .Where(group => GetEffectiveFormDataPermissions(group).HasFlag(FormDataPermissions.Import))
                 .ToList();
             if (groups.Count == 0)
             {
@@ -619,16 +619,16 @@ namespace EIMSNext.ApiService
             }
 
             return new FormImportPermissionContext(
-                MergeFieldPerms(groups),
+                MergeFormFieldPermissions(groups),
                 BuildDataScopeFilter(groups));
         }
 
-        private DynamicFilter? BuildDataScopeFilter(IEnumerable<AuthGroup> authGroups)
+        private DynamicFilter? BuildDataScopeFilter(IEnumerable<FormDataPermissionGroup> permissionGroups)
         {
             var rangeFilters = new List<DynamicFilter>();
-            foreach (var authGroup in authGroups)
+            foreach (var permissionGroup in permissionGroups)
             {
-                var groupFilter = BuildAuthGroupDataFilter(authGroup);
+                var groupFilter = BuildFormDataPermissionGroupDataFilter(permissionGroup);
                 if (groupFilter == null || groupFilter.IsEmpty)
                 {
                     return null;
@@ -640,11 +640,11 @@ namespace EIMSNext.ApiService
             return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
         }
 
-        private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)
+        private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (authGroup.Type)
+            switch (permissionGroup.Type)
             {
-                case AuthGroupType.ManageSelfData:
+                case FormDataPermissionMode.ManageSelfData:
                     if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
                     {
                         return CreateNoMatchFilter();
@@ -656,16 +656,16 @@ namespace EIMSNext.ApiService
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };
-                case AuthGroupType.ViewAllData:
-                case AuthGroupType.ManageAllData:
+                case FormDataPermissionMode.ViewAllData:
+                case FormDataPermissionMode.ManageAllData:
                     return null;
-                case AuthGroupType.Custom:
-                    if (string.IsNullOrWhiteSpace(authGroup.DataFilter))
+                case FormDataPermissionMode.Custom:
+                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
                     {
                         return null;
                     }
 
-                    var condList = authGroup.DataFilter.DeserializeFromJson<ConditionList>();
+                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
                     return condList?.ToDynamicFilter();
                 default:
                     return null;
@@ -705,20 +705,20 @@ namespace EIMSNext.ApiService
             };
         }
 
-        private static List<FieldPerm>? MergeFieldPerms(IEnumerable<AuthGroup> authGroups)
+        private static List<FormFieldPermission>? MergeFormFieldPermissions(IEnumerable<FormDataPermissionGroup> permissionGroups)
         {
-            var groups = authGroups.ToList();
-            if (groups.Any(x => x.FieldPerms == null || x.FieldPerms.Count == 0))
+            var groups = permissionGroups.ToList();
+            if (groups.Any(x => x.FormFieldPermissions == null || x.FormFieldPermissions.Count == 0))
             {
                 return null;
             }
 
-            var merged = new Dictionary<string, FieldPerm>(StringComparer.OrdinalIgnoreCase);
-            foreach (var fieldPerm in groups.SelectMany(x => x.FieldPerms))
+            var merged = new Dictionary<string, FormFieldPermission>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fieldPerm in groups.SelectMany(x => x.FormFieldPermissions))
             {
                 if (!merged.TryGetValue(fieldPerm.Id, out var current))
                 {
-                    merged[fieldPerm.Id] = new FieldPerm
+                    merged[fieldPerm.Id] = new FormFieldPermission
                     {
                         Id = fieldPerm.Id,
                         Visible = fieldPerm.Visible,
@@ -756,21 +756,21 @@ namespace EIMSNext.ApiService
         }
 
         // keep in sync with FormDataController.cs:1258-1267
-        private static DataPerms GetEffectiveDataPerms(AuthGroup authGroup)
+        private static FormDataPermissions GetEffectiveFormDataPermissions(FormDataPermissionGroup permissionGroup)
         {
-            return authGroup.Type switch
+            return permissionGroup.Type switch
             {
-                AuthGroupType.ManageSelfData => DataPerms.All,
-                AuthGroupType.ManageAllData => DataPerms.All,
-                AuthGroupType.ViewAllData => DataPerms.View,
-                _ => (DataPerms)authGroup.DataPerms,
+                FormDataPermissionMode.ManageSelfData => FormDataPermissions.All,
+                FormDataPermissionMode.ManageAllData => FormDataPermissions.All,
+                FormDataPermissionMode.ViewAllData => FormDataPermissions.View,
+                _ => (FormDataPermissions)permissionGroup.FormDataPermissions,
             };
         }
 
         // keep in sync with FormDataController.cs:1269-1272
-        private static bool HasInheritedDataAccess(AuthGroup authGroup)
+        private static bool HasInheritedDataAccess(FormDataPermissionGroup permissionGroup)
         {
-            return GetEffectiveDataPerms(authGroup) != DataPerms.None;
+            return GetEffectiveFormDataPermissions(permissionGroup) != FormDataPermissions.None;
         }
 
         private FormDataImportLog GetAccessibleImportLog(string id)
@@ -1440,7 +1440,7 @@ namespace EIMSNext.ApiService
                 : field;
         }
 
-        internal static List<FormDataImportFieldSnapshot> BuildImportFieldSnapshot(FormDef formDef, IReadOnlyCollection<FieldPerm>? fieldPerms = null)
+        internal static List<FormDataImportFieldSnapshot> BuildImportFieldSnapshot(FormDef formDef, IReadOnlyCollection<FormFieldPermission>? fieldPerms = null)
         {
             var fields = new List<FormDataImportFieldSnapshot>();
             foreach (var field in formDef.Content?.Items ?? [])
@@ -1451,7 +1451,7 @@ namespace EIMSNext.ApiService
             return fields;
         }
 
-        private static void AppendImportField(List<FormDataImportFieldSnapshot> fields, FieldDef field, FieldDef? parent, IReadOnlyCollection<FieldPerm>? fieldPerms)
+        private static void AppendImportField(List<FormDataImportFieldSnapshot> fields, FieldDef field, FieldDef? parent, IReadOnlyCollection<FormFieldPermission>? fieldPerms)
         {
             if (field.Hidden || field.Type == FieldType.Signature)
             {
@@ -1483,7 +1483,7 @@ namespace EIMSNext.ApiService
             });
         }
 
-        private static bool CanImportField(FieldDef field, FieldDef? parent, IReadOnlyCollection<FieldPerm>? fieldPerms)
+        private static bool CanImportField(FieldDef field, FieldDef? parent, IReadOnlyCollection<FormFieldPermission>? fieldPerms)
         {
             if (fieldPerms == null)
             {
@@ -1591,7 +1591,7 @@ namespace EIMSNext.ApiService
         }
 
         private sealed record FormImportPermissionContext(
-            IReadOnlyCollection<FieldPerm>? FieldPerms,
+            IReadOnlyCollection<FormFieldPermission>? FormFieldPermissions,
             DynamicFilter? DataScopeFilter);
 
         internal sealed class FormDataImportFieldSnapshot

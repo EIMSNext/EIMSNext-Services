@@ -9,7 +9,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.OData;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.OData.Query;
@@ -21,7 +21,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     {
         protected override IQueryable<AppDefViewModel> FilterByPermission(IQueryable<AppDefViewModel> query, ODataQueryOptions<AppDefViewModel> options)
         {
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return base.FilterByPermission(query, options);

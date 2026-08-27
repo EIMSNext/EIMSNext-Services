@@ -3,7 +3,7 @@ using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OData;
 
@@ -43,7 +43,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
 
         protected override IQueryable<FormDefViewModel> FilterByPermission(IQueryable<FormDefViewModel> query, ODataQueryOptions<FormDefViewModel> options)
         {
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return base.FilterByPermission(query, options);

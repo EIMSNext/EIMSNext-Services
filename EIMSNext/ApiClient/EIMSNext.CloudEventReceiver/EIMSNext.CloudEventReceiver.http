@@ -1,0 +1,6 @@
+@EIMSNext.CloudEventReceiver_HostAddress = http://localhost:5012
+
+GET {{EIMSNext.CloudEventReceiver_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -3,7 +3,7 @@ using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
 
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Component
 {

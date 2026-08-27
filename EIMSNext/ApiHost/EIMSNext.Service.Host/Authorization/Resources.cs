@@ -15,11 +15,11 @@ namespace EIMSNext.Service.Host.Authorization
         /// <summary>部门（Department）。</summary>
         public const string Department = "department";
 
-        /// <summary>角色（Role）。</summary>
-        public const string Role = "role";
+        /// <summary>角色（EmployeeGroup）。</summary>
+        public const string EmployeeGroup = "role";
 
-        /// <summary>角色组（RoleGroup）。</summary>
-        public const string RoleGroup = "roleGroup";
+        /// <summary>角色组（EmployeeGroupCategory）。</summary>
+        public const string EmployeeGroupCategory = "employeeGroupCategory";
 
         /// <summary>应用（AppDef）。仅读。</summary>
         public const string AppDef = "appdef";
@@ -41,8 +41,8 @@ namespace EIMSNext.Service.Host.Authorization
         {
             Employee,
             Department,
-            Role,
-            RoleGroup,
+            EmployeeGroup,
+            EmployeeGroupCategory,
             AppDef,
             FormDef,
             FormData,

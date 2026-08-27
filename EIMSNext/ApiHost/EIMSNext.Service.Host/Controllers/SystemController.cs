@@ -1,11 +1,11 @@
 using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.Extensions;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
@@ -16,7 +16,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
@@ -74,7 +73,7 @@ namespace EIMSNext.Service.Host.Controllers
                 corpId = IdentityContext.CurrentCorpId,
                 departmentIds,
                 userType = IdentityContext.IdentityType,
-                roles = emp?.Roles.Select(x => x.RoleId)
+                roles = emp?.EmployeeGroups.Select(x => x.EmployeeGroupId)
             }).ToActionResult();
         }
 
@@ -105,13 +104,13 @@ namespace EIMSNext.Service.Host.Controllers
         [IdentityType(IdentityTypeDefaults.AppAdmin)]
         public IActionResult GetAdminPermissions()
         {
-            return ApiResult.Success(Resolver.Resolve<AdminPermissionEvaluator>().GetSnapshot()).ToActionResult();
+            return ApiResult.Success(Resolver.Resolve<TenantAccessEvaluator>().GetSnapshot()).ToActionResult();
         }
 
         [HttpGet("AppMenuPerms")]
         public IActionResult GetAppMenuPerms(string appId)
         {
-            return Ok(Resolver.Resolve<AdminPermissionEvaluator>().GetAppMenuPermissions(appId));
+            return Ok(Resolver.Resolve<TenantAccessEvaluator>().GetAppMenuPermissions(appId));
         }
 
         /// <summary>

@@ -1,5 +1,5 @@
 using EIMSNext.Flow.Core;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using System.Reflection;
 using WorkflowCore.Models;
 

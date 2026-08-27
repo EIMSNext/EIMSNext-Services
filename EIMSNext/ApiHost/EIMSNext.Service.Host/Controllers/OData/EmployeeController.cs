@@ -12,7 +12,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OData;
 using HKH.Mef2.Integration;
@@ -152,7 +152,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
 
             if (IsAdminScope())
             {
-                var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+                var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
                 if (evaluator.ShouldApplyNormalAdminRules)
                 {
                     var snapshot = evaluator.GetSnapshot();

@@ -10,6 +10,7 @@ namespace EIMSNext.Core.Mongo
         private bool _isRootScope;
         private bool _completed = false;
         private readonly List<Func<Task>> _afterCommit = [];
+        private List<Func<Task>>? _committedCallbacks;
         private static readonly AsyncLocal<List<Func<Task>>?> _afterCommitCallbacks = new();
 
         public MongoTransactionScope(IMongoDbContex dbContex, TransactionOptions? transOptions = null)
@@ -43,20 +44,9 @@ namespace EIMSNext.Core.Mongo
             {
                 SessionHandle.CommitTransaction();
                 _completed = true;
-                var callbacks = _afterCommit.ToArray();
+                _committedCallbacks = _afterCommit.ToList();
                 _afterCommit.Clear();
                 _afterCommitCallbacks.Value = null;
-                foreach (var callback in callbacks)
-                {
-                    try
-                    {
-                        callback().GetAwaiter().GetResult();
-                    }
-                    catch
-                    {
-                        // After-commit work must not turn a committed business transaction into a failure.
-                    }
-                }
             }
         }
 
@@ -82,6 +72,7 @@ namespace EIMSNext.Core.Mongo
         {
             if (_isRootScope)
             {
+                var callbacks = _completed ? _committedCallbacks?.ToArray() : [];
                 try
                 {
                     if (!_completed)
@@ -92,6 +83,18 @@ namespace EIMSNext.Core.Mongo
                     _currentSession.Value = null;
                     _afterCommitCallbacks.Value = null;
                     SessionHandle.Dispose();
+                }
+
+                foreach (var callback in callbacks)
+                {
+                    try
+                    {
+                        callback().GetAwaiter().GetResult();
+                    }
+                    catch
+                    {
+                        // After-commit work must not turn a committed business transaction into a failure.
+                    }
                 }
             }
         }

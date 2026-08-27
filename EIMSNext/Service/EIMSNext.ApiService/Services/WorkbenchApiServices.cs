@@ -9,7 +9,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -542,7 +542,7 @@ namespace EIMSNext.ApiService
         public static List<string> GetAccessibleFormIds(IResolver resolver, IIdentityContext identityContext, string? appId)
         {
             var corpId = identityContext.CurrentCorpId;
-            var evaluator = resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return resolver.GetRepository<FormDef>().Queryable
@@ -578,13 +578,13 @@ namespace EIMSNext.ApiService
 
         public static List<string> GetAccessibleDashboardIds(IResolver resolver, IIdentityContext identityContext, string? appId)
         {
-            return resolver.Resolve<AdminPermissionEvaluator>().GetUsageDashboardIdsForCurrentEmployee(appId);
+            return resolver.Resolve<TenantAccessEvaluator>().GetUsageDashboardIdsForCurrentEmployee(appId);
         }
 
         public static HashSet<string> GetAccessibleAppIds(IResolver resolver, IIdentityContext identityContext)
         {
             var corpId = identityContext.CurrentCorpId;
-            var evaluator = resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return resolver.GetRepository<AppDef>().Queryable

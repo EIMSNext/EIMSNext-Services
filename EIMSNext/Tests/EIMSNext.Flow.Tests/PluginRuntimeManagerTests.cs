@@ -1,4 +1,4 @@
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.Plugin.Contracts;
 
 using Microsoft.Extensions.DependencyInjection;

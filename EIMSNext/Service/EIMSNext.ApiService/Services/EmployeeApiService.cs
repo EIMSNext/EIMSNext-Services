@@ -1,6 +1,6 @@
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
@@ -10,7 +10,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
 using HKH.Common.Security;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -33,7 +32,7 @@ namespace EIMSNext.ApiService
         {
             Resolver.GetRepository<Employee>().EnsureId(entity);
             var relations = BuildEmployeeDepartments(entity, departments);
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, null, relations.Select(x => x.DepartmentId));
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, null, relations.Select(x => x.DepartmentId));
 
             entity.Depts = BuildDepts(entity, departments);
             await AddAsync(entity);
@@ -49,7 +48,7 @@ namespace EIMSNext.ApiService
                 entity.Depts = BuildDepts(entity, departments);
             }
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, original: null, relations?.Select(x => x.DepartmentId));
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, original: null, relations?.Select(x => x.DepartmentId));
             var result = await ReplaceAsync(entity);
 
             if (syncDepartments)
@@ -146,7 +145,7 @@ namespace EIMSNext.ApiService
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Employee entity)
         {
             var original = await CoreService.GetAsync(entity.Id) ?? throw new InvalidOperationException("员工不存在");
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployee(entity, original);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, original);
 
             if (GetCurrentCorpPlatform() == PlatformType.Private)
             {
@@ -169,7 +168,7 @@ namespace EIMSNext.ApiService
             var employees = empService.Query(x => x.CorpId == IdentityContext.CurrentCorpId && idList.Contains(x.Id)).ToList();
             var isPrivate = GetCurrentCorpPlatform() == PlatformType.Private;
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageEmployees(idList);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployees(idList);
 
             foreach (var employee in employees)
             {

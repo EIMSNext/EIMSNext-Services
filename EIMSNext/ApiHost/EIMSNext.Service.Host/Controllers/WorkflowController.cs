@@ -11,7 +11,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Models;
 using EIMSNext.Service.Host.Requests;

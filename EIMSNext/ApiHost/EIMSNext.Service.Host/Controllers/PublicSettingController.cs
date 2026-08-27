@@ -6,7 +6,7 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using Microsoft.AspNetCore.Mvc;
 

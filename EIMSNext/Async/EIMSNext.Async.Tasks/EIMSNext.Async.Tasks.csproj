@@ -16,7 +16,7 @@
     <PackageReference Include="System.Security.Cryptography.Xml" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Service\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Notification\EIMSNext.Notification.csproj" />
     <ProjectReference Include="..\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
@@ -25,7 +25,8 @@
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
   </ItemGroup>
   <ItemGroup>
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">

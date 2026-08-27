@@ -1,7 +1,7 @@
 using System.Dynamic;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Tasks.Consumers;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
 

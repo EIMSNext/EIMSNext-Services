@@ -9,7 +9,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiClient.Flow;
 
 using MongoDB.Driver;
@@ -27,13 +27,13 @@ namespace EIMSNext.ApiService
 
         public override async Task AddAsync(Wf_Definition entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             await base.AddAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
         }
         public override async Task<ReplaceOneResult> ReplaceAsync(Wf_Definition entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             var result = await base.ReplaceAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
             return result;
@@ -58,7 +58,7 @@ namespace EIMSNext.ApiService
         protected override IQueryable<WfDefinitionViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return query;
@@ -85,7 +85,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("流程定义不存在");
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var definition in definitions)
             {
                 evaluator.EnsureCanManageApp(definition.AppId);
@@ -107,7 +107,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("流程定义不存在");
             }
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(definition.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(definition.AppId);
             return definition;
         }
     }

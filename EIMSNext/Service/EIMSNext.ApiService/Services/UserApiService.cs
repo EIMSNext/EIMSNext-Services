@@ -1,6 +1,6 @@
 using HKH.Mef2.Integration;
 
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService

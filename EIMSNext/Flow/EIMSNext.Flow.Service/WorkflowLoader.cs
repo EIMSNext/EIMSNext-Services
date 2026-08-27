@@ -2,7 +2,7 @@ using System.Dynamic;
 using System.Linq.Expressions;
 using EIMSNext.Flow.Core;
 using System.Reflection;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Core.Nodes;
 using EIMSNext.Service.Contracts;

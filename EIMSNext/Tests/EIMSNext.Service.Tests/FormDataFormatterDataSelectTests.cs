@@ -2,7 +2,7 @@ using System.Dynamic;
 
 using EIMSNext.Common;
 using EIMSNext.Component;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests
 {

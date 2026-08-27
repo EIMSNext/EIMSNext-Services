@@ -12,7 +12,7 @@ using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 

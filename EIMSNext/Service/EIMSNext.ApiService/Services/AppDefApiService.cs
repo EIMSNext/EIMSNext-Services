@@ -8,7 +8,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -166,17 +166,17 @@ namespace EIMSNext.ApiService
 
         protected override async Task AddAsyncCore(AppDef entity)
         {
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             evaluator.EnsureCanCreateApp();
             ValidateHomeEntries(entity);
 
             await base.AddAsyncCore(entity);
-            await evaluator.SyncCreatedAppToNormalAdminGroupsAsync(entity.Id);
+            await evaluator.SyncCreatedAppToNormalTenantAdminGroupsAsync(entity.Id);
         }
 
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(AppDef entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.Id);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.Id);
             ValidateHomeEntries(entity);
             return base.ReplaceAsyncCore(entity);
         }
@@ -184,7 +184,7 @@ namespace EIMSNext.ApiService
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var id in idList)
             {
                 evaluator.EnsureCanDeleteApp(id);
@@ -195,7 +195,7 @@ namespace EIMSNext.ApiService
 
         private async Task<AppDef> GetManageableAppAsync(string appId)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(appId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(appId);
             var app = await CoreService.GetAsync(appId);
             if (app == null || app.CorpId != IdentityContext.CurrentCorpId || app.DeleteFlag)
             {

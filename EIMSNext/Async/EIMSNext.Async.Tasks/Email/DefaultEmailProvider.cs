@@ -2,6 +2,7 @@ using System.Composition;
 
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Core.Abstractions;
+using EIMSNext.Mef;
 
 using HKH.Mef2.Integration;
 

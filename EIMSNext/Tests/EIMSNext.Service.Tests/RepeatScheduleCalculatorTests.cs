@@ -1,5 +1,5 @@
 using EIMSNext.Common.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests
 {

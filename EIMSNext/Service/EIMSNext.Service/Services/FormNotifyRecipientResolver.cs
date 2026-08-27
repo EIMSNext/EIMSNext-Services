@@ -12,7 +12,7 @@ using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Async.Abstractions.Messaging;
 
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
@@ -61,7 +61,7 @@ namespace EIMSNext.Service
         {
             var receivers = new Dictionary<string, NotifyReceiver>(StringComparer.OrdinalIgnoreCase);
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var roleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var employeeGroupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var empIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var notifier in candidates)
@@ -77,10 +77,10 @@ namespace EIMSNext.Service
                             }
                         }
                         break;
-                    case CandidateType.Role:
+                    case CandidateType.EmployeeGroup:
                         if (!string.IsNullOrWhiteSpace(notifier.CandidateId))
                         {
-                            roleIds.Add(notifier.CandidateId);
+                            employeeGroupIds.Add(notifier.CandidateId);
                         }
                         break;
                     case CandidateType.Employee:
@@ -111,9 +111,9 @@ namespace EIMSNext.Service
                 filters.Add(Builders<Employee>.Filter.In(x => x.Id, departmentEmployeeIds));
             }
 
-            if (roleIds.Count > 0)
+            if (employeeGroupIds.Count > 0)
             {
-                filters.Add(Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId)));
+                filters.Add(Builders<Employee>.Filter.ElemMatch(x => x.EmployeeGroups, r => employeeGroupIds.Contains(r.EmployeeGroupId)));
             }
 
             if (filters.Count == 0)

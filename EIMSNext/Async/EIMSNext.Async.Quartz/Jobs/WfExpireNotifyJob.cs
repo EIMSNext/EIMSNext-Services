@@ -8,7 +8,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Persistence;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 using Quartz;

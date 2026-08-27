@@ -1,7 +1,7 @@
 using System.Composition.Hosting;
 using System.Linq.Expressions;
 
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
@@ -13,7 +13,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.Service.Entities;
 
 using MongoDB.Bson;
 

@@ -4,7 +4,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using Microsoft.AspNetCore.Mvc;

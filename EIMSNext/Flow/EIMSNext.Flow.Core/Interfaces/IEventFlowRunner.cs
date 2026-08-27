@@ -1,6 +1,6 @@
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using WorkflowCore.Models;
 

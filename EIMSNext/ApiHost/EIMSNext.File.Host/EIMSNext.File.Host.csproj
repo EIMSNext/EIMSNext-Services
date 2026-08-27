@@ -26,5 +26,9 @@
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\File\EIMSNext.File\EIMSNext.File.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
+    <ProjectReference Include="..\..\File\EIMSNext.File.Contracts\EIMSNext.File.Contracts.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
   </ItemGroup>
 </Project>

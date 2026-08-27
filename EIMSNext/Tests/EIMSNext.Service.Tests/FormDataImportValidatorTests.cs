@@ -1,7 +1,7 @@
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests
 {
@@ -147,7 +147,7 @@ namespace EIMSNext.Service.Tests
                     }
                 }
             };
-            var fieldPerms = new List<FieldPerm>
+            var fieldPerms = new List<FormFieldPermission>
             {
                 new() { Id = "allowed", Visible = true, Editable = true },
                 new() { Id = "readonly", Visible = true, Editable = false },
@@ -183,7 +183,7 @@ namespace EIMSNext.Service.Tests
                     }
                 }
             };
-            var fieldPerms = new List<FieldPerm>
+            var fieldPerms = new List<FormFieldPermission>
             {
                 new() { Id = "items", Visible = true, Editable = true },
                 new() { Id = "items>qty", Visible = true, Editable = true },

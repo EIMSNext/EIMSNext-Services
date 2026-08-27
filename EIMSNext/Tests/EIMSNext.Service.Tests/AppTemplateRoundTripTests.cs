@@ -11,7 +11,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Service;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -42,8 +42,8 @@ namespace EIMSNext.Service.Tests
             var workflowTemplateRepo = repos.Add(new InMemoryRepository<WfDefinitionTemplate>());
             var printTemplateTemplateRepo = repos.Add(new InMemoryRepository<PrintDefTemplate>());
             var profileRepo = repos.Add(new InMemoryRepository<AppProfile>());
-            var authGroupRepo = repos.Add(new InMemoryRepository<AuthGroup>());
-            var authGroupTemplateRepo = repos.Add(new InMemoryRepository<AuthGroupTemplate>());
+            var permissionGroupRepo = repos.Add(new InMemoryRepository<FormDataPermissionGroup>());
+            var permissionGroupTemplateRepo = repos.Add(new InMemoryRepository<FormDataPermissionGroupTemplate>());
             repos.AddService<IServiceContext>(new TestServiceContext
             {
                 CorpId = "corp-installed",
@@ -302,7 +302,7 @@ namespace EIMSNext.Service.Tests
             source.Add(new InMemoryRepository<DashboardItemTemplate>());
             source.Add(new InMemoryRepository<WfDefinitionTemplate>());
             source.Add(new InMemoryRepository<PrintDefTemplate>());
-            source.Add(new InMemoryRepository<AuthGroupTemplate>());
+            source.Add(new InMemoryRepository<FormDataPermissionGroupTemplate>());
             source.AddService<IServiceContext>(new TestServiceContext { Operator = new Operator("source", "S001", "Source") });
 
             await sourceProfileRepo.InsertAsync(new AppProfile
@@ -356,7 +356,7 @@ namespace EIMSNext.Service.Tests
                 FormTemplateId = formId,
                 Content = $"{{\"formId\":\"{formId}\"}}",
             });
-            await ((InMemoryRepository<AuthGroupTemplate>)source.Services[typeof(IRepository<AuthGroupTemplate>)]).InsertAsync(new AuthGroupTemplate
+            await ((InMemoryRepository<FormDataPermissionGroupTemplate>)source.Services[typeof(IRepository<FormDataPermissionGroupTemplate>)]).InsertAsync(new FormDataPermissionGroupTemplate
             {
                 Id = "auth-group-package",
                 AppTemplateId = templateId,
@@ -373,7 +373,7 @@ namespace EIMSNext.Service.Tests
             target.Add(new InMemoryRepository<DashboardItemTemplate>());
             target.Add(new InMemoryRepository<WfDefinitionTemplate>());
             target.Add(new InMemoryRepository<PrintDefTemplate>());
-            target.Add(new InMemoryRepository<AuthGroupTemplate>());
+            target.Add(new InMemoryRepository<FormDataPermissionGroupTemplate>());
             target.AddService<IServiceContext>(new TestServiceContext { Operator = new Operator("target", "T001", "Target") });
             await targetProfileRepo.InsertAsync(new AppProfile
             {
@@ -412,7 +412,7 @@ namespace EIMSNext.Service.Tests
             Assert.IsNotNull(((InMemoryRepository<DashboardItemTemplate>)target.Services[typeof(IRepository<DashboardItemTemplate>)]).Get("dashboard-item-package"));
             Assert.IsNotNull(((InMemoryRepository<WfDefinitionTemplate>)target.Services[typeof(IRepository<WfDefinitionTemplate>)]).Get("workflow-package"));
             Assert.IsNotNull(((InMemoryRepository<PrintDefTemplate>)target.Services[typeof(IRepository<PrintDefTemplate>)]).Get("print-package"));
-            Assert.IsNotNull(((InMemoryRepository<AuthGroupTemplate>)target.Services[typeof(IRepository<AuthGroupTemplate>)]).Get("auth-group-package"));
+            Assert.IsNotNull(((InMemoryRepository<FormDataPermissionGroupTemplate>)target.Services[typeof(IRepository<FormDataPermissionGroupTemplate>)]).Get("auth-group-package"));
 
             targetProfile.TemplateId = "different-template";
             await targetProfileRepo.ReplaceAsync(targetProfile);
@@ -430,7 +430,7 @@ namespace EIMSNext.Service.Tests
             freshTarget.Add(new InMemoryRepository<DashboardItemTemplate>());
             freshTarget.Add(new InMemoryRepository<WfDefinitionTemplate>());
             freshTarget.Add(new InMemoryRepository<PrintDefTemplate>());
-            freshTarget.Add(new InMemoryRepository<AuthGroupTemplate>());
+            freshTarget.Add(new InMemoryRepository<FormDataPermissionGroupTemplate>());
             freshTarget.AddService<IServiceContext>(new TestServiceContext { Operator = new Operator("fresh", "F001", "Fresh") });
             await using (var importStream = new MemoryStream(exported.Content))
             {

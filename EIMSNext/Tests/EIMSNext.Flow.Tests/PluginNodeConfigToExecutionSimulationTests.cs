@@ -7,7 +7,7 @@ using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Nodes;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Scripting;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using SamplePlugin;
 
 namespace EIMSNext.Flow.Tests

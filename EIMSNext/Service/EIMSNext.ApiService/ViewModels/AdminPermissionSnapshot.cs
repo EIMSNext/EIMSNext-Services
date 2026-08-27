@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.ViewModels
 {
@@ -19,9 +19,9 @@ namespace EIMSNext.ApiService.ViewModels
 
         public List<string> AppDepartmentIds { get; set; } = [];
 
-        public string AppRoleScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
+        public string AppEmployeeGroupScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
 
-        public List<string> AppRoleIds { get; set; } = [];
+        public List<string> AppEmployeeGroupIds { get; set; } = [];
 
         public string ContactViewDepartmentScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
 
@@ -31,13 +31,13 @@ namespace EIMSNext.ApiService.ViewModels
 
         public List<string> ContactManageDepartmentIds { get; set; } = [];
 
-        public string ContactViewRoleScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
+        public string ContactViewEmployeeGroupScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
 
-        public List<string> ContactViewRoleIds { get; set; } = [];
+        public List<string> ContactViewEmployeeGroupIds { get; set; } = [];
 
-        public string ContactManageRoleScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
+        public string ContactManageEmployeeGroupScopeMode { get; set; } = ToWireScopeMode(ScopeMode.Partial);
 
-        public List<string> ContactManageRoleIds { get; set; } = [];
+        public List<string> ContactManageEmployeeGroupIds { get; set; } = [];
 
         public static string ToWireScopeMode(ScopeMode mode)
         {

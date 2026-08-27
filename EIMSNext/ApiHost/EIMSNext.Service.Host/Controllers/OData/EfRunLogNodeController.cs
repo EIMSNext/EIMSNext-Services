@@ -12,7 +12,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService;
 
 using Microsoft.AspNetCore.OData.Query;

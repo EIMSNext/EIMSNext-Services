@@ -9,7 +9,7 @@ var sourceRoot = GetArgument("--source") ?? throw new ArgumentException("--sourc
 var output = GetArgument("--output") ?? throw new ArgumentException("--output is required");
 var modelNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
-    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "RoleRequest", "RoleGroupRequest", "DynamicFindOptions", "DynamicFilter", "DynamicField", "DynamicSort", "DataScope", "SortItem", "DashboardAggregateRequest", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "Role", "RoleGroup", "Wf_Task", "Wf_TaskLog", "WfTaskViewModel", "BriefField"
+    "AppRequest", "FormDefRequest", "EmployeeRequest", "DepartmentRequest", "EmployeeGroupRequest", "EmployeeGroupCategoryRequest", "DynamicFindOptions", "DynamicFilter", "DynamicField", "DynamicSort", "DataScope", "SortItem", "DashboardAggregateRequest", "FormData", "FormDataFilterOptionsRequest", "AppDef", "FormDef", "Employee", "Department", "EmployeeGroup", "EmployeeGroupCategory", "Wf_Task", "Wf_TaskLog", "WfTaskViewModel", "BriefField"
 };
 var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {

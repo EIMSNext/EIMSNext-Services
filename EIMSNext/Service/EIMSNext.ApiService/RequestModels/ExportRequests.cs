@@ -1,6 +1,6 @@
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -13,7 +13,7 @@ namespace EIMSNext.ApiService.RequestModels
         public ExportColumnType Type { get; set; } = ExportColumnType.String;
     }
 
-    public class AuditLoginExportRequest
+    public class IdentityLoginAuditExportRequest
     {
         public ExportFormat Format { get; set; } = ExportFormat.Csv;
 
@@ -53,7 +53,7 @@ namespace EIMSNext.ApiService.RequestModels
 
         public DynamicFilter? Filter { get; set; }
 
-        public string? AuthGroupId { get; set; }
+        public string? PermissionGroupId { get; set; }
 
         public string? Keyword { get; set; }
 

@@ -4,7 +4,7 @@ using System.Linq.Expressions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
@@ -16,7 +16,6 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -39,12 +38,12 @@ namespace EIMSNext.Service.Tests
         private InMemoryRepository<Employee> _employeeRepo = null!;
         private InMemoryRepository<EmployeeDepartment> _employeeDepartmentRepo = null!;
         private InMemoryRepository<Department> _departmentRepo = null!;
-        private InMemoryRepository<AuthGroup> _authGroupRepo = null!;
-        private InMemoryRepository<AdminGroup> _adminGroupRepo = null!;
+        private InMemoryRepository<FormDataPermissionGroup> _permissionGroupRepo = null!;
+        private InMemoryRepository<TenantAdminGroup> _adminGroupRepo = null!;
         private FakeIdentityContext _identityContext = null!;
         private EmployeeApiService _employeeApiService = null!;
         private TestableDepartmentService _departmentService = null!;
-        private AdminPermissionEvaluator _permissionEvaluator = null!;
+        private TenantAccessEvaluator _permissionEvaluator = null!;
         private FormDataReadScopeResolver _readScopeResolver = null!;
 
         [TestInitialize]
@@ -53,8 +52,8 @@ namespace EIMSNext.Service.Tests
             _employeeRepo = new InMemoryRepository<Employee>();
             _employeeDepartmentRepo = new InMemoryRepository<EmployeeDepartment>();
             _departmentRepo = new InMemoryRepository<Department>();
-            _authGroupRepo = new InMemoryRepository<AuthGroup>();
-            _adminGroupRepo = new InMemoryRepository<AdminGroup>();
+            _permissionGroupRepo = new InMemoryRepository<FormDataPermissionGroup>();
+            _adminGroupRepo = new InMemoryRepository<TenantAdminGroup>();
 
             var corporateRepo = new InMemoryRepository<Corporate>();
             corporateRepo.Insert(new Corporate { Id = CorpId, Name = "Test Corp", Platform = PlatformType.Public });
@@ -71,17 +70,17 @@ namespace EIMSNext.Service.Tests
                 [typeof(IRepository<Employee>)] = _employeeRepo,
                 [typeof(IRepository<EmployeeDepartment>)] = _employeeDepartmentRepo,
                 [typeof(IRepository<Department>)] = _departmentRepo,
-                [typeof(IRepository<AuthGroup>)] = _authGroupRepo,
-                [typeof(IRepository<AdminGroup>)] = _adminGroupRepo,
+                [typeof(IRepository<FormDataPermissionGroup>)] = _permissionGroupRepo,
+                [typeof(IRepository<TenantAdminGroup>)] = _adminGroupRepo,
                 [typeof(IRepository<Corporate>)] = corporateRepo,
                 [typeof(IRepository<AuditLog>)] = new InMemoryRepository<AuditLog>(),
                 [typeof(IEmployeeService)] = new FakeEmployeeService(_employeeRepo),
-                [typeof(IAuthGroupService)] = new FakeAuthGroupService(_authGroupRepo),
-                [typeof(IAdminGroupService)] = new FakeAdminGroupService(_adminGroupRepo),
+                [typeof(IFormDataPermissionGroupService)] = new FakeFormDataPermissionGroupService(_permissionGroupRepo),
+                [typeof(ITenantAdminGroupService)] = new FakeTenantAdminGroupService(_adminGroupRepo),
                 [typeof(IService<Corporate>)] = new FakeEntityService<Corporate>(corporateRepo),
                 [typeof(IService<User>)] = new FakeEntityService<User>(new InMemoryRepository<User>()),
-                [typeof(IService<AuthGroup>)] = new FakeEntityService<AuthGroup>(_authGroupRepo),
-                [typeof(IService<AdminGroup>)] = new FakeEntityService<AdminGroup>(_adminGroupRepo),
+                [typeof(IService<FormDataPermissionGroup>)] = new FakeEntityService<FormDataPermissionGroup>(_permissionGroupRepo),
+                [typeof(IService<TenantAdminGroup>)] = new FakeEntityService<TenantAdminGroup>(_adminGroupRepo),
                 [typeof(IService<Department>)] = new FakeEntityService<Department>(_departmentRepo),
                 [typeof(IService<Employee>)] = new FakeEntityService<Employee>(_employeeRepo),
                 [typeof(ICacheClient)] = new FakeCacheClient(),
@@ -94,9 +93,14 @@ namespace EIMSNext.Service.Tests
                 [typeof(ILogger<Corporate>)] = new FakeLogger<Corporate>()
             };
 
+            services[typeof(IEmployeeAccessSubjectResolver)] = new FakeEmployeeAccessSubjectResolver(
+                _identityContext,
+                _employeeDepartmentRepo,
+                _departmentRepo);
+
             var resolver = new TestResolver(services);
-            _permissionEvaluator = new AdminPermissionEvaluator(resolver);
-            services[typeof(AdminPermissionEvaluator)] = _permissionEvaluator;
+            _permissionEvaluator = new TenantAccessEvaluator(resolver);
+            services[typeof(TenantAccessEvaluator)] = _permissionEvaluator;
             _readScopeResolver = new FormDataReadScopeResolver(resolver);
             _employeeApiService = new EmployeeApiService(resolver);
             _departmentService = new TestableDepartmentService(resolver);
@@ -188,7 +192,7 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
-        public void AuthGroup_WithCascadedParentDepartment_ReturnsChildDepartmentEmployee()
+        public void FormDataPermissionGroup_WithCascadedParentDepartment_ReturnsChildDepartmentEmployee()
         {
             var parent = SeedDepartment("dept-auth-parent", "总部");
             var child = SeedDepartment("dept-auth-child", "研发部", parent.Id);
@@ -196,7 +200,7 @@ namespace EIMSNext.Service.Tests
             _identityContext.IdentityTypeValue = IdentityType.Employee;
             _identityContext.CurrentEmployeeValue = employee;
 
-            _authGroupRepo.Insert(new AuthGroup
+            _permissionGroupRepo.Insert(new FormDataPermissionGroup
             {
                 Id = "auth-parent-cascade",
                 CorpId = CorpId,
@@ -220,27 +224,27 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
-        public void UsageAuthGroups_ForAppAdmin_MatchesCurrentEmployeeMembershipOnly()
+        public void UsageFormDataPermissionGroups_ForAppAdmin_MatchesCurrentEmployeeMembershipOnly()
         {
             var parent = SeedDepartment("dept-auth-scope-parent", "总部");
             var child = SeedDepartment("dept-auth-scope-child", "研发部", parent.Id);
             var employee = SeedEmployee("emp-auth-scope", "Scoped Admin", child.Id);
-            employee.Roles.Add(new EmpRole { RoleId = "role-auth-scope", RoleName = "业务角色" });
+            employee.EmployeeGroups.Add(new EmployeeGroupRef { EmployeeGroupId = "role-auth-scope", EmployeeGroupName = "业务角色" });
             _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
             _identityContext.CurrentEmployeeValue = employee;
 
-            _authGroupRepo.Insert(
+            _permissionGroupRepo.Insert(
             [
-                CreateAuthGroup("auth-by-employee", new Member { Id = employee.Id, Type = MemberType.Employee }),
-                CreateAuthGroup("auth-by-role", new Member { Id = "role-auth-scope", Type = MemberType.Role }),
-                CreateAuthGroup("auth-by-direct-dept", new Member { Id = child.Id, Type = MemberType.Department }),
-                CreateAuthGroup("auth-by-cascaded-dept", new Member { Id = parent.Id, Type = MemberType.Department, CascadedDept = true }),
-                CreateAuthGroup("auth-unassigned", new Member { Id = "another-employee", Type = MemberType.Employee }),
-                CreateAuthGroup("auth-disabled", new Member { Id = employee.Id, Type = MemberType.Employee }, disabled: true),
-                CreateAuthGroup("auth-other-form", new Member { Id = employee.Id, Type = MemberType.Employee }, formId: "form-002")
+                CreateFormDataPermissionGroup("auth-by-employee", new Member { Id = employee.Id, Type = MemberType.Employee }),
+                CreateFormDataPermissionGroup("auth-by-role", new Member { Id = "role-auth-scope", Type = MemberType.EmployeeGroup }),
+                CreateFormDataPermissionGroup("auth-by-direct-dept", new Member { Id = child.Id, Type = MemberType.Department }),
+                CreateFormDataPermissionGroup("auth-by-cascaded-dept", new Member { Id = parent.Id, Type = MemberType.Department, CascadedDept = true }),
+                CreateFormDataPermissionGroup("auth-unassigned", new Member { Id = "another-employee", Type = MemberType.Employee }),
+                CreateFormDataPermissionGroup("auth-disabled", new Member { Id = employee.Id, Type = MemberType.Employee }, disabled: true),
+                CreateFormDataPermissionGroup("auth-other-form", new Member { Id = employee.Id, Type = MemberType.Employee }, formId: "form-002")
             ]);
 
-            var result = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee("form-001")
+            var result = _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee("form-001")
                 .Select(x => x.Id)
                 .ToList();
 
@@ -250,13 +254,13 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
-        public void FormDataReadScope_ForUnrestrictedAdmin_HonorsExplicitAuthGroup()
+        public void FormDataReadScope_ForUnrestrictedAdmin_HonorsExplicitFormDataPermissionGroup()
         {
             var department = SeedDepartment("dept-auth-read-scope", "研发部");
             var employee = SeedEmployee("emp-auth-read-scope", "Corp Admin", department.Id);
             _identityContext.IdentityTypeValue = IdentityType.CorpAdmin;
             _identityContext.CurrentEmployeeValue = employee;
-            _authGroupRepo.Insert(CreateAuthGroup(
+            _permissionGroupRepo.Insert(CreateFormDataPermissionGroup(
                 "auth-read-scope",
                 new Member { Id = employee.Id, Type = MemberType.Employee }));
 
@@ -280,11 +284,11 @@ namespace EIMSNext.Service.Tests
             var admin = SeedEmployee("emp-admin", "Admin", parent.Id);
             _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
             _identityContext.CurrentEmployeeValue = admin;
-            _adminGroupRepo.Insert(new AdminGroup
+            _adminGroupRepo.Insert(new TenantAdminGroup
             {
                 Id = "admin-group",
                 CorpId = CorpId,
-                Type = AdminGroupType.Normal,
+                Type = TenantAdminGroupType.Normal,
                 EmployeeIds = [admin.Id],
                 ContactDepartmentPermission = PermissionLevel.Manage,
                 ContactDepartmentScopeMode = ScopeMode.Partial,
@@ -308,11 +312,11 @@ namespace EIMSNext.Service.Tests
             var admin = SeedEmployee("emp-admin-denied", "Admin", allowed.Id);
             _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
             _identityContext.CurrentEmployeeValue = admin;
-            _adminGroupRepo.Insert(new AdminGroup
+            _adminGroupRepo.Insert(new TenantAdminGroup
             {
                 Id = "admin-group-denied",
                 CorpId = CorpId,
-                Type = AdminGroupType.Normal,
+                Type = TenantAdminGroupType.Normal,
                 EmployeeIds = [admin.Id],
                 ContactDepartmentPermission = PermissionLevel.Manage,
                 ContactDepartmentScopeMode = ScopeMode.Partial,
@@ -360,9 +364,9 @@ namespace EIMSNext.Service.Tests
             return department;
         }
 
-        private static AuthGroup CreateAuthGroup(string id, Member member, bool disabled = false, string formId = "form-001")
+        private static FormDataPermissionGroup CreateFormDataPermissionGroup(string id, Member member, bool disabled = false, string formId = "form-001")
         {
-            return new AuthGroup
+            return new FormDataPermissionGroup
             {
                 Id = id,
                 CorpId = CorpId,
@@ -471,19 +475,50 @@ namespace EIMSNext.Service.Tests
         private sealed class FakeEmployeeService(InMemoryRepository<Employee> repository)
             : FakeEntityService<Employee>(repository), IEmployeeService
         {
-            public Task<UpdateResult> AddToRoleAsync(Role role, IEnumerable<string> empIds) => throw new NotSupportedException();
-            public Task<UpdateResult> RemoveFromRoleAsync(string roleId, IEnumerable<string> empIds) => throw new NotSupportedException();
+            public Task<UpdateResult> AddToEmployeeGroupAsync(EmployeeGroup role, IEnumerable<string> empIds) => throw new NotSupportedException();
+            public Task<UpdateResult> RemoveFromEmployeeGroupAsync(string employeeGroupId, IEnumerable<string> empIds) => throw new NotSupportedException();
             public Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved, string corpId) => throw new NotSupportedException();
             public Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted) => throw new NotSupportedException();
         }
 
-        private sealed class FakeAuthGroupService(InMemoryRepository<AuthGroup> repository)
-            : FakeEntityService<AuthGroup>(repository), IAuthGroupService
+        private sealed class FakeEmployeeAccessSubjectResolver(
+            FakeIdentityContext identityContext,
+            InMemoryRepository<EmployeeDepartment> employeeDepartmentRepository,
+            InMemoryRepository<Department> departmentRepository) : IEmployeeAccessSubjectResolver
+        {
+            public EmployeeAccessSubjects ResolveCurrent()
+            {
+                var employee = identityContext.CurrentEmployeeValue;
+                if (employee == null)
+                {
+                    return EmployeeAccessSubjects.Empty;
+                }
+
+                var departmentIds = employeeDepartmentRepository.Queryable
+                    .Where(x => x.EmployeeId == employee.Id)
+                    .Select(x => x.DepartmentId)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var ancestorDepartmentIds = departmentRepository.Queryable
+                    .Where(x => departmentIds.Contains(x.Id))
+                    .SelectMany(x => x.HeriarchyId.Split('|', StringSplitOptions.RemoveEmptyEntries))
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                return new EmployeeAccessSubjects(
+                    employee.Id,
+                    departmentIds,
+                    ancestorDepartmentIds,
+                    employee.EmployeeGroups.Select(x => x.EmployeeGroupId)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+            }
+        }
+
+        private sealed class FakeFormDataPermissionGroupService(InMemoryRepository<FormDataPermissionGroup> repository)
+            : FakeEntityService<FormDataPermissionGroup>(repository), IFormDataPermissionGroupService
         {
         }
 
-        private sealed class FakeAdminGroupService(InMemoryRepository<AdminGroup> repository)
-            : FakeEntityService<AdminGroup>(repository), IAdminGroupService
+        private sealed class FakeTenantAdminGroupService(InMemoryRepository<TenantAdminGroup> repository)
+            : FakeEntityService<TenantAdminGroup>(repository), ITenantAdminGroupService
         {
         }
 

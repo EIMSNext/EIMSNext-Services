@@ -5,7 +5,7 @@ using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Query;
 using EIMSNext.Service.Host.Authorization;
@@ -41,7 +41,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
 
         protected override IQueryable<DashboardItemDefViewModel> FilterByPermission(IQueryable<DashboardItemDefViewModel> query, ODataQueryOptions<DashboardItemDefViewModel> options)
         {
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return base.FilterByPermission(query, options);

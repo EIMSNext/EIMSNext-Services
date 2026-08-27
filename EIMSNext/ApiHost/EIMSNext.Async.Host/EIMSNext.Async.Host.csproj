@@ -26,10 +26,12 @@
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Notification\EIMSNext.Notification.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Service\EIMSNext.Flow.Service.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
   </ItemGroup>
 </Project>

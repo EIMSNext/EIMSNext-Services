@@ -1,6 +1,6 @@
 using HKH.Mef2.Integration;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Component;
 using EIMSNext.Service.Contracts;
@@ -13,7 +13,7 @@ namespace EIMSNext.ApiService
         protected override Task AddAsyncCore(PublicSetting entity)
         {
             Normalize(entity);
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             EnsurePublicFormFields(entity);
             return base.AddAsyncCore(entity);
         }
@@ -21,7 +21,7 @@ namespace EIMSNext.ApiService
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(PublicSetting entity)
         {
             Normalize(entity);
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             EnsurePublicFormFields(entity);
             return base.ReplaceAsyncCore(entity);
         }
@@ -38,7 +38,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("公开设置不存在");
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var setting in settings)
             {
                 evaluator.EnsureCanManageApp(setting.AppId);

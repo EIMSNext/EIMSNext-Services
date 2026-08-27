@@ -5,7 +5,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Query;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Host.Controllers
 {

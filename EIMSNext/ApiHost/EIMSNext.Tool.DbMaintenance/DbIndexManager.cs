@@ -1,14 +1,13 @@
-using EIMSNext.Auth.Entities;
-using EIMSNext.Service.Persistence.Outbox;
+using EIMSNext.Entities;
+using EIMSNext.Persistence.Mongo.Outbox;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Service.Entities;
 
 using MongoDB.Driver;
 
 using WorkflowCore.Models;
 
-namespace EIMSNext.Auth.DbMaintenance
+namespace EIMSNext.Identity.DbMaintenance
 {
     public class DbIndexManager
     {
@@ -23,7 +22,7 @@ namespace EIMSNext.Auth.DbMaintenance
         {
             var background = new CreateIndexOptions { Background = true };
 
-            CreateAuthIndexes(background);
+            CreateIdentityIndexes(background);
             CreateCorporateSettingIndexes(background);
             CreateOrganizationIndexes(background);
             CreatePluginStoreIndexes(background);
@@ -40,7 +39,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateOutboxIndexes(background);
         }
 
-        private void CreateAuthIndexes(CreateIndexOptions options)
+        private void CreateIdentityIndexes(CreateIndexOptions options)
         {
             CreateIndex(_dbContext.Users,
                 Builders<User>.IndexKeys.Ascending(x => x.Email).Ascending(x => x.Disabled),
@@ -52,10 +51,10 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_user_phone_disabled");
 
-            CreateIndex(_dbContext.AuditLogins,
-                Builders<AuditLogin>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Descending(x => x.CreateTime),
+            CreateIndex(_dbContext.IdentityLoginAudits,
+                Builders<IdentityLoginAudit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Descending(x => x.CreateTime),
                 options,
-                "ix_auditlogin_corp_delete_createtime");
+                "ix_identityloginaudit_corp_delete_createtime");
         }
 
         private void CreateOrganizationIndexes(CreateIndexOptions options)
@@ -63,7 +62,7 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateCorpIdIndex<Department>(options, "ix_department_corpid");
             CreateCorpIdIndex<Employee>(options, "ix_employee_corpid");
             CreateCorpIdIndex<EmployeeDepartment>(options, "ix_employeedepartment_corpid");
-            CreateCorpIdIndex<Role>(options, "ix_role_corpid");
+            CreateCorpIdIndex<EmployeeGroup>(options, "ix_employeegroup_corpid");
 
             CreateIndex(GetCollection<Employee>(),
                 Builders<Employee>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.UserId),
@@ -88,19 +87,19 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_employeedepartment_corp_employee_sort");
 
-            CreateIndex(GetCollection<AdminGroup>(),
-                Builders<AdminGroup>.IndexKeys
+            CreateIndex(GetCollection<TenantAdminGroup>(),
+                Builders<TenantAdminGroup>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.DeleteFlag)
                     .Ascending(x => x.EmployeeIds)
                     .Ascending(x => x.Type),
                 options,
-                "ix_admingroup_corp_delete_employee_type");
+                "ix_tenantadmingroup_corp_delete_employee_type");
 
             CreateIndex(GetCollection<Employee>(),
-                Builders<Employee>.IndexKeys.Ascending("Roles.RoleId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
+                Builders<Employee>.IndexKeys.Ascending("EmployeeGroups.EmployeeGroupId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
                 options,
-                "ix_employee_role_status_dummy");
+                "ix_employee_employeegroup_status_dummy");
         }
 
         private void CreatePluginStoreIndexes(CreateIndexOptions options)

@@ -4,7 +4,7 @@ using System.Globalization;
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Component
 {

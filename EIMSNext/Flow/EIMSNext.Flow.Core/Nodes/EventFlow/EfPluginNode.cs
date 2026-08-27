@@ -2,11 +2,11 @@ using System.Dynamic;
 using System.Text.Json;
 using System.Collections;
 
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Plugin.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 

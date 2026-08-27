@@ -1,12 +1,11 @@
 using HKH.Mef2.Integration;
 using System.Net;
 using System.Text;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Configuration;

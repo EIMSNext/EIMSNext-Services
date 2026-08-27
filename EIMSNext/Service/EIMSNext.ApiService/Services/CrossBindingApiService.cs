@@ -8,7 +8,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
@@ -19,7 +19,7 @@ namespace EIMSNext.ApiService
         protected override IQueryable<CrossBindingViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return query;
@@ -62,7 +62,7 @@ namespace EIMSNext.ApiService
 
             foreach (var binding in bindings)
             {
-                Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(binding.TargetAppId);
+                Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(binding.TargetAppId);
             }
 
             return await base.DeleteAsyncCore(idList);
@@ -70,7 +70,7 @@ namespace EIMSNext.ApiService
 
         private void ValidateBindingTarget(string targetAppId, string sourceAppId, string sourceFormId)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(targetAppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(targetAppId);
 
             if (string.IsNullOrWhiteSpace(sourceAppId))
             {

@@ -1,7 +1,7 @@
 using System.Reflection;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Core.Nodes;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Tests
 {

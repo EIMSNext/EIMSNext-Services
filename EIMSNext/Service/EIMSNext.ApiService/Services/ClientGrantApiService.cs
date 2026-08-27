@@ -1,6 +1,6 @@
 using HKH.Mef2.Integration;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.ApiService.ViewModels;
 using MongoDB.Driver;

@@ -1,5 +1,5 @@
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 

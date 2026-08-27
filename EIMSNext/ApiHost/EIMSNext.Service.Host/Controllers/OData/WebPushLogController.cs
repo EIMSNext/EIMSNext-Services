@@ -3,7 +3,7 @@ using Asp.Versioning;
 using HKH.Mef2.Integration;
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService;
 
 namespace EIMSNext.Service.Host.Controllers.OData

@@ -8,7 +8,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
@@ -19,7 +19,7 @@ namespace EIMSNext.ApiService
         protected override IQueryable<WebhookAliasViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)
             {
                 return query;
@@ -60,7 +60,7 @@ namespace EIMSNext.ApiService
 
             foreach (var item in items)
             {
-                Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(item.AppId);
+                Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(item.AppId);
             }
 
             return await base.DeleteAsyncCore(idList);
@@ -68,7 +68,7 @@ namespace EIMSNext.ApiService
 
         private void EnsureCanManageAlias(WebhookAlias entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
 
             if (string.IsNullOrWhiteSpace(entity.FormId))
             {

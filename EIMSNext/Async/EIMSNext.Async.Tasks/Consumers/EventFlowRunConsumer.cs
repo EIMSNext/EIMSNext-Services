@@ -10,7 +10,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -68,39 +68,39 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
         }
 
-        private static ApiClient.Flow.EventSourceType MapEventSource(Service.Entities.EventSourceType source)
+        private static ApiClient.Flow.EventSourceType MapEventSource(EIMSNext.Entities.EventSourceType source)
         {
             return source switch
             {
-                Service.Entities.EventSourceType.Form => ApiClient.Flow.EventSourceType.Form,
-                Service.Entities.EventSourceType.Http => ApiClient.Flow.EventSourceType.Http,
-                Service.Entities.EventSourceType.Schedule => ApiClient.Flow.EventSourceType.Schedule,
-                Service.Entities.EventSourceType.Button => ApiClient.Flow.EventSourceType.Button,
+                EIMSNext.Entities.EventSourceType.Form => ApiClient.Flow.EventSourceType.Form,
+                EIMSNext.Entities.EventSourceType.Http => ApiClient.Flow.EventSourceType.Http,
+                EIMSNext.Entities.EventSourceType.Schedule => ApiClient.Flow.EventSourceType.Schedule,
+                EIMSNext.Entities.EventSourceType.Button => ApiClient.Flow.EventSourceType.Button,
                 _ => ApiClient.Flow.EventSourceType.None,
             };
         }
 
-        private static ApiClient.Flow.EventType MapEventType(Service.Entities.EventType type)
+        private static ApiClient.Flow.EventType MapEventType(EIMSNext.Entities.EventType type)
         {
             return type switch
             {
-                Service.Entities.EventType.Submitted => ApiClient.Flow.EventType.Submitted,
-                Service.Entities.EventType.Modified => ApiClient.Flow.EventType.Modified,
-                Service.Entities.EventType.Removed => ApiClient.Flow.EventType.Removed,
-                Service.Entities.EventType.Approving => ApiClient.Flow.EventType.Approving,
-                Service.Entities.EventType.Approved => ApiClient.Flow.EventType.Approved,
-                Service.Entities.EventType.Rejected => ApiClient.Flow.EventType.Rejected,
+                EIMSNext.Entities.EventType.Submitted => ApiClient.Flow.EventType.Submitted,
+                EIMSNext.Entities.EventType.Modified => ApiClient.Flow.EventType.Modified,
+                EIMSNext.Entities.EventType.Removed => ApiClient.Flow.EventType.Removed,
+                EIMSNext.Entities.EventType.Approving => ApiClient.Flow.EventType.Approving,
+                EIMSNext.Entities.EventType.Approved => ApiClient.Flow.EventType.Approved,
+                EIMSNext.Entities.EventType.Rejected => ApiClient.Flow.EventType.Rejected,
                 _ => ApiClient.Flow.EventType.None,
             };
         }
 
-        private static ApiClient.Flow.CascadeMode MapCascade(Service.Entities.CascadeMode mode)
+        private static ApiClient.Flow.CascadeMode MapCascade(EIMSNext.Entities.CascadeMode mode)
         {
             return mode switch
             {
-                Service.Entities.CascadeMode.All => ApiClient.Flow.CascadeMode.All,
-                Service.Entities.CascadeMode.Specified => ApiClient.Flow.CascadeMode.Specified,
-                Service.Entities.CascadeMode.Never => ApiClient.Flow.CascadeMode.Never,
+                EIMSNext.Entities.CascadeMode.All => ApiClient.Flow.CascadeMode.All,
+                EIMSNext.Entities.CascadeMode.Specified => ApiClient.Flow.CascadeMode.Specified,
+                EIMSNext.Entities.CascadeMode.Never => ApiClient.Flow.CascadeMode.Never,
                 _ => ApiClient.Flow.CascadeMode.NotSet,
             };
         }

@@ -16,7 +16,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
@@ -41,7 +41,7 @@ namespace EIMSNext.Service.Host.Controllers
         private const int MongoMaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
-        private readonly AdminPermissionEvaluator _permissionEvaluator = resolver.Resolve<AdminPermissionEvaluator>();
+        private readonly TenantAccessEvaluator _permissionEvaluator = resolver.Resolve<TenantAccessEvaluator>();
         private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
         private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
         private readonly IFormDataService _formDataService = resolver.Resolve<IFormDataService>();
@@ -51,15 +51,15 @@ namespace EIMSNext.Service.Host.Controllers
         /// 获取当前用户在指定表单中实际所属的权限组。
         /// </summary>
         [Permission(Operation = Operation.Read)]
-        [HttpGet("authgroups")]
-        public ActionResult GetAssignedAuthGroups([FromQuery] string formId)
+        [HttpGet("permissiongroups")]
+        public ActionResult GetAssignedFormDataPermissionGroups([FromQuery] string formId)
         {
             if (string.IsNullOrWhiteSpace(formId))
             {
                 return BadRequest("表单ID不能为空");
             }
 
-            var groups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+            var groups = _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee(formId)
                 .OrderBy(x => x.CreateTime)
                 .ThenBy(x => x.Id)
                 .Select(x => new
@@ -70,8 +70,8 @@ namespace EIMSNext.Service.Host.Controllers
                     x.Name,
                     x.Desc,
                     x.Type,
-                    x.DataPerms,
-                    x.FieldPerms,
+                    x.FormDataPermissions,
+                    x.FormFieldPermissions,
                     x.Disabled,
                     x.CreateTime,
                 })
@@ -347,12 +347,12 @@ namespace EIMSNext.Service.Host.Controllers
                     return query;
                 }
 
-                if (!string.IsNullOrEmpty(query.Scope.AuthGroupId))
+                if (!string.IsNullOrEmpty(query.Scope.PermissionGroupId))
                 {
                     var formId = query.Scope.FormId ?? FindFormId(query.Filter);
                     var readScope = string.IsNullOrWhiteSpace(formId)
                         ? new FormDataReadScope(false, CreateNoMatchFilter(), [])
-                        : Resolver.Resolve<FormDataReadScopeResolver>().Resolve(formId, query.Scope.AuthGroupId);
+                        : Resolver.Resolve<FormDataReadScopeResolver>().Resolve(formId, query.Scope.PermissionGroupId);
                     query.Filter = query.Filter.And(readScope.DataFilter);
                 }
             }
@@ -425,10 +425,10 @@ namespace EIMSNext.Service.Host.Controllers
                 return request;
             }
 
-            if (!string.IsNullOrEmpty(request.AuthGroupId))
+            if (!string.IsNullOrEmpty(request.PermissionGroupId))
             {
                 var readScope = Resolver.Resolve<FormDataReadScopeResolver>()
-                    .Resolve(request.FormId, request.AuthGroupId);
+                    .Resolve(request.FormId, request.PermissionGroupId);
                 request.Filter = request.Filter.And(readScope.DataFilter);
             }
 
@@ -459,13 +459,13 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="key">表单数据ID</param>
         /// <param name="skip">跳过数量</param>
         /// <param name="top">返回数量</param>
-        /// <param name="authGroupId">授权组ID</param>
+        /// <param name="permissionGroupId">授权组ID</param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [HttpGet("{key}/changelog")]
-        public ActionResult GetChangeLogs([FromRoute] string key, [FromQuery] int skip = 0, [FromQuery] int top = 20, [FromQuery] string? authGroupId = null)
+        public ActionResult GetChangeLogs([FromRoute] string key, [FromQuery] int skip = 0, [FromQuery] int top = 20, [FromQuery] string? permissionGroupId = null)
         {
-            if (!CanReadFormData(key, authGroupId)) return NotFound();
+            if (!CanReadFormData(key, permissionGroupId)) return NotFound();
 
             return Ok(new { value = ApiService.GetChangeLogs(key, skip, top) });
         }
@@ -474,25 +474,25 @@ namespace EIMSNext.Service.Host.Controllers
         /// 查询表单数据修改日志总数
         /// </summary>
         /// <param name="key">表单数据ID</param>
-        /// <param name="authGroupId">授权组ID</param>
+        /// <param name="permissionGroupId">授权组ID</param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [HttpGet("{key}/changelog/$count")]
-        public ActionResult GetChangeLogCount([FromRoute] string key, [FromQuery] string? authGroupId = null)
+        public ActionResult GetChangeLogCount([FromRoute] string key, [FromQuery] string? permissionGroupId = null)
         {
-            if (!CanReadFormData(key, authGroupId)) return NotFound();
+            if (!CanReadFormData(key, permissionGroupId)) return NotFound();
 
             return Ok(ApiService.CountChangeLogs(key));
         }
 
-        private bool CanReadFormData(string key, string? authGroupId)
+        private bool CanReadFormData(string key, string? permissionGroupId)
         {
             var options = new DynamicFindOptions<FormData>
             {
                 Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
                 Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
                 Take = 1,
-                Scope = string.IsNullOrWhiteSpace(authGroupId) ? null : new DataScope { AuthGroupId = authGroupId }
+                Scope = string.IsNullOrWhiteSpace(permissionGroupId) ? null : new DataScope { PermissionGroupId = permissionGroupId }
             };
 
             return ApiService.Find(FilterResult(options)).FirstOrDefault() != null;
@@ -527,45 +527,45 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 return Ok(new FormDataPermissionScopeResponse
                 {
-                    DataPerms = DataPerms.All,
-                    FieldPerms = null,
+                    FormDataPermissions = FormDataPermissions.All,
+                    FormFieldPermissions = null,
                 });
             }
 
-            var matchedGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+            var matchedGroups = _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee(formId)
                 .Where(HasInheritedDataAccess)
                 .ToList();
             if (matchedGroups.Count == 0)
             {
                 return Ok(new FormDataPermissionScopeResponse
                 {
-                    DataPerms = DataPerms.None,
-                    FieldPerms = [],
+                    FormDataPermissions = FormDataPermissions.None,
+                    FormFieldPermissions = [],
                 });
             }
 
             var applicableGroups = matchedGroups
-                .Where(group => AuthGroupAppliesToData(group, key))
+                .Where(group => FormDataPermissionGroupAppliesToData(group, key))
                 .ToList();
             if (applicableGroups.Count == 0)
             {
                 return Ok(new FormDataPermissionScopeResponse
                 {
-                    DataPerms = DataPerms.None,
-                    FieldPerms = [],
+                    FormDataPermissions = FormDataPermissions.None,
+                    FormFieldPermissions = [],
                 });
             }
 
             var mergedPerms = applicableGroups
-                .Select(GetEffectiveDataPerms)
-                .Aggregate(DataPerms.None, (current, next) => current | next);
+                .Select(GetEffectiveFormDataPermissions)
+                .Aggregate(FormDataPermissions.None, (current, next) => current | next);
 
-            var mergedFieldPerms = MergeFieldPerms(applicableGroups);
+            var mergedFormFieldPermissions = MergeFormFieldPermissions(applicableGroups);
 
             return Ok(new FormDataPermissionScopeResponse
             {
-                DataPerms = mergedPerms,
-                FieldPerms = mergedFieldPerms,
+                FormDataPermissions = mergedPerms,
+                FormFieldPermissions = mergedFormFieldPermissions,
             });
         }
 
@@ -912,18 +912,18 @@ namespace EIMSNext.Service.Host.Controllers
 
         private DynamicFilter BuildInheritedPermissionFilter(string formId)
         {
-            var authGroups = _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
+            var permissionGroups = _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee(formId)
                 .Where(HasInheritedDataAccess)
                 .ToList();
-            if (authGroups.Count == 0)
+            if (permissionGroups.Count == 0)
             {
                 return CreateNoMatchFilter();
             }
 
             var rangeFilters = new List<DynamicFilter>();
-            foreach (var authGroup in authGroups)
+            foreach (var permissionGroup in permissionGroups)
             {
-                var groupFilter = BuildAuthGroupDataFilter(authGroup);
+                var groupFilter = BuildFormDataPermissionGroupDataFilter(permissionGroup);
                 if (groupFilter == null || groupFilter.IsEmpty)
                 {
                     return DynamicFilter.Empty;
@@ -1496,11 +1496,11 @@ namespace EIMSNext.Service.Host.Controllers
             return FormDataViewModel.FromFormData(formData, dataTitle);
         }
 
-        private DynamicFilter? BuildAuthGroupDataFilter(AuthGroup authGroup)
+        private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (authGroup.Type)
+            switch (permissionGroup.Type)
             {
-                case AuthGroupType.ManageSelfData:
+                case FormDataPermissionMode.ManageSelfData:
                     if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
                     {
                         return CreateNoMatchFilter();
@@ -1512,41 +1512,41 @@ namespace EIMSNext.Service.Host.Controllers
                         Op = FilterOp.Eq,
                         Value = IdentityContext.CurrentEmployee.Id,
                     };
-                case AuthGroupType.ViewAllData:
-                case AuthGroupType.ManageAllData:
+                case FormDataPermissionMode.ViewAllData:
+                case FormDataPermissionMode.ManageAllData:
                     return null;
-                case AuthGroupType.Custom:
-                    if (string.IsNullOrWhiteSpace(authGroup.DataFilter))
+                case FormDataPermissionMode.Custom:
+                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
                     {
                         return null;
                     }
 
-                    var condList = authGroup.DataFilter.DeserializeFromJson<ConditionList>();
+                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
                     return condList?.ToDynamicFilter();
                 default:
                     return null;
             }
         }
 
-        private static DataPerms GetEffectiveDataPerms(AuthGroup authGroup)
+        private static FormDataPermissions GetEffectiveFormDataPermissions(FormDataPermissionGroup permissionGroup)
         {
-            return authGroup.Type switch
+            return permissionGroup.Type switch
             {
-                AuthGroupType.ManageSelfData => DataPerms.All,
-                AuthGroupType.ManageAllData => DataPerms.All,
-                AuthGroupType.ViewAllData => DataPerms.View,
-                _ => (DataPerms)authGroup.DataPerms,
+                FormDataPermissionMode.ManageSelfData => FormDataPermissions.All,
+                FormDataPermissionMode.ManageAllData => FormDataPermissions.All,
+                FormDataPermissionMode.ViewAllData => FormDataPermissions.View,
+                _ => (FormDataPermissions)permissionGroup.FormDataPermissions,
             };
         }
 
-        private static bool HasInheritedDataAccess(AuthGroup authGroup)
+        private static bool HasInheritedDataAccess(FormDataPermissionGroup permissionGroup)
         {
-            return GetEffectiveDataPerms(authGroup) != DataPerms.None;
+            return GetEffectiveFormDataPermissions(permissionGroup) != FormDataPermissions.None;
         }
 
-        private bool AuthGroupAppliesToData(AuthGroup authGroup, string dataId)
+        private bool FormDataPermissionGroupAppliesToData(FormDataPermissionGroup permissionGroup, string dataId)
         {
-            var rangeFilter = BuildAuthGroupDataFilter(authGroup);
+            var rangeFilter = BuildFormDataPermissionGroupDataFilter(permissionGroup);
             if (rangeFilter == null || rangeFilter.IsEmpty)
             {
                 return true;
@@ -1565,20 +1565,20 @@ namespace EIMSNext.Service.Host.Controllers
             return result != null;
         }
 
-        private static List<FieldPerm>? MergeFieldPerms(IEnumerable<AuthGroup> authGroups)
+        private static List<FormFieldPermission>? MergeFormFieldPermissions(IEnumerable<FormDataPermissionGroup> permissionGroups)
         {
-            var groups = authGroups.ToList();
-            if (groups.Any(x => x.FieldPerms == null || x.FieldPerms.Count == 0))
+            var groups = permissionGroups.ToList();
+            if (groups.Any(x => x.FormFieldPermissions == null || x.FormFieldPermissions.Count == 0))
             {
                 return null;
             }
 
-            var merged = new Dictionary<string, FieldPerm>(StringComparer.OrdinalIgnoreCase);
-            foreach (var fieldPerm in groups.SelectMany(x => x.FieldPerms))
+            var merged = new Dictionary<string, FormFieldPermission>(StringComparer.OrdinalIgnoreCase);
+            foreach (var fieldPerm in groups.SelectMany(x => x.FormFieldPermissions))
             {
                 if (!merged.TryGetValue(fieldPerm.Id, out var current))
                 {
-                    merged[fieldPerm.Id] = new FieldPerm
+                    merged[fieldPerm.Id] = new FormFieldPermission
                     {
                         Id = fieldPerm.Id,
                         Visible = fieldPerm.Visible,

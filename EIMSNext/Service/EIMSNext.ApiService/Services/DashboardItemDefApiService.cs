@@ -1,6 +1,6 @@
 using HKH.Mef2.Integration;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
 using MongoDB.Driver;
@@ -11,13 +11,13 @@ namespace EIMSNext.ApiService
 	{
         protected override Task AddAsyncCore(DashboardItemDef entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.AddAsyncCore(entity);
         }
 
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(DashboardItemDef entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.ReplaceAsyncCore(entity);
         }
 
@@ -33,7 +33,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("仪表盘项不存在");
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var item in items)
             {
                 evaluator.EnsureCanManageApp(item.AppId);

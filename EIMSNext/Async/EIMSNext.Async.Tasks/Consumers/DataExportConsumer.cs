@@ -10,7 +10,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,7 +145,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             return exportType switch
             {
-                ExportType.AuditLogin => "登录日志",
+                ExportType.IdentityLoginAudit => "登录日志",
                 ExportType.AuditLog => "操作日志",
                 ExportType.FormData => "表单数据",
                 _ => "导出",
