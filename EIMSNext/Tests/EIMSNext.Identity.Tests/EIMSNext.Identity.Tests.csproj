@@ -16,7 +16,7 @@
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Identity\EIMSNext.Identity\EIMSNext.Identity.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />

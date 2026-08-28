@@ -14,11 +14,11 @@
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
+    <ProjectReference Include="..\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
+    <ProjectReference Include="..\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj" />
+    <ProjectReference Include="..\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
+    <ProjectReference Include="..\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
+    <ProjectReference Include="..\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
   </ItemGroup>
 </Project>

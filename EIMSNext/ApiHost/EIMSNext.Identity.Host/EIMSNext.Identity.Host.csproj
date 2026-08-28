@@ -22,11 +22,11 @@
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
     <ProjectReference Include="..\..\Identity\EIMSNext.Identity\EIMSNext.Identity.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.WeChat\EIMSNext.Identity.WeChat.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.WxWork\EIMSNext.Identity.WxWork.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.DingTalk\EIMSNext.Identity.DingTalk.csproj" />
-    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Feishu\EIMSNext.Identity.Feishu.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.WeChat\EIMSNext.Identity.WeChat.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.WxWork\EIMSNext.Identity.WxWork.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.DingTalk\EIMSNext.Identity.DingTalk.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity.Feishu\EIMSNext.Identity.Feishu.csproj" />
   </ItemGroup>
   <ItemGroup>
     <None Update="eims.pfx">

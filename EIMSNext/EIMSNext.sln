@@ -131,25 +131,23 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Scripting.Tests", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Service.Tests", "Tests\EIMSNext.Service.Tests\EIMSNext.Service.Tests.csproj", "{504A9D73-E0FD-477A-8907-2D138E722FE8}"
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Auth", "Auth", "{D029680B-BA85-4B52-A88F-A04C74E17782}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.WeChat", "Identity\EIMSNext.WeChat\EIMSNext.WeChat.csproj", "{8DA36B0D-7FFE-45B7-A10E-C5D71648A263}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.WeChat", "Auth\EIMSNext.WeChat\EIMSNext.WeChat.csproj", "{8DA36B0D-7FFE-45B7-A10E-C5D71648A263}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.WxWork", "Identity\EIMSNext.WxWork\EIMSNext.WxWork.csproj", "{BAD36DF4-E6EA-4644-B6BA-34A1BFF41AE5}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.WxWork", "Auth\EIMSNext.WxWork\EIMSNext.WxWork.csproj", "{BAD36DF4-E6EA-4644-B6BA-34A1BFF41AE5}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.DingTalk", "Identity\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj", "{8259795A-5C07-438F-A430-7F9CD4F860AF}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.DingTalk", "Auth\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj", "{8259795A-5C07-438F-A430-7F9CD4F860AF}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Feishu", "Identity\EIMSNext.Feishu\EIMSNext.Feishu.csproj", "{B6F82CBD-6328-45A9-902E-DB305D7B1452}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Feishu", "Auth\EIMSNext.Feishu\EIMSNext.Feishu.csproj", "{B6F82CBD-6328-45A9-902E-DB305D7B1452}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.Abstractions", "Identity\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj", "{9E304864-C0DB-40F5-85B8-DBC8AB683697}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.Abstractions", "Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj", "{9E304864-C0DB-40F5-85B8-DBC8AB683697}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.WeChat", "Identity\EIMSNext.Identity.WeChat\EIMSNext.Identity.WeChat.csproj", "{584726A8-5B4C-466E-BCFD-C58B10F00E3B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.WeChat", "Auth\EIMSNext.Identity.WeChat\EIMSNext.Identity.WeChat.csproj", "{584726A8-5B4C-466E-BCFD-C58B10F00E3B}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.WxWork", "Identity\EIMSNext.Identity.WxWork\EIMSNext.Identity.WxWork.csproj", "{761B46BB-B00E-47B7-8CD9-102C55DCE07E}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.WxWork", "Auth\EIMSNext.Identity.WxWork\EIMSNext.Identity.WxWork.csproj", "{761B46BB-B00E-47B7-8CD9-102C55DCE07E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.DingTalk", "Identity\EIMSNext.Identity.DingTalk\EIMSNext.Identity.DingTalk.csproj", "{61C6C782-2994-4473-9FD4-9DF6EEA02C16}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.DingTalk", "Auth\EIMSNext.Identity.DingTalk\EIMSNext.Identity.DingTalk.csproj", "{61C6C782-2994-4473-9FD4-9DF6EEA02C16}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.Feishu", "Auth\EIMSNext.Identity.Feishu\EIMSNext.Identity.Feishu.csproj", "{6CC0D19A-E9CC-46A0-80B9-9DD7597060AC}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EIMSNext.Identity.Feishu", "Identity\EIMSNext.Identity.Feishu\EIMSNext.Identity.Feishu.csproj", "{6CC0D19A-E9CC-46A0-80B9-9DD7597060AC}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
