@@ -1,7 +1,7 @@
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
@@ -11,13 +11,13 @@ namespace EIMSNext.ApiService
     {
         protected override Task AddAsyncCore(FormListView entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.AddAsyncCore(entity);
         }
 
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(FormListView entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.ReplaceAsyncCore(entity);
         }
 
@@ -33,7 +33,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("视图不存在");
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var view in views)
             {
                 evaluator.EnsureCanManageApp(view.AppId);

@@ -6,7 +6,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using MongoDB.Bson.IO;
 using MongoDB.Driver;

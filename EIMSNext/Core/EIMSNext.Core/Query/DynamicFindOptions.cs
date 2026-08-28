@@ -51,7 +51,7 @@ namespace EIMSNext.Core.Query
     public class DataScope
     {
         /// <summary>数据权限组 ID。</summary>
-        public string? AuthGroupId { get; set; }
+        public string? PermissionGroupId { get; set; }
 
         /// <summary>目标表单 ID。</summary>
         public string? FormId { get; set; }

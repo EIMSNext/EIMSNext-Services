@@ -7,7 +7,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;

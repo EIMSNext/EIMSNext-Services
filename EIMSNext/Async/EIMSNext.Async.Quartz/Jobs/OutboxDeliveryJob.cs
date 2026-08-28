@@ -4,7 +4,7 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Persistence.Outbox;
+using EIMSNext.Persistence.Mongo.Outbox;
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Logging;

@@ -5,7 +5,7 @@ using System.Text.Json;
 
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
@@ -18,7 +18,6 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -212,7 +211,7 @@ namespace EIMSNext.Service.Tests
             };
 
             var resolver = new TestResolver(services);
-            services[typeof(AdminPermissionEvaluator)] = new AdminPermissionEvaluator(resolver);
+            services[typeof(TenantAccessEvaluator)] = new TenantAccessEvaluator(resolver);
             services[typeof(FormDataReadScopeResolver)] = new FormDataReadScopeResolver(resolver);
             return new FormDataApiService(resolver);
         }

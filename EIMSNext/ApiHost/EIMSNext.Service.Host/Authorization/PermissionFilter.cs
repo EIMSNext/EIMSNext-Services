@@ -1,7 +1,7 @@
 using EIMSNext.ApiService;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
@@ -18,14 +18,14 @@ namespace EIMSNext.Service.Host.Authorization
         private readonly ICacheClient _cache;
         private readonly IIdentityContext _identity;
         private readonly IPublicAccessValidator _publicAccessValidator;
-        private readonly AdminPermissionEvaluator _permissionEvaluator;
+        private readonly TenantAccessEvaluator _permissionEvaluator;
         private readonly ILogger<PermissionFilter> _logger;
 
         public PermissionFilter(
             IIdentityContext identityContext,
             ICacheClient cache,
             IPublicAccessValidator publicAccessValidator,
-            AdminPermissionEvaluator permissionEvaluator,
+            TenantAccessEvaluator permissionEvaluator,
             ILogger<PermissionFilter> logger)
         {
             _identity = identityContext;
@@ -145,7 +145,7 @@ namespace EIMSNext.Service.Host.Authorization
             if (_identity.IdentityType == IdentityType.Client)
             {
                 var clientId = context.HttpContext.User.Claims
-                    .FirstOrDefault(c => string.Equals(c.Type, EIMSNext.Auth.Entities.AuthClaimTypes.ClientId, StringComparison.OrdinalIgnoreCase))?.Value;
+                    .FirstOrDefault(c => string.Equals(c.Type, EIMSNext.Entities.IdentityClaimTypes.ClientId, StringComparison.OrdinalIgnoreCase))?.Value;
                 if (string.IsNullOrWhiteSpace(clientId))
                 {
                     return false;
@@ -153,7 +153,7 @@ namespace EIMSNext.Service.Host.Authorization
                 var clientInfo = _cache.Get<EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo>(
                     "clientGrant", CacheScope.Client, clientId);
 
-                // 缓存未命中：lazy refresh（避免重启 Auth.Host 后第一次 token 失败）
+                // 缓存未命中：lazy refresh（避免重启 Identity.Host 后第一次 token 失败）
                 if (clientInfo == null)
                 {
                     clientInfo = TryLazyRefreshClientInfo(context, clientId);
@@ -228,19 +228,19 @@ namespace EIMSNext.Service.Host.Authorization
                 return false;
             }
 
-            var required = operation.HasFlag(Operation.Add) ? DataPerms.AddNew :
-                operation.HasFlag(Operation.Edit) ? DataPerms.Edit :
-                operation.HasFlag(Operation.Delete) ? DataPerms.Remove :
-                operation.HasFlag(Operation.Import) ? DataPerms.Import :
-                operation.HasFlag(Operation.Read) ? DataPerms.View : DataPerms.None;
+            var required = operation.HasFlag(Operation.Add) ? FormDataPermissions.AddNew :
+                operation.HasFlag(Operation.Edit) ? FormDataPermissions.Edit :
+                operation.HasFlag(Operation.Delete) ? FormDataPermissions.Remove :
+                operation.HasFlag(Operation.Import) ? FormDataPermissions.Import :
+                operation.HasFlag(Operation.Read) ? FormDataPermissions.View : FormDataPermissions.None;
 
-            if (required == DataPerms.None)
+            if (required == FormDataPermissions.None)
             {
                 return false;
             }
 
-            return _permissionEvaluator.GetUsageAuthGroupsForCurrentEmployee(formId)
-                .Any(group => (GetEffectiveDataPerms(group) & required) == required);
+            return _permissionEvaluator.GetUsageFormDataPermissionGroupsForCurrentEmployee(formId)
+                .Any(group => (GetEffectiveFormDataPermissions(group) & required) == required);
         }
 
         private static async Task<string?> ReadFormIdAsync(HttpRequest request)
@@ -280,13 +280,13 @@ namespace EIMSNext.Service.Host.Authorization
             return null;
         }
 
-        private static DataPerms GetEffectiveDataPerms(AuthGroup group)
+        private static FormDataPermissions GetEffectiveFormDataPermissions(FormDataPermissionGroup group)
         {
             return group.Type switch
             {
-                AuthGroupType.ManageSelfData or AuthGroupType.ManageAllData => DataPerms.All,
-                AuthGroupType.ViewAllData => DataPerms.View,
-                _ => (DataPerms)group.DataPerms,
+                FormDataPermissionMode.ManageSelfData or FormDataPermissionMode.ManageAllData => FormDataPermissions.All,
+                FormDataPermissionMode.ViewAllData => FormDataPermissions.View,
+                _ => (FormDataPermissions)group.FormDataPermissions,
             };
         }
 

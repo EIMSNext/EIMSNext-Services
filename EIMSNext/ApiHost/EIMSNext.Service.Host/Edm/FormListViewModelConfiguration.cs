@@ -1,6 +1,6 @@
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.OData.ModelBuilder;
 
 namespace EIMSNext.Service.Host.Edm
@@ -11,7 +11,7 @@ namespace EIMSNext.Service.Host.Edm
         {
             base.ConfigureCommon(entityType);
 
-            entityType.CollectionProperty(x => x.AuthGroupIds);
+            entityType.CollectionProperty(x => x.PermissionGroupIds);
         }
     }
 }

@@ -12,7 +12,7 @@ using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Scripting;
 using EIMSNext.Component;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Service

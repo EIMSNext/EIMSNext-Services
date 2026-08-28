@@ -1,5 +1,5 @@
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;

@@ -4,7 +4,7 @@ using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Plugin.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Scripting;
 using MongoDB.Driver;
 

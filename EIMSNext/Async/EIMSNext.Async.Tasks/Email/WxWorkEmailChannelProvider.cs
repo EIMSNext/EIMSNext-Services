@@ -7,6 +7,7 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Mef;
 
 using HKH.Mef2.Integration;
 

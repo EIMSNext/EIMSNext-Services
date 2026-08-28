@@ -71,7 +71,7 @@
     "Name": "ALL",
     "Projects": [
       {
-        "Path": "ApiHost\\EIMSNext.Auth.Host\\EIMSNext.Auth.Host.csproj",
+        "Path": "ApiHost\\EIMSNext.Identity.Host\\EIMSNext.Identity.Host.csproj",
         "Action": "Start"
       },
       {

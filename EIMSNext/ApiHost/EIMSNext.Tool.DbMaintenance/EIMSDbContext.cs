@@ -1,10 +1,10 @@
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Mongo;
 using Microsoft.Extensions.Options;
 using MongoDB.Driver;
 using WorkflowCore.Models;
 
-namespace EIMSNext.Auth.DbMaintenance
+namespace EIMSNext.Identity.DbMaintenance
 {
     public class EIMSDbContext : MongoDbContextBase
     {
@@ -14,7 +14,7 @@ namespace EIMSNext.Auth.DbMaintenance
 
         public IMongoCollection<Client> Clients => GetCollection<Client>();
         public IMongoCollection<User> Users => GetCollection<User>();
-        public IMongoCollection<AuditLogin> AuditLogins => GetCollection<AuditLogin>();
+        public IMongoCollection<IdentityLoginAudit> IdentityLoginAudits => GetCollection<IdentityLoginAudit>();
         public IMongoCollection<WorkflowInstance> WorkflowInstances => GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
         public IMongoCollection<EventSubscription> WorkflowEventSubscriptions => GetCollection<EventSubscription>("Wf_Subscription");
         public IMongoCollection<Event> WorkflowEvents => GetCollection<Event>("Wf_Event");

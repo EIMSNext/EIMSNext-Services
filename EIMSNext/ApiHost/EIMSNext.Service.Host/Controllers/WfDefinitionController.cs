@@ -7,7 +7,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -51,7 +51,7 @@ namespace EIMSNext.Service.Host.Controllers
 	            return NotFound("智能助手不存在");
 	        }
 
-	        Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(def.AppId);
+	        Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(def.AppId);
 
 	        var hookApi = Resolver.Resolve<EventFlowHookApiService>();
 	        var sample = await hookApi.GetLatestSampleAsync(corpId, eventFlowId);

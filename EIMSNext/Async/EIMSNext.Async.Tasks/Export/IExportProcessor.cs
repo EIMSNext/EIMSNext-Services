@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Async.Tasks.Export

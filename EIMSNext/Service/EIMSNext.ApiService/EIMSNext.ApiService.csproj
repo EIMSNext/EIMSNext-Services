@@ -18,8 +18,9 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
-    <ProjectReference Include="..\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />

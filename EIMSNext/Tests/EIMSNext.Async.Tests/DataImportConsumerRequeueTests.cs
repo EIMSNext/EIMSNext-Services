@@ -7,7 +7,7 @@ using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Driver;

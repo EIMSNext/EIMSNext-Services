@@ -3,4 +3,4 @@
 Core/EIMSNext.Common/EIMSNext.Common.xml
 Core/EIMSNext.Core/EIMSNext.Core.xml
 Service/EIMSNext.ApiService/EIMSNext.ApiService.xml
-Service/EIMSNext.Service.Entities/EIMSNext.Service.Entities.xml
+Core/EIMSNext.Entities/EIMSNext.Entities.xml

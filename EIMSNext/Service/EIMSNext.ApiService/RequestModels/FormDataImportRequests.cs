@@ -1,7 +1,7 @@
 using System.Dynamic;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -27,7 +27,7 @@ namespace EIMSNext.ApiService.RequestModels
 
         public string FormId { get; set; } = string.Empty;
 
-        public string? AuthGroupId { get; set; }
+        public string? PermissionGroupId { get; set; }
 
         public FormDataImportMode Mode { get; set; } = FormDataImportMode.AddOnly;
 

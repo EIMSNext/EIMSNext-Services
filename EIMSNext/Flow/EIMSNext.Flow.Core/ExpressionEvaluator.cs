@@ -1,6 +1,6 @@
 using System.Dynamic;
 using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;

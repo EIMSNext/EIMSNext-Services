@@ -137,7 +137,7 @@ namespace EIMSNext.ApiCore
         {
             var oauthSection = configuration.GetSection("OAuth");
             var authority = oauthSection["Authority"];
-            var issuer = oauthSection["Issuer"] ?? "https://auth.eimsnext.com/issuer";
+            var issuer = oauthSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
             var audience = oauthSection["Audience"] ?? "eimsnext.api";
             var requireHttps = oauthSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
 

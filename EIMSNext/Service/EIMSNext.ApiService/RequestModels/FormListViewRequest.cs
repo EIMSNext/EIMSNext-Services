@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -19,7 +19,7 @@ namespace EIMSNext.ApiService.RequestModels
 
         public int SortIndex { get; set; }
 
-        public List<string> AuthGroupIds { get; set; } = new List<string>();
+        public List<string> PermissionGroupIds { get; set; } = new List<string>();
 
         public string Settings { get; set; } = string.Empty;
 

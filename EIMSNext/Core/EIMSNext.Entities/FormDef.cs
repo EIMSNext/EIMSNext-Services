@@ -1,0 +1,267 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
+using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
+
+using EIMSNext.Common;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+
+namespace EIMSNext.Entities
+{
+    /// <summary>
+    /// 表单定义
+    /// </summary>
+    public class FormDef : CorpEntityBase
+    {
+        /// <summary>
+        /// 应用ID
+        /// </summary>
+        public string AppId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// 模板Id, 对于从模板安装的表单
+        /// </summary>
+        public string? TemplateId { get; set; }
+
+        /// <summary>
+        /// 表单名称
+        /// </summary>
+        public string Name { get; set; } = string.Empty;
+
+         /// <summary>
+        /// 表单内容
+        /// </summary>
+        public FormContent Content { get; set; } = new FormContent();
+
+        /// <summary>
+        /// 是否流程表单
+        /// </summary>
+        public bool UsingWorkflow { get; set; }
+
+        /// <summary>
+        /// 表单设置
+        /// </summary>
+        public FormSettings FormSettings { get; set; } = new FormSettings();
+
+        /// <summary>
+        /// 公开表单可直接查询的关联数据源表单。仅后端持久化和鉴权使用。
+        /// </summary>
+        [JsonIgnore]
+        public List<string> PublicRelatedFormIds { get; set; } = [];
+    }
+
+    /// <summary>
+    /// 表单设置。
+    /// </summary>
+    public class FormSettings
+    {
+        /// <summary>
+        /// 高级功能设置。
+        /// </summary>
+        public DataAdvancedSettings Advanced { get; set; } = new DataAdvancedSettings();
+    }
+
+    /// <summary>
+    /// 表单高级功能设置。
+    /// </summary>
+    public class DataAdvancedSettings
+    {
+        /// <summary>
+        /// 数据标题设置。
+        /// </summary>
+        public DataTitleSettings DataTitle { get; set; } = new DataTitleSettings();
+    }
+
+    /// <summary>
+    /// 数据标题设置。
+    /// </summary>
+    public class DataTitleSettings
+    {
+        /// <summary>
+        /// 标题模式，支持 default/custom。
+        /// </summary>
+        public string Mode { get; set; } = "default";
+
+        /// <summary>
+        /// 自定义标题模板内容。
+        /// </summary>
+        public string Content { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// 自定义表单类型
+    /// </summary>
+    public enum FormType
+    {
+        /// <summary>
+        /// 表单
+        /// </summary>
+        Form,
+        /// <summary>
+        /// 仪表盘
+        /// </summary>
+        Dashboard,
+        /// <summary>
+        /// 表单分组
+        /// </summary>
+        Group
+    }
+
+    /// <summary>
+    /// 表单定义内容，包括修改历史等
+    /// </summary>
+    public class FormContent
+    {
+        /// <summary>
+        /// 表单布局
+        /// </summary>
+        public string Layout { get; set; } = string.Empty;
+        /// <summary>
+        /// 表单设置
+        /// </summary>
+        public string Options { get; set; } = string.Empty;
+        /// <summary>
+        /// 表单组件（仅表单元素，不包含布局组件）
+        /// </summary>
+        public IList<FieldDef>? Items { get; set; }
+
+        /// <summary>
+        /// 已删除字段记录。
+        /// </summary>
+        public IList<FieldChangeLog> FieldChangeLogs { get; set; } = [];
+    }
+
+    /// <summary>
+    /// 字段定义
+    /// </summary>
+    public class FieldDef
+    {
+        /// <summary>
+        /// 字段名
+        /// </summary>
+        public string Field { get; set; } = string.Empty;
+        /// <summary>
+        /// 字段类型
+        /// </summary>
+        public string Type { get; set; } = FieldType.Input;
+        /// <summary>
+        /// 标题
+        /// </summary>
+        public string Title { get; set; } = string.Empty;
+        /// <summary>
+        /// 标题多语言Key
+        /// </summary>
+        public string? I18n { get; set; }
+        /// <summary>
+        /// 属性配置
+        /// </summary>
+        public FieldProp Props { get; set; } = new FieldProp();
+
+        /// <summary>
+        /// 是否必填。兼容前端 form-create 的 $required 配置。
+        /// </summary>
+        [JsonPropertyName("$required")]
+        public bool Required { get; set; }
+
+        /// <summary>
+        /// 子表单中的列
+        /// </summary>
+        public IList<FieldDef>? Columns { get; set; }
+
+        /// <summary>
+        /// 是否隐藏
+        /// </summary>
+        public bool Hidden { get; set; }
+
+        /// <summary>
+        /// 字段来源。public 表示公开发布系统字段。
+        /// </summary>
+        public string? Source { get; set; }
+
+        /// <summary>
+        /// 系统字段分类。
+        /// </summary>
+        public string? SystemKind { get; set; }
+    }
+
+    /// <summary>
+    /// 字段属性配置
+    /// </summary>
+    public class FieldProp
+    {
+        /// <summary>
+        /// Radio/Checkbox/Select/Select2预设的选项
+        /// </summary>
+        public List<ValueOption>? Options { get; set; }
+        /// <summary>
+        /// Number/Timestamp的格式
+        /// </summary>
+        public string? Format { get; set; }
+        /// <summary>
+        /// 兼容部分子表单列把必填配置存放在 props.required 的情况。
+        /// </summary>
+        public bool? Required { get; set; }
+        /// <summary>
+        /// 值配置
+        /// </summary>
+        public ValueProp? ValueProp { get; set; }
+    }
+    /// <summary>
+    /// 值选项
+    /// </summary>
+    public class ValueOption
+    {
+        /// <summary>
+        /// 选项值
+        /// </summary>
+        public string Value {  get; set; } = string.Empty;
+        /// <summary>
+        /// 选项显示文本
+        /// </summary>
+        public string Label {  get; set; } = string.Empty;
+    }
+    /// <summary>
+    /// 值配置
+    /// </summary>
+    public class ValueProp
+    {
+        /// <summary>
+        /// 值公式
+        /// </summary>
+        public string? Formula { get; set; }
+        /// <summary>
+        /// 公式依赖
+        /// </summary>
+        public string? Depends { get; set; }
+    }
+
+    /// <summary>
+    /// 已删除字段记录
+    /// </summary>
+    public class FieldChangeLog
+    {
+        /// <summary>
+        /// 字段 ID。子表字段使用 parentField&gt;childField。
+        /// </summary>
+        public string FieldId { get; set; } = string.Empty;
+        /// <summary>
+        /// 字段类型
+        /// </summary>
+        public string FieldType { get; set; } = string.Empty;
+        /// <summary>
+        /// 字段名称。子表字段使用 parentLabel.childLabel。
+        /// </summary>
+        public string FieldLabel { get; set; } = string.Empty;
+        /// <summary>
+        /// 删除人
+        /// </summary>
+        public Operator DeletedBy { get; set; } = Operator.Empty;
+        /// <summary>
+        /// 删除时间
+        /// </summary>
+        public long DeletedTime { get; set; }
+    }
+}

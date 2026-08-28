@@ -1,4 +1,4 @@
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {

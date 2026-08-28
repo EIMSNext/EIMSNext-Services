@@ -13,7 +13,7 @@ using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;

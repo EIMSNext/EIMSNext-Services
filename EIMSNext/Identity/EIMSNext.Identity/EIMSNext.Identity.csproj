@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenIddict.Server.AspNetCore" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.DingTalk\EIMSNext.DingTalk.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Feishu\EIMSNext.Feishu.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.WeChat\EIMSNext.WeChat.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.WxWork\EIMSNext.WxWork.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
+  </ItemGroup>
+</Project>

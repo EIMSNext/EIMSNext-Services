@@ -1,4 +1,4 @@
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.Plugin.Contracts;
 
 using Microsoft.Extensions.DependencyInjection;
@@ -17,8 +17,8 @@ namespace EIMSNext.Flow.Tests
             var pluginV2Dir = Path.Combine(root, "Plugins", "sampleplugin", "2.0");
             Directory.CreateDirectory(pluginV1Dir);
             Directory.CreateDirectory(pluginV2Dir);
-            File.WriteAllText(Path.Combine(pluginV1Dir, "SamplePlugin.dll"), string.Empty);
-            File.WriteAllText(Path.Combine(pluginV2Dir, "SamplePlugin.dll"), string.Empty);
+            System.IO.File.WriteAllText(Path.Combine(pluginV1Dir, "SamplePlugin.dll"), string.Empty);
+            System.IO.File.WriteAllText(Path.Combine(pluginV2Dir, "SamplePlugin.dll"), string.Empty);
 
             var manager = new PluginRuntimeManager(
                 new ServiceCollection().BuildServiceProvider(),
@@ -55,7 +55,7 @@ namespace EIMSNext.Flow.Tests
             var root = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString("N"));
             var pluginV2Dir = Path.Combine(root, "Plugins", "sampleplugin", "2.0");
             Directory.CreateDirectory(pluginV2Dir);
-            File.WriteAllText(Path.Combine(pluginV2Dir, "SamplePlugin.dll"), string.Empty);
+            System.IO.File.WriteAllText(Path.Combine(pluginV2Dir, "SamplePlugin.dll"), string.Empty);
 
             manager = new PluginRuntimeManager(
                 services,

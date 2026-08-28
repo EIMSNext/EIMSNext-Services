@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Authors>EIMSNext Team</Authors>
+    <Version>1.1.0.0</Version>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="OpenIddict.Server.AspNetCore" />
+    <PackageReference Include="RestSharp" />
+    <PackageReference Include="Serilog.AspNetCore" />
+    <PackageReference Include="Serilog.Settings.Configuration" />
+    <PackageReference Include="Serilog.Sinks.Console" />
+    <PackageReference Include="Serilog.Sinks.File" />
+    <PackageReference Include="Swashbuckle.AspNetCore" />
+    <PackageReference Include="Swashbuckle.AspNetCore.Annotations" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
+    <ProjectReference Include="..\..\Identity\EIMSNext.Identity\EIMSNext.Identity.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Abstractions\EIMSNext.Identity.Abstractions.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.WeChat\EIMSNext.Identity.WeChat.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.WxWork\EIMSNext.Identity.WxWork.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.DingTalk\EIMSNext.Identity.DingTalk.csproj" />
+    <ProjectReference Include="..\..\Auth\EIMSNext.Identity.Feishu\EIMSNext.Identity.Feishu.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Update="eims.pfx">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+</Project>

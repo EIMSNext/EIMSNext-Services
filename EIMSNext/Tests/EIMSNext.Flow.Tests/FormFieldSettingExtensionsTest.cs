@@ -1,6 +1,6 @@
 using EIMSNext.Flow.Core.Nodes.EventFlow;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Tests
 {

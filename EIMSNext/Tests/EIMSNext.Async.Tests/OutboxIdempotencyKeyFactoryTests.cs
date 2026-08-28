@@ -1,5 +1,5 @@
 using EIMSNext.Async.Abstractions.Messaging;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Async.RabbitMQ.Outbox;
 
 namespace EIMSNext.Async.Tests

@@ -11,7 +11,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 using NanoidDotNet;
@@ -30,7 +30,7 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("Test")]
         public async Task<IActionResult> TestAsync([FromBody]WebhookRequest request)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(request.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(request.AppId);
             if (!string.IsNullOrWhiteSpace(request.FormId))
             {
                 var form = Resolver.GetService<FormDef>().Get(request.FormId);

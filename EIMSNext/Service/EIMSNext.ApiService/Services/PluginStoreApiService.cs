@@ -1,4 +1,4 @@
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
@@ -11,7 +11,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService

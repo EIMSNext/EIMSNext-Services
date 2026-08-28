@@ -10,7 +10,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using MongoDB.Driver;
 
@@ -47,7 +47,7 @@ namespace EIMSNext.Flow.Core
             }
 
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var roleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var employeeGroupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var managerRequests = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
             FormData? formData = null;
             FormDef? formDef = null;
@@ -65,10 +65,10 @@ namespace EIMSNext.Flow.Core
                             }
                         }
                         break;
-                    case CandidateType.Role:
+                    case CandidateType.EmployeeGroup:
                         if (!string.IsNullOrWhiteSpace(candidate.CandidateId))
                         {
-                            roleIds.Add(candidate.CandidateId);
+                            employeeGroupIds.Add(candidate.CandidateId);
                         }
                         break;
                     case CandidateType.Employee:
@@ -102,11 +102,11 @@ namespace EIMSNext.Flow.Core
                     .ForEachAsync(x => empIds.Add(x.Id));
             }
 
-            if (roleIds.Count > 0)
+            if (employeeGroupIds.Count > 0)
             {
                 await _employeeRepository.Find(new MongoFindOptions<Employee>
                 {
-                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId)))
+                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.ElemMatch(x => x.EmployeeGroups, r => employeeGroupIds.Contains(r.EmployeeGroupId)))
                 }).ForEachAsync(x => empIds.Add(x.Id));
             }
 

@@ -3,6 +3,7 @@ using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Services;
+using EIMSNext.Mef;
 
 using HKH.Mef2.Integration;
 

@@ -5,12 +5,12 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.Quartz.Jobs;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.CloudEvent;
+using EIMSNext.Notification;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Persistence;
+using EIMSNext.Persistence.Mongo;
 
 namespace EIMSNext.Async.Host.Extensions
 {

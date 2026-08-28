@@ -1,7 +1,7 @@
 using EIMSNext.ApiService;
 using EIMSNext.Cache;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 
 using Microsoft.Extensions.Caching.Distributed;

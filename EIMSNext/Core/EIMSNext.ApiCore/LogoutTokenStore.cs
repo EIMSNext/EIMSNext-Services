@@ -49,7 +49,7 @@ namespace EIMSNext.ApiCore
 
     public static class LogoutTokenHelper
     {
-        private const string CacheKeyPrefix = "auth:logout:";
+        private const string CacheKeyPrefix = "identity:logout:";
         private const string BearerPrefix = "Bearer ";
 
         public static string GetCacheKey(string token)

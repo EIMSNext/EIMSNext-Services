@@ -1,6 +1,6 @@
 using System.Runtime.CompilerServices;
 
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Core.Nodes.EventFlow
 {

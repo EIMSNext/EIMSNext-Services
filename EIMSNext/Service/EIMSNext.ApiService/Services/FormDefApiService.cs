@@ -2,7 +2,7 @@ using HKH.Mef2.Integration;
 
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Component;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using MongoDB.Driver;
 using EIMSNext.Service.Contracts;
@@ -14,7 +14,7 @@ namespace EIMSNext.ApiService
 	{
         public List<FormDefViewModel> GetFormsIncludeCross(string appId)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(appId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(appId);
 
             var ownForms = CoreService.All()
                 .Where(x =>
@@ -71,7 +71,7 @@ namespace EIMSNext.ApiService
 
         public override Task AddAsync(FormDef entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ValidateFieldIds(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
@@ -80,7 +80,7 @@ namespace EIMSNext.ApiService
 
         public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
         {
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(entity.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             var existing = CoreService.Get(entity.Id);
             PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
@@ -108,7 +108,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("表单不存在");
             }
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(form.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(form.AppId);
             await CoreService.PurgeFieldChangeLogsAsync(formId, ids, clearAll);
         }
 
@@ -124,7 +124,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("表单不存在");
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             foreach (var form in forms)
             {
                 evaluator.EnsureCanManageApp(form.AppId);

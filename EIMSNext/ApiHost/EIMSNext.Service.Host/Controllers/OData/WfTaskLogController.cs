@@ -1,7 +1,7 @@
 using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Host.OData;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.OData.Query;

@@ -10,7 +10,7 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 
 ## Main function modules
 
-### 1. Authentication Module (Auth)
+### 1. Identity Module (Identity)
 - Provide identity authentication services based on IdentityServer.
 - Supports multiple authorization methods, including password verification, CAPTCHA, single sign-on (SSO), and integrated authorization.
 - Management functions of entities such as clients, resources, scopes, and users.
@@ -69,10 +69,10 @@ Demo： [work.eimsnext.com](https://work.eimsnext.com)
 ### 1. Start the service
 - Ensure that MongoDB is installed and running.
 - Configuration `appsettings.json` Database connection information.
-- Start all API services (AuthApi, FileUploadApi, FlowApi, ServiceApi) /gitee.com/eimsnext/EIMSNext-Services)。
+- Start all API services (Identity.Host, File.Host, Flow.Host, Service.Host, Async.Host).
 
 ### 2. Authentication
-- Use  `/auth/sendcode` Send verification code through the interface.
+- Use `/identity/sendRegCode` to send a registration verification code.
 - Use the standard OAuth2 interface to obtain an access token.
 - Supports multiple authorization methods, including password, verification code, single sign-on, integrated authorization, and more.
 

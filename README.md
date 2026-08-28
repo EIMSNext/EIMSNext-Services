@@ -10,7 +10,7 @@ EIMSNext（又名东风低代码）是一款开源企业级信息管理解决方
 
 ## 主要功能模块
 
-### 1. 身份验证模块 (Auth)
+### 1. 身份验证模块 (Identity)
 - 提供基于 IdentityServer 的身份验证服务。
 - 支持多种授权方式，包括密码验证、验证码、单点登录 (SSO) 和集成授权。
 - 包含客户端、资源、作用域、用户等实体的管理功能。
@@ -69,10 +69,10 @@ EIMSNext（又名东风低代码）是一款开源企业级信息管理解决方
 ### 1. 启动服务
 - 确保 MongoDB 已安装并运行。
 - 配置 `appsettings.json` 中的数据库连接信息。
-- 启动各个 API 服务（AuthApi、FileUploadApi、FlowApi、ServiceApi ://gitee.com/eimsnext/EIMSNext-Services)。
+- 启动各个 API 服务（Identity.Host、File.Host、Flow.Host、Service.Host、Async.Host）。
 
 ### 2. 身份验证
-- 使用 `/auth/sendcode` 接口发送验证码。
+- 使用 `/identity/sendRegCode` 接口发送注册验证码。
 - 使用标准 OAuth2 接口获取访问令牌。
 - 支持多种授权方式，包括密码、验证码、单点登录、集成授权等。
 

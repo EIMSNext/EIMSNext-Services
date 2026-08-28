@@ -1,5 +1,5 @@
 using HKH.Mef2.Integration;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 

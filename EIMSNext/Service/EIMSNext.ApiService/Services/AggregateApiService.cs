@@ -8,7 +8,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Bson;
 using MongoDB.Bson.Serialization;
@@ -144,7 +144,7 @@ namespace EIMSNext.ApiService
 
                 // Only the component definition is subject to field visibility. Runtime filters and sorts
                 // intentionally remain dynamic; data permission and Mongo operator value protections still apply.
-                var scope = authorization.FieldPerms;
+                var scope = authorization.FormFieldPermissions;
                 if (scope != null)
                 {
                     var configuredFields = new AggCalcRequest
@@ -175,7 +175,7 @@ namespace EIMSNext.ApiService
                 return new AggregateAuthorization(true, validator.GetCurrentSetting()?.CorpId ?? string.Empty, null);
             }
 
-            var permissionEvaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var permissionEvaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (isPreview)
             {
                 permissionEvaluator.EnsureCanManageApp(item.AppId);
@@ -187,7 +187,7 @@ namespace EIMSNext.ApiService
 
             var scope = Resolver.Resolve<FormDataReadScopeResolver>().Resolve(formId);
             return scope.CanRead
-                ? new AggregateAuthorization(true, ServiceContext.CorpId, scope.DataFilter, scope.FieldPerms)
+                ? new AggregateAuthorization(true, ServiceContext.CorpId, scope.DataFilter, scope.FormFieldPermissions)
                 : AggregateAuthorization.Denied;
         }
 
@@ -337,7 +337,7 @@ namespace EIMSNext.ApiService
             }
 
             var scope = Resolver.Resolve<FormDataReadScopeResolver>().Resolve(request.DataSource.Id);
-            if (!scope.CanRead || !AreRequestedFieldsVisible(request, scope.FieldPerms))
+            if (!scope.CanRead || !AreRequestedFieldsVisible(request, scope.FormFieldPermissions))
             {
                 return AggregateAuthorization.Denied;
             }
@@ -625,7 +625,7 @@ namespace EIMSNext.ApiService
                     yield return nestedField;
         }
 
-        private static bool AreRequestedFieldsVisible(AggCalcRequest request, IReadOnlyCollection<FieldPerm>? fieldPerms)
+        private static bool AreRequestedFieldsVisible(AggCalcRequest request, IReadOnlyCollection<FormFieldPermission>? fieldPerms)
         {
             if (fieldPerms == null)
             {
@@ -667,7 +667,7 @@ namespace EIMSNext.ApiService
             }
         }
 
-        private static bool IsFieldVisible(string? field, IReadOnlyCollection<FieldPerm> fieldPerms, AggCalcRequest request)
+        private static bool IsFieldVisible(string? field, IReadOnlyCollection<FormFieldPermission> fieldPerms, AggCalcRequest request)
         {
             if (string.IsNullOrWhiteSpace(field))
             {
@@ -720,7 +720,7 @@ namespace EIMSNext.ApiService
 
         private sealed record DashboardAggregateBuild(AggCalcRequest Request, AggregateAuthorization Authorization, int? CountLimit);
 
-        private sealed record AggregateAuthorization(bool Allowed, string CorpId, DynamicFilter? DataFilter, IReadOnlyCollection<FieldPerm>? FieldPerms = null)
+        private sealed record AggregateAuthorization(bool Allowed, string CorpId, DynamicFilter? DataFilter, IReadOnlyCollection<FormFieldPermission>? FormFieldPermissions = null)
         {
             public static AggregateAuthorization Denied { get; } = new(false, string.Empty, null);
         }

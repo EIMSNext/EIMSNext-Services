@@ -1,5 +1,5 @@
 using EIMSNext.ApiCore;
-using EIMSNext.Auth.DbMaintenance;
+using EIMSNext.Identity.DbMaintenance;
 using EIMSNext.Core.Mongo;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;

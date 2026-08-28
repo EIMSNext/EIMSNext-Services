@@ -7,7 +7,7 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
@@ -76,7 +76,7 @@ namespace EIMSNext.ApiService
                 return null;
             }
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(run.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(run.AppId);
 
             var fb = RunLogNodeService.Collection;
             var nodes = await fb
@@ -110,7 +110,7 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("智能助手不存在");
             }
 
-            Resolver.Resolve<AdminPermissionEvaluator>().EnsureCanManageApp(definition.AppId);
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(definition.AppId);
         }
     }
 

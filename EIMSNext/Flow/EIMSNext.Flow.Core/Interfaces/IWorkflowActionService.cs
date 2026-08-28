@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
 using WorkflowCore.Models;

@@ -2,7 +2,7 @@ using System.Text.Json;
 
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Service.Persistence.Outbox;
+using EIMSNext.Persistence.Mongo.Outbox;
 
 using Microsoft.Extensions.Logging;
 

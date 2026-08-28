@@ -3,7 +3,7 @@ using System.Linq.Expressions;
 
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
@@ -15,7 +15,6 @@ using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -46,11 +45,11 @@ namespace EIMSNext.Service.Tests
             {
                 [typeof(IAppDefService)] = _appDefService,
                 [typeof(IService<AppDef>)] = _appDefService,
-                [typeof(IService<AdminGroup>)] = new FakeEntityService<AdminGroup>(),
-                [typeof(IAdminGroupService)] = new FakeAdminGroupService(),
+                [typeof(IService<TenantAdminGroup>)] = new FakeEntityService<TenantAdminGroup>(),
+                [typeof(ITenantAdminGroupService)] = new FakeTenantAdminGroupService(),
                 [typeof(IService<DashboardDef>)] = new FakeEntityService<DashboardDef>(),
                 [typeof(IService<FormDef>)] = new FakeEntityService<FormDef>(),
-                [typeof(IService<AuthGroup>)] = new FakeEntityService<AuthGroup>(),
+                [typeof(IService<FormDataPermissionGroup>)] = new FakeEntityService<FormDataPermissionGroup>(),
                 [typeof(IService<Department>)] = new FakeEntityService<Department>(),
                 [typeof(IService<Employee>)] = new FakeEntityService<Employee>(),
                 [typeof(IIdentityContext)] = identityContext,
@@ -60,7 +59,7 @@ namespace EIMSNext.Service.Tests
             };
 
             var resolver = new TestResolver(services);
-            services[typeof(AdminPermissionEvaluator)] = new AdminPermissionEvaluator(resolver);
+            services[typeof(TenantAccessEvaluator)] = new TenantAccessEvaluator(resolver);
             _apiService = new AppDefApiService(resolver);
         }
 
@@ -244,7 +243,7 @@ namespace EIMSNext.Service.Tests
         {
         }
 
-        private sealed class FakeAdminGroupService : FakeEntityService<AdminGroup>, IAdminGroupService
+        private sealed class FakeTenantAdminGroupService : FakeEntityService<TenantAdminGroup>, ITenantAdminGroupService
         {
         }
 

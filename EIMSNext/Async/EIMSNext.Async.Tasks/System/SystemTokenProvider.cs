@@ -1,4 +1,4 @@
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Common;
 using HKH.Common;
 using RestSharp;

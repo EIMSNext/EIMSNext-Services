@@ -2,7 +2,7 @@ using Asp.Versioning;
 
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Mongo.Entities;
@@ -11,7 +11,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
-using EIMSNext.Service.Entities;
 
 using Microsoft.OData.ModelBuilder;
 
@@ -41,10 +40,10 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<WfApprovalMode>();
             builder.EnumType<ApproverType>();
             builder.EnumType<PrintDefType>();
-            builder.EnumType<AuthGroupType>();
+            builder.EnumType<FormDataPermissionMode>();
             builder.EnumType<FormListViewType>();
             builder.EnumType<MobileFormListViewType>();
-            //builder.EnumType<DataPerms>();
+            //builder.EnumType<FormDataPermissions>();
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
             builder.EnumType<NotifyTargetType>();
@@ -54,7 +53,7 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<TimeUnit>();
 
             builder.ComplexType<UserCorp>();
-            builder.ComplexType<EmpRole>();
+            builder.ComplexType<EmployeeGroupRef>();
             builder.ComplexType<EmpDept>();
             builder.ComplexType<Operator>();
             builder.ComplexType<DepartmentRef>();
@@ -66,7 +65,7 @@ namespace EIMSNext.Service.Host.Edm
             builder.ComplexType<FormContent>();
             builder.ComplexType<AppMenu>();
             builder.ComplexType<Member>();
-            builder.ComplexType<FieldPerm>();
+            builder.ComplexType<FormFieldPermission>();
 
             builder.ComplexType<WfMetadata>();
             builder.ComplexType<WfStep>();

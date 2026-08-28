@@ -1,6 +1,6 @@
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -25,7 +25,7 @@ namespace EIMSNext.ApiService.RequestModels
         public DynamicFilter? Filter { get; set; }
 
         /// <summary>数据权限组 ID。</summary>
-        public string? AuthGroupId { get; set; }
+        public string? PermissionGroupId { get; set; }
 
         /// <summary>最多返回的选项数量，默认 50。</summary>
         public int Limit { get; set; } = 50;
@@ -38,8 +38,8 @@ namespace EIMSNext.ApiService.RequestModels
 
     public class FormDataPermissionScopeResponse
     {
-        public DataPerms DataPerms { get; set; }
+        public FormDataPermissions FormDataPermissions { get; set; }
 
-        public List<FieldPerm>? FieldPerms { get; set; }
+        public List<FormFieldPermission>? FormFieldPermissions { get; set; }
     }
 }

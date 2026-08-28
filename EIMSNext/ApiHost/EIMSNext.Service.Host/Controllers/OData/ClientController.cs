@@ -4,7 +4,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OpenPlatform;

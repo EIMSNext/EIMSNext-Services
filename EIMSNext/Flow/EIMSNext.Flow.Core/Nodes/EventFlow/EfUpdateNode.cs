@@ -4,7 +4,7 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Nodes.EventFlow;
 using EIMSNext.Scripting;
 using HKH.Mef2.Integration;

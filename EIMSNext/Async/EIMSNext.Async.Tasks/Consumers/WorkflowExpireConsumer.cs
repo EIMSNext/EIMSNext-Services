@@ -10,7 +10,7 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -62,14 +62,14 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
         }
 
-        private static ApiClient.Flow.WfExpireActionType MapActionType(Service.Entities.WfExpireActionType actionType)
+        private static ApiClient.Flow.WfExpireActionType MapActionType(EIMSNext.Entities.WfExpireActionType actionType)
         {
             return actionType switch
             {
-                Service.Entities.WfExpireActionType.AutoApprove => ApiClient.Flow.WfExpireActionType.AutoApprove,
-                Service.Entities.WfExpireActionType.AutoTransfer => ApiClient.Flow.WfExpireActionType.AutoTransfer,
-                Service.Entities.WfExpireActionType.AutoReject => ApiClient.Flow.WfExpireActionType.AutoReject,
-                Service.Entities.WfExpireActionType.AutoReturn => ApiClient.Flow.WfExpireActionType.AutoReturn,
+                EIMSNext.Entities.WfExpireActionType.AutoApprove => ApiClient.Flow.WfExpireActionType.AutoApprove,
+                EIMSNext.Entities.WfExpireActionType.AutoTransfer => ApiClient.Flow.WfExpireActionType.AutoTransfer,
+                EIMSNext.Entities.WfExpireActionType.AutoReject => ApiClient.Flow.WfExpireActionType.AutoReject,
+                EIMSNext.Entities.WfExpireActionType.AutoReturn => ApiClient.Flow.WfExpireActionType.AutoReturn,
                 _ => ApiClient.Flow.WfExpireActionType.AutoNotify,
             };
         }

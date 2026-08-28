@@ -5,7 +5,7 @@ using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Mvc;
 using EIMSNext.Service.Host.Authorization;
 using Microsoft.AspNetCore.OData.Formatter;
@@ -30,7 +30,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
                 return query;
             }
 
-            var evaluator = Resolver.Resolve<AdminPermissionEvaluator>();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (!evaluator.ShouldApplyNormalAdminRules)
             {
                 return query;
