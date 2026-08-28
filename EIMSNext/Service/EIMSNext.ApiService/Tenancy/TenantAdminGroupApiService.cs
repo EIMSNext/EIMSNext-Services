@@ -399,8 +399,8 @@ namespace EIMSNext.ApiService
             EnsureIdsExist<AppDef>(entity.AppIds, "应用");
             EnsureIdsExist<Department>(entity.AppDepartmentIds, "应用内可选部门");
             EnsureIdsExist<Department>(entity.ContactDepartmentIds, "通讯录部门");
-            EnsureIdsExist<EmployeeGroup>(entity.AppEmployeeGroupIds, "应用内可选角色");
-            EnsureIdsExist<EmployeeGroup>(entity.ContactEmployeeGroupIds, "通讯录角色");
+            EnsureIdsExist<EmployeeGroup>(entity.AppEmployeeGroupIds, "应用内可选员工组");
+            EnsureIdsExist<EmployeeGroup>(entity.ContactEmployeeGroupIds, "通讯录员工组");
         }
 
         private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Mongo.Entities.CorpEntityBase
@@ -473,3 +473,4 @@ namespace EIMSNext.ApiService
         }
     }
 }
+

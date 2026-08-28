@@ -8,7 +8,7 @@ namespace EIMSNext.Entities
     ///
     /// 与 <see cref="FormDataPermissionGroup"/> 互不相干：
     /// <list type="bullet">
-    /// <item><see cref="FormDataPermissionGroup"/>：用户/角色级别的表单数据权限（FormDataPermissions）。</item>
+    /// <item><see cref="FormDataPermissionGroup"/>：用户/员工组级别的表单数据权限（FormDataPermissions）。</item>
     /// <item><see cref="ClientGrant"/>：OAuth 客户端级别的 API 资源访问权限（Operation 位掩码）。</item>
     /// </list>
     /// </summary>
@@ -52,3 +52,4 @@ namespace EIMSNext.Entities
         public long Actions { get; set; }
     }
 }
+

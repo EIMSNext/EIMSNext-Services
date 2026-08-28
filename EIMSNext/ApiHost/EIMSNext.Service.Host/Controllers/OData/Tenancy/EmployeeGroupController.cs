@@ -44,7 +44,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
             {
                 foreach (ExpandedNavigationSelectItem item in expands)
                 {
-                    if (item.NavigationSource.Name.Equals("rolegroup", StringComparison.OrdinalIgnoreCase))
+                    if (item.NavigationSource.Name.Equals("employeeGroupCategory", StringComparison.OrdinalIgnoreCase))
                     {
                         var groups = Resolver.GetService<EmployeeGroupCategory>().All();
                         query = query.Join(groups, x => x.EmployeeGroupCategoryId, y => y.Id, ObjectConvert.ProjExp<EmployeeGroupViewModel, EmployeeGroupCategory>(x => x.EmployeeGroupCategory!));

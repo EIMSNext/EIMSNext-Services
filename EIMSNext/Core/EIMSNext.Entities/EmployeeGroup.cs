@@ -4,24 +4,24 @@ using EIMSNext.Core.Mongo.Entities;
 namespace EIMSNext.Entities
 {
     /// <summary>
-    /// 角色
+    /// 员工组
     /// </summary>
     public class EmployeeGroup : CorpEntityBase
     {
         /// <summary>
-        /// 角色名称
+        /// 员工组名称
         /// </summary>
         public string Name { get; set; } = "";
         /// <summary>
-        /// 角色描述
+        /// 员工组描述
         /// </summary>
         public string Description { get; set; } = "";
         /// <summary>
-        /// 角色所属角色组 ID
+        /// 所属员工组分类 ID
         /// </summary>
         public string EmployeeGroupCategoryId { get; set; } = "";
         /// <summary>
-        /// 角色排序值
+        /// 员工组排序值
         /// </summary>
         public int SortValue { get; set; }
     }

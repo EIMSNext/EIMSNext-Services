@@ -46,11 +46,11 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public List<string> AppDepartmentIds { get; set; } = [];
         /// <summary>
-        /// 应用内可选角色范围模式
+        /// 应用内可选员工组范围模式
         /// </summary>
         public EIMSNext.Entities.ScopeMode AppEmployeeGroupScopeMode { get; set; } = EIMSNext.Entities.ScopeMode.All;
         /// <summary>
-        /// 应用内可选角色ID列表
+        /// 应用内可选员工组ID列表
         /// </summary>
         public List<string> AppEmployeeGroupIds { get; set; } = [];
         /// <summary>
@@ -66,15 +66,15 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public List<string> ContactDepartmentIds { get; set; } = [];
         /// <summary>
-        /// 通讯录角色权限
+        /// 通讯录员工组权限
         /// </summary>
         public EIMSNext.Entities.PermissionLevel ContactEmployeeGroupPermission { get; set; } = EIMSNext.Entities.PermissionLevel.None;
         /// <summary>
-        /// 通讯录角色范围模式
+        /// 通讯录员工组范围模式
         /// </summary>
         public EIMSNext.Entities.ScopeMode ContactEmployeeGroupScopeMode { get; set; } = EIMSNext.Entities.ScopeMode.All;
         /// <summary>
-        /// 通讯录角色ID列表
+        /// 通讯录员工组ID列表
         /// </summary>
         public List<string> ContactEmployeeGroupIds { get; set; } = [];
     }
@@ -102,3 +102,4 @@ namespace EIMSNext.ApiService.RequestModels
         public string NextId { get; set; } = string.Empty;
     }
 }
+

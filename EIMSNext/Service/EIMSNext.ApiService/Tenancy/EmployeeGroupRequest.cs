@@ -1,20 +1,20 @@
 namespace EIMSNext.ApiService.RequestModels
 {
     /// <summary>
-    /// 角色请求
+    /// 员工组请求
     /// </summary>
     public class EmployeeGroupRequest : RequestBase
     {
         /// <summary>
-        /// 角色名称
+        /// 员工组名称
         /// </summary>
         public string Name { get; set; } = "";
         /// <summary>
-        /// 角色描述
+        /// 员工组描述
         /// </summary>
         public string Description { get; set; } = "";
         /// <summary>
-        /// 角色组ID
+        /// 员工组分类 ID
         /// </summary>
         public string EmployeeGroupCategoryId { get; set; } = "";
         /// <summary>
@@ -24,12 +24,12 @@ namespace EIMSNext.ApiService.RequestModels
     }
 
     /// <summary>
-    /// 添加员工到角色请求
+    /// 添加员工到员工组请求
     /// </summary>
     public class AddEmployeesToEmployeeGroupRequest
     {
         /// <summary>
-        /// 角色ID
+        /// 员工组 ID
         /// </summary>
         public string? EmployeeGroupId { get; set; }
         /// <summary>
@@ -38,12 +38,12 @@ namespace EIMSNext.ApiService.RequestModels
         public List<string>? EmpIds { get; set; }
     }
     /// <summary>
-    /// 从角色中移除员工请求
+    /// 从员工组中移除员工请求
     /// </summary>
     public class RemoveEmployeesFromEmployeeGroupRequest
     {
         /// <summary>
-        /// 角色ID
+        /// 员工组 ID
         /// </summary>
         public string? EmployeeGroupId { get; set; }
         /// <summary>
@@ -53,7 +53,7 @@ namespace EIMSNext.ApiService.RequestModels
     }
 
     /// <summary>
-    /// 移动角色树节点请求
+    /// 移动员工组树节点请求
     /// </summary>
     public class MoveEmployeeGroupTreeNodeRequest
     {
@@ -62,11 +62,11 @@ namespace EIMSNext.ApiService.RequestModels
         /// </summary>
         public string Id { get; set; } = string.Empty;
         /// <summary>
-        /// 是否角色组
+        /// 是否员工组分类
         /// </summary>
         public bool IsGroup { get; set; }
         /// <summary>
-        /// 新角色组ID，空表示根级
+        /// 新员工组分类 ID，空表示根级
         /// </summary>
         public string EmployeeGroupCategoryId { get; set; } = string.Empty;
         /// <summary>

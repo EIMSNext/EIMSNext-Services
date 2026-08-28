@@ -24,11 +24,11 @@ namespace EIMSNext.Service
         private IRepository<User> UserRepository => Resolver.GetRepository<User>();
         private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => Resolver.GetRepository<EmployeeDepartment>();
 
-        public Task<UpdateResult> AddToEmployeeGroupAsync(EmployeeGroup role, IEnumerable<string> empIds)
+        public Task<UpdateResult> AddToEmployeeGroupAsync(EmployeeGroup employeeGroup, IEnumerable<string> empIds)
         {
-            var update = UpdateBuilder.AddToSet(x => x.EmployeeGroups, new EmployeeGroupRef { EmployeeGroupId = role.Id, EmployeeGroupName = role.Name });
+            var update = UpdateBuilder.AddToSet(x => x.EmployeeGroups, new EmployeeGroupRef { EmployeeGroupId = employeeGroup.Id, EmployeeGroupName = employeeGroup.Name });
             var filter = FilterBuilder.And(FilterBuilder.In(x => x.Id, empIds),
-                FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.EmployeeGroups, r => r.EmployeeGroupId == role.Id) // 排除已存在该EmployeeGroupId的员工
+                FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.EmployeeGroups, r => r.EmployeeGroupId == employeeGroup.Id) // 排除已存在该EmployeeGroupId的员工
     )           );
 
             return Repository.UpdateManyAsync(filter, update, upsert: false);

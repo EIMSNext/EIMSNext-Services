@@ -153,7 +153,7 @@ namespace EIMSNext.Service.Host.Authorization
                 var clientInfo = _cache.Get<EIMSNext.Service.Host.OpenPlatform.ClientPermissionInfo>(
                     "clientGrant", CacheScope.Client, clientId);
 
-                // 缓存未命中：lazy refresh（避免重启 Auth.Host 后第一次 token 失败）
+                // 缓存未命中：lazy refresh（避免重启 Identity.Host 后第一次 token 失败）
                 if (clientInfo == null)
                 {
                     clientInfo = TryLazyRefreshClientInfo(context, clientId);

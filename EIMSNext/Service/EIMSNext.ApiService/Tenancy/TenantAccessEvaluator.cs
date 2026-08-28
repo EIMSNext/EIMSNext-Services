@@ -313,7 +313,7 @@ namespace EIMSNext.ApiService
                         EnsureEmployeeDepartmentInScope(member.Id, snapshot.AppDepartmentScopeMode, snapshot.AppDepartmentIds, "应用成员包含无权选择的员工");
                         break;
                     case MemberType.EmployeeGroup:
-                        EnsureEmployeeGroupInScope(member.Id, snapshot.AppEmployeeGroupScopeMode, snapshot.AppEmployeeGroupIds, "应用成员包含无权选择的角色");
+                        EnsureEmployeeGroupInScope(member.Id, snapshot.AppEmployeeGroupScopeMode, snapshot.AppEmployeeGroupIds, "应用成员包含无权选择的员工组");
                         break;
                 }
             }
@@ -420,11 +420,11 @@ namespace EIMSNext.ApiService
 
             if (!ShouldApplyNormalAdminRules)
             {
-                throw new ForbiddenException("没有管理角色成员权限");
+                throw new ForbiddenException("没有管理员工组成员权限");
             }
 
             var snapshot = GetSnapshot();
-            EnsureEmployeeGroupInScope(employeeGroupId, snapshot.ContactManageEmployeeGroupScopeMode, snapshot.ContactManageEmployeeGroupIds, "没有管理该角色成员的权限");
+            EnsureEmployeeGroupInScope(employeeGroupId, snapshot.ContactManageEmployeeGroupScopeMode, snapshot.ContactManageEmployeeGroupIds, "没有管理该员工组成员的权限");
             EnsureCanManageEmployees(employeeIds);
         }
 
@@ -654,10 +654,10 @@ namespace EIMSNext.ApiService
         {
             if (string.IsNullOrWhiteSpace(employeeGroupId))
             {
-                throw new BadRequestException("角色ID不能为空");
+                throw new BadRequestException("员工组 ID 不能为空");
             }
 
-            EnsureEntityExists<EmployeeGroup>(employeeGroupId, "角色不存在");
+            EnsureEntityExists<EmployeeGroup>(employeeGroupId, "员工组不存在");
             if (!IsInScope(employeeGroupId, scopeMode, employeeGroupIds))
             {
                 throw new ForbiddenException(message);
@@ -811,3 +811,4 @@ namespace EIMSNext.ApiService
         }
     }
 }
+

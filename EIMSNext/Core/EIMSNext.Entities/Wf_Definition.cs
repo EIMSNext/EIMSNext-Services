@@ -1098,7 +1098,7 @@ namespace EIMSNext.Entities
     public class ApprovalCandidate
     {
         /// <summary>
-        /// 候选人类型（部门、员工、角色等）
+        /// 候选人类型（部门、员工、员工组等）
         /// </summary>
         public CandidateType CandidateType { get; set; }
         /// <summary>
@@ -1138,7 +1138,7 @@ namespace EIMSNext.Entities
         /// </summary>
         Employee,
         /// <summary>
-        /// 角色
+        /// 员工组
         /// </summary>
         EmployeeGroup,
         /// <summary>
@@ -1357,3 +1357,4 @@ namespace EIMSNext.Entities
 
     }
 }
+

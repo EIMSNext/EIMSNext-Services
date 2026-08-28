@@ -122,7 +122,7 @@ namespace EIMSNext.Entities
         /// </summary>
         Employee,
         /// <summary>
-        /// 角色
+        /// 员工组
         /// </summary>
         EmployeeGroup
     }
@@ -202,3 +202,4 @@ namespace EIMSNext.Entities
         public bool? TableDelete { get; set; }
     }
 }
+

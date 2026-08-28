@@ -73,7 +73,7 @@ namespace EIMSNext.Service.Host.Controllers
                 corpId = IdentityContext.CurrentCorpId,
                 departmentIds,
                 userType = IdentityContext.IdentityType,
-                roles = emp?.EmployeeGroups.Select(x => x.EmployeeGroupId)
+                employeeGroups = emp?.EmployeeGroups.Select(x => x.EmployeeGroupId)
             }).ToActionResult();
         }
 

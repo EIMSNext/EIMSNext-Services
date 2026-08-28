@@ -1,16 +1,16 @@
 namespace EIMSNext.ApiService.RequestModels
 {
     /// <summary>
-    /// 角色组请求
+    /// 员工组分类请求
     /// </summary>
     public class EmployeeGroupCategoryRequest : RequestBase
     {
         /// <summary>
-        /// 角色组名称
+        /// 员工组分类名称
         /// </summary>
         public string Name { get; set; } = "";
         /// <summary>
-        /// 角色组描述
+        /// 员工组分类描述
         /// </summary>
         public string Description { get; set; } = "";
         /// <summary>

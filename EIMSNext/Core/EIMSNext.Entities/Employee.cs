@@ -53,7 +53,7 @@ namespace EIMSNext.Entities
         public bool UserBound { get; set; }
 
         /// <summary>
-        /// 所属角色
+        /// 所属员工组
         /// </summary>
         public List<EmployeeGroupRef> EmployeeGroups { get; set; } = new List<EmployeeGroupRef>();
 
@@ -82,16 +82,16 @@ namespace EIMSNext.Entities
     }
 
     /// <summary>
-    /// 员工角色关联
+    /// 员工组关联
     /// </summary>
     public class EmployeeGroupRef
     {
         /// <summary>
-        /// 角色ID
+        /// 员工组 ID
         /// </summary>
         public string EmployeeGroupId { get; set; } = "";
         /// <summary>
-        /// 角色名称
+        /// 员工组名称
         /// </summary>
         public string EmployeeGroupName { get; set; } = "";
     }

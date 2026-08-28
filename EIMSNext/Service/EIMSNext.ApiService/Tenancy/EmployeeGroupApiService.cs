@@ -21,11 +21,11 @@ namespace EIMSNext.ApiService
         public async Task AddEmployeesToEmployeeGroup(AddEmployeesToEmployeeGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployeeGroupMembers(request.EmployeeGroupId!, request.EmpIds ?? []);
-            var role = CoreService.Get(request.EmployeeGroupId!);
-            if (role != null)
+            var employeeGroup = CoreService.Get(request.EmployeeGroupId!);
+            if (employeeGroup != null)
             {
                 var empService = Resolver.GetService<IEmployeeService, Employee>();
-                await empService.AddToEmployeeGroupAsync(role, request.EmpIds!);
+                await empService.AddToEmployeeGroupAsync(employeeGroup, request.EmpIds!);
             }
         }
 
@@ -38,7 +38,7 @@ namespace EIMSNext.ApiService
 
         public async Task<bool> Move(MoveEmployeeGroupTreeNodeRequest request)
         {
-            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改角色结构的权限");
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组结构的权限");
 
             if (string.IsNullOrWhiteSpace(request.Id))
             {
@@ -49,7 +49,7 @@ namespace EIMSNext.ApiService
             var employeeGroupCategoryId = request.EmployeeGroupCategoryId?.Trim() ?? string.Empty;
             if (request.IsGroup && !string.IsNullOrEmpty(employeeGroupCategoryId))
             {
-                throw new ArgumentException("角色组只能位于根级");
+                throw new ArgumentException("员工组分类只能位于根级");
             }
 
             if (!string.IsNullOrEmpty(employeeGroupCategoryId))
@@ -61,7 +61,7 @@ namespace EIMSNext.ApiService
 
                 if (!parentExists)
                 {
-                    throw new ArgumentException("角色组不存在");
+                    throw new ArgumentException("员工组分类不存在");
                 }
             }
 
@@ -136,21 +136,21 @@ namespace EIMSNext.ApiService
 
         protected override Task AddAsyncCore(EmployeeGroup entity)
         {
-            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建角色的权限");
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建员工组的权限");
             EnsureEmployeeGroupCategoryBelongsToCurrentCorp(entity.EmployeeGroupCategoryId);
             return base.AddAsyncCore(entity);
         }
 
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroup entity)
         {
-            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改角色的权限");
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组的权限");
             EnsureEmployeeGroupCategoryBelongsToCurrentCorp(entity.EmployeeGroupCategoryId);
             return base.ReplaceAsyncCore(entity);
         }
 
         protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
-            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除角色的权限");
+            Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组的权限");
 
             var employeeGroupIds = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var referenced = Resolver.GetRepository<Employee>().Queryable
@@ -158,7 +158,7 @@ namespace EIMSNext.ApiService
                 .Any(x => x.EmployeeGroups.Any(r => employeeGroupIds.Contains(r.EmployeeGroupId)));
             if (referenced)
             {
-                throw new BadRequestException("该角色有员工使用，不能删除");
+                throw new BadRequestException("该员工组有员工使用，不能删除");
             }
 
             return base.DeleteAsyncCore(ids);
@@ -174,7 +174,7 @@ namespace EIMSNext.ApiService
             var group = Resolver.GetRepository<EmployeeGroupCategory>().Get(employeeGroupCategoryId);
             if (group == null || group.DeleteFlag || group.CorpId != IdentityContext.CurrentCorpId)
             {
-                throw new BadRequestException("角色组不存在或不属于当前企业");
+                throw new BadRequestException("员工组分类不存在或不属于当前企业");
             }
         }
 
@@ -185,12 +185,12 @@ namespace EIMSNext.ApiService
                 .Select(x => new EmployeeGroupSortNode(x))
                 .ToList();
 
-            var roles = employeeGroupService.All()
+            var employeeGroups = employeeGroupService.All()
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.EmployeeGroupCategoryId == string.Empty && x.Id != movingId)
                 .Select(x => new EmployeeGroupSortNode(x))
                 .ToList();
 
-            return groups.Concat(roles).OrderBy(x => x.SortValue).ThenBy(x => x.Id).ToList();
+            return groups.Concat(employeeGroups).OrderBy(x => x.SortValue).ThenBy(x => x.Id).ToList();
         }
 
         private List<EmployeeGroupSortNode> LoadEmployeeGroupSiblingNodes(IEmployeeGroupCategoryService groupService, IEmployeeGroupService employeeGroupService, string employeeGroupCategoryId, string movingId)
@@ -227,9 +227,9 @@ namespace EIMSNext.ApiService
                 Group = group;
             }
 
-            public EmployeeGroupSortNode(EmployeeGroup role)
+            public EmployeeGroupSortNode(EmployeeGroup employeeGroup)
             {
-                EmployeeGroup = role;
+                EmployeeGroup = employeeGroup;
             }
 
             public EmployeeGroupCategory? Group { get; }
@@ -256,3 +256,4 @@ namespace EIMSNext.ApiService
         }
     }
 }
+
