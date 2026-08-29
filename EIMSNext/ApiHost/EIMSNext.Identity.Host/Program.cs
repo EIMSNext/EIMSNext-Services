@@ -1,18 +1,21 @@
 using EIMSNext.ApiCore;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.Identity.Extensions;
 using EIMSNext.Identity.Host;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Services;
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Services.Extensions;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.Extensions.Options;
 using Microsoft.OpenApi;
+
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -88,29 +91,18 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     }
     else
     {
-        foreach (var seedClient in seedClients)
+
+        var seedClient = seedClients.First(x => x.Id == InternalClients.PublicClientId);
+        var publicClient = context.Clients.FirstOrDefault(x => x.Id == InternalClients.PublicClientId);
+        if (publicClient == null)
         {
-            var client = context.Clients.FirstOrDefault(x => x.Id == seedClient.Id);
-            if (client == null)
-            {
-                context.AddClient(seedClient).GetAwaiter().GetResult();
-                continue;
-            }
-
+            context.AddClient(seedClient).GetAwaiter().GetResult();
+        }
+        else
+        {
             var changed = false;
-            if (!string.Equals(client.Name, seedClient.Name, StringComparison.Ordinal))
-            {
-                client.Name = seedClient.Name;
-                changed = true;
-            }
 
-            if (client.RequireClientSecret != seedClient.RequireClientSecret)
-            {
-                client.RequireClientSecret = seedClient.RequireClientSecret;
-                changed = true;
-            }
-
-            var currentGrantTypes = client.AllowedGrantTypes
+            var currentGrantTypes = publicClient.AllowedGrantTypes
                 .Select(x => x.GrantType)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
@@ -122,13 +114,13 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
                 .ToArray();
             if (!currentGrantTypes.SequenceEqual(seedGrantTypes, StringComparer.Ordinal))
             {
-                client.AllowedGrantTypes = seedClient.AllowedGrantTypes
+                publicClient.AllowedGrantTypes = seedClient.AllowedGrantTypes
                     .Select(x => new EIMSNext.Entities.ClientGrantType { GrantType = x.GrantType })
                     .ToList();
                 changed = true;
             }
 
-            var currentScopes = client.AllowedScopes
+            var currentScopes = publicClient.AllowedScopes
                 .Select(x => x.Scope)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
@@ -140,7 +132,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
                 .ToArray();
             if (!currentScopes.SequenceEqual(seedScopes, StringComparer.Ordinal))
             {
-                client.AllowedScopes = seedClient.AllowedScopes
+                publicClient.AllowedScopes = seedClient.AllowedScopes
                     .Select(x => new EIMSNext.Entities.ClientScope { Scope = x.Scope })
                     .ToList();
                 changed = true;
@@ -148,7 +140,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
 
             if (changed)
             {
-                context.UpdateClient(client).GetAwaiter().GetResult();
+                context.UpdateClient(publicClient).GetAwaiter().GetResult();
             }
         }
     }
