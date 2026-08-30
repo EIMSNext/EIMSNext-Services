@@ -189,11 +189,13 @@ namespace EIMSNext.Flow.Core
             await EnsureStartTaskLogAsync(workflowInstance, dataContext);
 
             var trail = GetReturnTrail(workflowInstance, task, dataContext.Round);
-            return trail
+            var targets = trail
                 .Where(x => x.NodeId != task.ApproveNodeId)
                 .Select(x => new ReturnTargetNodeResult { NodeId = x.NodeId, NodeName = x.NodeName, Round = x.Round })
                 .DistinctBy(x => x.NodeId)
                 .ToList();
+
+            return FilterReturnTargets(workflowInstance, task, targets);
         }
 
         public async Task<WorkflowActionResult> ReturnAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Task task, string targetNodeId, string comment)
@@ -221,6 +223,19 @@ namespace EIMSNext.Flow.Core
             if (target == null)
             {
                 throw new BadRequestException("目标节点不在可回退范围内");
+            }
+
+            if (action == ApproveAction.Return)
+            {
+                var targets = trail
+                    .Where(x => x.NodeId != task.ApproveNodeId)
+                    .Select(x => new ReturnTargetNodeResult { NodeId = x.NodeId, NodeName = x.NodeName, Round = x.Round })
+                    .DistinctBy(x => x.NodeId)
+                    .ToList();
+                if (!FilterReturnTargets(workflowInstance, task, targets).Any(x => x.NodeId == targetNodeId))
+                {
+                    throw new BadRequestException("目标节点不在配置的可回退范围内");
+                }
             }
 
             var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
@@ -518,6 +533,27 @@ namespace EIMSNext.Flow.Core
                 ReturnTargetMode.Specified => trail.FirstOrDefault(x => x.NodeId == returnSetting?.TargetNodeId)?.NodeId
                     ?? throw new BadRequestException("审批超时自动回退失败：指定回退节点不可达"),
                 _ => trail.Last().NodeId
+            };
+        }
+
+        private List<ReturnTargetNodeResult> FilterReturnTargets(WorkflowInstance workflowInstance, Wf_Task task, List<ReturnTargetNodeResult> targets)
+        {
+            var definition = GetWorkflowDefinition(workflowInstance);
+            var setting = definition?.Metadata?.Steps
+                ?.FirstOrDefault(x => x.Id == task.ApproveNodeId)
+                ?.WfNodeSetting?.ApproveSetting?.NodeActions
+                ?.FirstOrDefault(x => x.ActionType == NodeActionType.Return && x.Enabled)
+                ?.ReturnSetting;
+            if (setting == null)
+            {
+                return targets;
+            }
+
+            return setting.TargetMode switch
+            {
+                ReturnTargetMode.Start => targets.Where(x => x.NodeId == definition?.Metadata?.Steps?.FirstOrDefault(step => step.NodeType == WfNodeType.Start)?.Id).ToList(),
+                ReturnTargetMode.Specified when !string.IsNullOrWhiteSpace(setting.TargetNodeId) => targets.Where(x => x.NodeId == setting.TargetNodeId).ToList(),
+                _ => targets.TakeLast(1).ToList(),
             };
         }
 

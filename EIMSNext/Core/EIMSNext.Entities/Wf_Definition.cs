@@ -494,6 +494,11 @@ namespace EIMSNext.Entities
         /// 操作候选人。
         /// </summary>
         public List<ApprovalCandidate>? Candidates { get; set; }
+
+        /// <summary>
+        /// 回退目标设置，仅回退操作使用。
+        /// </summary>
+        public ReturnSetting? ReturnSetting { get; set; }
     }
 
     /// <summary>

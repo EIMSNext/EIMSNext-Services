@@ -194,7 +194,12 @@ namespace EIMSNext.Component
                             ActionType = Enum.TryParse<NodeActionType>(x.ActionType.ToString(), true, out var actionType) ? actionType : NodeActionType.Submit,
                             Enabled = x.Enabled ?? false,
                             Text = x.Text,
-                            Candidates = x.Candidates?.ToList()
+                            Candidates = x.Candidates?.ToList(),
+                            ReturnSetting = x.ReturnSetting == null ? null : new ReturnSetting
+                            {
+                                TargetMode = x.ReturnSetting.TargetMode,
+                                TargetNodeId = x.ReturnSetting.TargetNodeId,
+                            },
                         }).ToList(),
                         NotifyChannels = approveMeta?.NotifyChannels ?? NotifyChannel.None,
                         ExpireSetting = approveMeta?.ExpireSetting == null ? null : new ExpireSetting
@@ -803,6 +808,7 @@ namespace EIMSNext.Component
             public bool? Enabled { get; set; }
             public string? Text { get; set; }
             public List<ApprovalCandidate>? Candidates { get; set; }
+            public ReturnMeta? ReturnSetting { get; set; }
         }
 
         private class ExpireMeta
