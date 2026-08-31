@@ -1,5 +1,6 @@
 using System.Dynamic;
 
+using EIMSNext.ApiCore;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
@@ -17,6 +18,7 @@ using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
+using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -66,8 +68,36 @@ namespace EIMSNext.Flow.Core.Nodes
                     throw new InvalidOperationException("打印模板不存在或不属于当前表单");
                 }
 
-                var datas = sourceNode.ActionDatas
-                    .Select(x => (object)FormDataFormatter.Format(x.FormData, formDef.Content.Items ?? []))
+                var formDatas = sourceNode.ActionDatas
+                    .Select(x => x.FormData)
+                    .ToList();
+                var dataIds = formDatas.Select(x => x.Id).ToList();
+                var taskLogsByDataId = Resolver.GetRepository<Wf_TaskLog>()
+                    .Find(x => dataIds.Contains(x.DataId))
+                    .ToList()
+                    .GroupBy(x => x.DataId)
+                    .ToDictionary(x => x.Key, x => x.AsEnumerable());
+                var tasksByDataId = Resolver.GetRepository<Wf_Task>()
+                    .Find(x => dataIds.Contains(x.DataId))
+                    .ToList()
+                    .GroupBy(x => x.DataId)
+                    .ToDictionary(x => x.Key, x => x.ToList());
+                var employeeIds = tasksByDataId.Values
+                    .SelectMany(x => x.Select(task => task.EmployeeId))
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .Distinct()
+                    .ToList();
+                var employeeNames = Resolver.GetRepository<Employee>()
+                    .Find(x => employeeIds.Contains(x.Id))
+                    .ToList()
+                    .ToDictionary(x => x.Id, x => x.EmpName);
+
+                var datas = formDatas
+                    .Select(data => (object)PrintDataFormatter.Format(
+                        data,
+                        formDef.Content.Items ?? [],
+                        taskLogsByDataId.GetValueOrDefault(data.Id),
+                        BuildPrintDataContext(data, tasksByDataId.GetValueOrDefault(data.Id), employeeNames, dataContext.WfStarter)))
                     .ToList();
                 if (datas.Count == 0)
                 {
@@ -135,6 +165,37 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             var normalized = Path.GetFileName(fileName ?? string.Empty);
             return string.IsNullOrWhiteSpace(normalized) ? $"print_{DateTime.UtcNow:yyyyMMddHHmmssfff}" : normalized;
+        }
+
+        private PrintDataContext BuildPrintDataContext(
+            FormData data,
+            IReadOnlyCollection<Wf_Task>? tasks,
+            IReadOnlyDictionary<string, string> employeeNames,
+            Operator? printedBy)
+        {
+            var currentTasks = tasks ?? [];
+            var currentNode = string.Join("、", currentTasks
+                .Select(x => x.ApproveNodeName)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct());
+            var currentOwner = string.Join("、", currentTasks
+                .Select(x => employeeNames.GetValueOrDefault(x.EmployeeId, string.Empty))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct());
+
+            var baseUrl = Resolver.GetAppSetting().WebHost.BaseUrl?.TrimEnd('/');
+            return new PrintDataContext
+            {
+                CurrentNode = currentNode,
+                CurrentOwner = currentOwner,
+                InternalDataUrl = string.IsNullOrWhiteSpace(baseUrl)
+                    ? string.Empty
+                    : $"{baseUrl}/#/app/{data.AppId}/form/{data.FormId}/data/{data.Id}",
+                ExternalDataUrl = string.IsNullOrWhiteSpace(baseUrl)
+                    ? string.Empty
+                    : $"{baseUrl}/#/public/form/{data.FormId}/data/{data.Id}",
+                PrintedBy = printedBy,
+            };
         }
     }
 }

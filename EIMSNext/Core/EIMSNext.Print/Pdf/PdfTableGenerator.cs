@@ -2,6 +2,10 @@ using System.Text.Json.Nodes;
 using EIMSNext.Print.Extensions;
 using MigraDoc.DocumentObjectModel;
 using MigraDoc.DocumentObjectModel.Tables;
+using SixLabors.ImageSharp;
+using SixLabors.ImageSharp.PixelFormats;
+using ZXing;
+using ZXing.Common;
 
 namespace EIMSNext.Print.Pdf
 {
@@ -263,7 +267,8 @@ namespace EIMSNext.Print.Pdf
                             ? GetCellValue(templateCell, _data!, new[] { i })
                             : string.Empty;
 
-                        if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, templateCell, rowIndex, columnIndex, _scaleFactor))
+                        if (!TryRenderQrCode(cell, templateCell, cellValue, rowIndex, columnIndex)
+                            && !_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, templateCell, rowIndex, columnIndex, _scaleFactor))
                         {
                             AddCellParagraph(cell, templateCell, cellValue, keepEmptyParagraph: true, leftIndentCm: 0.1, rowIndex: rowIndex, columnIndex: columnIndex);
                         }
@@ -306,7 +311,8 @@ namespace EIMSNext.Print.Pdf
                     ApplyMergedBoundaryStyles(cell, rowIndex, columnIndex);
                     var cellValue = GetCellValue(univerCell, _data!, Array.Empty<int>());
 
-                    if (!_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, univerCell, rowIndex, columnIndex, _scaleFactor))
+                    if (!TryRenderQrCode(cell, univerCell, cellValue, rowIndex, columnIndex)
+                        && !_imageRenderer.TryRenderCellImage(cell, _workbook, _worksheet!, univerCell, rowIndex, columnIndex, _scaleFactor))
                     {
                         AddCellParagraph(cell, univerCell, cellValue, keepEmptyParagraph: false, leftIndentCm: 0, rowIndex: rowIndex, columnIndex: columnIndex);
                     }
@@ -385,6 +391,45 @@ namespace EIMSNext.Print.Pdf
             if (cell.PrintMeta == null) return cell.Value?.ToString() ?? string.Empty;
 
             return data.GetJsonValue(cell.PrintMeta.GetValuePath(indexes));
+        }
+
+        private bool TryRenderQrCode(Cell cell, UniverCell univerCell, string value, int rowIndex, int columnIndex)
+        {
+            if (!string.Equals(univerCell.PrintMeta?.DataType, "qrcode", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(value))
+            {
+                return false;
+            }
+
+            try
+            {
+                var writer = new BarcodeWriterPixelData
+                {
+                    Format = BarcodeFormat.QR_CODE,
+                    Options = new EncodingOptions
+                    {
+                        Width = 256,
+                        Height = 256,
+                        Margin = 0,
+                    },
+                };
+                var pixels = writer.Write(value);
+                using var image = Image.LoadPixelData<Rgba32>(pixels.Pixels, pixels.Width, pixels.Height);
+                using var stream = new MemoryStream();
+                image.SaveAsPng(stream);
+
+                var paragraph = cell.AddParagraph();
+                paragraph.Format.Alignment = cell.Format.Alignment;
+                var qrCode = paragraph.AddImage($"base64:{Convert.ToBase64String(stream.ToArray())}");
+                qrCode.LockAspectRatio = false;
+                qrCode.Width = Unit.FromCentimeter(Math.Max(GetColumnWidth(_worksheet!, columnIndex) * _scaleFactor * 0.85, 0.2));
+                qrCode.Height = Unit.FromCentimeter(Math.Max(GetRowHeight(_worksheet!, rowIndex) * 0.85, 0.2));
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private void AddCellParagraph(Cell cell, UniverCell univerCell, string cellValue, bool keepEmptyParagraph, double leftIndentCm, int rowIndex, int columnIndex)

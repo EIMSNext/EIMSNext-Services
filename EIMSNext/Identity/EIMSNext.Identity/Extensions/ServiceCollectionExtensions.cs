@@ -54,7 +54,7 @@ namespace EIMSNext.Identity.Extensions
             services.AddOpenIddict()
                 .AddServer(options =>
                 {
-                    var issuerValue = configuration.GetSection("OAuth:Issuer").Value
+                    var issuerValue = configuration.GetSection("IdentityHost:Issuer").Value
                         ?? "https://identity.eimsnext.com/issuer";
                     options.SetIssuer(issuerValue);
                     options.SetTokenEndpointUris("connect/token", "identity/login", "public/token", "system/token");

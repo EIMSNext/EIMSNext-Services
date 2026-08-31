@@ -1,6 +1,6 @@
 namespace EIMSNext.Common;
 
-public class OAuthSettings
+public class IdentityHostSettings
 {
     public string? BaseUrl { get; set; }
     public string? Authority { get; set; }

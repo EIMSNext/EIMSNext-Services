@@ -29,10 +29,10 @@ internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IW
             certificatePassword,
             X509KeyStorageFlags.EphemeralKeySet);
 
-        var oauthSection = configuration.GetSection("OAuth");
-        var authority = oauthSection["Authority"];
-        var issuer = oauthSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
-        var audience = oauthSection["Audience"] ?? "eimsnext.api";
+        var identityHostSection = configuration.GetSection("IdentityHost");
+        var authority = identityHostSection["Authority"];
+        var issuer = identityHostSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
+        var audience = identityHostSection["Audience"] ?? "eimsnext.api";
 
         options.Authority = null;
         options.Events = JwtBearerLogoutTokenEvents.Create();

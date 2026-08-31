@@ -89,7 +89,7 @@ namespace EIMSNext.ApiHost.Controllers
 
         //private JsonObject? GetAccessToken(string userName)
         //{
-        //    RestClient restClient = new RestClient(AppSetting.OAuth.TokenEndPoint!);
+        //    RestClient restClient = new RestClient(AppSetting.IdentityHost.TokenEndPoint!);
         //    var request = new RestRequest("", Method.Post);
         //    request.AddHeader("Content-Type", "application/x-www-form-urlencoded");
         //    request.AddParameter("application/x-www-form-urlencoded", $@"grant_type=password&client_id=1&username={userName}&password={UrlEncoder.Default.Encode("(!@#^&*$%) [,./';:>?<]")}", ParameterType.RequestBody);

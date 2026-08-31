@@ -4,6 +4,9 @@ using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
 using EIMSNext.Component;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.Print.Abstractions;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
@@ -72,7 +75,37 @@ namespace EIMSNext.Service.Host.Controllers
             if (formDef == null || formDef.Content.Items == null)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
 
-            using var printResult = new Print.CustomPrintService().Print(new PrintTemplate { Content = template.Content, PrintType = (PrintType)(int)template.PrintType }, new PrintOption(), datas.Select(x => FormDataFormatter.Format(x, formDef.Content.Items)).ToList());
+            var dataIds = datas.Select(x => x.Id).ToList();
+            var taskLogsByDataId = Resolver.GetRepository<Wf_TaskLog>()
+                .Find(x => dataIds.Contains(x.DataId))
+                .ToList()
+                .GroupBy(x => x.DataId)
+                .ToDictionary(x => x.Key, x => x.AsEnumerable());
+            var tasksByDataId = Resolver.GetRepository<Wf_Task>()
+                .Find(x => dataIds.Contains(x.DataId))
+                .ToList()
+                .GroupBy(x => x.DataId)
+                .ToDictionary(x => x.Key, x => x.ToList());
+            var employeeIds = tasksByDataId.Values
+                .SelectMany(x => x.Select(task => task.EmployeeId))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToList();
+            var employeeNames = Resolver.GetRepository<Employee>()
+                .Find(x => employeeIds.Contains(x.Id))
+                .ToList()
+                .ToDictionary(x => x.Id, x => x.EmpName);
+            var printedBy = IdentityContext.CurrentEmployee?.ToOperator();
+
+            var printData = datas.Select(data => PrintDataFormatter.Format(
+                data,
+                formDef.Content.Items,
+                taskLogsByDataId.GetValueOrDefault(data.Id),
+                BuildPrintDataContext(data, tasksByDataId.GetValueOrDefault(data.Id), employeeNames, printedBy)))
+                .Cast<object>()
+                .ToList();
+
+            using var printResult = new Print.CustomPrintService().Print(new PrintTemplate { Content = template.Content, PrintType = (PrintType)(int)template.PrintType }, new PrintOption(), printData);
 
             if (printResult != null && !string.IsNullOrEmpty(printResult.FileName))
             {
@@ -86,6 +119,37 @@ namespace EIMSNext.Service.Host.Controllers
             }
             else
                 return ApiResult.Fail(500, "打印文件失败").ToActionResult();
+        }
+
+        private PrintDataContext BuildPrintDataContext(
+            FormData data,
+            IReadOnlyCollection<Wf_Task>? tasks,
+            IReadOnlyDictionary<string, string> employeeNames,
+            Operator? printedBy)
+        {
+            var currentTasks = tasks ?? [];
+            var currentNode = string.Join("、", currentTasks
+                .Select(x => x.ApproveNodeName)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct());
+            var currentOwner = string.Join("、", currentTasks
+                .Select(x => employeeNames.GetValueOrDefault(x.EmployeeId, string.Empty))
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct());
+
+            var baseUrl = AppSetting.WebHost.BaseUrl?.TrimEnd('/');
+            return new PrintDataContext
+            {
+                CurrentNode = currentNode,
+                CurrentOwner = currentOwner,
+                InternalDataUrl = string.IsNullOrWhiteSpace(baseUrl)
+                    ? string.Empty
+                    : $"{baseUrl}/#/app/{data.AppId}/form/{data.FormId}/data/{data.Id}",
+                ExternalDataUrl = string.IsNullOrWhiteSpace(baseUrl)
+                    ? string.Empty
+                    : $"{baseUrl}/#/public/form/{data.FormId}/data/{data.Id}",
+                PrintedBy = printedBy,
+            };
         }
     }
 }

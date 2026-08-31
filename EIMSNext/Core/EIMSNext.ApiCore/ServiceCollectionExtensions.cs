@@ -135,11 +135,11 @@ namespace EIMSNext.ApiCore
 
         public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
-            var oauthSection = configuration.GetSection("OAuth");
-            var authority = oauthSection["Authority"];
-            var issuer = oauthSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
-            var audience = oauthSection["Audience"] ?? "eimsnext.api";
-            var requireHttps = oauthSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
+            var identityHostSection = configuration.GetSection("IdentityHost");
+            var authority = identityHostSection["Authority"];
+            var issuer = identityHostSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
+            var audience = identityHostSection["Audience"] ?? "eimsnext.api";
+            var requireHttps = identityHostSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
 
             services.AddAuthentication(o =>
             {
