@@ -71,7 +71,7 @@ if (app.Environment.IsDevelopment())
 app.UseSerilogRequestLogging();
 app.UseCustomMiddlewares();
 
-//app.UseHttpsRedirection();
+app.UseHttpsRedirection();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

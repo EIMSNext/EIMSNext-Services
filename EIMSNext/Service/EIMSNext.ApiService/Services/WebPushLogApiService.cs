@@ -12,8 +12,15 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// Web 推送日志的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, WebPushLogViewModel, IWebPushLogService>(resolver)
 	{
+        /// <summary>
+        /// 按当前身份权限过滤查询。
+        /// </summary>
         protected override IQueryable<WebPushLogViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();

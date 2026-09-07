@@ -1,14 +1,39 @@
 namespace EIMSNext.Core.Abstractions
 {
+    /// <summary>
+    /// 用户接口，定义用户的基础信息。
+    /// </summary>
     public interface IUser
     {
+        /// <summary>
+        /// 获取或设置用户 ID。
+        /// </summary>
         string Id { get; set; }
+
+        /// <summary>
+        /// 获取用户名称。
+        /// </summary>
         string Name { get; }
+
+        /// <summary>
+        /// 获取用户邮箱。
+        /// </summary>
         string? Email { get; }
+
+        /// <summary>
+        /// 获取用户手机号。
+        /// </summary>
         string? Phone { get; }
+
+        /// <summary>
+        /// 获取用户所属平台。
+        /// </summary>
         PlatformType Platform { get; }
     }
 
+    /// <summary>
+    /// 员工接口，定义员工在企业维度的信息。
+    /// </summary>
     public interface IEmployee
     {
         /// <summary>
@@ -32,6 +57,10 @@ namespace EIMSNext.Core.Abstractions
         /// </summary>
         string EmpName { get; }
 
+        /// <summary>
+        /// 转换为操作者对象。
+        /// </summary>
+        /// <returns>操作者对象。</returns>
         Operator ToOperator();
     }
     /// <summary>

@@ -263,7 +263,7 @@ namespace EIMSNext.Print.Pdf
                     {
                         _styleResolver.ApplyCellStyle(cell, templateCell);
                         ApplyMergedBoundaryStyles(cell, rowIndex, columnIndex);
-                        var cellValue = subDataArray != null && subDataArray.Count > 0
+                        var cellValue = _isPreview || subDataArray?.Count > 0
                             ? GetCellValue(templateCell, _data!, new[] { i })
                             : string.Empty;
 

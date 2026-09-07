@@ -14,12 +14,18 @@ namespace EIMSNext.ApiService
     public class ClientGrantApiService(IResolver resolver)
         : ApiServiceBase<ClientGrant, ClientGrantViewModel, IClientGrantService>(resolver), IClientGrantApiService
     {
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(ClientGrant entity)
         {
             ValidateGrant(entity);
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(ClientGrant entity)
         {
             ValidateGrant(entity);

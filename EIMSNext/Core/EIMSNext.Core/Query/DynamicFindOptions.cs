@@ -5,6 +5,7 @@ namespace EIMSNext.Core.Query
     /// </summary>
     public class DynamicFindOptions<T>
     {
+        /// <summary>未指定时默认返回的记录数。</summary>
         public const int DefaultTakeWhenUnspecified = 200;
 
         /// <summary>投影字段列表。</summary>
@@ -39,6 +40,10 @@ namespace EIMSNext.Core.Query
             return Take <= 0 ? DefaultTakeWhenUnspecified : Take;
         }
 
+        /// <summary>
+        /// 获取有效的跳过记录数。
+        /// </summary>
+        /// <returns>有效的跳过记录数。</returns>
         public int GetEffectiveSkip()
         {
             return Math.Max(0, Skip);

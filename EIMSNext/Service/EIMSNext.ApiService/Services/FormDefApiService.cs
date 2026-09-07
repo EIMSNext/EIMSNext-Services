@@ -10,8 +10,15 @@ using EIMSNext.Common;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 表单定义的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, FormDefViewModel, IFormDefService>(resolver)
 	{
+        /// <summary>
+        /// 获取FormsIncludeCross。
+        /// </summary>
         public List<FormDefViewModel> GetFormsIncludeCross(string appId)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(appId);
@@ -69,6 +76,9 @@ namespace EIMSNext.ApiService
             return ownForms;
         }
 
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public override Task AddAsync(FormDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
@@ -78,6 +88,9 @@ namespace EIMSNext.ApiService
             return base.AddAsync(entity);
         }
 
+        /// <summary>
+        /// 更新实体。
+        /// </summary>
         public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
@@ -91,6 +104,9 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsync(entity);
         }
 
+        /// <summary>
+        /// 执行 PurgeFieldChangeLogsAsync 操作。
+        /// </summary>
         public async Task PurgeFieldChangeLogsAsync(string formId, IEnumerable<string>? fieldIds, bool clearAll)
         {
             var ids = fieldIds?
@@ -112,6 +128,9 @@ namespace EIMSNext.ApiService
             await CoreService.PurgeFieldChangeLogsAsync(formId, ids, clearAll);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

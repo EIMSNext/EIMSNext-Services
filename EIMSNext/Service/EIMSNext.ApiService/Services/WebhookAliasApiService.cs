@@ -14,8 +14,15 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// Webhook 别名的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class WebhookAliasApiService(IResolver resolver) : ApiServiceBase<WebhookAlias, WebhookAliasViewModel, IWebhookAliasService>(resolver)
     {
+        /// <summary>
+        /// 按当前身份权限过滤查询。
+        /// </summary>
         protected override IQueryable<WebhookAliasViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
@@ -34,18 +41,27 @@ namespace EIMSNext.ApiService
             return query.Where(x => false);
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(WebhookAlias entity)
         {
             EnsureCanManageAlias(entity);
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(WebhookAlias entity)
         {
             EnsureCanManageAlias(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

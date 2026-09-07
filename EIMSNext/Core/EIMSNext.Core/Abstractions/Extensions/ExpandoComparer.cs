@@ -3,6 +3,9 @@ using System.Dynamic;
 
 namespace EIMSNext.Core.Abstractions.Extensions
 {
+    /// <summary>
+    /// 动态对象比较器，用于比较两个 <see cref="ExpandoObject"/> 的属性变化。
+    /// </summary>
     public class ExpandoComparer
     {
         /// <summary>
@@ -10,7 +13,7 @@ namespace EIMSNext.Core.Abstractions.Extensions
         /// </summary>
         /// <param name="original">修改前的对象</param>
         /// <param name="modified">修改后的对象</param>
-        /// <returns>IList<DataUpdateLog> 变更列表</returns>
+        /// <returns><see cref="IList{ExpandoChangeLog}"/> 变更列表。</returns>
         public static IList<ExpandoChangeLog> Compare(ExpandoObject original, ExpandoObject modified)
         {
             var oriDict = original as IDictionary<string, object> ?? new Dictionary<string, object>();
@@ -111,6 +114,9 @@ namespace EIMSNext.Core.Abstractions.Extensions
         }
     }
 
+    /// <summary>
+    /// 动态对象属性变更日志。
+    /// </summary>
     public class ExpandoChangeLog
     {
         /// <summary>
@@ -133,10 +139,22 @@ namespace EIMSNext.Core.Abstractions.Extensions
         /// </summary>
         public DataChangeType ChangeType { get; set; }
     }
+    /// <summary>
+    /// 数据变更类型。
+    /// </summary>
     public enum DataChangeType
     {
+        /// <summary>
+        /// 新增。
+        /// </summary>
         Added,
+        /// <summary>
+        /// 修改。
+        /// </summary>
         Modified,
+        /// <summary>
+        /// 删除。
+        /// </summary>
         Deleted
     }
 }

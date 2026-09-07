@@ -26,6 +26,9 @@ using NPOI.SS.UserModel;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 表单数据的 API 服务。
+    /// </summary>
     public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
     {
         private const int ImportMaxColumns = 500;
@@ -34,6 +37,10 @@ namespace EIMSNext.ApiService
         private IFormDataChangeLogService _formDataChangeLogService;
         private TenantAccessEvaluator _permissionEvaluator;
         private FormDataReadScopeResolver _readScopeResolver;
+        /// <summary>
+        /// 初始化FormDataApiService的新实例。
+        /// </summary>
+        /// <param name="resolver">服务解析器。</param>
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _formDefService = resolver.Resolve<IFormDefService>();
@@ -42,22 +49,34 @@ namespace EIMSNext.ApiService
             _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         }
 
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public override Task AddAsync(FormData entity)
         {
             throw new UnLogException("Please use AddAsync(FormData,DataAction) instead");
         }
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public Task AddAsync(FormData entity, DataAction action)
         {
             ServiceContext.Action = action;
             return base.AddAsync(entity);
         }
 
+        /// <summary>
+        /// 更新实体。
+        /// </summary>
         public Task ReplaceAsync(FormData entity, DataAction action)
         {
             ServiceContext.Action = action;
             return base.ReplaceAsync(entity);
         }
 
+        /// <summary>
+        /// 执行 ExportAsync 操作。
+        /// </summary>
         public async Task<ExportResponse> ExportAsync(FormDataExportRequest request)
         {
             ValidateExportRequest(request);
@@ -120,6 +139,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 预览Import。
+        /// </summary>
         public FormDataImportPreviewResponse PreviewImport(string formId, Stream source, string fileName, long fileSize)
         {
             ValidateImportFile(fileName, fileSize);
@@ -165,6 +187,9 @@ namespace EIMSNext.ApiService
             return response;
         }
 
+        /// <summary>
+        /// 执行 StartImportAsync 操作。
+        /// </summary>
         public async Task<FormDataImportStartResponse> StartImportAsync(FormDataImportStartRequest request, Stream source, string fileName, long fileSize)
         {
             ValidateImportRequest(request, fileName, fileSize);
@@ -227,6 +252,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 获取ImportStatus。
+        /// </summary>
         public FormDataImportStatusResponse GetImportStatus(string id)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -249,6 +277,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 获取EditableImportErrors。
+        /// </summary>
         public FormDataImportEditableErrorsResponse GetEditableImportErrors(string id)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -259,6 +290,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 执行 RetryImportAsync 操作。
+        /// </summary>
         public async Task<FormDataImportRetryResponse> RetryImportAsync(string id, FormDataImportRetryRequest request)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -383,6 +417,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 获取FilterOptions。
+        /// </summary>
         public async Task<FormDataFilterOptionsResponse> GetFilterOptionsAsync(FormDataFilterOptionsRequest request)
         {
             var filter = BuildBaseFilter(request);
@@ -416,6 +453,9 @@ namespace EIMSNext.ApiService
             return new FormDataFilterOptionsResponse { Items = result.Items };
         }
 
+        /// <summary>
+        /// 获取ChangeLogs。
+        /// </summary>
         public List<FormDataChangeLog> GetChangeLogs(string dataId, int skip, int top)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return [];
@@ -431,6 +471,9 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 统计ChangeLogs。
+        /// </summary>
         public long CountChangeLogs(string dataId)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return 0;

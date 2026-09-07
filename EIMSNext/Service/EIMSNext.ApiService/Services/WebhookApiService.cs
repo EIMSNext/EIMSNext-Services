@@ -14,8 +14,15 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
-	public class WebhookApiService(IResolver resolver) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
-	{
+    /// <summary>
+    /// 数据推送（Webhook）的 API 服务。
+    /// </summary>
+    public class WebhookApiService(IResolver resolver) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
+    {
+        /// <summary>
+        /// 获取按权限过滤后的数据推送视图查询。
+        /// </summary>
+        /// <returns>视图模型的可查询对象。</returns>
         protected override IQueryable<WebhookViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
@@ -34,18 +41,32 @@ namespace EIMSNext.ApiService
             return query.Where(x => false);
         }
 
+        /// <summary>
+        /// 新增数据推送。
+        /// </summary>
+        /// <param name="entity">数据推送实体。</param>
         protected override Task AddAsyncCore(Webhook entity)
         {
             EnsureCanManageWebhook(entity);
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 替换数据推送。
+        /// </summary>
+        /// <param name="entity">数据推送实体。</param>
+        /// <returns>替换结果。</returns>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(Webhook entity)
         {
             EnsureCanManageWebhook(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除数据推送。
+        /// </summary>
+        /// <param name="ids">数据推送 ID 集合。</param>
+        /// <returns>删除结果。</returns>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

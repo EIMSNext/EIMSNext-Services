@@ -1,11 +1,33 @@
 namespace EIMSNext.Core.Abstractions
 {
+    /// <summary>
+    /// 数据库操作类型。
+    /// </summary>
     public enum DbAction
     {
+        /// <summary>
+        /// 无操作。
+        /// </summary>
         None,
+
+        /// <summary>
+        /// 新增。
+        /// </summary>
         Insert,
+
+        /// <summary>
+        /// 更新。
+        /// </summary>
         Update,
+
+        /// <summary>
+        /// 删除（逻辑删除）。
+        /// </summary>
         Delete,
+
+        /// <summary>
+        /// 物理删除。
+        /// </summary>
         PhysicalDelete
     }
 

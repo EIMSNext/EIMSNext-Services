@@ -15,20 +15,33 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 员工组分类的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class EmployeeGroupCategoryApiService(IResolver resolver) : ApiServiceBase<EmployeeGroupCategory, EmployeeGroupCategoryViewModel, IEmployeeGroupCategoryService>(resolver)
 	{
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(EmployeeGroupCategory entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建员工组分类的权限");
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroupCategory entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组分类的权限");
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组分类的权限");

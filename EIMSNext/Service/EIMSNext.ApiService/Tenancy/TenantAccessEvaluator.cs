@@ -14,6 +14,10 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 租户访问权限评估器，根据当前登录身份评估可管理的应用、表单、仪表盘、员工等资源范围，并提供权限校验与数据范围过滤。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class TenantAccessEvaluator(IResolver resolver) : ApiServiceBase(resolver)
     {
         // 注意：此类的实例生命周期必须是 Scoped (per-request)，由 MEF2 容器保证。
@@ -22,14 +26,23 @@ namespace EIMSNext.ApiService
         private IReadOnlyList<TenantAdminGroup>? _normalGroups;
         private AdminPermissionSnapshot? _snapshot;
 
+        /// <summary>
+        /// 获取一个值，指示当前身份是否具有不受限的管理身份（企业所有者、企业管理员、系统或客户端）。
+        /// </summary>
         public bool HasUnrestrictedManagementIdentity =>
             IdentityContext.IdentityType == IdentityType.CorpOwmer ||
             IdentityContext.IdentityType == IdentityType.CorpAdmin ||
             IdentityContext.IdentityType == IdentityType.System ||
             IdentityContext.IdentityType == IdentityType.Client;
 
+        /// <summary>
+        /// 获取一个值，指示当前身份是否为应用管理员，从而需要应用普通管理员规则。
+        /// </summary>
         public bool ShouldApplyNormalAdminRules => IdentityContext.IdentityType == IdentityType.AppAdmin;
 
+        /// <summary>
+        /// 获取当前请求内缓存的管理员权限快照，用于快速判断应用、通讯录等资源的可见与管理范围。
+        /// </summary>
         public AdminPermissionSnapshot GetSnapshot()
         {
             if (_snapshot != null)
@@ -86,6 +99,9 @@ namespace EIMSNext.ApiService
             return snapshot;
         }
 
+        /// <summary>
+        /// 获取当前员工可使用的应用 ID 集合。
+        /// </summary>
         public List<string> GetUsageAppIdsForCurrentEmployee()
         {
             var memberScope = GetCurrentEmployeeMemberScope();
@@ -113,6 +129,10 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 获取当前员工在指定应用（或全部应用）内可使用的表单 ID 集合。
+        /// </summary>
+        /// <param name="appId">应用 ID；为 null 或空时不过滤应用。</param>
         public List<string> GetUsageFormIdsForCurrentEmployee(string? appId)
         {
             var memberScope = GetCurrentEmployeeMemberScope();
@@ -136,6 +156,10 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 获取当前员工在指定应用（或全部应用）内可使用的仪表盘 ID 集合。
+        /// </summary>
+        /// <param name="appId">应用 ID；为 null 或空时不过滤应用。</param>
         public List<string> GetUsageDashboardIdsForCurrentEmployee(string? appId)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -173,6 +197,10 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 获取当前员工在指定表单（或全部表单）内生效的表单数据权限组列表。
+        /// </summary>
+        /// <param name="formId">表单 ID；为 null 或空时不过滤表单。</param>
         public List<FormDataPermissionGroup> GetUsageFormDataPermissionGroupsForCurrentEmployee(string? formId)
         {
             var employee = IdentityContext.CurrentEmployee as Employee;
@@ -199,6 +227,10 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 获取当前身份在指定应用内的菜单权限项集合。
+        /// </summary>
+        /// <param name="appId">应用 ID。</param>
         public List<AppMenuPermissionItem> GetAppMenuPermissions(string appId)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -235,6 +267,9 @@ namespace EIMSNext.ApiService
             return [];
         }
 
+        /// <summary>
+        /// 校验当前身份是否有新建应用的权限，否则抛出 ForbiddenException。
+        /// </summary>
         public void EnsureCanCreateApp()
         {
             if (HasUnrestrictedManagementIdentity)
@@ -248,6 +283,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否具有不受限的管理身份，否则抛出 ForbiddenException。
+        /// </summary>
+        /// <param name="message">校验失败时抛出的异常消息。</param>
         public void EnsureUnrestrictedManagement(string message)
         {
             if (!HasUnrestrictedManagementIdentity)
@@ -256,6 +295,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定应用的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="appId">应用 ID。</param>
         public void EnsureCanManageApp(string? appId)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -274,6 +317,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有删除指定应用的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="appId">应用 ID。</param>
         public void EnsureCanDeleteApp(string? appId)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -292,6 +339,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定表单数据权限组的权限，并校验其成员是否在可管理范围内。
+        /// </summary>
+        /// <param name="entity">表单数据权限组实体。</param>
         public void EnsureCanManageFormDataPermissionGroup(FormDataPermissionGroup entity)
         {
             EnsureCanManageApp(entity.AppId);
@@ -319,11 +370,22 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定员工的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="entity">员工实体。</param>
+        /// <param name="original">原始员工实体（用于校验原有部门范围）。</param>
         public void EnsureCanManageEmployee(Employee entity, Employee? original = null)
         {
             EnsureCanManageEmployee(entity, original, null);
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定员工及其目标部门的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="entity">员工实体。</param>
+        /// <param name="original">原始员工实体。</param>
+        /// <param name="targetDepartmentIds">目标部门 ID 集合。</param>
         public void EnsureCanManageEmployee(Employee entity, Employee? original, IEnumerable<string>? targetDepartmentIds)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -367,6 +429,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定员工集合的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="employeeIds">员工 ID 集合。</param>
         public void EnsureCanManageEmployees(IEnumerable<string> employeeIds)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -411,6 +477,11 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 校验当前身份是否有管理指定员工组及其成员的权限，否则抛出异常。
+        /// </summary>
+        /// <param name="employeeGroupId">员工组 ID。</param>
+        /// <param name="employeeIds">员工 ID 集合。</param>
         public void EnsureCanManageEmployeeGroupMembers(string employeeGroupId, IEnumerable<string> employeeIds)
         {
             if (HasUnrestrictedManagementIdentity)
@@ -428,6 +499,10 @@ namespace EIMSNext.ApiService
             EnsureCanManageEmployees(employeeIds);
         }
 
+        /// <summary>
+        /// 将新建的应用同步到当前员工所属的、可创建或删除应用的普通租户管理员组。
+        /// </summary>
+        /// <param name="appId">应用 ID。</param>
         public async Task SyncCreatedAppToNormalTenantAdminGroupsAsync(string appId)
         {
             if (!ShouldApplyNormalAdminRules || string.IsNullOrWhiteSpace(appId))
@@ -462,6 +537,10 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 按当前管理员可管理的部门范围过滤部门查询。
+        /// </summary>
+        /// <param name="query">原始部门查询。</param>
         public IQueryable<Department> FilterDepartmentsForAdminScope(IQueryable<Department> query)
         {
             if (!ShouldApplyNormalAdminRules)
@@ -473,6 +552,10 @@ namespace EIMSNext.ApiService
             return FilterByScope(query, snapshot.ContactViewDepartmentScopeMode, snapshot.ContactViewDepartmentIds);
         }
 
+        /// <summary>
+        /// 按当前管理员可管理的部门范围过滤员工查询。
+        /// </summary>
+        /// <param name="query">原始员工查询。</param>
         public IQueryable<Employee> FilterEmployeesForAdminScope(IQueryable<Employee> query)
         {
             if (!ShouldApplyNormalAdminRules)
@@ -484,6 +567,10 @@ namespace EIMSNext.ApiService
             return FilterEmployeesByDepartmentScope(query, snapshot.ContactViewDepartmentScopeMode, snapshot.ContactViewDepartmentIds);
         }
 
+        /// <summary>
+        /// 按当前管理员可管理的员工组范围过滤员工组查询。
+        /// </summary>
+        /// <param name="query">原始员工组查询。</param>
         public IQueryable<EmployeeGroup> FilterEmployeeGroupsForAdminScope(IQueryable<EmployeeGroup> query)
         {
             if (!ShouldApplyNormalAdminRules)
@@ -495,6 +582,10 @@ namespace EIMSNext.ApiService
             return FilterByScope(query, snapshot.ContactViewEmployeeGroupScopeMode, snapshot.ContactViewEmployeeGroupIds);
         }
 
+        /// <summary>
+        /// 获取一个值，指示指定应用是否可被当前身份管理。
+        /// </summary>
+        /// <param name="appId">应用 ID。</param>
         public bool IsAppManageable(string appId)
         {
             if (HasUnrestrictedManagementIdentity)

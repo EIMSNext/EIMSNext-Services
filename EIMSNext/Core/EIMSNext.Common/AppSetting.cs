@@ -3,16 +3,28 @@ using Microsoft.Extensions.Configuration;
 namespace EIMSNext.Common
 {
     /// <summary>
-    /// 配置
+    /// 应用程序配置，从 <see cref="IConfiguration"/> 中读取并组合各主机配置。
     /// </summary>
     public class AppSetting
     {
+        /// <summary>
+        /// 获取服务主机配置。
+        /// </summary>
         public ServiceHostSettings ServiceHost { get; }
 
+        /// <summary>
+        /// 获取 Web 主机配置。
+        /// </summary>
         public WebHostSettings WebHost { get; }
 
+        /// <summary>
+        /// 获取文件存储配置。
+        /// </summary>
         public StorageSettings Storage { get; }
 
+        /// <summary>
+        /// 获取身份认证主机配置。
+        /// </summary>
         public IdentityHostSettings IdentityHost { get; }
         /// <summary>
         /// 

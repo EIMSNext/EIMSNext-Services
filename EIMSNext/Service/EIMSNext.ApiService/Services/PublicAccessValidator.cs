@@ -8,6 +8,10 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 公开访问校验器，根据当前公开身份与发布设置判断是否可访问仪表盘、仪表盘项、表单定义及表单数据，并据此过滤表单数据查询范围。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public sealed class PublicAccessValidator(IResolver resolver) : ApiServiceBase(resolver), IPublicAccessValidator
     {
         private PublicSetting? _setting;
@@ -17,10 +21,19 @@ namespace EIMSNext.ApiService
         private HashSet<string>? _dashboardFormIds;
         private HashSet<string>? _dashboardItemIds;
 
+        /// <summary>
+        /// 获取一个值，指示当前身份是否为公开访问身份。
+        /// </summary>
         public bool IsPublicIdentity => IdentityContext.IdentityType == IdentityType.Public;
 
+        /// <summary>
+        /// 获取当前公开访问目标的 ID（仪表盘 ID）。
+        /// </summary>
         public string TargetId => IdentityContext.CurrentDashboardId;
 
+        /// <summary>
+        /// 获取当前公开访问目标对应的发布设置；非公开身份或目标为空时返回 null。
+        /// </summary>
         public PublicSetting? GetCurrentSetting()
         {
             if (!IsPublicIdentity || string.IsNullOrWhiteSpace(TargetId))
@@ -34,11 +47,18 @@ namespace EIMSNext.ApiService
                 .FirstOrDefault(IsAnyPublishEnabled);
         }
 
+        /// <summary>
+        /// 获取一个值，指示当前公开访问目标是否存在任何已启用的发布区块。
+        /// </summary>
         public bool IsAnySectionEnabled()
         {
             return GetCurrentSetting() != null;
         }
 
+        /// <summary>
+        /// 判断是否可访问指定的公开仪表盘。
+        /// </summary>
+        /// <param name="dashboardId">仪表盘 ID。</param>
         public bool CanReadDashboard(string dashboardId)
         {
             var setting = GetCurrentSetting();
@@ -47,6 +67,10 @@ namespace EIMSNext.ApiService
                    string.Equals(setting.TargetId, dashboardId, StringComparison.Ordinal);
         }
 
+        /// <summary>
+        /// 判断是否可访问指定的仪表盘项。
+        /// </summary>
+        /// <param name="itemId">仪表盘项 ID。</param>
         public bool CanReadDashboardItem(string itemId)
         {
             if (string.IsNullOrWhiteSpace(itemId) || !IsDashboardAvailable())
@@ -58,6 +82,10 @@ namespace EIMSNext.ApiService
             return _dashboardItemIds?.Contains(itemId) == true;
         }
 
+        /// <summary>
+        /// 判断是否可查看指定表单的定义。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool CanReadFormDefinition(string formId)
         {
             var setting = GetCurrentSetting();
@@ -74,6 +102,10 @@ namespace EIMSNext.ApiService
             return CanReadDashboardForm(formId);
         }
 
+        /// <summary>
+        /// 判断是否可向指定表单提交数据。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool CanSubmitForm(string formId)
         {
             var setting = GetCurrentSetting();
@@ -82,6 +114,10 @@ namespace EIMSNext.ApiService
                    IsSectionAvailable(setting.Form.FormLink);
         }
 
+        /// <summary>
+        /// 判断是否可查看指定表单的数据。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool CanReadFormData(string formId)
         {
             var setting = GetCurrentSetting();
@@ -99,6 +135,10 @@ namespace EIMSNext.ApiService
             return CanReadDashboardForm(formId);
         }
 
+        /// <summary>
+        /// 判断是否可查询指定表单的数据。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool CanQueryFormData(string formId)
         {
             var setting = GetCurrentSetting();
@@ -124,6 +164,10 @@ namespace EIMSNext.ApiService
             return CanReadDashboardForm(formId);
         }
 
+        /// <summary>
+        /// 判断指定表单是否为当前公开表单的关联表单。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool IsRelatedForm(string formId)
         {
             if (string.IsNullOrWhiteSpace(formId))
@@ -141,6 +185,10 @@ namespace EIMSNext.ApiService
             return _relatedFormIds?.Contains(formId) == true;
         }
 
+        /// <summary>
+        /// 判断是否可访问当前公开仪表盘内引用的指定表单。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
         public bool CanReadDashboardForm(string formId)
         {
             if (string.IsNullOrWhiteSpace(formId) || !IsDashboardAvailable())
@@ -152,6 +200,9 @@ namespace EIMSNext.ApiService
             return _dashboardFormIds?.Contains(formId) == true;
         }
 
+        /// <summary>
+        /// 获取当前公开访问目标下可读的表单 ID 集合。
+        /// </summary>
         public IReadOnlyCollection<string> GetReadableFormIds()
         {
             var setting = GetCurrentSetting();
@@ -174,6 +225,11 @@ namespace EIMSNext.ApiService
             return [];
         }
 
+        /// <summary>
+        /// 在指定表单数据查询上叠加公开访问的数据范围过滤；无权访问时返回恒不匹配的过滤条件。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
+        /// <param name="filter">原始过滤条件。</param>
         public DynamicFilter ApplyFormDataScope(string formId, DynamicFilter? filter)
         {
             if (!CanReadFormData(formId) && !CanQueryFormData(formId) && !CanReadDashboardForm(formId))
@@ -330,6 +386,10 @@ namespace EIMSNext.ApiService
                    IsSectionAvailable(setting.Form.QueryLink);
         }
 
+        /// <summary>
+        /// 判断指定发布区块当前是否可用（已启用且未过期）。
+        /// </summary>
+        /// <param name="section">发布区块配置。</param>
         public static bool IsSectionAvailable(PublicPublishSection? section)
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();

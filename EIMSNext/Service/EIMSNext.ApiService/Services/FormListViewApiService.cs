@@ -7,20 +7,33 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 表单列表视图的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class FormListViewApiService(IResolver resolver) : ApiServiceBase<FormListView, FormListViewViewModel, IFormListViewService>(resolver)
     {
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(FormListView entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(FormListView entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

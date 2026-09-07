@@ -2,25 +2,91 @@ using System.Text.RegularExpressions;
 
 namespace EIMSNext.Common
 {
+    /// <summary>
+    /// 定义系统字段名常量以及系统字段判断方法。
+    /// </summary>
     public static class Fields
     {
+        /// <summary>
+        /// MongoDB 内部主键字段名。
+        /// </summary>
         public const string BsonId = "_id";
+
+        /// <summary>
+        /// 主键字段名。
+        /// </summary>
         public const string Id = "id";
+
+        /// <summary>
+        /// 数据标题字段名。
+        /// </summary>
         public const string DataTitle = "dataTitle";
+
+        /// <summary>
+        /// 创建人字段名。
+        /// </summary>
         public const string CreateBy = "createBy";
+
+        /// <summary>
+        /// 创建人 Id 字段名。
+        /// </summary>
         public const string CreateById = $"{CreateBy}.{BsonId}";
+
+        /// <summary>
+        /// 创建时间字段名。
+        /// </summary>
         public const string CreateTime = "createTime";
+
+        /// <summary>
+        /// 更新人字段名。
+        /// </summary>
         public const string UpdateBy = "updateBy";
+
+        /// <summary>
+        /// 更新时间字段名。
+        /// </summary>
         public const string UpdateTime = "updateTime";
+
+        /// <summary>
+        /// 删除标记字段名。
+        /// </summary>
         public const string DeleteFlag = "deleteFlag";
+
+        /// <summary>
+        /// 数据字段名。
+        /// </summary>
         public const string Data = "data";
 
+        /// <summary>
+        /// 企业 Id 字段名。
+        /// </summary>
         public const string CorpId = "corpId";
+
+        /// <summary>
+        /// 应用 Id 字段名。
+        /// </summary>
         public const string AppId = "appId";
+
+        /// <summary>
+        /// 表单 Id 字段名。
+        /// </summary>
         public const string FormId = "formId";
+
+        /// <summary>
+        /// 流程状态字段名。
+        /// </summary>
         public const string FlowStatus = "flowStatus";
 
+        /// <summary>
+        /// 所有系统字段名列表。
+        /// </summary>
         public static readonly string[] SystemFields = { Id, BsonId, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
+
+        /// <summary>
+        /// 判断指定字段名是否为系统字段。
+        /// </summary>
+        /// <param name="fieldName">字段名。</param>
+        /// <returns>是系统字段时返回 true，否则返回 false。</returns>
         public static bool IsSystemField(string fieldName)
         {
             return SystemFields.Contains(fieldName, StringComparer.OrdinalIgnoreCase);
@@ -74,35 +140,111 @@ namespace EIMSNext.Common
         public static string ValidateSubFieldId(string? subFieldId) => ValidateFieldId(subFieldId);
     }
 
+    /// <summary>
+    /// 定义表单字段类型常量。
+    /// </summary>
     public static class FieldType
     {
-        public const string Input = "input";
-        public const string Number = "number";
-        public const string TimeStamp = "timestamp";
-        //public const string Phone = "phone";
-        //public const string Email = "email";
-        public const string TextArea = "textarea";
-        public const string Radio = "radio";
-        public const string CheckBox = "checkbox";
-        public const string Select1 = "select";
-        public const string Select2 = "select2";
-        //public const string Address = "address";
-        //public const string Location = "location";
-        public const string ImageUpload = "imageupload";
-        public const string FileUpload = "fileupload";
-        public const string Signature = "signature";
-        public const string DataSelect = "dataselect";
-        public const string TableForm = "tableform";
-        public const string Employee1 = "employee1";
-        public const string Employee2 = "employee2";
-        public const string Department1 = "department1";
-        public const string Department2 = "department2";
         /// <summary>
-        /// 流水号(自动生成,只读,提交时由后端生成)
+        /// 单行文本输入。
+        /// </summary>
+        public const string Input = "input";
+
+        /// <summary>
+        /// 数值输入。
+        /// </summary>
+        public const string Number = "number";
+
+        /// <summary>
+        /// 时间戳。
+        /// </summary>
+        public const string TimeStamp = "timestamp";
+
+        /// <summary>
+        /// 多行文本。
+        /// </summary>
+        public const string TextArea = "textarea";
+
+        /// <summary>
+        /// 单选按钮。
+        /// </summary>
+        public const string Radio = "radio";
+
+        /// <summary>
+        /// 多选框。
+        /// </summary>
+        public const string CheckBox = "checkbox";
+
+        /// <summary>
+        /// 单选下拉。
+        /// </summary>
+        public const string Select1 = "select";
+
+        /// <summary>
+        /// 多选下拉。
+        /// </summary>
+        public const string Select2 = "select2";
+
+        /// <summary>
+        /// 图片上传。
+        /// </summary>
+        public const string ImageUpload = "imageupload";
+
+        /// <summary>
+        /// 文件上传。
+        /// </summary>
+        public const string FileUpload = "fileupload";
+
+        /// <summary>
+        /// 电子签名。
+        /// </summary>
+        public const string Signature = "signature";
+
+        /// <summary>
+        /// 数据选择。
+        /// </summary>
+        public const string DataSelect = "dataselect";
+
+        /// <summary>
+        /// 子表。
+        /// </summary>
+        public const string TableForm = "tableform";
+
+        /// <summary>
+        /// 员工单选。
+        /// </summary>
+        public const string Employee1 = "employee1";
+
+        /// <summary>
+        /// 员工多选。
+        /// </summary>
+        public const string Employee2 = "employee2";
+
+        /// <summary>
+        /// 部门单选。
+        /// </summary>
+        public const string Department1 = "department1";
+
+        /// <summary>
+        /// 部门多选。
+        /// </summary>
+        public const string Department2 = "department2";
+
+        /// <summary>
+        /// 流水号(自动生成,只读,提交时由后端生成)。
         /// </summary>
         public const string SerialNo = "serialno";
 
+        /// <summary>
+        /// 所有支持的字段类型列表。
+        /// </summary>
         public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, Signature, DataSelect, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
+
+        /// <summary>
+        /// 判断指定类型是否为有效的表单字段类型。
+        /// </summary>
+        /// <param name="type">字段类型字符串。</param>
+        /// <returns>是有效字段类型时返回 true，否则返回 false。</returns>
         public static bool IsInputField(string type)
         {
             return AllFieldTypes.Contains(type);

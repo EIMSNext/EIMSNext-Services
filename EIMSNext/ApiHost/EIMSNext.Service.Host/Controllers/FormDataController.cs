@@ -51,7 +51,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// 获取当前用户在指定表单中实际所属的权限组。
         /// </summary>
         [Permission(Operation = Operation.Read)]
-        [HttpGet("permissiongroups")]
+        [HttpGet("permission-group")]
         public ActionResult GetAssignedFormDataPermissionGroups([FromQuery] string formId)
         {
             if (string.IsNullOrWhiteSpace(formId))
@@ -127,10 +127,17 @@ namespace EIMSNext.Service.Host.Controllers
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
         [HttpPost("$count")]
-        public ActionResult GetCount([FromBody] DynamicFilter filter)
+        public ActionResult GetCount([FromBody] DynamicFindOptions<FormData> options)
         {
-            var options = FilterResult(new DynamicFindOptions<FormData> { Filter = filter });
-            return Ok(ApiService.Count(options.Filter ?? DynamicFilter.Empty));
+            var filtered = FilterResult(new DynamicFindOptions<FormData>
+            {
+                Filter = options.Filter,
+                Keyword = options.Keyword,
+                SearchFields = options.SearchFields,
+                Scope = options.Scope,
+                IncludeDeleted = options.IncludeDeleted,
+            });
+            return Ok(ApiService.Count(filtered.Filter ?? DynamicFilter.Empty));
         }
 
         /// <summary>
@@ -144,16 +151,7 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
-            if (options.Select == null || options.Select.Count == 0)
-            {
-                //不指定列时，不返回历史日志字段
-                options.Select = new DynamicFieldList()
-                {
-                    DynamicField.Create("updateLog",false),
-                    DynamicField.Create("changeLog",false)
-                };
-            }
-            var filtered = FilterResult(options);
+             var filtered = FilterResult(options);
             var result = ApiService.Find(filtered).ToList();
             return Ok(new { value = result.Select(item => ToViewModel(item)) });
         }

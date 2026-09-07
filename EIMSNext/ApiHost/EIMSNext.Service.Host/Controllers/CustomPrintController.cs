@@ -75,6 +75,12 @@ namespace EIMSNext.Service.Host.Controllers
             if (formDef == null || formDef.Content.Items == null)
                 return ApiResult.Fail(400, "数据或模板为空").ToActionResult();
 
+            if (!string.Equals(template.FormId, formDef.Id, StringComparison.OrdinalIgnoreCase)
+                || datas.Any(data => !string.Equals(data.FormId, formDef.Id, StringComparison.OrdinalIgnoreCase)))
+            {
+                return ApiResult.Fail(400, "打印模板与数据所属表单不一致").ToActionResult();
+            }
+
             var dataIds = datas.Select(x => x.Id).ToList();
             var taskLogsByDataId = Resolver.GetRepository<Wf_TaskLog>()
                 .Find(x => dataIds.Contains(x.DataId))

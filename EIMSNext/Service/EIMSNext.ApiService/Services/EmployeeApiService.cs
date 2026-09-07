@@ -16,18 +16,31 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 员工的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, EmployeeViewModel, IEmployeeService>(resolver)
     {
+        /// <summary>
+        /// 执行 ReviewJoinCorporateAsync 操作。
+        /// </summary>
         public Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved)
         {
             return CoreService.ReviewJoinCorporateAsync(employeeIds, approved, IdentityContext.CurrentCorpId);
         }
 
+        /// <summary>
+        /// 执行 AcceptInviteAsync 操作。
+        /// </summary>
         public Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted)
         {
             return CoreService.AcceptInviteAsync(userId, phone, email, accepted);
         }
 
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public async Task AddAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
         {
             Resolver.GetRepository<Employee>().EnsureId(entity);
@@ -39,6 +52,9 @@ namespace EIMSNext.ApiService
             await ReplaceEmployeeDepartmentsAsync(entity.Id, relations);
         }
 
+        /// <summary>
+        /// 更新实体。
+        /// </summary>
         public async Task<ReplaceOneResult> ReplaceAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments, bool syncDepartments)
         {
             List<EmployeeDepartment>? relations = null;
@@ -59,6 +75,9 @@ namespace EIMSNext.ApiService
             return result;
         }
 
+        /// <summary>
+        /// 按部门过滤查询。
+        /// </summary>
         public IQueryable<EmployeeViewModel> FilterByDepartment(IQueryable<EmployeeViewModel> query, string? departmentId, bool cascaded)
         {
             if (string.IsNullOrWhiteSpace(departmentId) || departmentId.Equals("all", StringComparison.OrdinalIgnoreCase))
@@ -84,6 +103,9 @@ namespace EIMSNext.ApiService
             return query.Where(x => employeeIds.Contains(x.Id));
         }
 
+        /// <summary>
+        /// 获取AncestorDepartmentIds。
+        /// </summary>
         public List<string> GetAncestorDepartmentIds(IEnumerable<string> departmentIds)
         {
             var ids = departmentIds
@@ -112,6 +134,9 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override async Task AddAsyncCore(Employee entity)
         {
             var platform = GetCurrentCorpPlatform();
@@ -142,6 +167,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Employee entity)
         {
             var original = await CoreService.GetAsync(entity.Id) ?? throw new InvalidOperationException("员工不存在");
@@ -155,6 +183,9 @@ namespace EIMSNext.ApiService
             return await base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Distinct().ToList();

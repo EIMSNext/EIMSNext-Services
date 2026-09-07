@@ -7,8 +7,17 @@ using System.Text.RegularExpressions;
 
 namespace EIMSNext.Core.Mongo.Query
 {
+    /// <summary>
+    /// 动态筛选条件转换为 Mongo 定义的扩展方法。
+    /// </summary>
     public static class DynamicFilterExtension
     {
+        /// <summary>
+        /// 将动态筛选条件转换为 Mongo 过滤定义。
+        /// </summary>
+        /// <typeparam name="T">实体类型。</typeparam>
+        /// <param name="filter">动态筛选条件。</param>
+        /// <returns>Mongo 过滤定义。</returns>
         public static FilterDefinition<T> ToFilterDefinition<T>(this DynamicFilter filter)
         {
             if (filter == null || filter.IsEmpty)
@@ -319,6 +328,12 @@ namespace EIMSNext.Core.Mongo.Query
             return myFilter;
         }
 
+        /// <summary>
+        /// 将动态排序字段列表转换为 Mongo 排序定义。
+        /// </summary>
+        /// <typeparam name="T">实体类型。</typeparam>
+        /// <param name="sortList">动态排序字段列表。</param>
+        /// <returns>Mongo 排序定义，列表为空时返回 null。</returns>
         public static SortDefinition<T>? ToSortDefinition<T>(this DynamicSortList sortList)
         {
             if (sortList == null || sortList.Count == 0)
@@ -376,6 +391,12 @@ namespace EIMSNext.Core.Mongo.Query
 
             return finalField;
         }
+        /// <summary>
+        /// 将动态投影字段列表转换为 Mongo 投影定义。
+        /// </summary>
+        /// <typeparam name="T">实体类型。</typeparam>
+        /// <param name="fieldList">动态投影字段列表。</param>
+        /// <returns>Mongo 投影定义，列表为空时返回 null。</returns>
         public static ProjectionDefinition<T>? ToProjectionDefinition<T>(this DynamicFieldList fieldList)
         {
             if (fieldList == null || fieldList.Count == 0)

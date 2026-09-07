@@ -36,6 +36,10 @@ namespace EIMSNext.ApiService
         private const string ApiKeyAlphabet =
             "_+-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()~`.,?=";
 
+        /// <summary>
+        /// 新增客户端，生成明文密钥并哈希后存储。
+        /// </summary>
+        /// <param name="entity">客户端实体。</param>
         protected override async Task AddAsyncCore(Client entity)
         {
             var plainSecret = GeneratePlainSecret();
@@ -67,6 +71,11 @@ namespace EIMSNext.ApiService
             CachePlainSecret(entity.Id, plainSecret);
         }
 
+        /// <summary>
+        /// 替换客户端，保护密钥与凭证字段不被请求体改写。
+        /// </summary>
+        /// <param name="entity">客户端实体。</param>
+        /// <returns>替换结果。</returns>
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Client entity)
         {
             var existing = await CoreService.GetAsync(entity.Id);
@@ -92,6 +101,11 @@ namespace EIMSNext.ApiService
             return await base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除客户端。
+        /// </summary>
+        /// <param name="ids">客户端 ID 集合。</param>
+        /// <returns>删除结果。</returns>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids
@@ -117,6 +131,11 @@ namespace EIMSNext.ApiService
         }
 
         // ===== 写操作 =====
+        /// <summary>
+        /// 生成新的客户端密钥。
+        /// </summary>
+        /// <param name="id">客户端 ID。</param>
+        /// <returns>客户端凭证。</returns>
         public async Task<ClientCredentials> GenerateSecretAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);
@@ -147,6 +166,11 @@ namespace EIMSNext.ApiService
         }
 
         // ===== 读操作 =====
+        /// <summary>
+        /// 取回客户端的明文密钥（若仍在缓存有效期内）。
+        /// </summary>
+        /// <param name="id">客户端 ID。</param>
+        /// <returns>客户端凭证。</returns>
         public async Task<ClientCredentials> RevealAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);

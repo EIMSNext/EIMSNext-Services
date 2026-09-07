@@ -16,8 +16,15 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 员工组的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class EmployeeGroupApiService(IResolver resolver) : ApiServiceBase<EmployeeGroup, EmployeeGroupViewModel, IEmployeeGroupService>(resolver)
     {
+        /// <summary>
+        /// 新增EmployeesToEmployeeGroup。
+        /// </summary>
         public async Task AddEmployeesToEmployeeGroup(AddEmployeesToEmployeeGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployeeGroupMembers(request.EmployeeGroupId!, request.EmpIds ?? []);
@@ -29,6 +36,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 移除EmployeesFromEmployeeGroup。
+        /// </summary>
         public async Task RemoveEmployeesFromEmployeeGroup(RemoveEmployeesFromEmployeeGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployeeGroupMembers(request.EmployeeGroupId!, request.EmpIds ?? []);
@@ -36,6 +46,9 @@ namespace EIMSNext.ApiService
             await empService.RemoveFromEmployeeGroupAsync(request.EmployeeGroupId!, request.EmpIds!);
         }
 
+        /// <summary>
+        /// 移动节点。
+        /// </summary>
         public async Task<bool> Move(MoveEmployeeGroupTreeNodeRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组结构的权限");
@@ -134,6 +147,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(EmployeeGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建员工组的权限");
@@ -141,6 +157,9 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组的权限");
@@ -148,6 +167,9 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组的权限");

@@ -45,9 +45,17 @@ namespace EIMSNext.Core.Mongo.Entities
     /// <summary>包含动态 data 对象的表单实体。</summary>
     public abstract class DynamicEntity : CorpEntityBase, IEntity
     {
+        /// <summary>
+        /// 初始化 <see cref="DynamicEntity"/> 类的新实例。
+        /// </summary>
         public DynamicEntity()
         {
         }
+
+        /// <summary>
+        /// 使用 JSON 数据初始化 <see cref="DynamicEntity"/> 类的新实例。
+        /// </summary>
+        /// <param name="dataJson">动态数据 JSON。</param>
         //测试用方法
         public DynamicEntity(string dataJson)
         {

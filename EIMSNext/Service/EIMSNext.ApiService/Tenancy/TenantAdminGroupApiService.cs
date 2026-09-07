@@ -16,8 +16,15 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 租户管理员组的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, TenantAdminGroupViewModel, ITenantAdminGroupService>(resolver)
     {
+        /// <summary>
+        /// 移动节点。
+        /// </summary>
         public async Task<TenantAdminGroup?> Move(MoveTenantAdminGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有移动管理组的权限");
@@ -93,6 +100,9 @@ namespace EIMSNext.ApiService
             return moving;
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override async Task AddAsyncCore(TenantAdminGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建管理组的权限");
@@ -114,6 +124,9 @@ namespace EIMSNext.ApiService
             await base.AddAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override async Task<ReplaceOneResult> ReplaceAsyncCore(TenantAdminGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改管理组的权限");
@@ -142,6 +155,9 @@ namespace EIMSNext.ApiService
             return await base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除管理组的权限");

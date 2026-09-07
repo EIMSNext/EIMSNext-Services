@@ -12,8 +12,15 @@ using Microsoft.Extensions.Configuration;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 企业的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class CorporateApiService(IResolver resolver) : ApiServiceBase<Corporate, CorporateViewModel, ICorporateService>(resolver)
 	{
+		/// <summary>
+		/// 新增实体。
+		/// </summary>
 		public override async Task AddAsync(Corporate entity)
 		{
 			await base.AddAsync(entity);

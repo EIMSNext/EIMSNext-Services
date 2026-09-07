@@ -19,6 +19,9 @@ namespace EIMSNext.ApiService
     /// </summary>
     public class EfRunLogApiService : ApiServiceBase
     {
+        /// <summary>
+        /// 执行 EfRunLogApiService 操作。
+        /// </summary>
         public EfRunLogApiService(IResolver resolver) : base(resolver)
         {
         }
@@ -26,6 +29,9 @@ namespace EIMSNext.ApiService
         private IEfRunLogService RunLogService => Resolver.GetService<IEfRunLogService, Ef_RunLog>();
         private IEfRunLogNodeService RunLogNodeService => Resolver.GetService<IEfRunLogNodeService, Ef_RunLogNode>();
 
+        /// <summary>
+        /// 获取Runs。
+        /// </summary>
         public async Task<(long total, IReadOnlyList<Ef_RunLog> items)> GetRunsAsync(
             string eventFlowId,
             long? startTime,
@@ -68,6 +74,9 @@ namespace EIMSNext.ApiService
             return (total, items);
         }
 
+        /// <summary>
+        /// 获取RunDetail。
+        /// </summary>
         public async Task<EfRunLogDetail?> GetRunDetailAsync(string runLogId)
         {
             var run = await RunLogService.GetAsync(runLogId);
@@ -114,11 +123,26 @@ namespace EIMSNext.ApiService
         }
     }
 
+    /// <summary>
+    /// EfRunLogDetail。
+    /// </summary>
     public class EfRunLogDetail
     {
+        /// <summary>
+        /// 获取或设置Run。
+        /// </summary>
         public Ef_RunLog Run { get; set; } = default!;
+        /// <summary>
+        /// 获取或设置Nodes。
+        /// </summary>
         public IReadOnlyList<Ef_RunLogNode> Nodes { get; set; } = Array.Empty<Ef_RunLogNode>();
+        /// <summary>
+        /// 获取或设置ExecutedNodeIds。
+        /// </summary>
         public IReadOnlyList<string> ExecutedNodeIds { get; set; } = Array.Empty<string>();
+        /// <summary>
+        /// 获取或设置FailedNodeIds。
+        /// </summary>
         public IReadOnlyList<string> FailedNodeIds { get; set; } = Array.Empty<string>();
     }
 }

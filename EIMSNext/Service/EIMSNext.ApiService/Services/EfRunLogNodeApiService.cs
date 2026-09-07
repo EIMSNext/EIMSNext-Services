@@ -16,6 +16,10 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 运行日志节点的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class EfRunLogNodeApiService(IResolver resolver) : ApiServiceBase<Ef_RunLogNode, EfRunLogNodeViewModel, IEfRunLogNodeService>(resolver)
 	{
         // 不再预过滤 AppId/RunLogId：

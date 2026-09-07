@@ -8,8 +8,12 @@ using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Http;
+
+using MongoDB.Driver;
 
 namespace EIMSNext.ApiHost.Authorization
 {
@@ -85,7 +89,7 @@ namespace EIMSNext.ApiHost.Authorization
                     var client = resolver.GetService<EIMSNext.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
-                        CurrentCorpId = client.CorpId??string.Empty;
+                        CurrentCorpId = client.CorpId ?? string.Empty;
                         CurrentUserID = "system";
                         _type = IdentityType.Client;
                         _retrieved = true;
@@ -155,12 +159,12 @@ namespace EIMSNext.ApiHost.Authorization
         {
             if (!_retrieved)
             {
-                _user = _resolver.GetService<User>().Get(CurrentUserID);
+                _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
                     CurrentCorpId = ResolveCurrentCorpId(_user, CurrentCorpId);
 
-                    _employee = _resolver.GetService<Employee>().Query(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
+                    _employee = _resolver.GetRepository<Employee>().Find(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
                 }
                 _retrieved = true;
             }

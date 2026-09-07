@@ -45,7 +45,6 @@ builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSw
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
-builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 
 var app = builder.Build();
 
@@ -70,7 +69,7 @@ app.UseSerilogRequestLogging();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<FileAccessMiddleware>();
+//app.UseMiddleware<FileAccessMiddleware>();
 app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>

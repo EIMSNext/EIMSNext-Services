@@ -21,6 +21,10 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 登录审计的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class IdentityLoginAuditApiService(IResolver resolver) : ApiServiceBase<IdentityLoginAudit, IdentityLoginAuditViewModel, IIdentityLoginAuditService>(resolver)
     {
         private static readonly Dictionary<string, ExportColumnType> IdentityLoginAuditColumnTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -32,6 +36,9 @@ namespace EIMSNext.ApiService
             ["clientIp"] = ExportColumnType.String,
         };
 
+        /// <summary>
+        /// 执行 ExportAsync 操作。
+        /// </summary>
         public async Task<ExportResponse> ExportAsync(IdentityLoginAuditExportRequest request)
         {
             ValidateLoginExportRequest(request);

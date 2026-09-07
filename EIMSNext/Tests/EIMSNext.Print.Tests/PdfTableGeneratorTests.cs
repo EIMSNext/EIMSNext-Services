@@ -56,6 +56,47 @@ namespace EIMSNext.Print.Tests
         }
 
         [TestMethod]
+        public void Generate_ShouldRenderTemplatePlaceholderForEmptyRepeatRowInPreview()
+        {
+            var workbook = new Pdf.UniverWorkbook
+            {
+                Styles = new Dictionary<string, Pdf.UniverStyle>(),
+                Sheets = new Dictionary<string, Pdf.UniverWorksheet>
+                {
+                    ["sheet1"] = new Pdf.UniverWorksheet
+                    {
+                        DefaultColumnWidth = 80,
+                        DefaultRowHeight = 20,
+                        CellData = new Dictionary<string, Dictionary<string, Pdf.UniverCell>>
+                        {
+                            ["0"] = new()
+                            {
+                                ["0"] = new Pdf.UniverCell
+                                {
+                                    Value = "${details.name}",
+                                    PrintMeta = new Pdf.PdfPrintMeta { Id = "details>name" }
+                                }
+                            }
+                        }
+                    }
+                }
+            };
+
+            var worksheet = workbook.Sheets["sheet1"];
+            var document = new Document();
+            var section = document.AddSection();
+            var table = section.AddTable();
+            var generator = new Pdf.PdfTableGenerator(workbook, new Pdf.PdfRenderOptions(), isPreview: true);
+
+            generator.Generate(worksheet, table, new JsonObject(), section.PageSetup);
+
+            Assert.AreEqual(1, table.Rows.Count);
+            var paragraph = (Paragraph)table.Rows[0].Cells[0].Elements[0];
+            var text = (MigraDoc.DocumentObjectModel.Text)paragraph.Elements[0]!;
+            Assert.AreEqual("${details.name}", text.Content!);
+        }
+
+        [TestMethod]
         public void Generate_ShouldKeepRepeatRowStyle_WhenDetailDataIsMissing()
         {
             var workbook = new Pdf.UniverWorkbook

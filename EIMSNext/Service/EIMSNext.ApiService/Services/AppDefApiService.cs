@@ -15,8 +15,15 @@ using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 应用定义的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, AppDefViewModel, IAppDefService>(resolver)
     {
+        /// <summary>
+        /// 创建Group。
+        /// </summary>
         public async Task<AppDef> CreateGroup(CreateAppGroupRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.AppId) || string.IsNullOrWhiteSpace(request.Name))
@@ -40,6 +47,9 @@ namespace EIMSNext.ApiService
             return app;
         }
 
+        /// <summary>
+        /// 执行 EditGroup 操作。
+        /// </summary>
         public async Task<AppDef> EditGroup(EditAppGroupRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.AppId) || string.IsNullOrWhiteSpace(request.MenuId) || string.IsNullOrWhiteSpace(request.Name))
@@ -59,6 +69,9 @@ namespace EIMSNext.ApiService
             return app;
         }
 
+        /// <summary>
+        /// 执行 EditMenu 操作。
+        /// </summary>
         public async Task<AppDef> EditMenu(EditAppMenuRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.AppId) || string.IsNullOrWhiteSpace(request.MenuId) || string.IsNullOrWhiteSpace(request.Name))
@@ -112,6 +125,9 @@ namespace EIMSNext.ApiService
             return app;
         }
 
+        /// <summary>
+        /// 删除应用分组。
+        /// </summary>
         public async Task<AppDef> DeleteGroup(DeleteAppGroupRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.AppId) || string.IsNullOrWhiteSpace(request.MenuId))
@@ -146,6 +162,9 @@ namespace EIMSNext.ApiService
             return app;
         }
 
+        /// <summary>
+        /// 保存应用菜单。
+        /// </summary>
         public async Task<AppDef> SaveMenus(SaveAppMenusRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.AppId))
@@ -164,6 +183,9 @@ namespace EIMSNext.ApiService
             return app;
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override async Task AddAsyncCore(AppDef entity)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
@@ -174,6 +196,9 @@ namespace EIMSNext.ApiService
             await evaluator.SyncCreatedAppToNormalTenantAdminGroupsAsync(entity.Id);
         }
 
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
         protected override Task<ReplaceOneResult> ReplaceAsyncCore(AppDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.Id);
@@ -181,6 +206,9 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsyncCore(entity);
         }
 
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
         protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

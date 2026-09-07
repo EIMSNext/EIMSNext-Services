@@ -45,7 +45,11 @@ namespace EIMSNext.File
                     });
                 }
 
-                Add(attachments);
+                // Uploading files is not transactional with the storage provider. Avoid
+                // wrapping the metadata/audit writes in a multi-document transaction: when
+                // collections are first created, concurrent uploads can race on MongoDB's
+                // implicit collection creation and fail at transaction commit with NamespaceExists.
+                AddCore(attachments, session: null);
                 return attachments;
             }
             catch

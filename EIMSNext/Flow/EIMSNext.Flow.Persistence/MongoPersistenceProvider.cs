@@ -34,6 +34,18 @@ namespace EIMSNext.Flow.Persistence
             await WorkflowInstances.ReplaceOneAsync(x => x.Id == workflow.Id, workflow, cancellationToken: cancellationToken);
         }
 
+        private async Task PersistWorkflow(
+            IClientSessionHandle session,
+            WorkflowInstance workflow,
+            CancellationToken cancellationToken)
+        {
+            await WorkflowInstances.ReplaceOneAsync(
+                session,
+                x => x.Id == workflow.Id,
+                workflow,
+                cancellationToken: cancellationToken);
+        }
+
         public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken = default)
         {
             if (subscriptions == null || subscriptions.Count < 1)
@@ -45,8 +57,8 @@ namespace EIMSNext.Flow.Persistence
             using (var session = await _dbContext.StartSessionAsync(cancellationToken))
             {
                 session.StartTransaction();
-                await PersistWorkflow(workflow, cancellationToken);
-                await EventSubscriptions.InsertManyAsync(subscriptions, cancellationToken: cancellationToken);
+                await PersistWorkflow(session, workflow, cancellationToken);
+                await EventSubscriptions.InsertManyAsync(session, subscriptions, cancellationToken: cancellationToken);
                 await session.CommitTransactionAsync(cancellationToken);
             }
         }

@@ -184,7 +184,11 @@ namespace EIMSNext.Service
 
         public override async Task AddAsync(IEnumerable<FormData> entities)
         {
+            var action = Context.Action;
             await base.AddAsync(entities);
+            // Nested persistence/hooks can share the request context. Restore the original
+            // action before deciding whether the submitted data must start a workflow.
+            Context.Action = action;
             await SubmitAsync(entities, null, EIMSNext.Entities.CascadeMode.NotSet, null);
         }
 
@@ -209,6 +213,7 @@ namespace EIMSNext.Service
 
         public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
         {
+            var action = Context.Action;
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
             if (old == null && ShouldTriggerFormDataChangeEventFlow())
             {
@@ -228,6 +233,7 @@ namespace EIMSNext.Service
                     .ToList();
 
             var result = await base.ReplaceAsync(entity);
+            Context.Action = action;
             await SubmitAsync([entity], null, EIMSNext.Entities.CascadeMode.NotSet, null);
 
             if (ShouldTriggerFormDataChangeEventFlow() && changeFields.Count > 0)
@@ -620,14 +626,40 @@ namespace EIMSNext.Service
 
                 if (formDef.UsingWorkflow)
                 {
-                    var wfDef = Resolver.GetRepository<Wf_Definition>().Find(x => x.ExternalId == entity.FormId).FirstOrDefault();
-                    if (wfDef != null)
+                    var wfDef = FindCurrentWorkflowDefinition(entity.FormId);
+                    if (wfDef == null)
                     {
-                        var wfResp = await _flowClient.Start(new StartRequest { WfDefinitionId = entity.FormId, DataId = entity.Id }, Context.AccessToken);
-                        if (wfResp != null && !string.IsNullOrEmpty(wfResp.Error))
+                        // A workflow form without an enabled workflow behaves like a normal form.
+                        entity.FlowStatus = FlowStatus.Approved;
+                        await Resolver.GetRepository<FormData>().UpdateAsync(
+                            entity.Id,
+                            UpdateBuilder.Set(x => x.FlowStatus, FlowStatus.Approved),
+                            upsert: false);
+                        return;
+                    }
+
+                    WfResponse? wfResp;
+                    try
+                    {
+                        wfResp = await _flowClient.Start(new StartRequest
                         {
-                            throw new UnLogException(wfResp.Error);
-                        }
+                            WfDefinitionId = wfDef.ExternalId,
+                            Version = wfDef.Version,
+                            DataId = entity.Id,
+                        }, Context.AccessToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new UnLogException($"流程服务调用失败: {ex.Message}", ex);
+                    }
+
+                    if (wfResp == null)
+                    {
+                        throw new UnLogException("流程服务未返回启动结果");
+                    }
+                    if (!string.IsNullOrEmpty(wfResp.Error))
+                    {
+                        throw new UnLogException($"流程启动失败: {wfResp.Error}");
                     }
                 }
                 else
@@ -635,6 +667,17 @@ namespace EIMSNext.Service
                     await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
                 }
             }
+        }
+
+        private Wf_Definition? FindCurrentWorkflowDefinition(string formId)
+        {
+            return Resolver.GetRepository<Wf_Definition>()
+                .Find(x => x.ExternalId == formId
+                    && x.FlowType == FlowType.Workflow
+                    && x.IsCurrent
+                    && !x.Disabled
+                    && !x.DeleteFlag)
+                .FirstOrDefault();
         }
 
         private bool ShouldTriggerFormDataChangeEventFlow()

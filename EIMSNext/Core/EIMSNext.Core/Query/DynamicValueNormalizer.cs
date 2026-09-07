@@ -2,8 +2,16 @@ using System.Text.Json;
 
 namespace EIMSNext.Core.Query
 {
+    /// <summary>
+    /// 动态值规范化器，将 JSON 元素等转换为对应的基础类型。
+    /// </summary>
     public static class DynamicValueNormalizer
     {
+        /// <summary>
+        /// 规范化动态值。
+        /// </summary>
+        /// <param name="value">原始值。</param>
+        /// <returns>规范化后的值。</returns>
         public static object? Normalize(object? value)
         {
             if (value is decimal decimalValue

@@ -17,6 +17,9 @@ using System.Text.Json;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 聚合的 API 服务。
+    /// </summary>
     public class AggregateApiService : ApiServiceBase, IAggregateApiService
     {
         private static readonly HashSet<string> SupportedAggregateFunctions = new(StringComparer.OrdinalIgnoreCase)
@@ -24,6 +27,10 @@ namespace EIMSNext.ApiService
             "count", "sum", "avg", "max", "min",
         };
 
+        /// <summary>
+        /// 初始化AggregateApiService的新实例。
+        /// </summary>
+        /// <param name="resolver">服务解析器。</param>
         public AggregateApiService(IResolver resolver) : base(resolver)
         {
             AggregateService = resolver.Resolve<AggregateService>();
@@ -33,24 +40,36 @@ namespace EIMSNext.ApiService
 
         private const int MaxDashboardTake = 1000;
 
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(DashboardAggregateRequest request)
         {
             var build = BuildDashboardRequest(request, null, false);
             return build == null ? null : await Execute(build);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(DashboardAggregateRequest request)
         {
             var build = BuildDashboardRequest(request, null, false);
             return build == null ? 0 : await ExecuteCount(build);
         }
 
+        /// <summary>
+        /// 预览聚合结果。
+        /// </summary>
         public async Task<IAsyncCursor<BsonDocument>?> Preview(DashboardAggregatePreviewRequest request)
         {
             var build = BuildDashboardRequest(request, request.Details, true);
             return build == null ? null : await Execute(build);
         }
 
+        /// <summary>
+        /// 预览聚合结果数量。
+        /// </summary>
         public async Task<long> PreviewCount(DashboardAggregatePreviewRequest request)
         {
             var build = BuildDashboardRequest(request, request.Details, true);
@@ -272,11 +291,17 @@ namespace EIMSNext.ApiService
 
         private static int ClampTake(int take, int? configuredLimit) => Math.Clamp(take <= 0 ? 20 : take, 1, Math.Min(configuredLimit ?? MaxDashboardTake, MaxDashboardTake));
 
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request)
         {
             return await Calucate(request, ServiceContext.CorpId);
         }
 
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
         public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return null;
@@ -293,11 +318,17 @@ namespace EIMSNext.ApiService
             return await collection.AggregateAsync(pipeline);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(AggCalcRequest request)
         {
             return await Count(request, ServiceContext.CorpId);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return 0;

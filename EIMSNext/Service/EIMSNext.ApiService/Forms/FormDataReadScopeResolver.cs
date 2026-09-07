@@ -17,6 +17,12 @@ namespace EIMSNext.ApiService
     /// </summary>
     public sealed class FormDataReadScopeResolver(IResolver resolver) : ApiServiceBase(resolver)
     {
+        /// <summary>
+        /// 解析用户的表单读取权限所授予的数据与字段范围。
+        /// </summary>
+        /// <param name="formId">表单 ID。</param>
+        /// <param name="permissionGroupId">权限组 ID。</param>
+        /// <returns>表单数据读取范围。</returns>
         public FormDataReadScope Resolve(string formId, string? permissionGroupId = null)
         {
             if (Resolver.Resolve<TenantAccessEvaluator>().HasUnrestrictedManagementIdentity &&
@@ -171,5 +177,11 @@ namespace EIMSNext.ApiService
         }
     }
 
+    /// <summary>
+    /// 表单数据读取范围。
+    /// </summary>
+    /// <param name="CanRead">是否可读。</param>
+    /// <param name="DataFilter">数据过滤条件。</param>
+    /// <param name="FormFieldPermissions">表单字段权限列表。</param>
     public sealed record FormDataReadScope(bool CanRead, DynamicFilter? DataFilter, List<FormFieldPermission>? FormFieldPermissions);
 }

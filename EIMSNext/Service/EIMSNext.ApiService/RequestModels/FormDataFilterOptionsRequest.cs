@@ -31,15 +31,24 @@ namespace EIMSNext.ApiService.RequestModels
         public int Limit { get; set; } = 50;
     }
 
+    /// <summary>
+    /// 动态表单字段选项查询响应。
+    /// </summary>
     public class FormDataFilterOptionsResponse
     {
+        /// <summary>过滤选项列表。</summary>
         public List<FilterOptionItem> Items { get; set; } = [];
     }
 
+    /// <summary>
+    /// 表单数据权限范围响应。
+    /// </summary>
     public class FormDataPermissionScopeResponse
     {
+        /// <summary>表单数据权限。</summary>
         public FormDataPermissions FormDataPermissions { get; set; }
 
+        /// <summary>表单字段权限列表。</summary>
         public List<FormFieldPermission>? FormFieldPermissions { get; set; }
     }
 }
