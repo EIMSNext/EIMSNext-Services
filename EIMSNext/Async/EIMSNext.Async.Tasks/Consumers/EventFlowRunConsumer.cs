@@ -45,6 +45,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                     new EfRunRequest
                     {
                         EventFlowId = args.EventFlowId,
+                        ExecutionId = args.ExecutionId,
                         DataId = args.DataId ?? string.Empty,
                         EventSource = MapEventSource(args.EventSource),
                         EventType = MapEventType(args.EventType),

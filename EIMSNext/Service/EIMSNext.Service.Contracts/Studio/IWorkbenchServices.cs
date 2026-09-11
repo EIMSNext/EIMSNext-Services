@@ -1,5 +1,6 @@
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
+using MongoDB.Driver;
 
 namespace EIMSNext.Service.Contracts
 {
@@ -13,5 +14,6 @@ namespace EIMSNext.Service.Contracts
 
     public interface IWorkbenchRecentVisitService : IService<WorkbenchRecentVisit>
     {
+        Task<ReplaceOneResult> TouchRecentVisitAsync(WorkbenchRecentVisit entity);
     }
 }

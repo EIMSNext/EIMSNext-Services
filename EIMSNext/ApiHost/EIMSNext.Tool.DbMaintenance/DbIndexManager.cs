@@ -33,6 +33,7 @@ namespace EIMSNext.Identity.DbMaintenance
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
             CreateEventFlowScheduleIndexes(background);
+            CreateEventFlowExecutionIndexes(background);
             CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
             CreateEventFlowLogIndexes(background);
@@ -518,20 +519,47 @@ namespace EIMSNext.Identity.DbMaintenance
                 options,
                 "ix_workbenchfavorite_sort");
 
-            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+            var recentTargetUniqueOptions = new CreateIndexOptions<WorkbenchRecentVisit>
+            {
+                Background = options.Background,
+                Unique = true,
+                Name = "ix_workbenchrecent_target_unique",
+                PartialFilterExpression = Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.DeleteFlag, false)
+            };
+            GetCollection<WorkbenchRecentVisit>().Indexes.CreateOne(new CreateIndexModel<WorkbenchRecentVisit>(
                 Builders<WorkbenchRecentVisit>.IndexKeys
                     .Ascending(x => x.CorpId)
                     .Ascending(x => x.EmployeeId)
                     .Ascending(x => x.TargetType)
-                    .Ascending(x => x.TargetId)
-                    .Ascending(x => x.DeleteFlag),
-                options,
-                "ix_workbenchrecent_target");
+                    .Ascending(x => x.TargetId),
+                recentTargetUniqueOptions));
 
             CreateIndex(GetCollection<WorkbenchRecentVisit>(),
                 Builders<WorkbenchRecentVisit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Descending(x => x.LastVisitTime),
                 options,
                 "ix_workbenchrecent_lastvisit");
+        }
+
+        private void CreateEventFlowExecutionIndexes(CreateIndexOptions options)
+        {
+            CreateIndex(GetCollection<EventFlowNodeExecution>(),
+                Builders<EventFlowNodeExecution>.IndexKeys.Ascending(x => x.ExecutionKey),
+                CreateUniqueOptions(options),
+                "ix_eventflownodeexecution_key_unique");
+
+            CreateIndex(GetCollection<EventFlowNodeExecution>(),
+                Builders<EventFlowNodeExecution>.IndexKeys
+                    .Ascending(x => x.ExecutionId)
+                    .Ascending(x => x.EventFlowId)
+                    .Ascending(x => x.NodeId)
+                    .Ascending(x => x.TargetKey),
+                options,
+                "ix_eventflownodeexecution_lookup");
+
+            CreateIndex(GetCollection<WorkflowTransitionExecution>(),
+                Builders<WorkflowTransitionExecution>.IndexKeys.Ascending(x => x.ExecutionId),
+                CreateUniqueOptions(options),
+                "ix_workflowtransitionexecution_id_unique");
         }
 
         private void CreateOutboxIndexes(CreateIndexOptions options)

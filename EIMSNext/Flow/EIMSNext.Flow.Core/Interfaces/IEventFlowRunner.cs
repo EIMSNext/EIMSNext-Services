@@ -39,6 +39,24 @@ namespace EIMSNext.Flow.Core.Interfaces
             return this;
         }
 
+        public EfRunParameter WithWorkflowTransition(bool value = true)
+        {
+            WorkflowTransition = value;
+            return this;
+        }
+
+        public EfRunParameter WithExecutionId(string executionId)
+        {
+            ExecutionId = executionId;
+            return this;
+        }
+
+        public EfRunParameter WithWorkflowInstanceId(string workflowInstanceId)
+        {
+            WorkflowInstanceId = workflowInstanceId;
+            return this;
+        }
+
         public EfRunParameter WithChangeFields(IEnumerable<string>? changeFields)
         {
             ChangeFields = changeFields?
@@ -56,6 +74,9 @@ namespace EIMSNext.Flow.Core.Interfaces
         public EventType EventType { get; private set; }
         public string WfNodeId { get; private set; }
         public string? NodeAction { get; private set; }
+        public bool WorkflowTransition { get; private set; }
+        public string ExecutionId { get; private set; } = string.Empty;
+        public string WorkflowInstanceId { get; private set; } = string.Empty;
         public Operator? Starter { get; private set; }
         public CascadeMode Cascade { get; private set; }
         public string? EventIds { get; private set; }

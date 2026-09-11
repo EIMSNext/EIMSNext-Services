@@ -6,6 +6,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Nodes.EventFlow;
+using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
@@ -24,6 +25,13 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             return ExecuteWithLog(context, dataContext =>
             {
+            var processor = Resolver.Resolve<IEfDataProcessor>();
+            if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
+            {
+                dataContext.NodeDatas[Metadata.Id] = restored!;
+                return ExecutionResult.Next();
+            }
+
             var updateSetting = Metadata!.EfNodeSetting!.UpdateSetting!;
             var formDef = GetFormDef(dataContext, updateSetting.FormId);
             var actionDatas = new List<ActionFormData>();
@@ -298,13 +306,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if ((actionDatas.Count > 0))
             {
-                dataContext.NodeDatas.Add(Metadata!.Id, new EfNodeData
+                var nodeData = new EfNodeData
                 {
                     NodeId = Metadata.Id,
                     SingleResult = Metadata.EfNodeSetting!.SingleResult,
                     FormId = updateSetting.FormId,
                     ActionDatas = actionDatas
-                });
+                };
+                dataContext.NodeDatas[Metadata.Id] = processor.ProcessNode(context.Workflow, nodeData, "update");
             }
 
             return ExecutionResult.Next();

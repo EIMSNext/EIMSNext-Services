@@ -65,6 +65,92 @@ namespace EIMSNext.Core.Tests
             }
         }
 
+        [TestMethod]
+        public void DisabledRootScopeDoesNotStartTransaction()
+        {
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: false))
+            {
+                Assert.IsNull(scope.SessionHandle);
+                Assert.IsNull(MongoTransactionScope.Transaction);
+                Assert.IsFalse(MongoTransactionScope.IsInTransaction);
+            }
+
+            Assert.IsNull(MongoTransactionScope.Transaction);
+        }
+
+        [TestMethod]
+        public void NestedScopeInheritsEnabledRootTransaction()
+        {
+            using (var root = new MongoTransactionScope(_dbContext!, enabled: true))
+            {
+                var rootSession = root.SessionHandle;
+                Assert.IsNotNull(rootSession);
+                Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+
+                using (var nested = new MongoTransactionScope(_dbContext!, enabled: false))
+                {
+                    Assert.AreSame(rootSession, nested.SessionHandle);
+                    Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+                }
+
+                root.AbortTransaction();
+            }
+        }
+
+        [TestMethod]
+        public void DisabledRootRunsAfterCommitImmediately()
+        {
+            var called = false;
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: false))
+            {
+                MongoTransactionScope.RegisterAfterCommit(() =>
+                {
+                    called = true;
+                    return Task.CompletedTask;
+                });
+
+                Assert.IsTrue(called);
+            }
+        }
+
+        [TestMethod]
+        public void EnabledRootRunsAfterCommitOnlyAfterCommit()
+        {
+            var called = false;
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: true))
+            {
+                MongoTransactionScope.RegisterAfterCommit(() =>
+                {
+                    called = true;
+                    return Task.CompletedTask;
+                });
+
+                Assert.IsFalse(called);
+                scope.CommitTransaction();
+                Assert.IsFalse(called);
+            }
+
+            Assert.IsTrue(called);
+        }
+
+        [TestMethod]
+        public void SuppressAmbientTemporarilyHidesAndRestoresRootTransaction()
+        {
+            using var root = new MongoTransactionScope(_dbContext!);
+            var session = root.SessionHandle;
+            Assert.IsNotNull(session);
+
+            using (MongoTransactionScope.SuppressAmbient())
+            {
+                Assert.IsNull(MongoTransactionScope.Transaction);
+                Assert.IsFalse(MongoTransactionScope.IsInTransaction);
+            }
+
+            Assert.AreSame(session, MongoTransactionScope.Transaction);
+            Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+            root.AbortTransaction();
+        }
+
         [TestInitialize]
         public void Init()
         {

@@ -108,6 +108,12 @@ namespace EIMSNext.Core.Services
         protected virtual bool LogAudit => true;
 
         /// <summary>
+        /// 获取一个值，指示通用增删改操作是否在 root scope 中启用事务。
+        /// 已存在的外层事务始终由内层操作继承。
+        /// </summary>
+        protected virtual bool TransNeeded => true;
+
+        /// <summary>
         /// 获取过滤器定义构建器。
         /// </summary>
         protected FilterDefinitionBuilder<T> FilterBuilder => Repository.FilterBuilder;
@@ -143,7 +149,7 @@ namespace EIMSNext.Core.Services
         /// <returns>新的事务作用域实例。</returns>
         protected MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null)
         {
-            return Repository.NewTransactionScope(transOptions);
+            return new MongoTransactionScope(Repository.DbContext, transOptions, TransNeeded);
         }
 
         /// <summary>

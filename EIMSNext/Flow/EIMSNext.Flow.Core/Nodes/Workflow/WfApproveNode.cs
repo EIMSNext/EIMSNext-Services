@@ -43,20 +43,17 @@ namespace EIMSNext.Flow.Core.Nodes
                 {
                     case ApproveAction.Approve:
                         {
-                            //读取待办， 有待办的才有权限审批
-                            var task = TaskRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
-                            if (task != null)
+                            Wf_Task? task;
+                            using (var scope = TaskRepository.NewTransactionScope())
                             {
-                                using (var scope = TaskRepository.NewTransactionScope())
+                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, scope.SessionHandle);
+                                if (task != null)
                                 {
                                     //写入审批记录
                                     AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, scope.SessionHandle);
 
                                     if (meta.WfNodeSetting!.ApproveSetting!.ApprovalMode == WfApprovalMode.CounterSign)
                                     {
-                                        //删除当前用户待办
-                                        TaskRepository.Delete(task.Id, scope.SessionHandle);
-
                                         //会签时，所有人通过，才为审批通过
                                         var remainTaskCnt = TaskRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id, scope.SessionHandle).CountDocuments();
                                         if (remainTaskCnt > 0)
@@ -67,7 +64,11 @@ namespace EIMSNext.Flow.Core.Nodes
                                         else
                                         {
                                             var formData = GetFormData(dataContext.DataId);
-                                            await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds));
+                                            await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                                .WithNodeAction("submit")
+                                                .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit")
+                                                .WithWorkflowInstanceId(context.Workflow.Id)
+                                                .WithWorkflowTransition());
 
                                             result = ApproveResult.Next;
                                         }
@@ -78,35 +79,35 @@ namespace EIMSNext.Flow.Core.Nodes
                                         DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
 
                                         var formData = GetFormData(dataContext.DataId);
-                                        await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds));
+                                        await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                            .WithNodeAction("submit")
+                                            .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit")
+                                            .WithWorkflowInstanceId(context.Workflow.Id)
+                                            .WithWorkflowTransition());
 
                                         result = ApproveResult.Next;
                                     }
 
                                     scope.CommitTransaction();
                                 }
-
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
                             }
-                            else
-                            {
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData, "没有审批权限");
-                            }
+                            CreateExecLog(context.Workflow, dataContext, meta, approveData, task == null ? "没有审批权限" : string.Empty);
                         }
                         break;
                     case ApproveAction.Reject:
-                        {                            //读取待办， 有待办的才有权限审批
-                            var task = TaskRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id && x.EmployeeId == approveData.WorkerId).FirstOrDefault();
-                            if (task != null)
+                        {
+                            Wf_Task? task;
+                            using (var scope = TaskRepository.NewTransactionScope())
                             {
-                                using (var scope = TaskRepository.NewTransactionScope())
+                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, scope.SessionHandle);
+                                if (task != null)
                                 {
                                     UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, scope.SessionHandle);
 
                                     //写入审批记录
                                     AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, scope.SessionHandle);
 
-                                    //删除待办记录
+                                    //当前任务已在 ClaimTask 中原子占用；其余待办一并删除。
                                     DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
 
                                     var formData = GetFormData(dataContext.DataId);
@@ -116,16 +117,13 @@ namespace EIMSNext.Flow.Core.Nodes
 
                                     scope.CommitTransaction();
                                 }
-
+                            }
+                            if (task != null)
+                            {
                                 //TODO：终止流程，将来可以改单据状态为草稿，允许重启流程
                                 context.Workflow.Status = WorkflowStatus.Terminated;
-
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData);
                             }
-                            else
-                            {
-                                CreateExecLog(context.Workflow, dataContext, meta, approveData, "没有审批权限");
-                            }
+                            CreateExecLog(context.Workflow, dataContext, meta, approveData, task == null ? "没有审批权限" : string.Empty);
                         }
                         break;
                     case ApproveAction.Return:

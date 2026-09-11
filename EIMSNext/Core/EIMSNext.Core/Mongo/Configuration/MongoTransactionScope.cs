@@ -9,41 +9,52 @@ namespace EIMSNext.Core.Mongo
     /// </summary>
     public class MongoTransactionScope : IDisposable
     {
-        private static readonly AsyncLocal<IClientSessionHandle?> _currentSession = new AsyncLocal<IClientSessionHandle?>();
-        private bool _isRootScope;
+        private sealed class ScopeState
+        {
+            public IClientSessionHandle? SessionHandle { get; init; }
+            public bool Enabled { get; init; }
+            public List<Func<Task>> AfterCommit { get; } = [];
+        }
+
+        private static readonly AsyncLocal<ScopeState?> _currentState = new();
+        private readonly bool _isRootScope;
         private bool _completed = false;
-        private readonly List<Func<Task>> _afterCommit = [];
         private List<Func<Task>>? _committedCallbacks;
-        private static readonly AsyncLocal<List<Func<Task>>?> _afterCommitCallbacks = new();
 
         /// <summary>
         /// 初始化 <see cref="MongoTransactionScope"/> 类的新实例。
         /// </summary>
         /// <param name="dbContex">数据库上下文。</param>
         /// <param name="transOptions">事务选项，可为空。</param>
-        public MongoTransactionScope(IMongoDbContex dbContex, TransactionOptions? transOptions = null)
+        /// <param name="enabled">是否由 root scope 启用事务。</param>
+        public MongoTransactionScope(IMongoDbContex dbContex, TransactionOptions? transOptions = null, bool enabled = true)
         {
-            if (_currentSession.Value == null)
+            if (_currentState.Value is { } parent)
             {
-                var options = transOptions ?? new TransactionOptions(readConcern: ReadConcern.Majority, writeConcern: WriteConcern.WMajority);
-                SessionHandle = dbContex.StartSession();
-                SessionHandle.StartTransaction(options);
-
-                _currentSession.Value = SessionHandle;
-                _afterCommitCallbacks.Value = _afterCommit;
-                _isRootScope = true;
-            }
-            else
-            {
-                SessionHandle = _currentSession.Value;
+                SessionHandle = parent.SessionHandle;
                 _isRootScope = false;
+                return;
             }
+
+            _isRootScope = true;
+            if (!enabled)
+            {
+                SessionHandle = null;
+                _currentState.Value = new ScopeState { Enabled = false };
+                return;
+            }
+
+            var options = transOptions ?? new TransactionOptions(readConcern: ReadConcern.Majority, writeConcern: WriteConcern.WMajority);
+            var session = dbContex.StartSession();
+            session.StartTransaction(options);
+            SessionHandle = session;
+            _currentState.Value = new ScopeState { Enabled = true, SessionHandle = session };
         }
 
         /// <summary>
         /// 获取当前事务的会话句柄。
         /// </summary>
-        public static IClientSessionHandle? Transaction => _currentSession.Value;
+        public static IClientSessionHandle? Transaction => _currentState.Value?.SessionHandle;
 
         /// <summary>
         /// 获取一个值，指示当前是否处于事务中。
@@ -51,9 +62,32 @@ namespace EIMSNext.Core.Mongo
         public static bool IsInTransaction => Transaction != null && Transaction.IsInTransaction;
 
         /// <summary>
+        /// 临时抑制当前异步上下文中的事务。退出作用域后恢复原状态。
+        /// 用于明确允许独立提交的弱一致性操作。
+        /// </summary>
+        public static IDisposable SuppressAmbient()
+        {
+            var previous = _currentState.Value;
+            _currentState.Value = null;
+            return new AmbientSuppression(previous);
+        }
+
+        private sealed class AmbientSuppression(ScopeState? previous) : IDisposable
+        {
+            private bool _disposed;
+
+            public void Dispose()
+            {
+                if (_disposed) return;
+                _disposed = true;
+                _currentState.Value = previous;
+            }
+        }
+
+        /// <summary>
         /// 获取事务会话句柄。
         /// </summary>
-        public IClientSessionHandle SessionHandle { get; private set; }
+        public IClientSessionHandle? SessionHandle { get; private set; }
         //public bool IsInTransaction => SessionHandle.IsInTransaction;
 
         /// <summary>
@@ -61,13 +95,12 @@ namespace EIMSNext.Core.Mongo
         /// </summary>
         public void CommitTransaction()
         {
-            if (_isRootScope && SessionHandle.IsInTransaction)
+            if (_isRootScope && SessionHandle?.IsInTransaction == true)
             {
                 SessionHandle.CommitTransaction();
                 _completed = true;
-                _committedCallbacks = _afterCommit.ToList();
-                _afterCommit.Clear();
-                _afterCommitCallbacks.Value = null;
+                _committedCallbacks = _currentState.Value?.AfterCommit.ToList();
+                _currentState.Value?.AfterCommit.Clear();
             }
         }
 
@@ -78,9 +111,9 @@ namespace EIMSNext.Core.Mongo
         public static void RegisterAfterCommit(Func<Task> callback)
         {
             ArgumentNullException.ThrowIfNull(callback);
-            if (_afterCommitCallbacks.Value is { } callbacks)
+            if (_currentState.Value is { Enabled: true } state)
             {
-                callbacks.Add(callback);
+                state.AfterCommit.Add(callback);
                 return;
             }
 
@@ -92,7 +125,7 @@ namespace EIMSNext.Core.Mongo
         /// </summary>
         public void AbortTransaction()
         {
-            if (_isRootScope && SessionHandle.IsInTransaction)
+            if (_isRootScope && SessionHandle?.IsInTransaction == true)
                 SessionHandle.AbortTransaction();
         }
 
@@ -111,9 +144,8 @@ namespace EIMSNext.Core.Mongo
                 }
                 finally
                 {
-                    _currentSession.Value = null;
-                    _afterCommitCallbacks.Value = null;
-                    SessionHandle.Dispose();
+                    _currentState.Value = null;
+                    SessionHandle?.Dispose();
                 }
 
                 foreach (var callback in callbacks ?? [])

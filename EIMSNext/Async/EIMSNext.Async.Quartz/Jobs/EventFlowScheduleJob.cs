@@ -83,6 +83,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                     {
                         CorpId = definition.CorpId??string.Empty,
                         EventFlowId = definition.Id,
+                        ExecutionId = $"schedule:{item.Id}:{item.TriggerTime}",
                         AppId = definition.AppId,
                         FormId = item.FormId,
                         DataId = item.DataId,

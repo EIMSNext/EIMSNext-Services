@@ -2,6 +2,7 @@ using System.Text.Json;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Entities;
+using EIMSNext.Flow.Core.Interfaces;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 using WorkflowCore.Interface;
@@ -19,6 +20,13 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             return ExecuteWithLog(context, dataContext =>
             {
+            var processor = Resolver.Resolve<IEfDataProcessor>();
+            if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
+            {
+                dataContext.NodeDatas[Metadata.Id] = restored!;
+                return ExecutionResult.Next();
+            }
+
             var updateSetting = Metadata!.EfNodeSetting!.DeleteSetting!;
             var formDef = GetFormDef(dataContext, updateSetting.FormId);
 
@@ -42,13 +50,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (toRemoves?.Count > 0)
             {
-                dataContext.NodeDatas.Add(Metadata!.Id, new EfNodeData
+                var nodeData = new EfNodeData
                 {
                     NodeId = Metadata.Id,
                     SingleResult = Metadata.EfNodeSetting!.SingleResult,
                     FormId = updateSetting.FormId,
                     ActionDatas = toRemoves
-                });
+                };
+                dataContext.NodeDatas[Metadata.Id] = processor.ProcessNode(context.Workflow, nodeData, "delete");
             }
 
             return ExecutionResult.Next();

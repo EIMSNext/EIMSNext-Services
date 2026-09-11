@@ -738,7 +738,7 @@ namespace EIMSNext.Flow.Core
             return brief;
         }
 
-        private void UpdateFormStatus(string dataId, FlowStatus flowStatus, IClientSessionHandle session)
+        private void UpdateFormStatus(string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
         {
             _formDataRepo.Update(dataId, Builders<FormData>.Update.Set(x => x.FlowStatus, flowStatus), session: session);
         }

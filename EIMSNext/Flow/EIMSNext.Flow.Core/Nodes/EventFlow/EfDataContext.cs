@@ -13,6 +13,11 @@ namespace EIMSNext.Flow.Core
         public string AppId { get; set; } = string.Empty;
         public string EventFlowId { get; set; } = string.Empty;
         public string RunLogId { get; set; } = string.Empty;
+        public string ExecutionId { get; set; } = string.Empty;
+        public string WorkflowInstanceId { get; set; } = string.Empty;
+        public bool WorkflowTransition { get; set; }
+        public string WfNodeId { get; set; } = string.Empty;
+        public string NodeAction { get; set; } = string.Empty;
         public string? FormId { get; set; }
         public string? DataId { get; set; }
         public Operator? WfStarter { get; set; }
@@ -68,6 +73,8 @@ namespace EIMSNext.Flow.Core
     {
         public DataState State { get; set; }
         public required FormData FormData { get; set; }
+        public bool Persisted { get; set; }
+        public bool WorkflowStarted { get; set; }
 
     }
     public enum DataState

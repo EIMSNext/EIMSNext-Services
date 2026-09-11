@@ -377,8 +377,6 @@ namespace EIMSNext.ApiService
     /// </summary>
     public class WorkbenchRecentVisitApiService(IResolver resolver) : ApiServiceBase<WorkbenchRecentVisit, WorkbenchRecentVisitViewModel, IWorkbenchRecentVisitService>(resolver)
     {
-        private const int MaxRecentVisitCount = 10;
-
         /// <summary>
         /// 获取按权限过滤后的工作台最近访问视图查询。
         /// </summary>
@@ -428,7 +426,6 @@ namespace EIMSNext.ApiService
             entity.VisitCount = 1;
             entity.LastVisitTime = Now();
             await base.AddAsyncCore(entity);
-            await PruneRecentVisitsAsync(entity.EmployeeId);
         }
 
         /// <summary>
@@ -447,10 +444,12 @@ namespace EIMSNext.ApiService
 
             ApplyTarget(entity, target);
             entity.EmployeeId = CurrentEmployeeId;
-            entity.VisitCount = Math.Max(0, entity.VisitCount) + 1;
-            entity.LastVisitTime = Now();
-            var result = await base.ReplaceAsyncCore(entity);
-            await PruneRecentVisitsAsync(entity.EmployeeId);
+            var result = await CoreService.TouchRecentVisitAsync(entity);
+            if (result.MatchedCount == 0)
+            {
+                throw new BadRequestException("最近使用记录不存在");
+            }
+
             return result;
         }
 
@@ -459,10 +458,10 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">最近访问记录 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
-            return base.DeleteAsyncCore(ids);
+            return await base.DeleteAsyncCore(ids);
         }
 
         private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
@@ -505,38 +504,6 @@ namespace EIMSNext.ApiService
             if (employeeId != CurrentEmployeeId)
             {
                 throw new BadRequestException("最近使用记录不存在");
-            }
-        }
-
-        private async Task PruneRecentVisitsAsync(string employeeId)
-        {
-            var records = CoreService.All()
-                .Where(x =>
-                    x.CorpId == IdentityContext.CurrentCorpId &&
-                    x.EmployeeId == employeeId &&
-                    !x.DeleteFlag)
-                .OrderByDescending(x => x.LastVisitTime)
-                .ThenByDescending(x => x.CreateTime)
-                .ToList();
-
-            var seenTargets = new HashSet<string>();
-            var keptCount = 0;
-            var idsToDelete = new List<string>();
-            foreach (var record in records)
-            {
-                var targetKey = $"{record.TargetType}:{record.TargetId}";
-                if (!seenTargets.Add(targetKey) || keptCount >= MaxRecentVisitCount)
-                {
-                    idsToDelete.Add(record.Id);
-                    continue;
-                }
-
-                keptCount++;
-            }
-
-            if (idsToDelete.Count > 0)
-            {
-                await CoreService.DeleteAsync(idsToDelete);
             }
         }
 

@@ -217,6 +217,18 @@ namespace EIMSNext.Flow.Core.Nodes
             return TaskRepository.Delete(filter, session);
         }
 
+        protected Wf_Task? ClaimTask(string workflowInstanceId, string dataId, string nodeId, string employeeId, IClientSessionHandle? session)
+        {
+            var filter = Builders<Wf_Task>.Filter.And(
+                Builders<Wf_Task>.Filter.Eq(x => x.WfInstanceId, workflowInstanceId),
+                Builders<Wf_Task>.Filter.Eq(x => x.DataId, dataId),
+                Builders<Wf_Task>.Filter.Eq(x => x.ApproveNodeId, nodeId),
+                Builders<Wf_Task>.Filter.Eq(x => x.EmployeeId, employeeId));
+            return session == null
+                ? TaskRepository.Collection.FindOneAndDelete(filter)
+                : TaskRepository.Collection.FindOneAndDelete(session, filter);
+        }
+
         public UpdateResult UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
         {
             return FormDataRepository.Update(dataId, Builders<FormData>.Update.Set(x => x.FlowStatus, flowStatus), session: session);
@@ -310,7 +322,19 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task RunEventFlow(EfRunParameter paramter)
         {
-            var efExecResult = await EventFlowRunner.RunAsync(paramter);
+            var isWorkflowTransition = paramter.WorkflowTransition
+                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
+            EfExecResult efExecResult;
+            if (isWorkflowTransition)
+            {
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
+            else
+            {
+                using var suppression = MongoTransactionScope.SuppressAmbient();
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
             if (!efExecResult.Success)
             {
                 throw new UnLogException(efExecResult.Error);

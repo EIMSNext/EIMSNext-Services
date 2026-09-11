@@ -699,6 +699,7 @@ namespace EIMSNext.Service
 
             var efResp = await _flowClient.RunEventFlow(new EfRunRequest
             {
+                ExecutionId = $"form:{entity.Id}:{eventType}:{entity.UpdateTime ?? entity.CreateTime}:{eventIds ?? string.Empty}",
                 DataId = entity.Id,
                 EventSource = ApiClient.Flow.EventSourceType.Form,
                 EventType = eventType,

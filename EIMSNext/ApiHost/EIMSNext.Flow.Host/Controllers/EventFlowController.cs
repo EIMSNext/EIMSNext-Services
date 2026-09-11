@@ -62,6 +62,12 @@ namespace EIMSNext.Flow.Host.Controllers
             if (request.EfCascade == CascadeMode.Never)
                 return ApiResult.Success(new { Id = "", Error = "" }).ToActionResult();
 
+            if (request.EventType.HasFlag(EventType.Approving)
+                || !string.IsNullOrWhiteSpace(request.NodeAction))
+            {
+                return BadRequest("外部 EventFlow 不允许触发工作流节点流转");
+            }
+
             FormData? formData = null;
             Wf_Definition? eventFlow = null;
 
@@ -117,8 +123,10 @@ namespace EIMSNext.Flow.Host.Controllers
                     ResolveStarter(request),
                     request.EfCascade,
                     request.EventIds)
+                .WithExecutionId(request.ExecutionId)
                 .WithEventFlowId(request.EventFlowId)
-                .WithNodeAction(request.NodeAction)
+                .WithNodeAction(null)
+                .WithWorkflowTransition(false)
                 .WithChangeFields(request.ChangeFields);
 
             var efExecResult = await _eventFlowRunner.RunAsync(runParamter);
@@ -203,6 +211,7 @@ namespace EIMSNext.Flow.Host.Controllers
     }
     public class EfRunRequest
     {
+        public string ExecutionId { get; set; } = string.Empty;
         public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }

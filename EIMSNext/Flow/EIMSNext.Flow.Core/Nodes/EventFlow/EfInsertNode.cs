@@ -1,4 +1,5 @@
 using HKH.Mef2.Integration;
+using EIMSNext.Flow.Core.Interfaces;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -15,6 +16,13 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             return ExecuteWithLog(context, dataContext =>
             {
+                var processor = Resolver.Resolve<IEfDataProcessor>();
+                if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
+                {
+                    dataContext.NodeDatas[Metadata.Id] = restored!;
+                    return ExecutionResult.Next();
+                }
+
                 var insertSetting = Metadata!.EfNodeSetting!.InsertSetting!;
                 var formDef = GetFormDef(dataContext, insertSetting.FormId);
 
@@ -22,13 +30,14 @@ namespace EIMSNext.Flow.Core.Nodes
                 {
                     //填充字段
                     var insertDatas = BuildInsertDatas(dataContext, formDef, insertSetting.FieldSettings);
-                    dataContext.NodeDatas.Add(Metadata!.Id, new EfNodeData
+                    var nodeData = new EfNodeData
                     {
                         NodeId = Metadata.Id,
                         SingleResult = Metadata.EfNodeSetting!.SingleResult,
                         FormId = insertSetting.FormId,
                         ActionDatas = insertDatas
-                    });
+                    };
+                    dataContext.NodeDatas[Metadata.Id] = processor.ProcessNode(context.Workflow, nodeData, "insert");
 
                 }
 

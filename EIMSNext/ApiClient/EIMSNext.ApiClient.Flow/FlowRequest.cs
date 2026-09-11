@@ -123,6 +123,7 @@ namespace EIMSNext.ApiClient.Flow
     }
     public class EfRunRequest
     {
+        public string ExecutionId { get; set; } = string.Empty;
         public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }

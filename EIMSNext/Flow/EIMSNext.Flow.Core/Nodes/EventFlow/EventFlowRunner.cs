@@ -35,6 +35,7 @@ namespace EIMSNext.Flow.Core.Nodes
         protected ISyncWorkflowRunner SyncWfRunner => _resolver.Resolve<ISyncWorkflowRunner>();
         protected IScriptEngine ScriptEngine { get; private set; }
         protected ILogger<EventFlowRunner> Logger { get; private set; }
+        private IRepository<WorkflowTransitionExecution> TransitionRepository => _resolver.Resolve<IRepository<WorkflowTransitionExecution>>();
 
 
         public bool IsMeet(Wf_Definition eventFlow, FormData data)
@@ -55,9 +56,42 @@ namespace EIMSNext.Flow.Core.Nodes
         public async Task<EfExecResult> RunAsync(EfRunParameter paramter)
         {
             var execResult = new EfExecResult();
+            if (string.IsNullOrWhiteSpace(paramter.ExecutionId))
+            {
+                paramter.WithExecutionId(Guid.NewGuid().ToString("N"));
+            }
             if (paramter.Cascade == CascadeMode.Never || (paramter.Cascade == CascadeMode.Specified && string.IsNullOrEmpty(paramter.EventIds)))
             {
                 return execResult;
+            }
+
+            var transitionMode = paramter.WorkflowTransition
+                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
+            var session = MongoTransactionScope.Transaction;
+            if (transitionMode)
+            {
+                var transition = TransitionRepository.Find(x => x.ExecutionId == paramter.ExecutionId, session).FirstOrDefault();
+                if (transition?.Status == WorkflowTransitionStatus.Completed)
+                {
+                    return execResult;
+                }
+
+                var now = DateTime.UtcNow.ToTimeStampMs();
+                TransitionRepository.UpdateMany(
+                    TransitionRepository.FilterBuilder.Eq(x => x.ExecutionId, paramter.ExecutionId),
+                    Builders<WorkflowTransitionExecution>.Update
+                        .SetOnInsert(x => x.Id, TransitionRepository.NewId())
+                        .SetOnInsert(x => x.ExecutionId, paramter.ExecutionId)
+                        .SetOnInsert(x => x.WorkflowInstanceId, paramter.WorkflowInstanceId)
+                        .SetOnInsert(x => x.CorpId, paramter.Data.CorpId ?? string.Empty)
+                        .SetOnInsert(x => x.WfNodeId, paramter.WfNodeId)
+                        .SetOnInsert(x => x.NodeAction, paramter.NodeAction ?? string.Empty)
+                        .SetOnInsert(x => x.CreateTime, now)
+                        .Set(x => x.Status, WorkflowTransitionStatus.Running)
+                        .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
+                    upsert: true,
+                    session: session);
             }
 
             var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
@@ -66,7 +100,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 && !x.DeleteFlag
                 && !x.Disabled
                 && x.EventSetting != null
-                && x.EventSource == paramter.EventSource).ToList();
+                && x.EventSource == paramter.EventSource, session).ToList();
 
             if (!string.IsNullOrEmpty(paramter.EventFlowId))
             {
@@ -83,6 +117,43 @@ namespace EIMSNext.Flow.Core.Nodes
                     execResult.Error = string.IsNullOrEmpty(execResult.Error)
                         ? result.Error
                         : $"{execResult.Error}; {result.Error}";
+                }
+            }
+
+            if (transitionMode)
+            {
+                if (string.IsNullOrEmpty(execResult.Error))
+                {
+                    TransitionRepository.UpdateMany(
+                        TransitionRepository.FilterBuilder.Eq(x => x.ExecutionId, paramter.ExecutionId),
+                        Builders<WorkflowTransitionExecution>.Update
+                            .Set(x => x.Status, WorkflowTransitionStatus.EventFlowsCompleted)
+                            .Set(x => x.Error, string.Empty)
+                            .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
+                        upsert: false,
+                        session: session);
+
+                    MongoTransactionScope.RegisterAfterCommit(() =>
+                    {
+                        TransitionRepository.UpdateMany(
+                            TransitionRepository.FilterBuilder.Eq(x => x.ExecutionId, paramter.ExecutionId),
+                            Builders<WorkflowTransitionExecution>.Update
+                                .Set(x => x.Status, WorkflowTransitionStatus.Completed)
+                                .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
+                            upsert: false);
+                        return Task.CompletedTask;
+                    });
+                }
+                else
+                {
+                    TransitionRepository.UpdateMany(
+                        TransitionRepository.FilterBuilder.Eq(x => x.ExecutionId, paramter.ExecutionId),
+                        Builders<WorkflowTransitionExecution>.Update
+                            .Set(x => x.Status, WorkflowTransitionStatus.Failed)
+                            .Set(x => x.Error, execResult.Error ?? string.Empty)
+                            .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
+                        upsert: false,
+                        session: session);
                 }
             }
 
@@ -212,6 +283,15 @@ namespace EIMSNext.Flow.Core.Nodes
                 AppId = paramter.Data.AppId,
                 EventFlowId = eventFlow.Id,
                 RunLogId = runLog?.Id ?? string.Empty,
+                ExecutionId = string.IsNullOrWhiteSpace(paramter.ExecutionId)
+                    ? runLog?.Id ?? Guid.NewGuid().ToString("N")
+                    : paramter.ExecutionId,
+                WorkflowInstanceId = paramter.WorkflowInstanceId,
+                WorkflowTransition = paramter.WorkflowTransition
+                    && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                    && !string.IsNullOrWhiteSpace(paramter.NodeAction),
+                WfNodeId = paramter.WfNodeId,
+                NodeAction = paramter.NodeAction ?? string.Empty,
                 FormId = paramter.Data.FormId,
                 DataId = paramter.Data.Id,
                 TriggerData = paramter.Data,
