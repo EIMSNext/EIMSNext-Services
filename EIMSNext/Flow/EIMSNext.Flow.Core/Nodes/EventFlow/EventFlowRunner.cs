@@ -133,7 +133,7 @@ namespace EIMSNext.Flow.Core.Nodes
                         upsert: false,
                         session: session);
 
-                    MongoTransactionScope.RegisterAfterCommit(() =>
+                    await MongoTransactionScope.RegisterAfterCommitAsync(() =>
                     {
                         TransitionRepository.UpdateMany(
                             TransitionRepository.FilterBuilder.Eq(x => x.ExecutionId, paramter.ExecutionId),

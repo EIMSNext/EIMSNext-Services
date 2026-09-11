@@ -298,10 +298,10 @@ namespace EIMSNext.Core.Services
         /// <param name="entities">要新增的实体集合。</param>
         public virtual async Task AddAsync(IEnumerable<T> entities)
         {
-            using (var scope = NewTransactionScope())
+            await using (var scope = NewTransactionScope())
             {
                 await AddCoreAsync(entities, scope.SessionHandle);
-                scope.CommitTransaction();
+                await scope.CommitTransactionAsync().ConfigureAwait(false);
                 return;
             }
         }
@@ -313,10 +313,10 @@ namespace EIMSNext.Core.Services
         /// <returns>替换结果。</returns>
         public virtual async Task<ReplaceOneResult> ReplaceAsync(T entity)
         {
-            using (var scope = NewTransactionScope())
+            await using (var scope = NewTransactionScope())
             {
                 var result = await ReplaceCoreAsync(entity, scope.SessionHandle);
-                scope.CommitTransaction();
+                await scope.CommitTransactionAsync().ConfigureAwait(false);
                 return result;
             }
         }
@@ -328,10 +328,10 @@ namespace EIMSNext.Core.Services
         /// <returns>删除结果。</returns>
         public virtual async Task<object> DeleteAsync(string id)
         {
-            using (var scope = NewTransactionScope())
+            await using (var scope = NewTransactionScope())
             {
                 var result = await DeleteCoreAsync(FilterBuilder.Eq(x =>x.Id, id), scope.SessionHandle);
-                scope.CommitTransaction();
+                await scope.CommitTransactionAsync().ConfigureAwait(false);
                 return result;
             }
         }
@@ -343,10 +343,10 @@ namespace EIMSNext.Core.Services
         /// <returns>删除结果。</returns>
         public virtual async Task<object> DeleteAsync(IEnumerable<string> ids)
         {
-            using (var scope = NewTransactionScope())
+            await using (var scope = NewTransactionScope())
             {
                 var result = await DeleteCoreAsync(FilterBuilder.In(x => x.Id, ids), scope.SessionHandle);
-                scope.CommitTransaction();
+                await scope.CommitTransactionAsync().ConfigureAwait(false);
                 return result;
             }
         }
@@ -358,10 +358,10 @@ namespace EIMSNext.Core.Services
         /// <returns>删除结果。</returns>
         public virtual async Task<object> DeleteAsync(DynamicFilter filter)
         {
-            using (var scope = NewTransactionScope())
+            await using (var scope = NewTransactionScope())
             {
                 var result = await DeleteCoreAsync(filter.ToFilterDefinition<T>(), scope.SessionHandle);
-                scope.CommitTransaction();
+                await scope.CommitTransactionAsync().ConfigureAwait(false);
                 return result;
             }
         }

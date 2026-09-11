@@ -7,7 +7,7 @@ namespace EIMSNext.Core.Mongo
     /// <summary>
     /// Mongo 事务作用域，管理事务的开启、提交、回滚与会话生命周期。
     /// </summary>
-    public class MongoTransactionScope : IDisposable
+    public class MongoTransactionScope : IDisposable, IAsyncDisposable
     {
         private sealed class ScopeState
         {
@@ -104,6 +104,18 @@ namespace EIMSNext.Core.Mongo
             }
         }
 
+        /// <summary>异步提交事务，并在提交后安排回调。</summary>
+        public async Task CommitTransactionAsync()
+        {
+            if (_isRootScope && SessionHandle?.IsInTransaction == true)
+            {
+                await SessionHandle.CommitTransactionAsync().ConfigureAwait(false);
+                _completed = true;
+                _committedCallbacks = _currentState.Value?.AfterCommit.ToList();
+                _currentState.Value?.AfterCommit.Clear();
+            }
+        }
+
         /// <summary>
         /// 注册事务提交后的回调。
         /// </summary>
@@ -118,6 +130,19 @@ namespace EIMSNext.Core.Mongo
             }
 
             callback().GetAwaiter().GetResult();
+        }
+
+        /// <summary>异步注册事务提交后的回调；无事务时立即异步执行。</summary>
+        public static Task RegisterAfterCommitAsync(Func<Task> callback)
+        {
+            ArgumentNullException.ThrowIfNull(callback);
+            if (_currentState.Value is { Enabled: true } state)
+            {
+                state.AfterCommit.Add(callback);
+                return Task.CompletedTask;
+            }
+
+            return callback();
         }
 
         /// <summary>
@@ -158,6 +183,37 @@ namespace EIMSNext.Core.Mongo
                     {
                         // After-commit work must not turn a committed business transaction into a failure.
                     }
+                }
+            }
+        }
+
+        /// <summary>异步释放事务作用域，并执行已提交回调。</summary>
+        public async ValueTask DisposeAsync()
+        {
+            if (!_isRootScope)
+                return;
+
+            var callbacks = _completed ? _committedCallbacks?.ToArray() : [];
+            try
+            {
+                if (!_completed && SessionHandle?.IsInTransaction == true)
+                    await SessionHandle.AbortTransactionAsync().ConfigureAwait(false);
+            }
+            finally
+            {
+                _currentState.Value = null;
+                SessionHandle?.Dispose();
+            }
+
+            foreach (var callback in callbacks ?? [])
+            {
+                try
+                {
+                    await callback().ConfigureAwait(false);
+                }
+                catch
+                {
+                    // After-commit work must not turn a committed transaction into a failure.
                 }
             }
         }
