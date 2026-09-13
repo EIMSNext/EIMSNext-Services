@@ -371,13 +371,14 @@ namespace EIMSNext.Service
                 .ToList();
             if (idList.Count == 0) return;
 
-            using var scope = NewTransactionScope();
             var filter = FilterBuilder.And(
                 FilterBuilder.In(x => x.Id, idList),
                 FilterBuilder.Eq(x => x.DeleteFlag, true));
             var update = UpdateBuilder.Set(x => x.DeleteFlag, false);
-            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
-            scope.CommitTransaction();
+            await ExecuteWithTransactionRetryAsync(async session =>
+            {
+                await PatchManyCoreAsync(filter, update, false, session).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
         public async Task PurgeAsync(IEnumerable<string> ids)
@@ -388,9 +389,10 @@ namespace EIMSNext.Service
                 .ToList();
             if (idList.Count == 0) return;
 
-            using var scope = NewTransactionScope();
-            await PurgeCoreAsync(idList, scope.SessionHandle);
-            scope.CommitTransaction();
+            await ExecuteWithTransactionRetryAsync(async session =>
+            {
+                await PurgeCoreAsync(idList, session).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
         public override async Task<object> DeleteAsync(DynamicFilter filter)
