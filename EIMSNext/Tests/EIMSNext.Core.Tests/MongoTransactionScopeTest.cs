@@ -171,6 +171,39 @@ namespace EIMSNext.Core.Tests
             root.AbortTransaction();
         }
 
+        [TestMethod]
+        public void SyncRetryExecutorRejectsNegativeRetryCount()
+        {
+            try { MongoTransactionScope.ExecuteWithRetry(_dbContext!, _ => 1, maxRetries: -1); Assert.Fail(); }
+            catch (ArgumentOutOfRangeException) { }
+        }
+
+        [TestMethod]
+        public void SyncRetryExecutorDoesNotRetryNonTransientErrors()
+        {
+            var calls = 0;
+            try { MongoTransactionScope.ExecuteWithRetry<int>(_dbContext!, _ =>
+                {
+                    calls++;
+                    throw new InvalidOperationException("expected");
+                }, maxRetries: 1); Assert.Fail(); }
+            catch (InvalidOperationException) { }
+            Assert.AreEqual(1, calls);
+        }
+
+        [TestMethod]
+        public async Task AsyncRetryExecutorDoesNotRetryNonTransientErrors()
+        {
+            var calls = 0;
+            try { await MongoTransactionScope.ExecuteWithRetryAsync(_dbContext!, _ =>
+                {
+                    calls++;
+                    return Task.FromException<int>(new InvalidOperationException("expected"));
+                }, maxRetries: 1); Assert.Fail(); }
+            catch (InvalidOperationException) { }
+            Assert.AreEqual(1, calls);
+        }
+
         [TestInitialize]
         public void Init()
         {

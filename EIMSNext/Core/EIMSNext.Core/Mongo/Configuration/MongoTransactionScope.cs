@@ -174,6 +174,13 @@ namespace EIMSNext.Core.Mongo
             CancellationToken cancellationToken = default)
             => ExecuteWithRetryAsync<object?>(dbContext, async session => { await operation(session).ConfigureAwait(false); return null; }, transactionOptions, maxRetries, cancellationToken);
 
+        /// <summary>同步执行事务，并对瞬态事务冲突自动重试。</summary>
+        /// <typeparam name="TResult">操作返回值类型。</typeparam>
+        /// <param name="dbContext">Mongo 数据库上下文。</param>
+        /// <param name="operation">接收事务 session 的业务操作。</param>
+        /// <param name="transactionOptions">可选事务配置。</param>
+        /// <param name="maxRetries">最大重试次数；未指定时读取数据库配置。</param>
+        /// <returns>业务操作返回值。</returns>
         public static TResult ExecuteWithRetry<TResult>(IMongoDbContex dbContext, Func<IClientSessionHandle, TResult> operation, TransactionOptions? transactionOptions = null, int? maxRetries = null)
         {
             var retryCount = maxRetries ?? dbContext.TransactionConfiguration.TransactionMaxRetries;
