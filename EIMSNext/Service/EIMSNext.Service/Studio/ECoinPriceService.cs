@@ -3,6 +3,7 @@ using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
+using MongoDB.Driver;
 
 namespace EIMSNext.Service
 {
@@ -10,30 +11,31 @@ namespace EIMSNext.Service
     {
         public async Task<IReadOnlyList<ECoinPrice>> BatchUpsertAsync(IReadOnlyList<ECoinPrice> items)
         {
+            return await ExecuteWithTransactionRetryAsync(async session =>
+            {
             var result = new List<ECoinPrice>(items.Count);
-            using var scope = NewTransactionScope();
             foreach (var item in items)
             {
-                var existing = Repository.Queryable.FirstOrDefault(x =>
-                    x.TargetType == item.TargetType && x.FeatureId == item.FeatureId);
-                if (existing == null)
+                var current = Repository.Find(x =>
+                    x.TargetType == item.TargetType && x.FeatureId == item.FeatureId, session).FirstOrDefault();
+                if (current == null)
                 {
                     item.Id = Repository.NewId();
-                    await Repository.InsertAsync(item);
+                    await Repository.InsertAsync(item, session);
                     result.Add(item);
                 }
                 else
                 {
-                    existing.FeatureDesc = item.FeatureDesc;
-                    existing.Price = item.Price;
-                    existing.ChargeType = item.ChargeType;
-                    existing.PluginId = item.PluginId;
-                    await Repository.ReplaceAsync(existing);
-                    result.Add(existing);
+                    current.FeatureDesc = item.FeatureDesc;
+                    current.Price = item.Price;
+                    current.ChargeType = item.ChargeType;
+                    current.PluginId = item.PluginId;
+                    await Repository.ReplaceAsync(current, session);
+                    result.Add(current);
                 }
             }
-            scope.CommitTransaction();
-            return result;
+            return (IReadOnlyList<ECoinPrice>)result;
+            }).ConfigureAwait(false);
         }
     }
 }

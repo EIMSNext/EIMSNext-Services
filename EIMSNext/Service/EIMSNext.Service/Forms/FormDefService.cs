@@ -83,9 +83,10 @@ namespace EIMSNext.Service
                 ? UpdateBuilder.Set(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>())
                 : UpdateBuilder.PullFilter(x => x.Content.FieldChangeLogs, x => normalizedIds.Contains(x.FieldId));
 
-            using var scope = NewTransactionScope();
-            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
-            scope.CommitTransaction();
+            await ExecuteWithTransactionRetryAsync(async session =>
+            {
+                await PatchManyCoreAsync(filter, update, false, session).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
         internal static void ReconcileFieldChangeLogs(
