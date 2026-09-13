@@ -153,6 +153,29 @@ namespace EIMSNext.Core.Services
         }
 
         /// <summary>
+        /// 
+        /// </summary>
+        /// <typeparam name="TResult"></typeparam>
+        /// <param name="operation"></param>
+        /// <param name="options"></param>
+        /// <param name="maxRetries"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        protected Task<TResult> ExecuteWithTransactionRetryAsync<TResult>(Func<IClientSessionHandle, Task<TResult>> operation, TransactionOptions? options = null, int? maxRetries = null, CancellationToken cancellationToken = default)
+            => MongoTransactionScope.ExecuteWithRetryAsync(Repository.DbContext, operation, options, maxRetries, cancellationToken);
+
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="operation"></param>
+        /// <param name="options"></param>
+        /// <param name="maxRetries"></param>
+        /// <param name="cancellationToken"></param>
+        /// <returns></returns>
+        protected Task ExecuteWithTransactionRetryAsync(Func<IClientSessionHandle, Task> operation, TransactionOptions? options = null, int? maxRetries = null, CancellationToken cancellationToken = default)
+            => MongoTransactionScope.ExecuteWithRetryAsync(Repository.DbContext, operation, options, maxRetries, cancellationToken);
+
+        /// <summary>
         /// 记录审计日志。
         /// </summary>
         /// <param name="action">数据库操作类型。</param>
@@ -181,7 +204,25 @@ namespace EIMSNext.Core.Services
 
             if (logList.Count > 0)
             {
-                AuditLogRepository.Insert(logList, session);
+                if (session != null)
+                {
+                    // TODO: 后续改为分布式审计队列，确保审计失败可重试且不阻塞业务事务。
+                    MongoTransactionScope.RegisterAfterCommitAsync(async () =>
+                    {
+                        try
+                        {
+                            await AuditLogRepository.InsertAsync(logList).ConfigureAwait(false);
+                        }
+                        catch (Exception ex)
+                        {
+                            Logger.LogError(ex, "事务提交后的审计日志写入失败，实体类型: {EntityType}", typeof(T).Name);
+                        }
+                    });
+                }
+                else
+                {
+                    AuditLogRepository.Insert(logList);
+                }
             }
         }
 

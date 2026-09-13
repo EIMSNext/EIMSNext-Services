@@ -151,6 +151,26 @@ namespace EIMSNext.Core.Tests
             root.AbortTransaction();
         }
 
+        [TestMethod]
+        public async Task RetryExecutorReusesAmbientTransaction()
+        {
+            await using var root = new MongoTransactionScope(_dbContext!);
+            var ambient = root.SessionHandle;
+            var calls = 0;
+            var result = await MongoTransactionScope.ExecuteWithRetryAsync(
+                _dbContext!,
+                session =>
+                {
+                    calls++;
+                    Assert.AreSame(ambient, session);
+                    return Task.FromResult(42);
+                }, maxRetries: 1);
+
+            Assert.AreEqual(42, result);
+            Assert.AreEqual(1, calls);
+            root.AbortTransaction();
+        }
+
         [TestInitialize]
         public void Init()
         {

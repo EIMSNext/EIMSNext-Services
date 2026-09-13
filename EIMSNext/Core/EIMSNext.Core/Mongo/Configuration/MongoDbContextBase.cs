@@ -8,6 +8,8 @@ namespace EIMSNext.Core.Mongo
     /// </summary>
     public interface IMongoDbContex : IDisposable
     {
+        /// <summary>获取事务配置。</summary>
+        MongoDbConfiguration TransactionConfiguration => new();
         /// <summary>
         /// 获取指定实体类型的集合。
         /// </summary>
@@ -43,6 +45,8 @@ namespace EIMSNext.Core.Mongo
     public abstract class MongoDbContextBase : IMongoDbContex, IDisposable
     {
         private readonly IMongoClient _client;
+        /// <summary>获取事务配置。</summary>
+        public MongoDbConfiguration TransactionConfiguration { get; }
 
         /// <summary>
         /// 使用配置选项初始化 <see cref="MongoDbContextBase"/> 类的新实例。
@@ -59,6 +63,7 @@ namespace EIMSNext.Core.Mongo
         /// <param name="setting">Mongo 配置对象。</param>
         protected MongoDbContextBase(MongoDbConfiguration setting)
         {
+            TransactionConfiguration = setting;
             if (setting.ConnectionString == null)
                 throw new ArgumentNullException(nameof(setting), "MongoDbConfiguration.ConnectionString cannot be null.");
 

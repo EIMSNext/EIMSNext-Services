@@ -43,19 +43,19 @@ namespace EIMSNext.Flow.Core.Nodes
                 {
                     case ApproveAction.Approve:
                         {
-                            Wf_Task? task;
-                            using (var scope = TaskRepository.NewTransactionScope())
+                            Wf_Task? task = null;
+                            await MongoTransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, async session =>
                             {
-                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, scope.SessionHandle);
+                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, session);
                                 if (task != null)
                                 {
                                     //写入审批记录
-                                    AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, scope.SessionHandle);
+                                    AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, session);
 
                                     if (meta.WfNodeSetting!.ApproveSetting!.ApprovalMode == WfApprovalMode.CounterSign)
                                     {
                                         //会签时，所有人通过，才为审批通过
-                                        var remainTaskCnt = TaskRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id, scope.SessionHandle).CountDocuments();
+                                        var remainTaskCnt = TaskRepository.Find(x => x.DataId == dataContext.DataId && x.ApproveNodeId == meta.Id, session).CountDocuments();
                                         if (remainTaskCnt > 0)
                                         {
                                             //审批还没完成，重置事件继续等待
@@ -76,7 +76,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                     else
                                     {
                                         //或签时，任何一人通过，即为审批通过, 删除所有当前节点待办
-                                        DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
+                                        DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, session);
 
                                         var formData = GetFormData(dataContext.DataId);
                                         await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
@@ -88,36 +88,35 @@ namespace EIMSNext.Flow.Core.Nodes
                                         result = ApproveResult.Next;
                                     }
 
-                                    scope.CommitTransaction();
                                 }
-                            }
+                            }).ConfigureAwait(false);
                             CreateExecLog(context.Workflow, dataContext, meta, approveData, task == null ? "没有审批权限" : string.Empty);
                         }
                         break;
                     case ApproveAction.Reject:
                         {
-                            Wf_Task? task;
-                            using (var scope = TaskRepository.NewTransactionScope())
+                            Wf_Task? task = null;
+                            await MongoTransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, async session =>
                             {
-                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, scope.SessionHandle);
+                                task = ClaimTask(context.Workflow.Id, dataContext.DataId, meta.Id, approveData.WorkerId, session);
                                 if (task != null)
                                 {
-                                    UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, scope.SessionHandle);
+                                    UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Rejected, session);
 
                                     //写入审批记录
-                                    AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, scope.SessionHandle);
+                                    AddTaskLog(context.Workflow, task, dataContext, Metadata!, approveData, session);
 
                                     //当前任务已在 ClaimTask 中原子占用；其余待办一并删除。
-                                    DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, scope.SessionHandle);
+                                    DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id, session);
 
                                     var formData = GetFormData(dataContext.DataId);
-                                    await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds));
+                                    await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                        .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:rejected"));
 
                                     result = ApproveResult.Persist;
 
-                                    scope.CommitTransaction();
                                 }
-                            }
+                            }).ConfigureAwait(false);
                             if (task != null)
                             {
                                 //TODO：终止流程，将来可以改单据状态为草稿，允许重启流程
@@ -166,11 +165,11 @@ namespace EIMSNext.Flow.Core.Nodes
                         string.Empty,
                         Guid.NewGuid().ToString());
 
-                    using (var scope = TaskRepository.NewTransactionScope())
+                    await MongoTransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, session =>
                     {
-                        AddTaskLog(context.Workflow, new Wf_Task { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, autoApproveData, scope.SessionHandle);
-                        scope.CommitTransaction();
-                    }
+                        AddTaskLog(context.Workflow, new Wf_Task { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, autoApproveData, session);
+                        return Task.CompletedTask;
+                    }).ConfigureAwait(false);
 
                     CreateExecLog(context.Workflow, dataContext, meta, autoApproveData);
                     return ExecutionResult.Next();
@@ -198,11 +197,11 @@ namespace EIMSNext.Flow.Core.Nodes
                             string.Empty,
                             Guid.NewGuid().ToString());
 
-                        using (var scope = TaskRepository.NewTransactionScope())
+                        await MongoTransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, session =>
                         {
-                            AddTaskLog(context.Workflow, new Wf_Task { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, noApproverApproveData, scope.SessionHandle);
-                            scope.CommitTransaction();
-                        }
+                            AddTaskLog(context.Workflow, new Wf_Task { DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId) }, dataContext, Metadata!, noApproverApproveData, session);
+                            return Task.CompletedTask;
+                        }).ConfigureAwait(false);
 
                         CreateExecLog(context.Workflow, dataContext, meta, noApproverApproveData);
                         return ExecutionResult.Next();

@@ -9,6 +9,9 @@ namespace EIMSNext.Core.Mongo
     /// </summary>
     public class MongoTransactionScope : IDisposable, IAsyncDisposable
     {
+        private const string TransientTransactionError = "TransientTransactionError";
+        private const string UnknownTransactionCommitResult = "UnknownTransactionCommitResult";
+        private const int WriteConflictCode = 112;
         private sealed class ScopeState
         {
             public IClientSessionHandle? SessionHandle { get; init; }
@@ -44,7 +47,10 @@ namespace EIMSNext.Core.Mongo
                 return;
             }
 
-            var options = transOptions ?? new TransactionOptions(readConcern: ReadConcern.Majority, writeConcern: WriteConcern.WMajority);
+            var config = dbContex.TransactionConfiguration ?? new MongoDbConfiguration();
+            var options = transOptions ?? new TransactionOptions(
+                readConcern: ParseReadConcern(config.TransactionReadConcern),
+                writeConcern: ParseWriteConcern(config.TransactionWriteConcern));
             var session = dbContex.StartSession();
             session.StartTransaction(options);
             SessionHandle = session;
@@ -144,6 +150,122 @@ namespace EIMSNext.Core.Mongo
 
             return callback();
         }
+
+        private static ReadConcern ParseReadConcern(string? value) => (value ?? "majority").ToLowerInvariant() switch
+        {
+            "local" => ReadConcern.Local, "majority" => ReadConcern.Majority,
+            "snapshot" => ReadConcern.Snapshot,
+            _ => throw new InvalidOperationException($"不支持的 Mongo TransactionReadConcern: {value}")
+        };
+
+        private static WriteConcern ParseWriteConcern(string? value) => (value ?? "majority").ToLowerInvariant() switch
+        {
+            "acknowledged" => WriteConcern.Acknowledged,
+            "majority" => WriteConcern.WMajority, "journaled" => new WriteConcern(journal: true),
+            _ => throw new InvalidOperationException($"不支持的 Mongo TransactionWriteConcern: {value}")
+        };
+
+        /// <summary>执行事务并对瞬态冲突进行重试。</summary>
+        public static Task ExecuteWithRetryAsync(
+            IMongoDbContex dbContext,
+            Func<IClientSessionHandle, Task> operation,
+            TransactionOptions? transactionOptions = null,
+            int? maxRetries = null,
+            CancellationToken cancellationToken = default)
+            => ExecuteWithRetryAsync<object?>(dbContext, async session => { await operation(session).ConfigureAwait(false); return null; }, transactionOptions, maxRetries, cancellationToken);
+
+        public static TResult ExecuteWithRetry<TResult>(IMongoDbContex dbContext, Func<IClientSessionHandle, TResult> operation, TransactionOptions? transactionOptions = null, int? maxRetries = null)
+        {
+            var retryCount = maxRetries ?? dbContext.TransactionConfiguration.TransactionMaxRetries;
+            if (retryCount < 0) throw new ArgumentOutOfRangeException(nameof(maxRetries));
+            Exception? last = null;
+            for (var attempt = 0; attempt <= retryCount; attempt++)
+            {
+                using var scope = new MongoTransactionScope(dbContext, transactionOptions);
+                try
+                {
+                    var result = operation(scope.SessionHandle!);
+                    CommitWithRetry(scope);
+                    return result;
+                }
+                catch (Exception ex) when (IsTransient(ex) && attempt < retryCount)
+                {
+                    last = ex;
+                    Thread.Sleep(TimeSpan.FromMilliseconds(Math.Min(1000, 50 * Math.Pow(2, attempt)) + Random.Shared.Next(25)));
+                }
+            }
+            throw last!;
+        }
+
+        private static void CommitWithRetry(MongoTransactionScope scope)
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try { scope.CommitTransaction(); return; }
+                catch (Exception ex) when (HasLabel(ex, UnknownTransactionCommitResult) && attempt < 1)
+                {
+                    Thread.Sleep(25);
+                }
+            }
+        }
+
+        /// <summary>执行有返回值的事务并对瞬态冲突进行重试。</summary>
+        public static async Task<TResult> ExecuteWithRetryAsync<TResult>(
+            IMongoDbContex dbContext,
+            Func<IClientSessionHandle, Task<TResult>> operation,
+            TransactionOptions? transactionOptions = null,
+            int? maxRetries = null,
+            CancellationToken cancellationToken = default)
+        {
+            ArgumentNullException.ThrowIfNull(dbContext);
+            ArgumentNullException.ThrowIfNull(operation);
+            var retryCount = maxRetries ?? dbContext.TransactionConfiguration.TransactionMaxRetries;
+            if (retryCount < 0) throw new ArgumentOutOfRangeException(nameof(maxRetries));
+            if (IsInTransaction)
+                return await operation(Transaction!).ConfigureAwait(false);
+
+            Exception? last = null;
+            for (var attempt = 0; attempt <= retryCount; attempt++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                await using var scope = new MongoTransactionScope(dbContext, transactionOptions);
+                try
+                {
+                    var result = await operation(scope.SessionHandle!).ConfigureAwait(false);
+                    await CommitWithRetryAsync(scope, cancellationToken).ConfigureAwait(false);
+                    return result;
+                }
+                catch (Exception ex) when (IsTransient(ex) && attempt < retryCount)
+                {
+                    last = ex;
+                    await DelayAsync(attempt, cancellationToken).ConfigureAwait(false);
+                }
+            }
+            throw last!;
+        }
+
+        private static async Task CommitWithRetryAsync(MongoTransactionScope scope, CancellationToken cancellationToken)
+        {
+            const int maxCommitRetries = 1;
+            for (var attempt = 0; ; attempt++)
+            {
+                try { await scope.CommitTransactionAsync().ConfigureAwait(false); return; }
+                catch (Exception ex) when (HasLabel(ex, UnknownTransactionCommitResult))
+                {
+                    if (attempt >= maxCommitRetries) throw;
+                    await Task.Delay(TimeSpan.FromMilliseconds(25 * (attempt + 1)), cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private static bool IsTransient(Exception ex)
+            => HasLabel(ex, TransientTransactionError) || ex is MongoWriteException w && w.WriteError?.Code == WriteConflictCode || ex is MongoBulkWriteException b && b.WriteErrors.Any(e => e.Code == WriteConflictCode);
+
+        private static bool HasLabel(Exception ex, string label)
+            => ex is MongoException m && m.HasErrorLabel(label) || ex.InnerException != null && HasLabel(ex.InnerException, label);
+
+        private static Task DelayAsync(int attempt, CancellationToken cancellationToken)
+            => Task.Delay(TimeSpan.FromMilliseconds(Math.Min(1000, 50 * Math.Pow(2, attempt)) + Random.Shared.Next(25)), cancellationToken);
 
         /// <summary>
         /// 中止事务。

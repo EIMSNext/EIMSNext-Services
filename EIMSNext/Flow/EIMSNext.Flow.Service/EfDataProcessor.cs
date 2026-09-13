@@ -76,14 +76,25 @@ namespace EIMSNext.Flow.Service
 
         public EfNodeData ProcessNode(WorkflowInstance inst, EfNodeData nodeData, string actionType)
         {
+            if (MongoTransactionScope.IsInTransaction)
+                return ProcessNodeCore(inst, nodeData, actionType, MongoTransactionScope.Transaction!);
+
+            return MongoTransactionScope.ExecuteWithRetry(
+                WfDefinitionRepository.DbContext,
+                session => ProcessNodeCore(inst, nodeData, actionType, session),
+                maxRetries: 1);
+        }
+
+        private EfNodeData ProcessNodeCore(WorkflowInstance inst, EfNodeData nodeData, string actionType, IClientSessionHandle session)
+        {
             var dataContext = (EfDataContext)inst.Data;
             InitServiceContext(dataContext);
             var executionId = string.IsNullOrWhiteSpace(dataContext.ExecutionId) ? inst.Id : dataContext.ExecutionId;
-            var actions = nodeData.ActionDatas;
+            var actions = nodeData.ActionDatas
+                .Select(x => new ActionFormData { State = x.State, FormData = x.FormData, Persisted = x.Persisted, WorkflowStarted = x.WorkflowStarted })
+                .ToList();
             try
             {
-                using var scope = WfDefinitionRepository.NewTransactionScope();
-                var session = scope.SessionHandle;
                 var restoredActions = new List<ActionFormData>();
                 var now = DateTime.UtcNow.ToTimeStampMs();
                 foreach (var action in actions)
@@ -154,9 +165,7 @@ namespace EIMSNext.Flow.Service
                         {
                             ReturnDocument = ReturnDocument.After
                         };
-                        execution = session == null
-                            ? NodeExecutionRepository.Collection.FindOneAndUpdate(claimFilter, claimUpdate, claimOptions)
-                            : NodeExecutionRepository.Collection.FindOneAndUpdate(session, claimFilter, claimUpdate, claimOptions);
+                        execution = NodeExecutionRepository.Collection.FindOneAndUpdate(session, claimFilter, claimUpdate, claimOptions);
                         if (execution == null)
                         {
                             throw new InvalidOperationException($"EventFlow 节点已被其他请求接管: {executionKey}");
@@ -233,7 +242,6 @@ namespace EIMSNext.Flow.Service
                         upsert: false,
                         session: session);
                 }
-                scope.CommitTransaction();
                 return nodeData;
             }
             catch (MongoWriteException ex) when (IsExecutionKeyDuplicate(ex))

@@ -156,12 +156,7 @@ namespace EIMSNext.Core.Services
         /// <returns>替换结果。</returns>
         public virtual ReplaceOneResult Replace(T entity)
         {
-            using (var scope = NewTransactionScope())
-            {
-                var result = ReplaceCore(entity, scope.SessionHandle);
-                scope.CommitTransaction();
-                return result;
-            }
+            return ReplaceCore(entity, null);
         }
 
         /// <summary>
@@ -171,12 +166,7 @@ namespace EIMSNext.Core.Services
         /// <returns>删除结果。</returns>
         public virtual object Delete(string id)
         {
-            using (var scope = NewTransactionScope())
-            {
-                var result = DeleteCore(FilterBuilder.Eq(x => x.Id, id), scope.SessionHandle);
-                scope.CommitTransaction();
-                return result;
-            }
+            return DeleteCore(FilterBuilder.Eq(x => x.Id, id), null);
         }
 
         /// <summary>
@@ -313,12 +303,7 @@ namespace EIMSNext.Core.Services
         /// <returns>替换结果。</returns>
         public virtual async Task<ReplaceOneResult> ReplaceAsync(T entity)
         {
-            await using (var scope = NewTransactionScope())
-            {
-                var result = await ReplaceCoreAsync(entity, scope.SessionHandle);
-                await scope.CommitTransactionAsync().ConfigureAwait(false);
-                return result;
-            }
+            return await ReplaceCoreAsync(entity, null).ConfigureAwait(false);
         }
 
         /// <summary>
@@ -328,12 +313,7 @@ namespace EIMSNext.Core.Services
         /// <returns>删除结果。</returns>
         public virtual async Task<object> DeleteAsync(string id)
         {
-            await using (var scope = NewTransactionScope())
-            {
-                var result = await DeleteCoreAsync(FilterBuilder.Eq(x =>x.Id, id), scope.SessionHandle);
-                await scope.CommitTransactionAsync().ConfigureAwait(false);
-                return result;
-            }
+            return await DeleteCoreAsync(FilterBuilder.Eq(x =>x.Id, id), null).ConfigureAwait(false);
         }
 
         /// <summary>

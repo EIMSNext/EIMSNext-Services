@@ -3,6 +3,7 @@ using HKH.Mef2.Integration;
 using EIMSNext.Component;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
@@ -56,16 +57,23 @@ namespace EIMSNext.Service
 
         public async Task<Wf_Definition> ActivateAsync(string id)
         {
-            var entity = Get(id) ?? throw new InvalidOperationException("流程版本不存在");
+            return await MongoTransactionScope.ExecuteWithRetryAsync(
+                Repository.DbContext,
+                async session =>
+                {
+                    var entity = GetCore(id, session) ?? throw new InvalidOperationException("流程版本不存在");
+                    Repository.UpdateMany(
+                        Builders<Wf_Definition>.Filter.And(
+                            FilterBuilder.Eq(x => x.ExternalId, entity.ExternalId),
+                            FilterBuilder.Eq(x => x.IsCurrent, true),
+                            FilterBuilder.Ne(x => x.Id, entity.Id)),
+                        UpdateBuilder.Set(x => x.IsCurrent, false), upsert: false, session: session);
 
-            Repository.UpdateMany(
-                FilterBuilder.Eq(x => x.ExternalId, entity.ExternalId),
-                UpdateBuilder.Set(x => x.IsCurrent, false));
-
-            entity.IsCurrent = true;
-            entity.Released = true;
-            await ReplaceAsync(entity);
-            return entity;
+                    entity.IsCurrent = true;
+                    entity.Released = true;
+                    await ReplaceAsync(entity);
+                    return entity;
+                }).ConfigureAwait(false);
         }
 
         protected override Task BeforeAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)

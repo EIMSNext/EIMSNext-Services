@@ -68,11 +68,11 @@ namespace EIMSNext.Identity.Extensions
                         nameof(EIMSNext.ApiService.PublicScope.QueryLink));
 
                     options.AllowPasswordFlow();
+                    options.AllowClientCredentialsFlow();
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.VerificationCode);
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.SingleSignOn);
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.Public);
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.System);
-                    options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.ClientCredentials);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();
