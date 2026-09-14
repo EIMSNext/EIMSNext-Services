@@ -8,5 +8,6 @@ namespace EIMSNext.Flow.Persistence
         IQueryable<WorkflowInstance> GetWorkflowInstances();
         IQueryable<WorkflowInstance> GetWorkflowInstancesByReference(IEnumerable<string> references, WorkflowStatus? status);
         IQueryable<WorkflowInstance> GetWorkflowInstancesByDefId(IEnumerable<string> defIds, WorkflowStatus? status);
+        Task ClearWorkflowRuntime(string workflowInstanceId, CancellationToken cancellationToken = default);
     }
 }

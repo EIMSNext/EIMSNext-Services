@@ -132,6 +132,12 @@ namespace EIMSNext.Flow.Persistence
             return WorkflowInstances.AsQueryable();
         }
 
+        public async Task ClearWorkflowRuntime(string workflowInstanceId, CancellationToken cancellationToken = default)
+        {
+            await EventSubscriptions.DeleteManyAsync(x => x.WorkflowId == workflowInstanceId, cancellationToken);
+            await ExecutionErrors.DeleteManyAsync(x => x.WorkflowId == workflowInstanceId, cancellationToken);
+        }
+
         public async Task<string> CreateEventSubscription(EventSubscription subscription, CancellationToken cancellationToken = default)
         {
             await EventSubscriptions.InsertOneAsync(subscription, cancellationToken: cancellationToken);
