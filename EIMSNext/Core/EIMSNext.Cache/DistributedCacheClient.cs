@@ -120,6 +120,16 @@ namespace EIMSNext.Cache
             return Task.FromResult(Increment(key, delta, ttl, scope, scopeId));
         }
 
+        public async Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            var cacheKey = GetKey(key, scope, scopeId);
+            if (_redis != null)
+                return await _redis.GetDatabase().StringSetAsync(cacheKey, value, ttl, When.NotExists);
+            if (await _cache.GetStringAsync(cacheKey) != null) return false;
+            await _cache.SetStringAsync(cacheKey, value, new DistributedCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
+            return true;
+        }
+
         private long IncrementLocally(string cacheKey, long delta, TimeSpan ttl)
         {
             var currentString = _cache.GetString(cacheKey);

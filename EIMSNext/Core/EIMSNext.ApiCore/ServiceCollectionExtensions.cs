@@ -1,4 +1,5 @@
 using EIMSNext.ApiCore.RateLimiting;
+using EIMSNext.ApiCore.Idempotency;
 using EIMSNext.Cache;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo;
@@ -54,6 +55,7 @@ namespace EIMSNext.ApiCore
 
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
+            services.Configure<IdempotencyOptions>(configuration.GetSection("Idempotency"));
             services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
             services.Configure<StorageConfiguration>(configuration.GetSection("Storage"));
             services.Configure<CorsOptions>(configuration.GetSection("Cors"));

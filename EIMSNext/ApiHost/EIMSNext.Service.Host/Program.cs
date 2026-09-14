@@ -1,6 +1,7 @@
 using Asp.Versioning;
 
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Idempotency;
 using EIMSNext.Plugin.Runtime;
 using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
@@ -120,6 +121,7 @@ app.UseODataQueryRequest();
 
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<IdempotencyMiddleware>();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
