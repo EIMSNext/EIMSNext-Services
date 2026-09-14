@@ -277,7 +277,11 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可撤回");
             }
 
-            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            {
+                return BadRequest("当前流程无可操作待办");
+            }
             if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可撤回");
@@ -312,6 +316,10 @@ namespace EIMSNext.Flow.Host.Controllers
                 formDef?.Name ?? string.Empty,
                 request.Comment);
 
+            // Clear runtime artifacts as part of withdrawal so a later resubmission
+            // starts with a clean workflow runtime.
+            await _store.ClearWorkflowRuntime(wfInst.Id);
+
             return ApiResult.Success(new { id = result.WorkflowInstanceId }).ToActionResult();
         }
 
@@ -329,7 +337,11 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可催办");
             }
 
-            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            {
+                return BadRequest("当前流程无可操作待办");
+            }
             if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
             {
                 return BadRequest("仅流程发起人可催办");
@@ -369,7 +381,11 @@ namespace EIMSNext.Flow.Host.Controllers
                 return Ok(new WorkflowActionStatusResponse());
             }
 
-            var task = _taskService.Query(x => x.WfInstanceId == wfInst.Id).FirstOrDefault();
+            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            {
+                return Ok(new WorkflowActionStatusResponse());
+            }
             var definition = _defservice.Query(x => x.ExternalId == wfInst.WorkflowDefinitionId && x.Version == wfInst.Version).FirstOrDefault();
             var status = _workflowActionService.GetActionStatus(IdentityContext.CurrentEmployee.Id, task, definition);
 
@@ -648,7 +664,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 data.EfCascade,
                 data.EventIds)
             {
-                Round = existingData.Round
+                Round = existingData.Round + 1
             };
 
             wfInst.Data = restartData.ToExpando();
