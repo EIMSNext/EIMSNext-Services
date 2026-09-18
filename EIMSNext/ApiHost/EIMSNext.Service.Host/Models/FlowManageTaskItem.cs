@@ -23,3 +23,4 @@ namespace EIMSNext.Service.Host.Models
         public long Total { get; set; }
     }
 }
+

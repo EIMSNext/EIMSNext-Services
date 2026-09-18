@@ -12,7 +12,7 @@
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" />
     <PackageReference Include="Quartz.Serialization.Json" />
-    <PackageReference Include="quartz-store-mongodb" />
+    <PackageReference Include="Npgsql" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
@@ -25,7 +25,7 @@
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Notification\EIMSNext.Notification.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />

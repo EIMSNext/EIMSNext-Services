@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
   </ItemGroup>
 </Project>
+

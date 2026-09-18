@@ -5,3 +5,4 @@ namespace EIMSNext.Service.Host.Requests
         public string? Avatar { get; set; }
     }
 }
+

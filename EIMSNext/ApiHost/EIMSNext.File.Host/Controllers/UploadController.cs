@@ -201,3 +201,4 @@ namespace EIMSNext.File.Host.Controllers
         private static bool StartsWith(ReadOnlySpan<byte> content, ReadOnlySpan<byte> signature) => content.StartsWith(signature);
     }
 }
+

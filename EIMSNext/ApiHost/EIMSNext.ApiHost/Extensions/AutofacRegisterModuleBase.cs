@@ -25,7 +25,7 @@ namespace EIMSNext.ApiHost.Extensions
         protected override void Load(ContainerBuilder builder)
         {
             builder.RegisterType<AppSetting>().AsSelf().SingleInstance();
-            builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).SingleInstance();
+            builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).InstancePerLifetimeScope();
             builder.RegisterType<AggregateService>().AsSelf().SingleInstance();
             builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterType<IdentityContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
@@ -43,3 +43,4 @@ namespace EIMSNext.ApiHost.Extensions
         }
     }
 }
+

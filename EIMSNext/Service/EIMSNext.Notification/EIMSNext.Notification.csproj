@@ -19,3 +19,4 @@
     <ProjectReference Include="..\EIMSNext.Notification.Contracts\EIMSNext.Notification.Contracts.csproj" />
   </ItemGroup>
 </Project>
+

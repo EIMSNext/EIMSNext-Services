@@ -17,3 +17,4 @@ namespace EIMSNext.Service.Host.Extensions
         public static ApiVersion V2 = new ApiVersion(2.0);
     }
 }
+

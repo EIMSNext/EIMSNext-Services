@@ -19,6 +19,7 @@ using EIMSNext.ApiService;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
+using EIMSNext.Persistence.PostgreSql;
 
 using HKH.Mef2.Integration;
 
@@ -37,6 +38,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigWebEnvironment();
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 builder.Services.AddServiceComponents();
 
 builder.Host.UseAutofac<AutofacRegisterModule>();
@@ -203,3 +205,4 @@ async Task EnsureSeedData(IResolver resolver)
         });
     }
 }
+

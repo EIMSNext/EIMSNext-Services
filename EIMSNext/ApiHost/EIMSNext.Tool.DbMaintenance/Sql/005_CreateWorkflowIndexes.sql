@@ -1,0 +1,10 @@
+CREATE INDEX "IX_WorkflowInstance_Status_NextExecution" ON "WorkflowInstance" ("Status", "NextExecution");
+CREATE INDEX "IX_WorkflowInstance_Reference_Status_CreateTime" ON "WorkflowInstance" ("Reference", "Status", "CreateTime");
+CREATE INDEX "IX_WorkflowInstance_WorkflowDefinitionId_Status" ON "WorkflowInstance" ("WorkflowDefinitionId", "Status");
+CREATE INDEX "IX_EventSubscription_EventLookup" ON "EventSubscription" ("EventName", "EventKey", "SubscribeAsOf", "ExternalToken");
+CREATE INDEX "IX_EventSubscription_WorkflowId" ON "EventSubscription" ("WorkflowId");
+CREATE INDEX "IX_Event_IsProcessed_EventTime" ON "Event" ("IsProcessed", "EventTime");
+CREATE INDEX "IX_Event_EventName_EventKey_EventTime" ON "Event" ("EventName", "EventKey", "EventTime");
+CREATE INDEX "IX_ExecutionError_WorkflowId" ON "ExecutionError" ("WorkflowId");
+CREATE UNIQUE INDEX "UX_ScheduledCommand_CommandName_Data" ON "ScheduledCommand" ("CommandName", "Data");
+CREATE INDEX "IX_ScheduledCommand_ExecuteTime" ON "ScheduledCommand" ("ExecuteTime");

@@ -12,3 +12,4 @@
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
   </ItemGroup>
 </Project>
+

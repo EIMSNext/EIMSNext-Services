@@ -23,6 +23,6 @@
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Persistence\EIMSNext.Flow.Persistence.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
   </ItemGroup>
 </Project>

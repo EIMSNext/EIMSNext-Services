@@ -7,7 +7,7 @@ using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Persistence.Mongo;
+using EIMSNext.Persistence.PostgreSql;
 
 namespace EIMSNext.Flow.Host.Extensions
 {
@@ -22,7 +22,6 @@ namespace EIMSNext.Flow.Host.Extensions
         {
             base.Load(builder);
 
-            builder.RegisterType<WfDbContext>().As<IWfDbContext>().AsImplementedInterfaces().SingleInstance();
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
 
             builder.RegisterType<EIMSDbContext>().AsImplementedInterfaces().SingleInstance();
@@ -30,3 +29,4 @@ namespace EIMSNext.Flow.Host.Extensions
         }
     }
 }
+

@@ -13,6 +13,7 @@
     <PackageReference Include="HKH.Common" />
     <PackageReference Include="HKH.Mef2.Integration.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Options" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
     <PackageReference Include="MongoDB.Driver" />
   </ItemGroup>
   <ItemGroup>
@@ -22,3 +23,4 @@
     <ProjectReference Include="..\EIMSNext.Json\EIMSNext.Json.csproj" />
   </ItemGroup>
 </Project>
+

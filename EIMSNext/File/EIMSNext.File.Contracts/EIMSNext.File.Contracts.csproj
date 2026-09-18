@@ -12,3 +12,4 @@
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
   </ItemGroup>
 </Project>
+

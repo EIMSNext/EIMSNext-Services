@@ -330,8 +330,7 @@ namespace EIMSNext.Async.Tasks.Consumers
         private static Wf_Definition? GetWorkflowDefinition(IResolver resolver, string wfInstanceId)
         {
             var workflowInstance = resolver.Resolve<IWfDbContext>().WorkflowInstances
-                .Find(x => x.Id == wfInstanceId)
-                .FirstOrDefault();
+                .FirstOrDefault(x => x.Id == wfInstanceId);
             if (workflowInstance == null)
             {
                 return null;

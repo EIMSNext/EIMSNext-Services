@@ -32,3 +32,4 @@
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
   </ItemGroup>
 </Project>
+

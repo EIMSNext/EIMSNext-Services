@@ -299,3 +299,4 @@ namespace EIMSNext.ApiHost.Authorization
         public PublicScope PublicScope => _publicScope;
     }
 }
+

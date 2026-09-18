@@ -18,7 +18,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
@@ -33,3 +33,4 @@
     </AssemblyAttribute>
   </ItemGroup>
 </Project>
+

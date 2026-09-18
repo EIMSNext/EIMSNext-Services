@@ -1,88 +1,41 @@
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Models;
-using EIMSNext.Core.Mongo;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
-namespace EIMSNext.Identity.Persistence
+namespace EIMSNext.Identity.Persistence;
+
+public sealed class IdentityDbContext(DbContextOptions<IdentityDbContext> options) : DbContext(options), IIdentityDbContext
 {
-    public class IdentityDbContext : MongoDbContextBase, IIdentityDbContext
+    private DbSet<Client> ClientSet => Set<Client>();
+    private DbSet<User> UserSet => Set<User>();
+    private DbSet<Employee> EmployeeSet => Set<Employee>();
+    private DbSet<IdentityLoginAudit> AuditSet => Set<IdentityLoginAudit>();
+    private DbSet<PublicAccessSetting> PublicSettingSet => Set<PublicAccessSetting>();
+    private DbSet<CorporateSettingReadModel> CorporateSettingSet => Set<CorporateSettingReadModel>();
+    public IQueryable<Client> Clients => ClientSet.AsNoTracking();
+    public IQueryable<User> Users => UserSet.AsNoTracking();
+    public IQueryable<EmployeeLookup> Employees => EmployeeSet.AsNoTracking().Select(x => new EmployeeLookup { Id = x.Id, CorpId = x.CorpId ?? string.Empty, UserId = x.UserId, Code = x.Code, Status = x.Status });
+    public IQueryable<PublicAccessSetting> PublicSettings => PublicSettingSet.AsNoTracking();
+    public IQueryable<CorporateSettingReadModel> CorporateSettings => CorporateSettingSet.AsNoTracking();
+    public Task AddClient(Client entity) => AddAndSaveAsync(ClientSet, entity);
+    public Task UpdateClient(Client entity) => UpdateAndSaveAsync(ClientSet, entity);
+    public Task AddUser(User entity) => AddAndSaveAsync(UserSet, entity);
+    public Task UpdateUser(User entity) => UpdateAndSaveAsync(UserSet, entity);
+    public Task AddIdentityLoginAudit(IdentityLoginAudit entity) => AddAndSaveAsync(AuditSet, entity);
+    public async Task AddIdentityLoginAudits(IReadOnlyCollection<IdentityLoginAudit> entities, CancellationToken cancellationToken = default)
     {
-        private readonly IMongoCollection<Client> _clients;
-        private readonly IMongoCollection<User> _users;
-        private readonly IMongoCollection<EmployeeLookup> _employees;
-        private readonly IMongoCollection<IdentityLoginAudit> _auditLogin;
-        private readonly IMongoCollection<PublicAccessSetting> _publicSettings;
-        private readonly IMongoCollection<CorporateSettingReadModel> _corporateSettings;
-
-        public IdentityDbContext(IOptions<MongoDbConfiguration> settings)
-            : base(settings)
+        foreach (var entity in entities)
         {
-            _clients = Database.GetCollection<Client>(nameof(Client));
-            _users = Database.GetCollection<User>(nameof(User));
-            _employees = Database.GetCollection<EmployeeLookup>("Employee");
-            _auditLogin = Database.GetCollection<IdentityLoginAudit>(nameof(IdentityLoginAudit));
-            _publicSettings = Database.GetCollection<PublicAccessSetting>("PublicSetting");
-            _corporateSettings = Database.GetCollection<CorporateSettingReadModel>("CorporateSetting");
+            var current = await AuditSet.FirstOrDefaultAsync(x => x.Id == entity.Id, cancellationToken);
+            if (current is null) AuditSet.Add(entity); else Entry(current).CurrentValues.SetValues(entity);
         }
-
-        #region IConfigurationDbContext
-
-        public IQueryable<Client> Clients => _clients.AsQueryable();
-        public IQueryable<User> Users => _users.AsQueryable();
-        public IQueryable<EmployeeLookup> Employees => _employees.AsQueryable();
-        public IQueryable<PublicAccessSetting> PublicSettings => _publicSettings.AsQueryable();
-        public IQueryable<CorporateSettingReadModel> CorporateSettings => _corporateSettings.AsQueryable();
-
-        public async Task AddClient(Client entity)
-        {
-            await _clients.InsertOneAsync(entity);
-        }
-
-        public Task UpdateClient(Client entity)
-        {
-            return _clients.ReplaceOneAsync(x => x.Id == entity.Id, entity);
-        }
-
-        public async Task AddUser(User entity)
-        {
-            await this._users.InsertOneAsync(entity);
-        }
-
-        public Task UpdateUser(User entity)
-        {
-            return _users.ReplaceOneAsync(x => x.Id == entity.Id, entity);
-        }
-
-        public async Task AddIdentityLoginAudit(IdentityLoginAudit entity)
-        {
-            await this._auditLogin.InsertOneAsync(entity);
-        }
-
-        public Task AddIdentityLoginAudits(IReadOnlyCollection<IdentityLoginAudit> entities, CancellationToken cancellationToken = default)
-        {
-            if (entities.Count == 0)
-            {
-                return Task.CompletedTask;
-            }
-
-            var writes = entities
-                .Select(entity => new ReplaceOneModel<IdentityLoginAudit>(
-                    Builders<IdentityLoginAudit>.Filter.Eq(x => x.Id, entity.Id),
-                    entity)
-                {
-                    IsUpsert = true
-                })
-                .Cast<WriteModel<IdentityLoginAudit>>()
-                .ToList();
-
-            return _auditLogin.BulkWriteAsync(
-                writes,
-                new BulkWriteOptions { IsOrdered = false },
-                cancellationToken);
-        }
-
-        #endregion
+        await SaveChangesAsync(cancellationToken);
     }
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Client>().ToTable("Client"); modelBuilder.Entity<User>().ToTable("User"); modelBuilder.Entity<Employee>().ToTable("Employee"); modelBuilder.Entity<IdentityLoginAudit>().ToTable("IdentityLoginAudit"); modelBuilder.Entity<PublicAccessSetting>().ToTable("PublicSetting"); modelBuilder.Entity<CorporateSettingReadModel>().HasNoKey().ToView("CorporateSetting");
+    }
+    private async Task AddAndSaveAsync<TEntity>(DbSet<TEntity> set, TEntity entity) where TEntity : class { set.Add(entity); await SaveChangesAsync(); }
+    private async Task UpdateAndSaveAsync<TEntity>(DbSet<TEntity> set, TEntity entity) where TEntity : class { set.Update(entity); await SaveChangesAsync(); }
 }

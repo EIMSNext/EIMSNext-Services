@@ -52,3 +52,4 @@ namespace EIMSNext.Service.Host.Controllers
         protected S ApiService { get; private set; }
     }
 }
+

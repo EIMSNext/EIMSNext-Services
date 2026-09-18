@@ -1,6 +1,6 @@
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Core.Mongo.Repositories
 {
@@ -18,7 +18,7 @@ namespace EIMSNext.Core.Mongo.Repositories
         /// 初始化 <see cref="DbRepository{T}"/> 类的新实例。
         /// </summary>
         /// <param name="dbContext">数据库上下文。</param>
-        public DbRepository(IMongoDbContex dbContext)
+        public DbRepository(DbContext dbContext)
             : base(dbContext)
         {
         }

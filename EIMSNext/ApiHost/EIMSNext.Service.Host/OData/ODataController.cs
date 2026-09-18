@@ -556,3 +556,4 @@ namespace EIMSNext.Service.Host.OData
     //    protected bool RequestExtend => (Request.Query["extend"].FirstOrDefault() ?? "0") == "1";
     //}
 }
+

@@ -39,7 +39,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             foreach (var group in expiredTasks.GroupBy(x => new { x.WfInstanceId, x.ApproveNodeId }))
             {
                 var sample = group.First();
-                var workflow = workflowCollection.Find(x => x.Id == sample.WfInstanceId).FirstOrDefault();
+                var workflow = workflowCollection.FirstOrDefault(x => x.Id == sample.WfInstanceId);
                 if (workflow == null)
                 {
                     continue;

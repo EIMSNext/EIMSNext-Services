@@ -49,3 +49,4 @@ internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IW
     }
 
 }
+
