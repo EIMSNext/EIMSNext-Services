@@ -1,7 +1,6 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 
 namespace EIMSNext.Core.Tests
 {
@@ -16,7 +15,9 @@ namespace EIMSNext.Core.Tests
 
             Assert.IsNotNull(opt);
             Assert.IsNotNull(opt.Filter);
-            var mgFilter = opt.Filter.ToFilterDefinition<FormData>();
+            // 迁移说明：原 ToFilterDefinition<T>() 产出 Mongo FilterDefinition，
+            // 现改为 ToPredicate<T>() 产出 EF Core 的 Expression<Func<T,bool>>。
+            var predicate = opt.Filter.ToPredicate<FormData>();
  
             jsonFilter = "{\"filter\":{\"rel\":\"Or\",\"items\":[{\"rel\":\"And\",\"field\":\"_id\",\"type\":\"None\",\"op\":\"Eq\",\"value\":[\"67de5e1ace67843829f57205\"]},{\"rel\":\"And\",\"field\":\"code\",\"type\":\"None\",\"op\":\"In\",\"value\":[1,2]}],\"type\":\"None\",\"op\":\"Eq\"},\"skip\":0,\"take\":20}";
             opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
@@ -43,8 +44,10 @@ namespace EIMSNext.Core.Tests
 
             var resp = new FormDataRepository(_dbContext!);
             var data = new FormData { FormId = "68298220d23e843cb3001645" };
-            resp.Insert(data, _scope?.SessionHandle);
-            var result = resp.Find(opt!, _scope?.SessionHandle).CountDocuments();
+            resp.Insert(data);
+            // 迁移说明：原 resp.Find(opt, session).CountDocuments() 是 Mongo 的游标计数，
+            // EF Core 侧对 IQueryable 直接用 Count()。
+            var result = resp.Find(opt!).Count();
 
             Assert.AreEqual(1, result);
         }
@@ -59,7 +62,7 @@ namespace EIMSNext.Core.Tests
                 Value = "$100"
             };
 
-            Assert.IsNotNull(filter.ToFilterDefinition<FormData>());
+            Assert.IsNotNull(filter.ToPredicate<FormData>());
         }
 
         [TestMethod]
@@ -71,12 +74,12 @@ namespace EIMSNext.Core.Tests
             Assert.IsNotNull(filter);
             try
             {
-                filter.ToFilterDefinition<FormData>();
+                filter.ToPredicate<FormData>();
                 Assert.Fail("应拒绝 Mongo 操作符对象");
             }
             catch (BadRequestException error)
             {
-                Assert.AreEqual("过滤值不允许包含 Mongo 操作符", error.Message);
+                Assert.AreEqual("过滤值不允许包含操作符对象", error.Message);
             }
         }
     }

@@ -1,14 +1,12 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -177,8 +175,7 @@ namespace EIMSNext.Service
 
             await profileRepo.UpdateAsync(
                 profile.Id,
-                profileRepo.UpdateBuilder.Inc(x => x.InstallCount, 1),
-                upsert: false);
+                setters => setters.SetProperty(x => x.InstallCount, x => x.InstallCount + 1));
 
             scope.CommitTransaction();
 

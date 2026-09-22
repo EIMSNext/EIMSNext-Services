@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiCore;
 using EIMSNext.Plugin.Runtime;
 using EIMSNext.Mef;
@@ -11,7 +11,6 @@ using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.Persistence.PostgreSql;
-using EIMSNext.Core.Mongo;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;

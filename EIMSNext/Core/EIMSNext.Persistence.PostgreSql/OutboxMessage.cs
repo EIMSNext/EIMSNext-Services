@@ -1,8 +1,13 @@
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Persistence.PostgreSql.Outbox;
 
-public sealed class OutboxMessage : MongoEntityBase
+/// <summary>
+/// 发件箱消息。Id 为字符串契约（不使用数据库自增），因此仍继承
+/// <see cref="KeyedEntityBase"/> 以获得统一的 Id 定义；该基类只提供 Id 属性，
+/// 不引入任何 MongoDB 依赖。
+/// </summary>
+public sealed class OutboxMessage : KeyedEntityBase
 {
     public string QueueName { get; set; } = string.Empty;
     public string MessageType { get; set; } = string.Empty;
@@ -19,7 +24,10 @@ public sealed class OutboxMessage : MongoEntityBase
 
 public enum OutboxStatus { Pending, Sent, Failed }
 
-public sealed class ProcessedMessage : MongoEntityBase
+/// <summary>
+/// 幂等去重表，记录已处理的消费事件，防止重复投递导致业务重复执行。
+/// </summary>
+public sealed class ProcessedMessage : KeyedEntityBase
 {
     public string EventKey { get; set; } = string.Empty;
     public string Target { get; set; } = string.Empty;

@@ -5,17 +5,15 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using EIMSNext.Mef;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Async.Tasks.Export
 {
@@ -33,7 +31,9 @@ namespace EIMSNext.Async.Tasks.Export
             var formDef = resolver.Resolve<IFormDefService>().Get(request.FormId)
                 ?? throw new InvalidOperationException("表单不存在或已被删除");
             var fields = formDef.Content?.Items?.Where(x => !x.Hidden).ToList() ?? [];
-            var filter = request.Filter?.ToFilterDefinition<FormData>() ?? Builders<FormData>.Filter.Empty;
+            // 原 Mongo 时期用 request.Filter?.ToFilterDefinition<FormData>() ?? Builders<FormData>.Filter.Empty；
+            // EF Core 下统一走表达式树（ToPredicate 对 null/空条件是恒真，语义等价于 Empty）。
+            var filter = request.Filter.ToPredicate<FormData>();
             var fileNamePrefix = SanitizeFileName(formDef.Name);
             var dataTitleResolver = resolver.Resolve<DataTitleResolver>();
 
@@ -274,7 +274,7 @@ namespace EIMSNext.Async.Tasks.Export
             var rows = new List<IDictionary<string, object?>>();
             foreach (var item in EnumerateItems(value))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 if (dict != null)
                 {
                     rows.Add(dict);
@@ -362,26 +362,6 @@ namespace EIMSNext.Async.Tasks.Export
                     yield return item;
                 }
             }
-        }
-
-        private static IDictionary<string, object?>? AsDictionary(object? value)
-        {
-            if (value is ExpandoObject expandoObject)
-            {
-                return (IDictionary<string, object?>)expandoObject;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return dict;
-            }
-
-            if (value is IDictionary<string, object> objectDict)
-            {
-                return objectDict.ToDictionary(x => x.Key, x => (object?)x.Value);
-            }
-
-            return null;
         }
     }
 }

@@ -1,15 +1,13 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.ApiService
 {
@@ -42,33 +40,33 @@ namespace EIMSNext.ApiService
         {
             EnsureCanManageEventFlow(eventFlowId);
 
-            var fb = RunLogService.Collection;
-            var filterBuilder = Builders<Ef_RunLog>.Filter;
-            var filter = filterBuilder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId)
-                & filterBuilder.Eq(x => x.EventFlowId, eventFlowId)
-                & filterBuilder.Eq(x => x.DeleteFlag, false);
+            var corpId = IdentityContext.CurrentCorpId;
+
+            var query = RunLogService.All().Where(x =>
+                x.CorpId == corpId &&
+                x.EventFlowId == eventFlowId &&
+                !x.DeleteFlag);
 
             if (startTime.HasValue)
             {
-                filter &= filterBuilder.Gte(x => x.TriggerTime, startTime.Value);
+                query = query.Where(x => x.TriggerTime >= startTime.Value);
             }
 
             if (endTime.HasValue)
             {
-                filter &= filterBuilder.Lte(x => x.TriggerTime, endTime.Value);
+                query = query.Where(x => x.TriggerTime <= endTime.Value);
             }
 
             if (success.HasValue)
             {
-                filter &= filterBuilder.Eq(x => x.Success, success.Value);
+                query = query.Where(x => x.Success == success.Value);
             }
 
-            var total = await RunLogService.Collection.CountDocumentsAsync(filter);
-            var items = await RunLogService.Collection
-                .Find(filter)
-                .SortByDescending(x => x.TriggerTime)
+            var total = await query.LongCountAsync();
+            var items = await query
+                .OrderByDescending(x => x.TriggerTime)
                 .Skip(skip)
-                .Limit(top)
+                .Take(top)
                 .ToListAsync();
 
             return (total, items);
@@ -87,12 +85,10 @@ namespace EIMSNext.ApiService
 
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(run.AppId);
 
-            var fb = RunLogNodeService.Collection;
-            var nodes = await fb
-                .Find(Builders<Ef_RunLogNode>.Filter.And(
-                    Builders<Ef_RunLogNode>.Filter.Eq(x => x.RunLogId, runLogId),
-                    Builders<Ef_RunLogNode>.Filter.Eq(x => x.CorpId, IdentityContext.CurrentCorpId)))
-                .SortBy(x => x.StartTime)
+            var corpId = IdentityContext.CurrentCorpId;
+            var nodes = await RunLogNodeService.All()
+                .Where(x => x.RunLogId == runLogId && x.CorpId == corpId)
+                .OrderBy(x => x.StartTime)
                 .ToListAsync();
 
             return new EfRunLogDetail

@@ -1,18 +1,15 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using HKH.Common.Security;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -47,7 +44,6 @@ namespace EIMSNext.ApiService
             var relations = BuildEmployeeDepartments(entity, departments);
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, null, relations.Select(x => x.DepartmentId));
 
-            entity.Depts = BuildDepts(entity, departments);
             await AddAsync(entity);
             await ReplaceEmployeeDepartmentsAsync(entity.Id, relations);
         }
@@ -55,13 +51,12 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体。
         /// </summary>
-        public async Task<ReplaceOneResult> ReplaceAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments, bool syncDepartments)
+        public async Task<int> ReplaceAsync(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments, bool syncDepartments)
         {
             List<EmployeeDepartment>? relations = null;
             if (syncDepartments)
             {
                 relations = BuildEmployeeDepartments(entity, departments);
-                entity.Depts = BuildDepts(entity, departments);
             }
 
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, original: null, relations?.Select(x => x.DepartmentId));
@@ -76,7 +71,7 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
-        /// 按部门过滤查询。
+        /// 按部门过滤查询。级联时直接对关系表的层级路径快照做 Contains，省去 Department 展开/联表。
         /// </summary>
         public IQueryable<EmployeeViewModel> FilterByDepartment(IQueryable<EmployeeViewModel> query, string? departmentId, bool cascaded)
         {
@@ -85,20 +80,20 @@ namespace EIMSNext.ApiService
                 return query;
             }
 
-            var departmentIds = GetDepartmentScopeIds(departmentId, cascaded);
-            if (departmentIds.Count == 0)
-            {
-                return query.Where(x => false);
-            }
-
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
             var employeeIds = relationRepo.Queryable
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId
                     && !x.DeleteFlag
-                    && departmentIds.Contains(x.DepartmentId))
+                    && (x.DepartmentId == departmentId
+                        || (cascaded && x.HeriarchyId.Contains($"|{departmentId}|"))))
                 .Select(x => x.EmployeeId)
                 .Distinct()
                 .ToList();
+
+            if (employeeIds.Count == 0)
+            {
+                return query.Where(x => false);
+            }
 
             return query.Where(x => employeeIds.Contains(x.Id));
         }
@@ -170,7 +165,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体核心逻辑。
         /// </summary>
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Employee entity)
+        protected override async Task<int> ReplaceAsyncCore(Employee entity)
         {
             var original = await CoreService.GetAsync(entity.Id) ?? throw new InvalidOperationException("员工不存在");
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployee(entity, original);
@@ -186,7 +181,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Distinct().ToList();
             if (idList.Count == 0)
@@ -220,12 +215,13 @@ namespace EIMSNext.ApiService
             }
 
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
-            await relationRepo.DeleteAsync(relationRepo.FilterBuilder.In(x => x.EmployeeId, employees.Select(x => x.Id)));
+            var employeeIds = employees.Select(x => x.Id).ToList();
+            await relationRepo.DeleteManyAsync(x => employeeIds.Contains(x.EmployeeId));
 
-            return new { count = employees.Count };
+            return employees.Count;
         }
 
-        private Task BindPrivateUserAsync(Employee entity, Employee? original, bool createWhenMissing)
+        private async Task BindPrivateUserAsync(Employee entity, Employee? original, bool createWhenMissing)
         {
             var userService = Resolver.GetService<User>();
             var existingUserId = !string.IsNullOrWhiteSpace(entity.UserId) ? entity.UserId : original?.UserId;
@@ -250,6 +246,7 @@ namespace EIMSNext.ApiService
                 EnsureUniqueContact(entity.WorkPhone, entity.WorkEmail, null);
                 user = CreateUser(entity, PlatformType.Private);
                 userService.Add(user);
+                await AppendUserCorpAsync(user, IdentityContext.CurrentCorpId);
             }
             else
             {
@@ -261,7 +258,39 @@ namespace EIMSNext.ApiService
             }
 
             ApplyBoundUser(entity, user);
-            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// 把用户与企业的绑定写入关系表 UserCorp（jsonb 投影 User.Crops 已移除）。
+        /// 已存在同企业绑定时不重复写入，否则把新企业设为默认并取消其它默认。
+        /// </summary>
+        private async Task AppendUserCorpAsync(User user, string corpId)
+        {
+            var userCorpRepo = Resolver.GetRepository<UserCorp>();
+            var existing = userCorpRepo.Queryable
+                .Where(x => x.UserId == user.Id)
+                .ToList();
+            if (existing.Any(x => x.CorpId == corpId))
+            {
+                return;
+            }
+
+            foreach (var corp in existing.Where(x => x.IsDefault))
+            {
+                corp.IsDefault = false;
+                await userCorpRepo.ReplaceAsync(corp);
+            }
+
+            var userCorp = new UserCorp
+            {
+                UserId = user.Id,
+                CorpId = corpId,
+                CorpType = "internal",
+                IsCorpOwner = false,
+                IsDefault = true
+            };
+            userCorpRepo.EnsureId(userCorp);
+            await userCorpRepo.InsertAsync(userCorp);
         }
 
         private void EnsureUniqueContact(string? phone, string? email, string? excludeUserId)
@@ -295,8 +324,7 @@ namespace EIMSNext.ApiService
                 Name = entity.EmpName,
                 Platform = platform,
                 Password = BCrypt.HashPassword("123456"),
-                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds(),
-                Crops = new List<UserCorp> { new() { CorpId = IdentityContext.CurrentCorpId, CorpType = "internal", IsDefault = true } }
+                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
             };
         }
 
@@ -397,74 +425,11 @@ namespace EIMSNext.ApiService
             }).ToList();
         }
 
-        private List<EmpDept> BuildDepts(Employee entity, IEnumerable<EmployeeDepartmentRequest>? departments)
-        {
-            if (string.IsNullOrWhiteSpace(entity.CorpId))
-            {
-                entity.CorpId = IdentityContext.CurrentCorpId;
-            }
-
-            var items = departments?
-                .Where(x => !string.IsNullOrWhiteSpace(x.DepartmentId))
-                .Select((x, index) => new EmployeeDepartmentRequest
-                {
-                    DepartmentId = x.DepartmentId,
-                    IsManager = x.IsManager,
-                    SortValue = x.SortValue == 0 ? index : x.SortValue
-                })
-                .ToList() ?? [];
-
-            if (items.Count == 0)
-            {
-                return [];
-            }
-
-            var departmentIds = items.Select(x => x.DepartmentId).Distinct().ToList();
-            var departmentRepo = Resolver.GetRepository<Department>();
-            var departmentsMap = departmentRepo.Queryable
-                .Where(x => x.CorpId == entity.CorpId && !x.DeleteFlag && departmentIds.Contains(x.Id))
-                .ToDictionary(x => x.Id);
-
-            return items
-                .Where(x => departmentsMap.ContainsKey(x.DepartmentId))
-                .OrderBy(x => x.SortValue)
-                .Select(x =>
-                {
-                    var dept = departmentsMap[x.DepartmentId];
-                    return new EmpDept
-                    {
-                        DeptId = dept.Id,
-                        HeriarchyId = dept.HeriarchyId,
-                        DeptName = dept.Name
-                    };
-                })
-                .ToList();
-        }
-
         private async Task ReplaceEmployeeDepartmentsAsync(string employeeId, IEnumerable<EmployeeDepartment> relations)
         {
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
-            await relationRepo.DeleteAsync(relationRepo.FilterBuilder.Eq(x => x.EmployeeId, employeeId));
+            await relationRepo.DeleteManyAsync(x => x.EmployeeId == employeeId);
             await relationRepo.InsertAsync(relations);
-        }
-
-        private List<string> GetDepartmentScopeIds(string departmentId, bool cascaded)
-        {
-            var departmentRepo = Resolver.GetRepository<Department>();
-            if (!cascaded)
-            {
-                return departmentRepo.Queryable
-                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && x.Id == departmentId)
-                    .Select(x => x.Id)
-                    .ToList();
-            }
-
-            return departmentRepo.Queryable
-                .Where(x => x.CorpId == IdentityContext.CurrentCorpId
-                    && !x.DeleteFlag
-                    && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")))
-                .Select(x => x.Id)
-                .ToList();
         }
     }
 }

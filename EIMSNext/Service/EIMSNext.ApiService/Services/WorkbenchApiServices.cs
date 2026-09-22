@@ -1,19 +1,16 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -195,7 +192,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台配置实体。</param>
         /// <returns>替换结果。</returns>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchConfig entity)
+        protected override Task<int> ReplaceAsyncCore(WorkbenchConfig entity)
         {
             EnsureOwner(entity.EmployeeId);
             entity.EmployeeId = CurrentEmployeeId;
@@ -207,7 +204,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">工作台配置 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
@@ -307,7 +304,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台收藏实体。</param>
         /// <returns>替换结果。</returns>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchFavorite entity)
+        protected override Task<int> ReplaceAsyncCore(WorkbenchFavorite entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -326,7 +323,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">工作台收藏 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
@@ -433,7 +430,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台最近访问实体。</param>
         /// <returns>替换结果。</returns>
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchRecentVisit entity)
+        protected override async Task<int> ReplaceAsyncCore(WorkbenchRecentVisit entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -445,7 +442,7 @@ namespace EIMSNext.ApiService
             ApplyTarget(entity, target);
             entity.EmployeeId = CurrentEmployeeId;
             var result = await CoreService.TouchRecentVisitAsync(entity);
-            if (result.MatchedCount == 0)
+            if (result == 0)
             {
                 throw new BadRequestException("最近使用记录不存在");
             }
@@ -458,7 +455,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">最近访问记录 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return await base.DeleteAsyncCore(ids);

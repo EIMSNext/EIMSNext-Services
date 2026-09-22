@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 
@@ -53,8 +51,6 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<TimeUnit>();
 
             builder.ComplexType<UserCorp>();
-            builder.ComplexType<EmployeeGroupRef>();
-            builder.ComplexType<EmpDept>();
             builder.ComplexType<Operator>();
             builder.ComplexType<DepartmentRef>();
             builder.ComplexType<EmployeeDepartmentRequest>();

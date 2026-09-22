@@ -1,19 +1,15 @@
-using EIMSNext.ApiCore;
+﻿using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 
 using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Http;
-
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiHost.Authorization
 {
@@ -162,6 +158,12 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
+                    // 企业归属来自关系表 UserCorp（jsonb 投影 User.Crops 已移除），
+                    // 取到用户后填充到非映射属性 User.UserCorps 供后续身份解析使用。
+                    _user.UserCorps = _resolver.GetRepository<UserCorp>().Queryable
+                        .Where(x => x.UserId == _user.Id)
+                        .ToList();
+
                     CurrentCorpId = ResolveCurrentCorpId(_user, CurrentCorpId);
 
                     _employee = _resolver.GetRepository<Employee>().Find(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
@@ -172,7 +174,7 @@ namespace EIMSNext.ApiHost.Authorization
 
         internal static string ResolveCurrentCorpId(User user, string claimedCorpId)
         {
-            var defaultCorpId = user.Crops.FirstOrDefault(x => x.IsDefault && !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId;
+            var defaultCorpId = user.UserCorps.FirstOrDefault(x => x.IsDefault && !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId;
             if (!string.IsNullOrWhiteSpace(defaultCorpId))
             {
                 return defaultCorpId;
@@ -180,7 +182,7 @@ namespace EIMSNext.ApiHost.Authorization
 
             return !string.IsNullOrWhiteSpace(claimedCorpId)
                 ? claimedCorpId
-                : user.Crops.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId ?? string.Empty;
+                : user.UserCorps.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId ?? string.Empty;
         }
 
         /// <summary>
@@ -199,7 +201,7 @@ namespace EIMSNext.ApiHost.Authorization
                         return _type;
                     }
 
-                    var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
+                    var corp = ((User)CurrentUser).UserCorps.FirstOrDefault(x => x.CorpId == CurrentCorpId);
                     if (corp != null)
                     {
                         if (corp.IsCorpOwner)

@@ -1,18 +1,16 @@
-using EIMSNext.Entities;
+﻿using EIMSNext.Entities;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -54,7 +52,7 @@ namespace EIMSNext.Service
             }
         }
 
-        protected override async Task AddCoreAsync(IEnumerable<Corporate> entities, IClientSessionHandle? session)
+        protected override async Task AddCoreAsync(IEnumerable<Corporate> entities)
         {
             var entity = entities.First();
             var deptRepo = Resolver.GetRepository<Department>();
@@ -93,11 +91,6 @@ namespace EIMSNext.Service
             };
             empRepo.EnsureId(emp);
 
-            emp.Depts = new List<EmpDept>
-            {
-                new() { DeptId = dept.Id, HeriarchyId = dept.HeriarchyId, DeptName = dept.Name }
-            };
-
             dept.CreateBy = Context.Operator;
             dept.CreateTime = DateTime.UtcNow.ToTimeStampMs();
             dept.UpdateBy = dept.CreateBy;
@@ -108,19 +101,35 @@ namespace EIMSNext.Service
             emp.UpdateBy = emp.CreateBy;
             emp.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
 
-            if (!user!.Crops.Any(x => x.CorpId == entity.Id))
+            // 用户与企业的绑定由关系表 UserCorp 承载（jsonb 投影 User.Crops 已移除），
+            // 绑定时必须显式写入 UserId。
+            var userCorpRepo = Resolver.GetRepository<UserCorp>();
+            var userCorps = userCorpRepo.Queryable
+                .Where(x => x.UserId == user!.Id)
+                .ToList();
+            if (userCorps.All(x => x.CorpId != entity.Id))
             {
-                foreach (var corp in user.Crops)
+                foreach (var corp in userCorps.Where(x => x.IsDefault))
                 {
                     corp.IsDefault = false;
+                    await userCorpRepo.ReplaceAsync(corp);
                 }
 
-                user.Crops.Add(new UserCorp { CorpId = entity.Id, CorpType = "internal", IsCorpOwner = true, IsDefault = true });
+                var userCorp = new UserCorp
+                {
+                    UserId = user!.Id,
+                    CorpId = entity.Id,
+                    CorpType = "internal",
+                    IsCorpOwner = true,
+                    IsDefault = true
+                };
+                userCorpRepo.EnsureId(userCorp);
+                await userCorpRepo.InsertAsync(userCorp);
             }
 
             var empDepartments = new List<EmployeeDepartment>
             {
-                new() { CorpId = entity.Id, EmployeeId = emp.Id, DepartmentId = dept.Id, SortValue = 0 },
+                new() { CorpId = entity.Id, EmployeeId = emp.Id, DepartmentId = dept.Id, HeriarchyId = dept.HeriarchyId, SortValue = 0 },
             };
             empDeptRepo.EnsureId(empDepartments);
             var systemTenantAdminGroup = new TenantAdminGroup
@@ -134,12 +143,12 @@ namespace EIMSNext.Service
             };
             adminGroupRepo.EnsureId(systemTenantAdminGroup);
 
-            await base.AddCoreAsync(entities, session);
-            await deptRepo.InsertAsync(dept, session);
-            await empRepo.InsertAsync(new List<Employee> { emp }, session);
-            await empDeptRepo.InsertAsync(empDepartments, session);
-            await adminGroupRepo.InsertAsync(systemTenantAdminGroup, session);
-            await userRepo.ReplaceAsync(user, session);
+            await base.AddCoreAsync(entities);
+            await deptRepo.InsertAsync(dept);
+            await empRepo.InsertAsync(new List<Employee> { emp });
+            await empDeptRepo.InsertAsync(empDepartments);
+            await adminGroupRepo.InsertAsync(systemTenantAdminGroup);
+            await userRepo.ReplaceAsync(user);
         }
     }
 }

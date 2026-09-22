@@ -1,14 +1,9 @@
-using System.Text;
+﻿using System.Text;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Tasks.Export;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Entities;
 using HKH.CSV;
 using NPOI.XSSF.UserModel;
 

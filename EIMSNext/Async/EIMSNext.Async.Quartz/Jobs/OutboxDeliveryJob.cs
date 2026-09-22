@@ -1,16 +1,14 @@
-using System.Text;
+﻿using System.Text;
 
 using EIMSNext.Async.Abstractions.Messaging;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Persistence.Mongo.Outbox;
+using EIMSNext.Persistence.PostgreSql.Outbox;
 using HKH.Mef2.Integration;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Quartz;
-
-using MongoDB.Driver;
 
 namespace EIMSNext.Async.Quartz.Jobs
 {
@@ -44,36 +42,34 @@ namespace EIMSNext.Async.Quartz.Jobs
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            var ready = _outboxRepo.Find(new MongoFindOptions<OutboxMessage>
-            {
-                Filter = Builders<OutboxMessage>.Filter.And(
-                    Builders<OutboxMessage>.Filter.Eq(x => x.Status, OutboxStatus.Pending),
-                    Builders<OutboxMessage>.Filter.Lte(x => x.OutAt, now)),
-                Sort = Builders<OutboxMessage>.Sort.Ascending(x => x.OutAt),
-                Take = 200
-            }).ToList();
+            // Mongo 时期的 FilterDefinition.And(...) + Sort.Ascending(...) + Take 已换成
+            // IQueryable 的 Where/OrderBy/Take。查询直接在数据库端翻译为
+            // SELECT ... WHERE "Status" = 'Pending' AND "OutAt" <= @now ORDER BY "OutAt" LIMIT 200
+            var ready = await _outboxRepo.Queryable
+                .Where(x => x.Status == OutboxStatus.Pending && x.OutAt <= now)
+                .OrderBy(x => x.OutAt)
+                .Take(200)
+                .ToListAsync();
             Logger.LogDebug("Outbox delivery scan found {Count} ready messages", ready.Count);
             foreach (var msg in ready)
             {
                 await DeliverOnceAsync(msg);
             }
 
+            // 死信补偿：Failed 且最后尝试时间已超过最长退避窗口的，重置回 Pending 再投一次。
             var deadLetterOldest = now - RetryBackoffMs[^1];
-            var failed = _outboxRepo.Find(new MongoFindOptions<OutboxMessage>
-            {
-                Filter = Builders<OutboxMessage>.Filter.And(
-                    Builders<OutboxMessage>.Filter.Eq(x => x.Status, OutboxStatus.Failed),
-                    Builders<OutboxMessage>.Filter.Lte(x => x.LastAttemptTime, deadLetterOldest)),
-                Sort = Builders<OutboxMessage>.Sort.Ascending(x => x.LastAttemptTime),
-                Take = 100
-            }).ToList();
+            var failed = await _outboxRepo.Queryable
+                .Where(x => x.Status == OutboxStatus.Failed && x.LastAttemptTime <= deadLetterOldest)
+                .OrderBy(x => x.LastAttemptTime)
+                .Take(100)
+                .ToListAsync();
             foreach (var msg in failed)
             {
-                await _outboxRepo.UpdateAsync(msg.Id, Builders<OutboxMessage>.Update
-                    .Set(x => x.Status, OutboxStatus.Pending)
-                    .Set(x => x.OutAt, now)
-                    .Set(x => x.Attempt, 0)
-                    .Set(x => x.Error, string.Empty), upsert: false);
+                await _outboxRepo.UpdateAsync(msg.Id, setters => setters
+                    .SetProperty(x => x.Status, OutboxStatus.Pending)
+                    .SetProperty(x => x.OutAt, now)
+                    .SetProperty(x => x.Attempt, 0)
+                    .SetProperty(x => x.Error, string.Empty));
                 Logger.LogInformation("Outbox dead-letter {Id} (key={Key}) reset to Pending, attempt={Attempt}",
                     msg.Id, msg.IdempotencyKey, 0);
             }
@@ -85,10 +81,10 @@ namespace EIMSNext.Async.Quartz.Jobs
             {
                 await _deliveryPublisher.PublishRawAsync(msg.QueueName, Encoding.UTF8.GetBytes(msg.Payload));
                 var sentTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-                await _outboxRepo.UpdateAsync(msg.Id, Builders<OutboxMessage>.Update
-                    .Set(x => x.Status, OutboxStatus.Sent)
-                    .Set(x => x.SentTime, sentTime)
-                    .Set(x => x.SentAt, DateTimeOffset.FromUnixTimeMilliseconds(sentTime).UtcDateTime), upsert: false);
+                await _outboxRepo.UpdateAsync(msg.Id, setters => setters
+                    .SetProperty(x => x.Status, OutboxStatus.Sent)
+                    .SetProperty(x => x.SentTime, sentTime)
+                    .SetProperty(x => x.SentAt, DateTimeOffset.FromUnixTimeMilliseconds(sentTime).UtcDateTime));
             }
             catch (Exception ex)
             {
@@ -97,12 +93,12 @@ namespace EIMSNext.Async.Quartz.Jobs
                 var failedAt = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
                 var retryable = nextAttempt <= MaxRetryAttempts;
                 var retryAt = failedAt + RetryBackoffMs[Math.Min(nextAttempt - 1, RetryBackoffMs.Length - 1)];
-                await _outboxRepo.UpdateAsync(msg.Id, Builders<OutboxMessage>.Update
-                    .Set(x => x.Status, retryable ? OutboxStatus.Pending : OutboxStatus.Failed)
-                    .Set(x => x.Attempt, nextAttempt)
-                    .Set(x => x.LastAttemptTime, failedAt)
-                    .Set(x => x.OutAt, retryAt)
-                    .Set(x => x.Error, ex.Message), upsert: false);
+                await _outboxRepo.UpdateAsync(msg.Id, setters => setters
+                    .SetProperty(x => x.Status, retryable ? OutboxStatus.Pending : OutboxStatus.Failed)
+                    .SetProperty(x => x.Attempt, nextAttempt)
+                    .SetProperty(x => x.LastAttemptTime, failedAt)
+                    .SetProperty(x => x.OutAt, retryAt)
+                    .SetProperty(x => x.Error, ex.Message));
             }
         }
     }

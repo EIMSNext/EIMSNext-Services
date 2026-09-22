@@ -1,17 +1,14 @@
+﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Common;
-using MongoDB.Bson;
-using MongoDB.Driver;
 using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
@@ -20,7 +17,7 @@ namespace EIMSNext.Service
     {
         private IRepository<Employee> EmployeeRepository => Resolver.GetRepository<Employee>();
 
-        protected override Task BeforeAdd(IEnumerable<Department> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<Department> entities)
         {
             foreach (var entity in entities)
             {
@@ -52,46 +49,40 @@ namespace EIMSNext.Service
                 }
             }
 
-            return base.BeforeAdd(entities, session);
+            return base.BeforeAdd(entities);
         }
 
-        protected override Task BeforeReplace(Department entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(Department entity)
         {
             NormalizeHierarchy(entity);
-            return base.BeforeReplace(entity, session);
+            return base.BeforeReplace(entity);
         }
 
-        protected override async Task AfterReplace(Department entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(Department entity)
         {
-            await base.AfterReplace(entity, session);
-            await RefreshDescendantHierarchy(entity, session);
-            await UpdateEmployeeDeptsOnNameChangeAsync(entity.Id, entity.Name, session);
+            await base.AfterReplace(entity);
+            // 本部门层级路径可能因换父级而变化，同步关系表上的层级快照。
+            SyncEmployeeDepartmentHeriarchy(entity.CorpId, entity.Id, entity.HeriarchyId);
+            await RefreshDescendantHierarchy(entity);
         }
 
-        protected override Task BeforeDelete(FilterDefinition<Department> filter, IClientSessionHandle? session)
+        protected override Task BeforeDelete(Expression<Func<Department, bool>> filter)
         {
-            var deletingDepartments = Repository.Find(new MongoFindOptions<Department> { Filter = filter }, session).ToList();
+            var deletingDepartments = Repository.Find(new QueryFindOptions<Department> { Filter = filter, Take = int.MaxValue })
+                .ToList();
             if (deletingDepartments.Count == 0)
             {
-                return base.BeforeDelete(filter, session);
+                return base.BeforeDelete(filter);
             }
 
             var roots = deletingDepartments.Select(x => x.Id).ToList();
             var corpIds = deletingDepartments.Select(x => x.CorpId).Distinct().ToList();
-            var hierarchyFilters = roots
-                .Select(root => Repository.FilterBuilder.Regex(
-                    x => x.HeriarchyId,
-                    new BsonRegularExpression(Regex.Escape($"|{root}|"))))
-                .ToList();
-            var protectedFilter = Repository.FilterBuilder.And(
-                Repository.FilterBuilder.In(x => x.CorpId, corpIds),
-                Repository.FilterBuilder.Or(
-                    Repository.FilterBuilder.In(x => x.Id, roots),
-                    Repository.FilterBuilder.Or(hierarchyFilters)));
-            var protectedDepartmentIds = Repository.Find(
-                    new MongoFindOptions<Department> { Filter = protectedFilter, Take = int.MaxValue },
-                    session)
+            // Mongo 用正则匹配层级路径；EF Core 下改为对每层路径做 Contains（等价于旧的 Regex.Escape($"|{root}|")）。
+            var protectedDepartmentIds = Repository.Queryable
+                .Where(x => corpIds.Contains(x.CorpId))
                 .ToList()
+                .Where(x => roots.Contains(x.Id)
+                    || (x.HeriarchyId != null && roots.Any(root => x.HeriarchyId.Contains($"|{root}|", StringComparison.Ordinal))))
                 .Select(x => x.Id)
                 .ToList();
 
@@ -108,7 +99,7 @@ namespace EIMSNext.Service
                 throw new BadRequestException("当前部门或下级部门存在员工，不能删除");
             }
 
-            return base.BeforeDelete(filter, session);
+            return base.BeforeDelete(filter);
         }
 
         private void NormalizeHierarchy(Department entity)
@@ -152,7 +143,7 @@ namespace EIMSNext.Service
             entity.HeriarchyName = $"{entity.Name}/{parent.HeriarchyName}";
         }
 
-        private async Task RefreshDescendantHierarchy(Department parent, IClientSessionHandle? session)
+        private async Task RefreshDescendantHierarchy(Department parent)
         {
             var children = Repository.Queryable
                 .Where(x => x.CorpId == parent.CorpId && !x.DeleteFlag && x.ParentId == parent.Id)
@@ -163,94 +154,29 @@ namespace EIMSNext.Service
                 child.ParentName = parent.Name;
                 child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
                 child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
-                Repository.Replace(child, session);
-                await UpdateEmployeeDeptsOnHierarchyChangeAsync(child.Id, child.HeriarchyId, session);
-                await RefreshDescendantHierarchy(child, session);
+                Repository.Replace(child);
+                SyncEmployeeDepartmentHeriarchy(child.CorpId, child.Id, child.HeriarchyId);
+                await RefreshDescendantHierarchy(child);
             }
         }
 
-        private Task UpdateEmployeeDeptsOnHierarchyChangeAsync(string departmentId, string newHeriarchyId, IClientSessionHandle? session)
+        /// <summary>
+        /// 部门层级路径变化时，同步刷新指向该部门的关系表行上的层级快照，
+        /// 保证「按部门级联查员工」直接用 <c>EmployeeDepartment.HeriarchyId</c> 的 Contains 即可命中。
+        /// </summary>
+        private void SyncEmployeeDepartmentHeriarchy(string corpId, string departmentId, string heriarchyId)
         {
-            var filter = EmployeeRepository.FilterBuilder.ElemMatch(
-                x => x.Depts,
-                dept => dept.DeptId == departmentId);
-            var update = EmployeeRepository.UpdateBuilder.Set(
-                "depts.$[dept].heriarchyId",
-                newHeriarchyId);
-            try
-            {
-                EmployeeRepository.Collection.UpdateMany(
-                    session,
-                    filter,
-                    update,
-                    new UpdateOptions
-                    {
-                        ArrayFilters =
-                        [
-                            new BsonDocumentArrayFilterDefinition<EmpDept>(
-                                new MongoDB.Bson.BsonDocument("dept.deptId", departmentId))
-                        ]
-                    });
-            }
-            catch (NotSupportedException)
-            {
-                // The unit-test repository has no Mongo collection. Production Mongo updates stay server-side.
-                foreach (var employee in EmployeeRepository.Queryable
-                    .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
-                    .ToList())
-                {
-                    foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
-                    {
-                        dept.HeriarchyId = newHeriarchyId;
-                    }
+            var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
+            var relations = relationRepo.Queryable
+                .Where(x => x.CorpId == corpId && x.DepartmentId == departmentId)
+                .ToList();
 
-                    EmployeeRepository.Replace(employee, session);
-                }
+            foreach (var relation in relations)
+            {
+                relation.HeriarchyId = heriarchyId;
+                relationRepo.Replace(relation);
             }
-
-            return Task.CompletedTask;
         }
 
-        private Task UpdateEmployeeDeptsOnNameChangeAsync(string departmentId, string newName, IClientSessionHandle? session)
-        {
-            var filter = EmployeeRepository.FilterBuilder.ElemMatch(
-                x => x.Depts,
-                dept => dept.DeptId == departmentId);
-            var update = EmployeeRepository.UpdateBuilder.Set(
-                "depts.$[dept].deptName",
-                newName);
-            try
-            {
-                EmployeeRepository.Collection.UpdateMany(
-                    session,
-                    filter,
-                    update,
-                    new UpdateOptions
-                    {
-                        ArrayFilters =
-                        [
-                            new BsonDocumentArrayFilterDefinition<EmpDept>(
-                                new MongoDB.Bson.BsonDocument("dept.deptId", departmentId))
-                        ]
-                    });
-            }
-            catch (NotSupportedException)
-            {
-                // The unit-test repository has no Mongo collection. Production Mongo updates stay server-side.
-                foreach (var employee in EmployeeRepository.Queryable
-                    .Where(x => x.Depts.Any(dept => dept.DeptId == departmentId))
-                    .ToList())
-                {
-                    foreach (var dept in employee.Depts.Where(x => x.DeptId == departmentId))
-                    {
-                        dept.DeptName = newName;
-                    }
-
-                    EmployeeRepository.Replace(employee, session);
-                }
-            }
-
-            return Task.CompletedTask;
-        }
     }
 }

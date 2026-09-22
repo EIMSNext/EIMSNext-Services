@@ -2,11 +2,9 @@ using System.Text.Json;
 using System.Linq;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Entities;
 using EIMSNext.Scripting;
-using MongoDB.Driver;
 
 namespace EIMSNext.Component
 {

@@ -1,20 +1,16 @@
-using EIMSNext.Entities;
+﻿using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using HKH.Mef2.Integration;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using System.Text.RegularExpressions;
 
 namespace EIMSNext.Service
 {
@@ -24,22 +20,80 @@ namespace EIMSNext.Service
         private IRepository<User> UserRepository => Resolver.GetRepository<User>();
         private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => Resolver.GetRepository<EmployeeDepartment>();
 
-        public Task<UpdateResult> AddToEmployeeGroupAsync(EmployeeGroup employeeGroup, IEnumerable<string> empIds)
+        public async Task<int> AddToEmployeeGroupAsync(EmployeeGroup employeeGroup, IEnumerable<string> empIds)
         {
-            var update = UpdateBuilder.AddToSet(x => x.EmployeeGroups, new EmployeeGroupRef { EmployeeGroupId = employeeGroup.Id, EmployeeGroupName = employeeGroup.Name });
-            var filter = FilterBuilder.And(FilterBuilder.In(x => x.Id, empIds),
-                FilterBuilder.Not(FilterBuilder.ElemMatch(x => x.EmployeeGroups, r => r.EmployeeGroupId == employeeGroup.Id) // 排除已存在该EmployeeGroupId的员工
-    )           );
+            var idList = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToList();
+            if (idList.Count == 0)
+            {
+                return 0;
+            }
 
-            return Repository.UpdateManyAsync(filter, update, upsert: false);
+            // 员工与员工组的归属由关系表 EmployeeGroupMember 承载（jsonb 投影
+            // Employee.EmployeeGroups 已移除）：先排除已在组内的员工，再补齐缺失的关系行。
+            var memberRepo = Resolver.GetRepository<EmployeeGroupMember>();
+            var joinedEmployeeIds = memberRepo.Queryable
+                .Where(x => idList.Contains(x.EmployeeId)
+                    && x.EmployeeGroupId == employeeGroup.Id
+                    && !x.DeleteFlag)
+                .Select(x => x.EmployeeId)
+                .ToList()
+                .ToHashSet(StringComparer.Ordinal);
+
+            var employeeIds = Repository.Queryable
+                .Where(x => idList.Contains(x.Id) && !x.DeleteFlag)
+                .Select(x => x.Id)
+                .ToList();
+
+            var relations = new List<EmployeeGroupMember>();
+            foreach (var employeeId in employeeIds)
+            {
+                if (joinedEmployeeIds.Contains(employeeId))
+                {
+                    continue;
+                }
+
+                var member = new EmployeeGroupMember
+                {
+                    CorpId = employeeGroup.CorpId,
+                    EmployeeId = employeeId,
+                    EmployeeGroupId = employeeGroup.Id,
+                    EmployeeGroupName = employeeGroup.Name
+                };
+                memberRepo.EnsureId(member);
+                relations.Add(member);
+            }
+
+            if (relations.Count == 0)
+            {
+                return 0;
+            }
+
+            await memberRepo.InsertAsync(relations);
+            return relations.Count;
         }
 
-        public Task<UpdateResult> RemoveFromEmployeeGroupAsync(string employeeGroupId, IEnumerable<string> empIds)
+        public async Task<int> RemoveFromEmployeeGroupAsync(string employeeGroupId, IEnumerable<string> empIds)
         {
-            var update = UpdateBuilder.PullFilter(x => x.EmployeeGroups, r => r.EmployeeGroupId == employeeGroupId);
-            var filter = FilterBuilder.In(x => x.Id, empIds);
+            var idList = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToList();
+            if (idList.Count == 0)
+            {
+                return 0;
+            }
 
-            return Repository.UpdateManyAsync(filter, update, upsert: false);
+            // 关系表是唯一事实来源，直接删除匹配的归属行。
+            var memberRepo = Resolver.GetRepository<EmployeeGroupMember>();
+            var relations = memberRepo.Queryable
+                .Where(x => idList.Contains(x.EmployeeId)
+                    && x.EmployeeGroupId == employeeGroupId
+                    && !x.DeleteFlag)
+                .ToList();
+            if (relations.Count == 0)
+            {
+                return 0;
+            }
+
+            await memberRepo.DeleteManyAsync(x => idList.Contains(x.EmployeeId) && x.EmployeeGroupId == employeeGroupId);
+            return relations.Count;
         }
 
         public async Task ReviewJoinCorporateAsync(IEnumerable<string> employeeIds, bool approved, string corpId)
@@ -56,20 +110,20 @@ namespace EIMSNext.Service
             var currentCorpId = Context.CorpId;
 
             List<AuditLog>? committedAuditLogs = null;
-            await ExecuteWithTransactionRetryAsync(async session =>
+            await ExecuteWithTransactionRetryAsync(async () =>
             {
-                var employees = Repository.Find(x => idList.Contains(x.Id) && !x.DeleteFlag, session).ToList();
+                var employees = Repository.Find(x => idList.Contains(x.Id) && !x.DeleteFlag).ToList();
                 if (employees.Count != idList.Count)
                     throw new NotFoundException("部分员工不存在");
                 if (employees.Any(x => x.CorpId != corpId || x.Status != EmployeeStatus.PendingReview))
                     throw new BadRequestException("包含无权审批或非待审核的员工");
 
-                var requests = RequestRepository.Find(x => idList.Contains(x.EmployeeId) && x.TargetCorpId == corpId && x.SourceType == CorpOnboardingSourceType.UserApply, session).ToList();
+                var requests = RequestRepository.Find(x => idList.Contains(x.EmployeeId) && x.TargetCorpId == corpId && x.SourceType == CorpOnboardingSourceType.UserApply).ToList();
                 if (requests.Count != idList.Count)
                     throw new NotFoundException("部分加入申请不存在");
                 var requestMap = requests.ToDictionary(x => x.EmployeeId, x => x);
                 var userIds = requests.Select(x => x.UserId).Distinct().ToList();
-                var users = UserRepository.Find(x => userIds.Contains(x.Id), session).ToList().ToDictionary(x => x.Id, x => x);
+                var users = UserRepository.Find(x => userIds.Contains(x.Id)).ToList().ToDictionary(x => x.Id, x => x);
                 if (users.Count != userIds.Count)
                     throw new NotFoundException("申请用户不存在");
 
@@ -79,9 +133,9 @@ namespace EIMSNext.Service
                     var request = requestMap[employee.Id];
                     if (!approved)
                     {
-                        await Repository.DeleteAsync(employee.Id, session);
-                        await EmployeeDepartmentRepository.DeleteAsync(EmployeeDepartmentRepository.FilterBuilder.Eq(x => x.EmployeeId, employee.Id), session);
-                        await RequestRepository.DeleteAsync(request.Id, session);
+                        await Repository.DeleteAsync(employee.Id);
+                        await EmployeeDepartmentRepository.DeleteManyAsync(x => x.EmployeeId == employee.Id);
+                        await RequestRepository.DeleteAsync(request.Id);
 
                         auditLogs.Add(CreateAuditLog(
                             action: DbAction.Delete,
@@ -93,7 +147,7 @@ namespace EIMSNext.Service
                     }
 
                     var user = users[request.UserId];
-                    AppendUserCorp(user, employee.CorpId ?? string.Empty);
+                    await AppendUserCorpAsync(user, employee.CorpId ?? string.Empty);
                     employee.Status = EmployeeStatus.Active;
                     employee.UserId = user.Id;
                     employee.UserName = user.Name;
@@ -101,9 +155,9 @@ namespace EIMSNext.Service
                     employee.UpdateBy = op;
                     employee.UpdateTime = reviewedTime;
 
-                    await Repository.ReplaceAsync(employee, session);
-                    await UserRepository.ReplaceAsync(user, session);
-                    await RequestRepository.DeleteAsync(request.Id, session);
+                    await Repository.ReplaceAsync(employee);
+                    await UserRepository.ReplaceAsync(user);
+                    await RequestRepository.DeleteAsync(request.Id);
 
                     auditLogs.Add(CreateAuditLog(
                         action: DbAction.Update,
@@ -154,38 +208,33 @@ namespace EIMSNext.Service
                 catch (Exception ex) { Logger.LogError(ex, "写入员工入职审计日志失败。Count={Count}", logs.Count); }
             }
 
-            if (MongoTransactionScope.IsInTransaction)
-                await MongoTransactionScope.RegisterAfterCommitAsync(WriteAsync).ConfigureAwait(false);
+            if (TransactionScope.IsInTransaction)
+                await TransactionScope.RegisterAfterCommitAsync(DbContext, WriteAsync).ConfigureAwait(false);
             else
                 await WriteAsync().ConfigureAwait(false);
         }
 
         public async Task AcceptInviteAsync(string userId, string? phone, string? email, bool accepted)
         {
-            var identityFilters = new List<FilterDefinition<Employee>>();
-            if (!string.IsNullOrWhiteSpace(phone))
-            {
-                identityFilters.Add(Repository.FilterBuilder.Regex(
-                    x => x.WorkPhone,
-                    new BsonRegularExpression($"^{Regex.Escape(phone.Trim())}$", "i")));
-            }
-            if (!string.IsNullOrWhiteSpace(email))
-            {
-                identityFilters.Add(Repository.FilterBuilder.Regex(
-                    x => x.WorkEmail,
-                    new BsonRegularExpression($"^{Regex.Escape(email.Trim())}$", "i")));
-            }
-            if (identityFilters.Count == 0)
+            var normalizedPhone = string.IsNullOrWhiteSpace(phone) ? null : phone.Trim();
+            var normalizedEmail = string.IsNullOrWhiteSpace(email) ? null : email.Trim();
+            if (normalizedPhone is null && normalizedEmail is null)
             {
                 throw new NotFoundException("未找到待处理的邀请");
             }
 
-            var inviteFilter = Repository.FilterBuilder.And(
-                Repository.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                Repository.FilterBuilder.Eq(x => x.Status, EmployeeStatus.Active),
-                Repository.FilterBuilder.Eq(x => x.UserBound, false),
-                Repository.FilterBuilder.Or(identityFilters));
-            var invites = Repository.Collection.Find(inviteFilter).ToList();
+            // Mongo 时期用大小写不敏感的正则做全等匹配（^...$ + Regex.Escape）。
+            // 这里用 lower() = lower() 表达同样的语义：ILike 会把值里的 % 与 _ 当成通配符，
+            // 邮箱里带下划线时会误命中别的员工，因此不能用 ILike。
+            var phoneKey = normalizedPhone?.ToLowerInvariant();
+            var emailKey = normalizedEmail?.ToLowerInvariant();
+            var invites = Repository.Queryable
+                .Where(x => !x.DeleteFlag
+                    && x.Status == EmployeeStatus.Active
+                    && !x.UserBound
+                    && ((phoneKey != null && x.WorkPhone.ToLower() == phoneKey)
+                        || (emailKey != null && x.WorkEmail.ToLower() == emailKey)))
+                .ToList();
             if (invites.Count == 0)
             {
                 throw new NotFoundException("未找到待处理的邀请");
@@ -209,7 +258,7 @@ namespace EIMSNext.Service
             }
 
             var user = UserRepository.Get(userId) ?? throw new NotFoundException("用户不存在");
-            AppendUserCorp(user, employee.CorpId ?? string.Empty);
+            await AppendUserCorpAsync(user, employee.CorpId ?? string.Empty);
             employee.UserId = user.Id;
             employee.UserName = user.Name;
             employee.UserBound = true;
@@ -222,33 +271,44 @@ namespace EIMSNext.Service
             await RequestRepository.DeleteAsync(request.Id);
         }
 
-        private static void AppendUserCorp(User user, string corpId)
+        /// <summary>
+        /// 把用户与企业的绑定写入关系表 UserCorp（jsonb 投影 User.Crops 已移除）。
+        /// 已绑定该企业时仅在缺少默认企业的情况下补设为默认；否则取消其它默认并新增。
+        /// </summary>
+        private async Task AppendUserCorpAsync(User user, string corpId)
         {
-            if (user.Crops.Any(x => x.CorpId == corpId))
+            var userCorpRepo = Resolver.GetRepository<UserCorp>();
+            var userCorps = userCorpRepo.Queryable
+                .Where(x => x.UserId == user.Id)
+                .ToList();
+
+            var current = userCorps.FirstOrDefault(x => x.CorpId == corpId);
+            if (current != null)
             {
-                if (!user.Crops.Any(x => x.IsDefault))
+                if (!userCorps.Any(x => x.IsDefault))
                 {
-                    var current = user.Crops.First(x => x.CorpId == corpId);
                     current.IsDefault = true;
+                    await userCorpRepo.ReplaceAsync(current);
                 }
                 return;
             }
 
-            if (user.Crops.Any())
+            foreach (var corp in userCorps.Where(x => x.IsDefault))
             {
-                foreach (var corp in user.Crops)
-                {
-                    corp.IsDefault = false;
-                }
+                corp.IsDefault = false;
+                await userCorpRepo.ReplaceAsync(corp);
             }
 
-            user.Crops.Add(new UserCorp
+            var userCorp = new UserCorp
             {
+                UserId = user.Id,
                 CorpId = corpId,
                 CorpType = "internal",
                 IsCorpOwner = false,
                 IsDefault = true
-            });
+            };
+            userCorpRepo.EnsureId(userCorp);
+            await userCorpRepo.InsertAsync(userCorp);
         }
     }
 }

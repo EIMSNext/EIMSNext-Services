@@ -1,9 +1,11 @@
+﻿using System.ComponentModel.DataAnnotations.Schema;
+
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
-    public class User : MongoEntityBase, IUser
+    public class User : KeyedEntityBase, IUser
     {
         /// <summary>
         /// 注册时间（Unix 毫秒时间戳）
@@ -45,16 +47,34 @@ namespace EIMSNext.Entities
         /// </summary>
         public string? UserType { get; set; }
 
-        public IList<UserCorp> Crops { get; set; } = new List<UserCorp>();
+        /// <summary>
+        /// 用户与企业的归属关系（源自关系表 "UserCorp"）。
+        /// 不参与持久化映射，由宿主按需查询后填充，取代原先内嵌的 jsonb 投影字段。
+        /// </summary>
+        [NotMapped]
+        public List<UserCorp> UserCorps { get; set; } = new List<UserCorp>();
 
         public bool IsSystem => Id == "system";
         public bool IsAnonymous => Id == "anonymous";
     }
 
-    public class UserCorp
+    /// <summary>
+    /// 用户与企业的关系（独立表 "UserCorp"），是唯一事实来源。
+    /// 通过 <see cref="UserId"/> 关联所属用户，不再以 jsonb 形式内嵌在 <see cref="User"/> 内。
+    /// 实现 <see cref="IEntityKey"/> 以便经 <c>IRepository&lt;UserCorp&gt;</c> 读写。
+    /// </summary>
+    public class UserCorp : IEntityKey
     {
         /// <summary>
-        /// 企业ID
+        /// 关系主键。Id 项目内统一保持字符串契约，不使用数据库自增。
+        /// </summary>
+        public string Id { get; set; } = "";
+        /// <summary>
+        /// 所属用户 ID。
+        /// </summary>
+        public string UserId { get; set; } = "";
+        /// <summary>
+        /// 企业ID。与 Corporate.Id 同为字符串契约，避免与业务标识混用整型。
         /// </summary>
         public string CorpId { get; set; } = "";
         /// <summary>

@@ -4,11 +4,9 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Persistence;
@@ -16,8 +14,7 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -34,8 +31,8 @@ namespace EIMSNext.Flow.Core
         private readonly IRepository<Employee> _employeeRepo;
         private readonly IRepository<EmployeeDepartment> _employeeDepartmentRepo;
         private readonly IRepository<Department> _departmentRepo;
-        private readonly IMongoCollection<WorkflowInstance> _workflowCollection;
-        private readonly IMongoCollection<EventSubscription> _subscriptionCollection;
+        private readonly DbSet<WorkflowInstance> _workflowInstances;
+        private readonly DbSet<EventSubscription> _eventSubscriptions;
         private readonly IWorkflowHost _workflowHost;
         private readonly IWfDbContext _dbContext;
 
@@ -52,14 +49,16 @@ namespace EIMSNext.Flow.Core
             _departmentRepo = resolver.GetRepository<Department>();
             _workflowHost = resolver.Resolve<IWorkflowHost>();
             _dbContext = resolver.Resolve<IWfDbContext>();
-            _workflowCollection = _dbContext.WorkflowInstances;
-            _subscriptionCollection = _dbContext.EventSubscriptions;
+            // 原 Mongo 时期是 IMongoCollection<WorkflowInstance>；
+            // 现在 WorkflowCore 的存储已落在 EF Core 上，直接用 DbSet。
+            _workflowInstances = _dbContext.WorkflowInstances;
+            _eventSubscriptions = _dbContext.EventSubscriptions;
         }
 
         public async Task<WorkflowActionResult> WithdrawAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Task task, string formName, string comment)
         {
             var definition = GetWorkflowDefinition(workflowInstance);
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
             dataContext.Round += 1;
             workflowInstance.Data = dataContext.ToExpando();
             workflowInstance.Status = WorkflowStatus.Suspended;
@@ -67,16 +66,14 @@ namespace EIMSNext.Flow.Core
             workflowInstance.CompleteTime = null;
             ResetWorkflowPointers(workflowInstance, definition);
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_dbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_dbContext.Context, async () =>
             {
-                _taskRepo.Delete(new DynamicFilter
-                {
-                    Rel = "and",
-                    Items = [new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = workflowInstance.Id }]
-                }, session);
-                _workflowCollection.ReplaceOne(session, x => x.Id == workflowInstance.Id, workflowInstance);
-                _subscriptionCollection.DeleteMany(session, x => x.WorkflowId == workflowInstance.Id);
-                _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, task, WfNodeType.Start, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.Withdraw, comment, dataContext.Round - 1), session);
+                await _taskRepo.DeleteManyAsync(x => x.WfInstanceId == workflowInstance.Id);
+                await ReplaceWorkflowInstanceAsync(workflowInstance);
+                await _eventSubscriptions
+                    .Where(x => x.WorkflowId == workflowInstance.Id)
+                    .ExecuteDeleteAsync();
+                await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Start, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.Withdraw, comment, dataContext.Round - 1));
             }).ConfigureAwait(false);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -114,16 +111,16 @@ namespace EIMSNext.Flow.Core
             await ValidateNodeActionEnabledAsync(workflowInstance, task, NodeActionType.Transfer);
             await ValidateTargetEmployeeAsync(workflowInstance, task, NodeActionType.Transfer, targetEmployeeId);
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
-            _taskRepo.Update(task.Id,
-                Builders<Wf_Task>.Update
-                    .Set(x => x.EmployeeId, targetEmployeeId)
-                    .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
-                session: session);
+            await _taskRepo.UpdateAsync(
+                task.Id,
+                setters => setters
+                    .SetProperty(x => x.EmployeeId, targetEmployeeId)
+                    .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
 
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
-            _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.Transfer, comment, dataContext.Round), session);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
+            await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.Transfer, comment, dataContext.Round));
             }).ConfigureAwait(false);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -139,14 +136,14 @@ namespace EIMSNext.Flow.Core
             await ValidateNodeActionEnabledAsync(workflowInstance, task, NodeActionType.AddSign);
             await ValidateTargetEmployeeAsync(workflowInstance, task, NodeActionType.AddSign, targetEmployeeId);
 
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async session =>
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
-            _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.AddSignAfter, comment, dataContext.Round), session);
-            _taskRepo.Delete(task.Id, session);
+            await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.AddSignAfter, comment, dataContext.Round));
+            await _taskRepo.DeleteManyAsync(x => x.Id == task.Id);
 
             var newTask = CloneTask(task, targetEmployeeId);
-            _taskRepo.Insert(newTask, session);
+            await _taskRepo.InsertAsync(newTask);
             }).ConfigureAwait(false);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -170,17 +167,17 @@ namespace EIMSNext.Flow.Core
                 throw new BadRequestException("目标审批人不存在");
             }
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
-            _taskRepo.Update(task.Id,
-                Builders<Wf_Task>.Update
-                    .Set(x => x.EmployeeId, targetEmployeeId)
-                    .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs())
-                    .Set(x => x.UpdateBy, context.CurrentEmployee),
-                session: session);
+            await _taskRepo.UpdateAsync(
+                task.Id,
+                setters => setters
+                    .SetProperty(x => x.EmployeeId, targetEmployeeId)
+                    .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs())
+                    .SetProperty(x => x.UpdateBy, context.CurrentEmployee));
 
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
-            _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.ChangeApprover, comment, dataContext.Round), session);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
+            await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.ChangeApprover, comment, dataContext.Round));
             }).ConfigureAwait(false);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -188,7 +185,7 @@ namespace EIMSNext.Flow.Core
 
         public async Task<List<ReturnTargetNodeResult>> GetReturnNodesAsync(WorkflowActionDataContext context, WorkflowInstance workflowInstance, Wf_Task task)
         {
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
             await EnsureStartTaskLogAsync(workflowInstance, dataContext);
 
             var trail = GetReturnTrail(workflowInstance, task, dataContext.Round);
@@ -218,7 +215,7 @@ namespace EIMSNext.Flow.Core
                 await ValidateNodeActionEnabledAsync(workflowInstance, task, NodeActionType.Return);
             }
 
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
             await EnsureStartTaskLogAsync(workflowInstance, dataContext);
 
             var trail = GetReturnTrail(workflowInstance, task, dataContext.Round);
@@ -247,34 +244,32 @@ namespace EIMSNext.Flow.Core
             workflowInstance.NextExecution = null;
             workflowInstance.CompleteTime = null;
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
-            _taskRepo.Delete(new DynamicFilter
-            {
-                Rel = "and",
-                Items = [
-                    new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = workflowInstance.Id },
-                ]
-            }, session);
+            await _taskRepo.DeleteManyAsync(x => x.WfInstanceId == workflowInstance.Id);
 
             if (target.NodeType == WfNodeType.Start)
             {
                 workflowInstance.Status = WorkflowStatus.Suspended;
                 ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
-                _workflowCollection.ReplaceOne(session, x => x.Id == workflowInstance.Id, workflowInstance);
-                _subscriptionCollection.DeleteMany(session, x => x.WorkflowId == workflowInstance.Id);
-                UpdateFormStatus(task.DataId, FlowStatus.Draft, session);
+                await ReplaceWorkflowInstanceAsync(workflowInstance);
+                await _eventSubscriptions
+                    .Where(x => x.WorkflowId == workflowInstance.Id)
+                    .ExecuteDeleteAsync();
+                await UpdateFormStatus(task.DataId, FlowStatus.Draft);
             }
             else
             {
                 workflowInstance.Status = WorkflowStatus.Runnable;
                 ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
-                _workflowCollection.ReplaceOne(session, x => x.Id == workflowInstance.Id, workflowInstance);
-                _subscriptionCollection.DeleteMany(session, x => x.WorkflowId == workflowInstance.Id);
-                UpdateFormStatus(task.DataId, FlowStatus.Approving, session);
+                await ReplaceWorkflowInstanceAsync(workflowInstance);
+                await _eventSubscriptions
+                    .Where(x => x.WorkflowId == workflowInstance.Id)
+                    .ExecuteDeleteAsync();
+                await UpdateFormStatus(task.DataId, FlowStatus.Approving);
             }
 
-            _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, action, comment, dataContext.Round - 1), session);
+            await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, action, comment, dataContext.Round - 1));
             }).ConfigureAwait(false);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
@@ -315,7 +310,7 @@ namespace EIMSNext.Flow.Core
             scriptData.TryAdd(EIMSNext.Common.Fields.CreateBy, formData.CreateBy);
             scriptData.TryAdd(WfConsts.MatchedResult, false);
 
-            var wrapData = new ExpandoObject();
+            var wrapData = new Dictionary<string, object?>();
             wrapData.TryAdd($"f_{formData.FormId}", scriptData);
 
             var result = _resolver.Resolve<IScriptEngine>().Evaluate(submitCondition.Expression, new Dictionary<string, object>
@@ -389,7 +384,7 @@ namespace EIMSNext.Flow.Core
 
         private async Task<List<string>> PopulateEmpIds(string dataId, IList<ApprovalCandidate>? candidates)
         {
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)GetWorkflowInstanceData(dataId));
+            var dataContext = WfDataContext.FromData(GetWorkflowInstanceData(dataId));
             return (await PopulateEmpIds(dataContext, candidates)).ToList();
         }
 
@@ -433,29 +428,22 @@ namespace EIMSNext.Flow.Core
                 return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
             }
 
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
             var now = DateTime.UtcNow.ToTimeStampMs();
             var replacementTasks = sourceTasks
                 .Select((sourceTask, index) => CloneTask(sourceTask, targetEmployeeIds[Math.Min(index, targetEmployeeIds.Count - 1)]))
                 .ToList();
             replacementTasks.ForEach(x => x.UpdateTime = now);
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
-            _taskRepo.Delete(new DynamicFilter
-            {
-                Rel = "and",
-                Items =
-                [
-                    new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = workflowInstance.Id },
-                    new DynamicFilter { Field = "ApproveNodeId", Op = FilterOp.Eq, Value = task.ApproveNodeId }
-                ]
-            }, session);
-            _taskRepo.Insert(replacementTasks, session);
+            await _taskRepo.DeleteManyAsync(x =>
+                x.WfInstanceId == workflowInstance.Id && x.ApproveNodeId == task.ApproveNodeId);
+            await _taskRepo.InsertAsync(replacementTasks);
 
             foreach (var sourceTask in sourceTasks)
             {
-                _taskLogRepo.Insert(CreateTaskLog(context, workflowInstance, sourceTask, WfNodeType.Approve, sourceTask.ApproveNodeId, sourceTask.ApproveNodeName, ApproveAction.AutoTransfer, "审批超时，系统自动转交", dataContext.Round), session);
+                await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, sourceTask, WfNodeType.Approve, sourceTask.ApproveNodeId, sourceTask.ApproveNodeName, ApproveAction.AutoTransfer, "审批超时，系统自动转交", dataContext.Round));
             }
             }).ConfigureAwait(false);
 
@@ -468,10 +456,15 @@ namespace EIMSNext.Flow.Core
             return await ReturnInternalAsync(context, workflowInstance, task, targetNodeId, "审批超时，系统自动回退", ApproveAction.AutoReturn);
         }
 
-        private ExpandoObject GetWorkflowInstanceData(string dataId)
+        private IDictionary<string, object?> GetWorkflowInstanceData(string dataId)
         {
-            var wfInst = _workflowCollection.Find(x => x.Reference == dataId).SortByDescending(x => x.CreateTime).FirstOrDefault();
-            return (ExpandoObject)(wfInst?.Data ?? new ExpandoObject());
+            // 原 Mongo: _workflowCollection.Find(x => x.Reference == dataId).SortByDescending(x => x.CreateTime).FirstOrDefault()
+            // EF Core 下换成 Where + OrderByDescending + FirstOrDefault，翻译为 ORDER BY ... LIMIT 1。
+            var wfInst = _workflowInstances
+                .Where(x => x.Reference == dataId)
+                .OrderByDescending(x => x.CreateTime)
+                .FirstOrDefault();
+            return (IDictionary<string, object?>?)wfInst?.Data ?? new Dictionary<string, object?>();
         }
 
         private async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
@@ -495,9 +488,9 @@ namespace EIMSNext.Flow.Core
                 return;
             }
 
-            await MongoTransactionScope.ExecuteWithRetryAsync(_taskLogRepo.DbContext, async session =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskLogRepo.DbContext, async () =>
             {
-            _taskLogRepo.Insert(new Wf_TaskLog
+            await _taskLogRepo.InsertAsync(new Wf_TaskLog
             {
                 CorpId = dataContext.CorpId,
                 AppId = dataContext.AppId,
@@ -515,13 +508,13 @@ namespace EIMSNext.Flow.Core
                 Result = ApproveAction.Approve,
                 WfVersion = workflowInstance.Version,
                 Round = 1,
-            }, session);
+            });
             }).ConfigureAwait(false);
         }
 
         private async Task<string> ResolveExpireReturnTargetNodeIdAsync(WorkflowInstance workflowInstance, Wf_Task task, ReturnSetting? returnSetting)
         {
-            var dataContext = WfDataContext.FromExpando((ExpandoObject)workflowInstance.Data);
+            var dataContext = WfDataContext.FromData((IDictionary<string, object?>)workflowInstance.Data);
             await EnsureStartTaskLogAsync(workflowInstance, dataContext);
 
             var trail = GetReturnTrail(workflowInstance, task, dataContext.Round)
@@ -577,7 +570,7 @@ namespace EIMSNext.Flow.Core
             do
             {
                 logs = _taskLogRepo.Find(x => x.DataId == task.DataId && x.Round == round)
-                    .SortBy(x => x.ApprovalTime)
+                    .OrderBy(x => x.ApprovalTime)
                     .ToList();
                 if (logs.Any(x => x.NodeId == startNodeId))
                 {
@@ -644,7 +637,7 @@ namespace EIMSNext.Flow.Core
             prevs.Add(stepId);
         }
 
-        private async Task<Wf_Task?> CreateTaskForNodeAsync(WorkflowInstance workflowInstance, WfDataContext dataContext, string nodeId, IClientSessionHandle session)
+        private async Task<Wf_Task?> CreateTaskForNodeAsync(WorkflowInstance workflowInstance, WfDataContext dataContext, string nodeId)
         {
             var definition = GetWorkflowDefinition(workflowInstance);
             var step = definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == nodeId);
@@ -678,7 +671,7 @@ namespace EIMSNext.Flow.Core
                 DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
                 ExpireHandled = false,
             };
-            _taskRepo.Insert(task, session);
+            await _taskRepo.InsertAsync(task);
             return task;
         }
 
@@ -744,9 +737,28 @@ namespace EIMSNext.Flow.Core
             return brief;
         }
 
-        private void UpdateFormStatus(string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
+        private async Task UpdateFormStatus(string dataId, FlowStatus flowStatus)
         {
-            _formDataRepo.Update(dataId, Builders<FormData>.Update.Set(x => x.FlowStatus, flowStatus), session: session);
+            await _formDataRepo.UpdateAsync(
+                dataId,
+                setters => setters.SetProperty(x => x.FlowStatus, flowStatus));
+        }
+
+        /// <summary>
+        /// 整行覆盖工作流实例。EF Core 下等价于 Mongo 的 <c>ReplaceOne</c>。
+        /// </summary>
+        /// <param name="workflowInstance">工作流实例。</param>
+        /// <remarks>
+        /// Mongo 的 <c>ReplaceOne</c> 是「按主键整行 upsert」，这里用
+        /// <c>DbSet.Update</c> + <c>SaveChangesAsync</c> 表达：实体已带主键，
+        /// EF 会生成 <c>UPDATE ... WHERE "Id" = @id</c>。若实例不存在则会抛
+        /// <c>DbUpdateConcurrencyException</c>，这与 Mongo 的「匹配 0 行」在语义上略有差异，
+        /// 但本方法的所有调用者都刚从上下文里取出该实例，实例必然存在。
+        /// </remarks>
+        private async Task ReplaceWorkflowInstanceAsync(WorkflowInstance workflowInstance)
+        {
+            _workflowInstances.Update(workflowInstance);
+            await _dbContext.SaveChangesAsync();
         }
 
         private Wf_Definition? GetWorkflowDefinition(WorkflowInstance wfInst)
@@ -766,7 +778,10 @@ namespace EIMSNext.Flow.Core
             wfInst.ExecutionPointers.Clear();
             wfInst.ExecutionPointers.Add(new ExecutionPointer
             {
-                Id = ObjectId.GenerateNewId().ToString(),
+                // ExecutionPointer.Id 是 WorkflowCore 自己用的字符串指针标识，不落业务表主键，
+                // 只要唯一即可。原实现借用了 Mongo 的 ObjectId（24 位十六进制）；
+                // 迁移后改用项目统一的 32 位无连字符 GUID 契约，避免保留 Mongo 依赖。
+                Id = Guid.NewGuid().ToString("N"),
                 StepId = stepId,
                 StepName = targetStep.Name,
                 Active = true,

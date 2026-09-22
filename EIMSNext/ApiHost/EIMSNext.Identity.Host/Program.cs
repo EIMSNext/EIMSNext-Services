@@ -1,10 +1,8 @@
-using EIMSNext.ApiCore;
+﻿using EIMSNext.ApiCore;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Extensions;

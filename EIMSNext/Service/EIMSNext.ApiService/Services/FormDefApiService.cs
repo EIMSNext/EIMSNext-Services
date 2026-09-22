@@ -4,7 +4,6 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Component;
 using EIMSNext.Entities;
 
-using MongoDB.Driver;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Common;
 
@@ -91,7 +90,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体。
         /// </summary>
-        public override Task<ReplaceOneResult> ReplaceAsync(FormDef entity)
+        public override Task<int> ReplaceAsync(FormDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             var existing = CoreService.Get(entity.Id);
@@ -131,7 +130,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var forms = CoreService.All()

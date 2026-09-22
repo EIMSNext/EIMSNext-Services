@@ -1,17 +1,14 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 using NanoidDotNet;
 
 namespace EIMSNext.ApiService
@@ -76,7 +73,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">客户端实体。</param>
         /// <returns>替换结果。</returns>
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Client entity)
+        protected override async Task<int> ReplaceAsyncCore(Client entity)
         {
             var existing = await CoreService.GetAsync(entity.Id);
             if (existing == null || existing.CorpId != IdentityContext.CurrentCorpId || existing.DeleteFlag)
@@ -106,7 +103,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">客户端 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -114,7 +111,8 @@ namespace EIMSNext.ApiService
                 .ToList();
             if (idList.Count == 0)
             {
-                return new object();
+                // 基类 DeleteAsyncCore 返回受影响行数，空集合下自然为 0。
+                return 0;
             }
 
             var deleting = CoreService.All()

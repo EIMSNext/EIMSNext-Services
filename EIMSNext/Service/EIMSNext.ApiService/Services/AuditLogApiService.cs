@@ -1,3 +1,4 @@
+﻿using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -5,16 +6,14 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.ApiService
 {
@@ -102,45 +101,47 @@ namespace EIMSNext.ApiService
 
 		private async Task<long> CountExportAsync(AuditLogExportRequest request)
 		{
-			var filter = BuildAuditLogFilter(request);
-			return await Resolver.GetRepository<AuditLog>().CountAsync(filter);
+			var query = Resolver.GetRepository<AuditLog>().Find(BuildAuditLogFilter(request));
+			return await query.LongCountAsync();
 		}
 
-		private FilterDefinition<AuditLog> BuildAuditLogFilter(AuditLogExportRequest request)
+		private Expression<Func<AuditLog, bool>> BuildAuditLogFilter(AuditLogExportRequest request)
 		{
-			var builder = Builders<AuditLog>.Filter;
-			var filters = new List<FilterDefinition<AuditLog>>
-			{
-				builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId),
-				builder.Ne(x => x.DeleteFlag, true),
-			};
+			var corpId = IdentityContext.CurrentCorpId;
+			Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
 
 			if (!string.IsNullOrWhiteSpace(request.EntityType))
 			{
-				filters.Add(builder.Eq(x => x.EntityType, request.EntityType));
+				var entityType = request.EntityType;
+				filter = filter.AndAlso(x => x.EntityType == entityType);
 			}
 
 			if (!string.IsNullOrWhiteSpace(request.Action) && Enum.TryParse<DbAction>(request.Action, true, out var action))
 			{
-				filters.Add(builder.Eq(x => x.Action, action));
+				filter = filter.AndAlso(x => x.Action == action);
 			}
 
 			if (!string.IsNullOrWhiteSpace(request.OperatorName))
 			{
-				filters.Add(builder.Regex(x => x.CreateBy!.Label, new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
+				// 原 Mongo 使用 BsonRegularExpression(..., "i") 做不区分大小写的子串匹配，
+				// PostgreSQL 下等价写法为 ILIKE '%pattern%'。
+				var keyword = DynamicQueryExtensions.EscapeLikePattern(request.OperatorName);
+				filter = filter.AndAlso(x => x.CreateBy != null && EF.Functions.ILike(x.CreateBy.Label, keyword));
 			}
 
 			if (request.StartTime.HasValue)
 			{
-				filters.Add(builder.Gte(x => x.CreateTime, request.StartTime.Value));
+				var startTime = request.StartTime.Value;
+				filter = filter.AndAlso(x => x.CreateTime >= startTime);
 			}
 
 			if (request.EndTime.HasValue)
 			{
-				filters.Add(builder.Lte(x => x.CreateTime, request.EndTime.Value));
+				var endTime = request.EndTime.Value;
+				filter = filter.AndAlso(x => x.CreateTime <= endTime);
 			}
 
-			return filters.Count == 1 ? filters[0] : builder.And(filters);
+			return filter;
 		}
 
 		private static void ValidateAuditLogExportRequest(AuditLogExportRequest request)

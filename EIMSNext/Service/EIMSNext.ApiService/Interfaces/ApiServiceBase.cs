@@ -1,18 +1,14 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Memory;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -63,11 +59,16 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 泛型 API 服务基类，为 <typeparamref name="T"/> 实体提供 <see cref="IApiService{T, V}"/> 的默认实现。
     /// </summary>
-    /// <typeparam name="T">实现 <see cref="IMongoEntity"/> 的实体类型。</typeparam>
+    /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
     /// <typeparam name="V">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
     /// <typeparam name="S">服务类型，实现 <see cref="IService{T}"/>。</typeparam>
+    /// <remarks>
+    /// PostgreSQL 迁移后本层不再暴露 Mongo 驱动类型：
+    /// <c>IFindFluent&lt;T,T&gt;</c> 换为 <see cref="IQueryable{T}"/>，
+    /// <c>ReplaceOneResult</c> 换为受影响行数 <see cref="int"/>。
+    /// </remarks>
     public abstract class ApiServiceBase<T, V, S> : ApiServiceBase, IApiService<T, V>
-        where T : class, IMongoEntity
+        where T : class, IEntityKey
         where V : T, new()
         where S : class, IService<T>
     {
@@ -118,8 +119,8 @@ namespace EIMSNext.ApiService
         /// 根据动态查询选项查找实体。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
-        /// <returns>可进一步链式操作的查询流。</returns>
-        public IFindFluent<T, T> Find(DynamicFindOptions<T> options)
+        /// <returns>可进一步链式操作的查询。</returns>
+        public IQueryable<T> Find(DynamicFindOptions<T> options)
         {
             return CoreService.Find(options);
         }
@@ -128,8 +129,18 @@ namespace EIMSNext.ApiService
         /// 根据表达式过滤条件查找实体。
         /// </summary>
         /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>可进一步链式操作的查询流。</returns>
-        public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter)
+        /// <returns>可进一步链式操作的查询。</returns>
+        public IQueryable<T> Find(Expression<Func<T, bool>> filter)
+        {
+            return CoreService.Find(filter);
+        }
+
+        /// <summary>
+        /// 根据动态过滤条件查找实体。
+        /// </summary>
+        /// <param name="filter">动态过滤条件。</param>
+        /// <returns>可进一步链式操作的查询。</returns>
+        public IQueryable<T> Find(DynamicFilter filter)
         {
             return CoreService.Find(filter);
         }
@@ -185,23 +196,25 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
-        /// 异步根据动态查询选项查找实体。
+        /// 异步根据动态查询选项查找实体列表。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
-        /// <returns>异步游标。</returns>
-        public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options)
+        /// <param name="cancellationToken">取消令牌。</param>
+        /// <returns>实体列表。</returns>
+        public Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
         {
-            return CoreService.FindAsync(options);
+            return CoreService.FindAsync(options, cancellationToken);
         }
 
         /// <summary>
-        /// 异步根据表达式过滤条件查找实体。
+        /// 异步根据表达式过滤条件查找实体列表。
         /// </summary>
         /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>异步游标。</returns>
-        public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter)
+        /// <param name="cancellationToken">取消令牌。</param>
+        /// <returns>实体列表。</returns>
+        public Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
         {
-            return CoreService.FindAsync(filter);
+            return CoreService.FindAsync(filter, cancellationToken);
         }
 
         /// <summary>
@@ -254,11 +267,11 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
-        /// 异步替换单个实体。
+        /// 异步替换（整行更新）单个实体。
         /// </summary>
         /// <param name="entity">要替换的实体。</param>
-        /// <returns>替换结果。</returns>
-        public virtual Task<ReplaceOneResult> ReplaceAsync(T entity)
+        /// <returns>受影响行数。</returns>
+        public virtual Task<int> ReplaceAsync(T entity)
         {
             return ReplaceAsyncCore(entity);
         }
@@ -267,8 +280,8 @@ namespace EIMSNext.ApiService
         /// 异步根据主键 ID 删除实体。
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
-        /// <returns>删除结果。</returns>
-        public virtual Task<object> DeleteAsync(string id)
+        /// <returns>受影响行数。</returns>
+        public virtual Task<int> DeleteAsync(string id)
         {
             return DeleteAsyncCore([id]);
         }
@@ -277,8 +290,8 @@ namespace EIMSNext.ApiService
         /// 异步根据多个主键 ID 批量删除实体。
         /// </summary>
         /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>删除结果。</returns>
-        public virtual Task<object> DeleteAsync(IEnumerable<string> ids)
+        /// <returns>受影响行数。</returns>
+        public virtual Task<int> DeleteAsync(IEnumerable<string> ids)
         {
             return DeleteAsyncCore(ids);
         }
@@ -287,8 +300,8 @@ namespace EIMSNext.ApiService
         /// 异步根据动态过滤条件批量删除实体。
         /// </summary>
         /// <param name="filter">动态过滤条件。</param>
-        /// <returns>删除结果。</returns>
-        public virtual Task<object> DeleteAsync(DynamicFilter filter)
+        /// <returns>受影响行数。</returns>
+        public virtual Task<int> DeleteAsync(DynamicFilter filter)
         {
             return CoreService.DeleteAsync(filter);
         }
@@ -320,8 +333,8 @@ namespace EIMSNext.ApiService
         /// 替换实体的核心实现。
         /// </summary>
         /// <param name="entity">要替换的实体。</param>
-        /// <returns>替换结果。</returns>
-        protected virtual Task<ReplaceOneResult> ReplaceAsyncCore(T entity)
+        /// <returns>受影响行数。</returns>
+        protected virtual Task<int> ReplaceAsyncCore(T entity)
         {
             return CoreService.ReplaceAsync(entity);
         }
@@ -330,8 +343,8 @@ namespace EIMSNext.ApiService
         /// 删除实体的核心实现。
         /// </summary>
         /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>删除结果。</returns>
-        protected virtual Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <returns>受影响行数。</returns>
+        protected virtual Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             return CoreService.DeleteAsync(ids);
         }

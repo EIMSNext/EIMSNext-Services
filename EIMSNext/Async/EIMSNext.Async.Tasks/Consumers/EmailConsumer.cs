@@ -1,13 +1,11 @@
-using EIMSNext.Async.RabbitMQ.Messaging;
+﻿using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 
@@ -15,8 +13,6 @@ using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Logging;
 
-using MongoDB.Driver;
-using MongoDB.Driver.Linq;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {

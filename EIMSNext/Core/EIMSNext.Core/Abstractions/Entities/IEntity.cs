@@ -1,9 +1,9 @@
-namespace EIMSNext.Core.Abstractions
+﻿namespace EIMSNext.Core.Abstractions
 {
     /// <summary>
-    /// Mongo 实体接口，定义实体的主键标识。
+    /// 实体主键接口，定义实体的主键标识。
     /// </summary>
-    public interface IMongoEntity
+    public interface IEntityKey
     {
         /// <summary>
         /// 获取或设置实体主键 ID。
@@ -36,7 +36,7 @@ namespace EIMSNext.Core.Abstractions
     /// <summary>
     /// 完整实体接口，包含主键、审计字段与逻辑删除标识。
     /// </summary>
-    public interface IEntity : IMongoEntity, IDeleteFlag
+    public interface IEntity : IEntityKey, IDeleteFlag
     {
         /// <summary>
         /// 获取或设置创建人。

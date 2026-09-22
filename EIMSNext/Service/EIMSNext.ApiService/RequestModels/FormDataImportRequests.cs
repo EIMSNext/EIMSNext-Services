@@ -1,6 +1,6 @@
 using System.Dynamic;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
@@ -287,7 +287,7 @@ namespace EIMSNext.ApiService.RequestModels
         /// <summary>
         /// 获取或设置数据对象。
         /// </summary>
-        public ExpandoObject Data { get; set; } = new();
+        public Dictionary<string, object?> Data { get; set; } = new();
 
         /// <summary>
         /// 获取或设置单元格错误列表。
@@ -308,7 +308,7 @@ namespace EIMSNext.ApiService.RequestModels
         /// <summary>
         /// 获取或设置数据对象。
         /// </summary>
-        public ExpandoObject Data { get; set; } = new();
+        public Dictionary<string, object?> Data { get; set; } = new();
     }
 
     /// <summary>

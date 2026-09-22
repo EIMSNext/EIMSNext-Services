@@ -1,18 +1,18 @@
 using System.Collections;
 using System.Dynamic;
+using System.Linq.Expressions;
 using System.Text.Json;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core
 {
@@ -95,19 +95,51 @@ namespace EIMSNext.Flow.Core
                     .Select(x => x.EmployeeId)
                     .Distinct()
                     .ToList();
-                await _employeeRepository.Find(new MongoFindOptions<Employee>
+                var matched = await _employeeRepository
+                    .Find(BuildActiveEmployeeFilter(x => employeeIds.Contains(x.Id)))
+                    .ToListAsync();
+                foreach (var employee in matched)
                 {
-                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, employeeIds))
-                })
-                    .ForEachAsync(x => empIds.Add(x.Id));
+                    empIds.Add(employee.Id);
+                }
             }
 
             if (employeeGroupIds.Count > 0)
             {
-                await _employeeRepository.Find(new MongoFindOptions<Employee>
+                // 员工组归属由关系表 EmployeeGroupMember 承载，可用服务端查询直接求出组内员工
+                // （原 jsonb 数组无法在服务端做元素级 EXISTS，只能拉回内存判断）。
+                var groupEmployeeIds = (await _employeeRepository.Queryable
+                    .SelectMany(x => x.Groups)
+                    .Where(x => employeeGroupIds.Contains(x.EmployeeGroupId))
+                    .Select(x => x.EmployeeId)
+                    .Distinct()
+                    .ToListAsync())
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+                var scopedEmployeeIds = _employeeDepartmentRepository.Queryable
+                    .Select(x => x.EmployeeId)
+                    .Distinct()
+                    .ToList();
+                var scope = scopedEmployeeIds.Count == 0 || deptIds.Count > 0
+                    ? null
+                    : scopedEmployeeIds;
+
+                var groupScopedEmployees = await _employeeRepository
+                    .Find(BuildActiveEmployeeFilter(_ => true))
+                    .ToListAsync();
+
+                foreach (var employee in groupScopedEmployees)
                 {
-                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.ElemMatch(x => x.EmployeeGroups, r => employeeGroupIds.Contains(r.EmployeeGroupId)))
-                }).ForEachAsync(x => empIds.Add(x.Id));
+                    if (scope is not null && !scope.Contains(employee.Id, StringComparer.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    if (groupEmployeeIds.Contains(employee.Id))
+                    {
+                        empIds.Add(employee.Id);
+                    }
+                }
             }
 
             if (managerRequests.Count > 0)
@@ -209,10 +241,9 @@ namespace EIMSNext.Flow.Core
                 case FieldType.Employee2:
                     if (managerLevels.Count > 0)
                     {
-                        var employees = _employeeRepository.Find(new MongoFindOptions<Employee>
-                        {
-                            Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, values))
-                        }).ToList();
+                        var employees = _employeeRepository
+                            .Find(BuildActiveEmployeeFilter(x => values.Contains(x.Id)))
+                            .ToList();
                         var employeeIds = employees.Select(x => x.Id).ToList();
                         var employeeDepartments = _employeeDepartmentRepository.Queryable
                             .Where(x => employeeIds.Contains(x.EmployeeId))
@@ -260,11 +291,14 @@ namespace EIMSNext.Flow.Core
                         .Select(x => x.EmployeeId)
                         .Distinct()
                         .ToList();
-                    await _employeeRepository.Find(new MongoFindOptions<Employee>
+                    var managers = await _employeeRepository
+                        .Find(BuildActiveEmployeeFilter(x => managerEmployeeIds.Contains(x.Id)))
+                        .ToListAsync();
+                    foreach (var manager in managers)
                     {
-                        Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, managerEmployeeIds))
-                    })
-                        .ForEachAsync(x => result.Add(x.Id));
+                        result.Add(manager.Id);
+                    }
+
                     targetLevels.Remove(currentLevel);
                 }
 
@@ -297,15 +331,14 @@ namespace EIMSNext.Flow.Core
                 return [];
             }
 
-            var query = _departmentRepository.Queryable
-                .Where(x => !x.DeleteFlag && x.Id == departmentId);
-            if (cascaded)
-            {
-                query = _departmentRepository.Queryable
-                    .Where(x => !x.DeleteFlag && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")));
-            }
-
-            return query.Select(x => x.Id).Distinct().ToList();
+            // 直接用关系表上的层级路径快照匹配，省去先查 Department 表展开子部门、
+            // 再按 DepartmentIds 查关系表的两次往返（快照由 DepartmentService 在层级变动时同步）。
+            return _employeeDepartmentRepository.Queryable
+                .Where(x => x.DepartmentId == departmentId
+                    || (cascaded && x.HeriarchyId.Contains($"|{departmentId}|")))
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
         }
 
         private FormData GetFormData(string dataId)
@@ -319,12 +352,18 @@ namespace EIMSNext.Flow.Core
                 ?? throw new InvalidOperationException("表单定义不存在");
         }
 
-        private static FilterDefinition<Employee> BuildActiveEmployeeFilter(FilterDefinition<Employee> filter)
+        /// <summary>
+        /// 在给定条件上叠加「非虚拟 + 在职」的通用员工过滤。
+        /// </summary>
+        /// <param name="predicate">业务过滤谓词。</param>
+        /// <returns>叠加后的过滤谓词。</returns>
+        /// <remarks>
+        /// 原实现是 <c>Builders&lt;Employee&gt;.Filter.And(IsDummy=false, Status=Active, filter)</c>；
+        /// EF Core 下用表达式组合表达，语义一致。
+        /// </remarks>
+        private static Expression<Func<Employee, bool>> BuildActiveEmployeeFilter(Expression<Func<Employee, bool>> predicate)
         {
-            return Builders<Employee>.Filter.And(
-                Builders<Employee>.Filter.Eq(x => x.IsDummy, false),
-                Builders<Employee>.Filter.Eq(x => x.Status, EmployeeStatus.Active),
-                filter);
+            return predicate.AndAlso(x => !x.IsDummy && x.Status == EmployeeStatus.Active);
         }
 
         private static List<int> NormalizeManagerLevels(IEnumerable<int>? levels)
@@ -360,7 +399,7 @@ namespace EIMSNext.Flow.Core
             var result = new List<string>();
             foreach (var item in EnumerateItemsOrSingle(rawValue))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 if (dict != null && dict.TryGetValue(Fields.Id, out var valueObj))
                 {
                     var value = valueObj?.ToString();
@@ -410,32 +449,6 @@ namespace EIMSNext.Flow.Core
             }
 
             yield return value;
-        }
-
-        private static IDictionary<string, object?>? AsDictionary(object? value)
-        {
-            if (value is ExpandoObject expandoObject)
-            {
-                return (IDictionary<string, object?>)expandoObject;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return dict;
-            }
-
-            if (value is IDictionary<string, object> objectDict)
-            {
-                return objectDict.ToDictionary(x => x.Key, x => (object?)x.Value);
-            }
-
-            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
-            {
-                var expando = jsonElement.ToString().DeserializeFromJson<ExpandoObject>();
-                return expando == null ? null : (IDictionary<string, object?>)expando;
-            }
-
-            return null;
         }
     }
 }

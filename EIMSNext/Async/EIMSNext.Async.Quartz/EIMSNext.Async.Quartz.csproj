@@ -9,7 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="HKH.Mef2.Integration.Abstractions" />
-    <PackageReference Include="MongoDB.Driver" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" />
     <PackageReference Include="WorkflowCore" />

@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Plugin.Runtime;
@@ -9,11 +9,9 @@ using EIMSNext.Entities;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Host.Authorization;
@@ -73,7 +71,12 @@ namespace EIMSNext.Service.Host.Controllers
                 corpId = IdentityContext.CurrentCorpId,
                 departmentIds,
                 userType = IdentityContext.IdentityType,
-                employeeGroups = emp?.EmployeeGroups.Select(x => x.EmployeeGroupId)
+                employeeGroups = emp == null
+                    ? null
+                    : Resolver.GetRepository<EmployeeGroupMember>().Queryable
+                        .Where(x => x.EmployeeId == emp.Id && !x.DeleteFlag)
+                        .Select(x => x.EmployeeGroupId)
+                        .ToList()
             }).ToActionResult();
         }
 
@@ -126,15 +129,30 @@ namespace EIMSNext.Service.Host.Controllers
             if (IdentityContext.CurrentUser is not User user)
                 return Unauthorized();
 
-            var targetCorp = user.Crops?.FirstOrDefault(x =>
+            // 企业归属由关系表 UserCorp 承载（jsonb 投影 User.Crops 已移除），
+            // 切换企业即把目标企业设为默认、其余取消默认。
+            var userCorpRepo = Resolver.GetRepository<UserCorp>();
+            var userCorps = userCorpRepo.Queryable
+                .Where(x => x.UserId == user.Id)
+                .ToList();
+
+            var targetCorp = userCorps.FirstOrDefault(x =>
                 string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.Ordinal));
             if (targetCorp == null)
                 return Forbid();
 
-            foreach (var corp in user.Crops ?? [])
-                corp.IsDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+            foreach (var corp in userCorps)
+            {
+                var isDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+                if (corp.IsDefault == isDefault)
+                {
+                    continue;
+                }
 
-            await UserApiService.ReplaceAsync(user);
+                corp.IsDefault = isDefault;
+                await userCorpRepo.ReplaceAsync(corp);
+            }
+
             return ApiResult.Success(targetCorp.CorpId).ToActionResult();
         }
 

@@ -1,13 +1,11 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Text.Json;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
@@ -272,24 +270,26 @@ namespace EIMSNext.Flow.Service
                 .WithEventFlowId(definition.Id));
         }
 
-        private static ExpandoObject ToExpando(EventFlowHttpRequestContext requestContext)
+        private static Dictionary<string, object?> ToExpando(EventFlowHttpRequestContext requestContext)
         {
-            IDictionary<string, object?> expando = new ExpandoObject();
-            expando["header"] = ToExpando(requestContext.Header);
-            expando["body"] = ToExpando(requestContext.Body);
-            expando["ip"] = requestContext.ClientIp;
-            return (ExpandoObject)expando;
+            var expando = new Dictionary<string, object?>
+            {
+                ["header"] = ToExpando(requestContext.Header),
+                ["body"] = ToExpando(requestContext.Body),
+                ["ip"] = requestContext.ClientIp,
+            };
+            return expando;
         }
 
-        private static ExpandoObject ToExpando(Dictionary<string, object?> value)
+        private static Dictionary<string, object?> ToExpando(Dictionary<string, object?> value)
         {
-            IDictionary<string, object?> expando = new ExpandoObject();
+            var expando = new Dictionary<string, object?>();
             foreach (var item in value)
             {
                 expando[item.Key] = item.Value is Dictionary<string, object?> dict ? ToExpando(dict) : item.Value;
             }
 
-            return (ExpandoObject)expando;
+            return expando;
         }
     }
 }

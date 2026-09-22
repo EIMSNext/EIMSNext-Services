@@ -26,6 +26,8 @@
     <ProjectReference Include="..\..\Service\EIMSNext.Notification\EIMSNext.Notification.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
+    <!-- 共享测试桩（StubRepository<T> 等）。 -->
+    <ProjectReference Include="..\EIMSNext.TestSupport\EIMSNext.TestSupport.csproj" />
   </ItemGroup>
   <ItemGroup>
     <Using Include="Microsoft.VisualStudio.TestTools.UnitTesting" />

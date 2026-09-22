@@ -55,7 +55,9 @@ try
 
             q.UsePersistentStore(store =>
             {
-                store.UsePostgreSql(postgres =>
+                // Quartz 没有独立包，PostgreSQL 走 AdoProviderExtensions.UsePostgres
+                // （内部即 UseGenericDatabase<PostgreSQLDelegate>("Npgsql", …)）。
+                store.UsePostgres(postgres =>
                 {
                     postgres.ConnectionString = connectionString;
                     postgres.TablePrefix = quartzConfiguration.GetValue<string>("TablePrefix") ?? "qrtz_";

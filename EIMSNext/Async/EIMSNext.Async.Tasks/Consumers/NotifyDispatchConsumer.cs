@@ -1,22 +1,19 @@
-using EIMSNext.Async.Abstractions.Messaging;
+﻿using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Bson;
-using MongoDB.Driver;
 using System.Text.Json;
 
 namespace EIMSNext.Async.Tasks.Consumers

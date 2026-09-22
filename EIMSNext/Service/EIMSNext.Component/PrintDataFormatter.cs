@@ -1,5 +1,4 @@
 using System.Collections;
-using System.Dynamic;
 using System.Globalization;
 using System.Text.Json;
 using EIMSNext.Core.Abstractions;
@@ -25,14 +24,13 @@ namespace EIMSNext.Component
     {
         public const string ApprovalLogs = "approvallogs";
 
-        public static ExpandoObject Format(
+        public static Dictionary<string, object?> Format(
             FormData data,
             IList<FieldDef> fieldDefs,
             IEnumerable<Wf_TaskLog>? taskLogs = null,
             PrintDataContext? context = null)
         {
-            var result = FormDataFormatter.Format(data, fieldDefs);
-            var values = (IDictionary<string, object?>)result;
+            var values = FormDataFormatter.Format(data, fieldDefs);
             context ??= new PrintDataContext();
 
             values["createBy"] = data.CreateBy?.Label ?? string.Empty;
@@ -48,10 +46,10 @@ namespace EIMSNext.Component
             values["printedTime"] = FormatTimestamp(context.PrintedTime ?? DateTime.UtcNow.ToTimeStampMs());
             values[ApprovalLogs] = BuildApprovalLogs(taskLogs ?? []);
 
-            return result;
+            return values;
         }
 
-        private static List<ExpandoObject> BuildApprovalLogs(IEnumerable<Wf_TaskLog> taskLogs)
+        private static List<Dictionary<string, object?>> BuildApprovalLogs(IEnumerable<Wf_TaskLog> taskLogs)
         {
             var latestRoundByNode = taskLogs
                 .Where(x => x.NodeType == WfNodeType.Approve)
@@ -68,17 +66,17 @@ namespace EIMSNext.Component
                 .ToList();
         }
 
-        private static ExpandoObject ToApprovalLog(Wf_TaskLog log, int sequence)
+        private static Dictionary<string, object?> ToApprovalLog(Wf_TaskLog log, int sequence)
         {
-            var item = new ExpandoObject();
-            var values = (IDictionary<string, object?>)item;
-            values["sequence"] = sequence;
-            values["approvalTime"] = FormatTimestamp(log.ApprovalTime);
-            values["nodeName"] = log.NodeName;
-            values["approver"] = log.Approver?.Label ?? string.Empty;
-            values["comment"] = log.Comment ?? string.Empty;
-            values["result"] = FormatApproveAction(log.Result);
-            return item;
+            return new Dictionary<string, object?>
+            {
+                ["sequence"] = sequence,
+                ["approvalTime"] = FormatTimestamp(log.ApprovalTime),
+                ["nodeName"] = log.NodeName,
+                ["approver"] = log.Approver?.Label ?? string.Empty,
+                ["comment"] = log.Comment ?? string.Empty,
+                ["result"] = FormatApproveAction(log.Result),
+            };
         }
 
         private static string GetFormDataValue(FormData data, string field)

@@ -1,12 +1,12 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
     /// <summary>
     /// 工作流执行日志实体
     /// </summary>
-    public class Wf_ExecLog : MongoEntityBase
+    public class Wf_ExecLog : KeyedEntityBase
     {
         /// <summary>
         /// 工作流实例ID

@@ -34,10 +34,9 @@ public sealed class PostgreSqlPersistenceTests
             await using (var setup = new NpgsqlConnection(settings.ConnectionString))
             {
                 await setup.OpenAsync();
-                var root = FindSolutionRoot();
-                foreach (var name in new[] { "004_CreateWorkflowTables.sql", "005_CreateWorkflowIndexes.sql" })
+                foreach (var script in ResolveWorkflowStoreScripts(FindSolutionRoot()))
                 {
-                    var sql = await File.ReadAllTextAsync(Path.Combine(root, "ApiHost", "EIMSNext.Tool.DbMaintenance", "Sql", name));
+                    var sql = await System.IO.File.ReadAllTextAsync(script);
                     await using var command = new NpgsqlCommand(sql, setup);
                     await command.ExecuteNonQueryAsync();
                 }
@@ -91,6 +90,24 @@ public sealed class PostgreSqlPersistenceTests
 
             var winners = await Task.WhenAll(Enumerable.Range(0, 8).Select(i =>
                 store.SetSubscriptionToken("sub-one", "token-" + i, "worker-" + i, now.AddMinutes(1))));
+
+            // 指针拆行：改一个、删一个、加一个，Persist 后按差量落行并完整读回。
+            loaded.ExecutionPointers.Single(x => x.Id == "pointer").StepId = 30;
+            loaded.ExecutionPointers.Remove(loaded.ExecutionPointers.Single(x => x.Id == "control"));
+            loaded.ExecutionPointers.Add(new ExecutionPointer
+            {
+                Id = "pointer-added", StepId = 9, Active = true,
+                PersistenceData = new ControlPersistenceData { ChildrenActive = false }
+            });
+            await store.PersistWorkflow(loaded);
+            var synced = await store.GetWorkflowInstance("wf-one");
+            Assert.AreEqual(2, synced.ExecutionPointers.Count);
+            Assert.AreEqual(30, synced.ExecutionPointers.Single(x => x.Id == "pointer").StepId);
+            var added = synced.ExecutionPointers.Single(x => x.Id == "pointer-added");
+            Assert.IsInstanceOfType<ControlPersistenceData>(added.PersistenceData);
+            Assert.IsFalse(((ControlPersistenceData)added.PersistenceData).ChildrenActive);
+            await using (var db = new TestContext(options))
+                Assert.AreEqual(2, await db.ExecutionPointers.CountAsync());
             Assert.AreEqual(1, winners.Count(x => x));
             var winner = await store.GetSubscription("sub-one");
             await store.ClearSubscriptionToken("sub-one", "wrong-token");
@@ -133,6 +150,8 @@ public sealed class PostgreSqlPersistenceTests
             {
                 Assert.AreEqual(0, await db.WorkflowInstances.CountAsync());
                 Assert.AreEqual(0, await db.EventSubscriptions.CountAsync());
+                // 实例删除时指针行经外键级联清理。
+                Assert.AreEqual(0, await db.ExecutionPointers.CountAsync());
             }
         }
         finally
@@ -145,17 +164,50 @@ public sealed class PostgreSqlPersistenceTests
     private static string FindSolutionRoot()
     {
         for (var directory = new DirectoryInfo(Environment.CurrentDirectory); directory != null; directory = directory.Parent)
-            if (File.Exists(Path.Combine(directory.FullName, "EIMSNext.sln"))) return directory.FullName;
+            if (System.IO.File.Exists(Path.Combine(directory.FullName, "EIMSNext.sln"))) return directory.FullName;
         throw new DirectoryNotFoundException("Run this test from the EIMSNext solution directory.");
+    }
+
+    /// <summary>
+    /// 定位 WorkflowCore 存储表与索引脚本。
+    /// </summary>
+    /// <remarks>
+    /// 按<b>版本前缀</b>查找而不是写死文件名：迁移链重排过一次编号
+    /// （Workflow 段从 004/005 前移到 003/004），写死的名字在重命名后只会静默失配，
+    /// 而这条用例默认因缺少 <c>EIMS_TEST_POSTGRES</c> 而跳过，缺陷可以潜伏很久。
+    /// </remarks>
+    private static IReadOnlyList<string> ResolveWorkflowStoreScripts(string root)
+        => ResolveScripts(root, "003_", "004_");
+
+    private static IReadOnlyList<string> ResolveScripts(string root, params string[] versionPrefixes)
+    {
+        var directory = Path.Combine(root, "ApiHost", "EIMSNext.Tool.DbMaintenance", "Sql");
+        var scripts = new List<string>(versionPrefixes.Length);
+
+        foreach (var prefix in versionPrefixes)
+        {
+            var matches = Directory.GetFiles(directory, prefix + "*.sql");
+            if (matches.Length != 1)
+                throw new InvalidOperationException(
+                    $"Sql 目录里版本前缀 {prefix} 的脚本应当唯一，实际找到 {matches.Length} 个。");
+
+            scripts.Add(matches[0]);
+        }
+
+        return scripts;
     }
 
     private sealed class TestContext(DbContextOptions<TestContext> options) : DbContext(options), IWfDbContext
     {
         public DbSet<WorkflowInstance> WorkflowInstances => Set<WorkflowInstance>();
+        public DbSet<ExecutionPointer> ExecutionPointers => Set<ExecutionPointer>();
         public DbSet<EventSubscription> EventSubscriptions => Set<EventSubscription>();
         public DbSet<Event> Events => Set<Event>();
         public DbSet<ExecutionError> ExecutionErrors => Set<ExecutionError>();
         public DbSet<ScheduledCommand> ScheduledCommands => Set<ScheduledCommand>();
+
+        // IWfDbContext 要求把自身收窄为 DbContext（与 WfDbContext 的显式实现一致）。
+        DbContext IWfDbContext.Context => this;
         protected override void OnModelCreating(ModelBuilder builder) => builder.ConfigureWorkflowStore();
     }
 }

@@ -1,12 +1,10 @@
-using EIMSNext.Entities;
+﻿using EIMSNext.Entities;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -23,6 +21,7 @@ namespace EIMSNext.Service
         private IRepository<Department> DepartmentRepository => Resolver.GetRepository<Department>();
         private IRepository<Employee> EmployeeRepository => Resolver.GetRepository<Employee>();
         private IRepository<EmployeeDepartment> EmployeeDepartmentRepository => Resolver.GetRepository<EmployeeDepartment>();
+        private IRepository<UserCorp> UserCorpRepository => Resolver.GetRepository<UserCorp>();
 
         public async Task ApplyJoinCorporateAsync(string corpId, User user)
         {
@@ -31,7 +30,7 @@ namespace EIMSNext.Service
                 throw new BadRequestException("请选择要加入的企业");
             }
 
-            if (user.Crops.Any(x => x.CorpId == corpId))
+            if (UserCorpRepository.Queryable.Any(x => x.UserId == user.Id && x.CorpId == corpId))
             {
                 throw new ConflictException("当前用户已加入该企业");
             }
@@ -80,16 +79,12 @@ namespace EIMSNext.Service
             };
             EmployeeRepository.EnsureId(employee);
 
-            employee.Depts = new List<EmpDept>
-            {
-                new() { DeptId = rootDepartment.Id, HeriarchyId = rootDepartment.HeriarchyId, DeptName = rootDepartment.Name }
-            };
-
             var employeeDepartment = new EmployeeDepartment
             {
                 CorpId = corporate.Id,
                 EmployeeId = employee.Id,
                 DepartmentId = rootDepartment.Id,
+                HeriarchyId = rootDepartment.HeriarchyId,
                 SortValue = 0,
                 CreateBy = Context.Operator,
                 UpdateBy = Context.Operator,
@@ -114,7 +109,7 @@ namespace EIMSNext.Service
 
             await EmployeeRepository.InsertAsync(employee);
             await EmployeeDepartmentRepository.InsertAsync(employeeDepartment);
-            await AddCoreAsync([onboardingRequest], null);
+            await AddCoreAsync([onboardingRequest]);
         }
 
         private string GeneratePendingEmployeeCode(string corpId)

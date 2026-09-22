@@ -1,14 +1,14 @@
+﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
 
 using EIMSNext.Component;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -27,11 +27,11 @@ namespace EIMSNext.Service
         {
             if (version.HasValue)
             {
-                return FindCore(x => x.ExternalId == wfExternalId && x.Version == version.Value, null).FirstOrDefault();
+                return FindCore(x => x.ExternalId == wfExternalId && x.Version == version.Value).FirstOrDefault();
             }
             else
             {
-                return FindCore(x => x.ExternalId == wfExternalId && x.IsCurrent, null).FirstOrDefault();
+                return FindCore(x => x.ExternalId == wfExternalId && x.IsCurrent).FirstOrDefault();
             }
         }
 
@@ -57,26 +57,22 @@ namespace EIMSNext.Service
 
         public async Task<Wf_Definition> ActivateAsync(string id)
         {
-            return await MongoTransactionScope.ExecuteWithRetryAsync(
-                Repository.DbContext,
-                async session =>
-                {
-                    var entity = GetCore(id, session) ?? throw new InvalidOperationException("流程版本不存在");
-                    Repository.UpdateMany(
-                        Builders<Wf_Definition>.Filter.And(
-                            FilterBuilder.Eq(x => x.ExternalId, entity.ExternalId),
-                            FilterBuilder.Eq(x => x.IsCurrent, true),
-                            FilterBuilder.Ne(x => x.Id, entity.Id)),
-                        UpdateBuilder.Set(x => x.IsCurrent, false), upsert: false, session: session);
+            return await ExecuteWithTransactionRetryAsync(async () =>
+            {
+                var entity = GetCore(id) ?? throw new InvalidOperationException("流程版本不存在");
+                // 同一 ExternalId 下只会有一个 IsCurrent 版本，切换前先把旧版本落下去。
+                await Repository.UpdateManyAsync(
+                    x => x.ExternalId == entity.ExternalId && x.IsCurrent && x.Id != entity.Id,
+                    setters => setters.SetProperty(x => x.IsCurrent, false));
 
-                    entity.IsCurrent = true;
-                    entity.Released = true;
-                    await ReplaceAsync(entity);
-                    return entity;
-                }).ConfigureAwait(false);
+                entity.IsCurrent = true;
+                entity.Released = true;
+                await ReplaceAsync(entity);
+                return entity;
+            }).ConfigureAwait(false);
         }
 
-        protected override Task BeforeAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<Wf_Definition> entities)
         {
             var entity = entities.First();
 
@@ -101,7 +97,7 @@ namespace EIMSNext.Service
             return Task.CompletedTask;
         }
 
-        protected override Task BeforeReplace(Wf_Definition entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(Wf_Definition entity)
         {
             var exist = Get(entity.Id) ?? throw new InvalidOperationException("流程版本不存在");
 
@@ -119,32 +115,29 @@ namespace EIMSNext.Service
             return Task.CompletedTask;
         }
 
-        protected override async Task AfterAdd(IEnumerable<Wf_Definition> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<Wf_Definition> entities)
         {
             foreach (var entity in entities.Where(x => x.FlowType == FlowType.EventFlow))
             {
-                await _eventFlowScheduleService.RebuildScheduleAsync(entity, session);
+                await _eventFlowScheduleService.RebuildScheduleAsync(entity);
             }
 
-            await base.AfterAdd(entities, session);
+            await base.AfterAdd(entities);
         }
 
-        protected override async Task AfterReplace(Wf_Definition entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(Wf_Definition entity)
         {
             if (entity.FlowType == FlowType.EventFlow)
             {
-                await _eventFlowScheduleService.RebuildScheduleAsync(entity, session);
+                await _eventFlowScheduleService.RebuildScheduleAsync(entity);
             }
 
-            await base.AfterReplace(entity, session);
+            await base.AfterReplace(entity);
         }
 
-        protected override Task BeforeDelete(FilterDefinition<Wf_Definition> filter, IClientSessionHandle? session)
+        protected override Task BeforeDelete(Expression<Func<Wf_Definition, bool>> filter)
         {
-            var releasedFilter = Builders<Wf_Definition>.Filter.And(
-                filter,
-                Builders<Wf_Definition>.Filter.Eq(x => x.Released, true));
-            if (Repository.Count(releasedFilter, session) > 0)
+            if (FindCore(filter).Any(x => x.Released))
             {
                 throw new InvalidOperationException("已启用或历史版本不允许删除");
             }

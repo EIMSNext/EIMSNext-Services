@@ -9,7 +9,16 @@ namespace EIMSNext.Tool.DbMaintenance;
 
 public sealed class PostgreSqlMaintenanceRunner(IOptions<PostgreSqlOptions> options, IConfiguration configuration)
 {
-    public async Task ApplyAsync(bool dryRun = false, bool verifyOnly = false, CancellationToken cancellationToken = default)
+    /// <summary>
+    /// 应用迁移。<paramref name="targetVersion"/> 非空时只执行不超过该版本的脚本，
+    /// 用于「升级到指定版本」或「灰度环境停留在旧版本」的场景。
+    /// </summary>
+    public async Task ApplyAsync(
+        bool dryRun = false,
+        bool verifyOnly = false,
+        string? targetVersion = null,
+        bool acceptChecksumChange = false,
+        CancellationToken cancellationToken = default)
     {
         var configured = configuration["DbMaintenance:SqlDirectory"] ?? "Sql";
         var directory = Path.GetFullPath(configured, AppContext.BaseDirectory);
@@ -27,6 +36,21 @@ public sealed class PostgreSqlMaintenanceRunner(IOptions<PostgreSqlOptions> opti
         if (scripts.Count == 0) throw new InvalidOperationException("No SQL scripts found.");
         if (scripts.GroupBy(x => x.Version.Split('_')[0]).Any(group => group.Count() > 1))
             throw new InvalidOperationException("SQL version prefixes must be unique.");
+
+        // 目标版本必须真实存在于脚本目录，避免因为拼错版本号而静默地什么都不执行。
+        if (!string.IsNullOrWhiteSpace(targetVersion))
+        {
+            if (!scripts.Any(x => string.Equals(x.Version, targetVersion, StringComparison.Ordinal)))
+                throw new InvalidOperationException($"Target version not found: {targetVersion}");
+
+            var skipped = scripts
+                .Where(x => string.CompareOrdinal(x.Version, targetVersion) > 0)
+                .Select(x => x.Version)
+                .ToArray();
+            if (skipped.Length != 0)
+                Console.WriteLine($"Target version {targetVersion}; skipping {skipped.Length} newer script(s): {string.Join(", ", skipped)}");
+            scripts = scripts.Where(x => string.CompareOrdinal(x.Version, targetVersion) <= 0).ToList();
+        }
 
         if (dryRun)
         {
@@ -73,8 +97,23 @@ public sealed class PostgreSqlMaintenanceRunner(IOptions<PostgreSqlOptions> opti
         {
             var script = scripts.SingleOrDefault(x => x.Version == entry.Key);
             if (script is null) throw new InvalidOperationException($"Applied script is missing: {entry.Key}");
-            if (!string.Equals(script.Checksum, entry.Value, StringComparison.OrdinalIgnoreCase))
-                throw new InvalidOperationException($"Applied script checksum changed: {entry.Key}");
+            if (string.Equals(script.Checksum, entry.Value, StringComparison.OrdinalIgnoreCase)) continue;
+
+            // 已执行脚本的内容被改动。默认阻断：这说明有人在迁移之后回头改了历史脚本，
+            // 而该改动不会自动作用到已迁移的库，环境之间会悄悄产生结构差异。
+            // 确属有意修正时用 --accept-checksum-change 显式放行，并同步更新台账校验和。
+            if (!acceptChecksumChange)
+                throw new InvalidOperationException(
+                    $"Applied script checksum changed: {entry.Key}. " +
+                    "若确认是有意修正，请带 --accept-checksum-change 重新执行。");
+
+            await using var update = new NpgsqlCommand(
+                "UPDATE \"__DbMaintenanceHistory\" SET \"Checksum\" = @checksum WHERE \"Version\" = @version", connection);
+            update.Parameters.AddWithValue("version", entry.Key);
+            update.Parameters.AddWithValue("checksum", script.Checksum);
+            await update.ExecuteNonQueryAsync(cancellationToken);
+            history[entry.Key] = script.Checksum;
+            Console.WriteLine($"Checksum updated for {entry.Key}");
         }
         var latest = history.Keys.Order(StringComparer.Ordinal).LastOrDefault();
         var pending = scripts.Where(x => !history.ContainsKey(x.Version)).ToArray();

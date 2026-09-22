@@ -1,16 +1,13 @@
-using EIMSNext.Async.Abstractions.Messaging;
+﻿using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 using Quartz;
 using WorkflowCore.Models;
 
@@ -87,18 +84,19 @@ namespace EIMSNext.Async.Quartz.Jobs
             }
         }
 
-        private static Task MarkExpireHandledAsync(IRepository<Wf_Task> taskRepo, IEnumerable<string> ids, long now)
+        private static async Task MarkExpireHandledAsync(IRepository<Wf_Task> taskRepo, IEnumerable<string> ids, long now)
         {
             var idList = ids.Distinct().ToList();
             if (idList.Count == 0)
             {
-                return Task.CompletedTask;
+                return;
             }
 
-            taskRepo.UpdateMany(Builders<Wf_Task>.Filter.In(x => x.Id, idList), Builders<Wf_Task>.Update
-                .Set(x => x.ExpireHandled, true)
-                .Set(x => x.UpdateTime, now), upsert: false);
-            return Task.CompletedTask;
+            await taskRepo.UpdateManyAsync(
+                x => idList.Contains(x.Id),
+                setters => setters
+                    .SetProperty(x => x.ExpireHandled, true)
+                    .SetProperty(x => x.UpdateTime, now));
         }
     }
 }

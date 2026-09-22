@@ -23,28 +23,32 @@ public sealed class EmployeeAccessSubjectResolver(IResolver resolver) : IEmploye
             return _current = EmployeeAccessSubjects.Empty;
         }
 
-        var departmentIds = resolver.GetRepository<EmployeeDepartment>().Queryable
+        var relations = resolver.GetRepository<EmployeeDepartment>().Queryable
             .Where(x => x.CorpId == context.CorpId && x.EmployeeId == employee.Id && !x.DeleteFlag)
+            .Select(x => new { x.DepartmentId, x.HeriarchyId })
+            .ToList();
+
+        var departmentIds = relations
             .Select(x => x.DepartmentId)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var hierarchyIds = resolver.GetRepository<Department>().Queryable
-            .Where(x => x.CorpId == context.CorpId && departmentIds.Contains(x.Id) && !x.DeleteFlag)
-            .Select(x => x.HeriarchyId)
-            .ToList();
+        // 祖先部门直接从关系表的层级路径快照展开，省去对 Department 表的第二次查询。
+        var ancestorDepartmentIds = relations
+            .Where(x => !string.IsNullOrWhiteSpace(x.HeriarchyId))
+            .SelectMany(x => x.HeriarchyId.Split('|', StringSplitOptions.RemoveEmptyEntries))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        var ancestorDepartmentIds = hierarchyIds
+        // 员工组归属由关系表 EmployeeGroupMember 承载（jsonb 投影 Employee.EmployeeGroups 已移除）。
+        var employeeGroupIds = resolver.GetRepository<EmployeeGroupMember>().Queryable
+            .Where(x => x.CorpId == context.CorpId && x.EmployeeId == employee.Id && !x.DeleteFlag)
+            .Select(x => x.EmployeeGroupId)
             .Where(x => !string.IsNullOrWhiteSpace(x))
-            .SelectMany(x => x.Split('|', StringSplitOptions.RemoveEmptyEntries))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
         return _current = new EmployeeAccessSubjects(
             employee.Id,
             departmentIds,
             ancestorDepartmentIds,
-            employee.EmployeeGroups
-                .Select(x => x.EmployeeGroupId)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToHashSet(StringComparer.OrdinalIgnoreCase));
+            employeeGroupIds);
     }
 }

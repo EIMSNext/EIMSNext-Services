@@ -1,4 +1,4 @@
-using EIMSNext.ApiHost.Extensions;
+﻿using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
@@ -19,7 +19,6 @@ using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
 using Microsoft.OData.UriParser;
 
-using MongoDB.AspNetCore.OData;
 
 using System.Buffers;
 using System.IO.Pipelines;
@@ -38,7 +37,7 @@ namespace EIMSNext.Service.Host.OData
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public abstract class ReadOnlyODataController<S, T, V> : ODataController
         where S : class, IApiService<T, V>
-        where T : class, IMongoEntity
+        where T : class, IEntityKey
         where V : class, T, new()
     {
         protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
@@ -100,7 +99,8 @@ namespace EIMSNext.Service.Host.OData
         /// <returns></returns>
         [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [MongoEnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize)]
+        // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
+        [EnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize, MaxExpansionDepth = 1, MaxNodeCount = 200)]
         public virtual IActionResult Get(ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
@@ -156,7 +156,8 @@ namespace EIMSNext.Service.Host.OData
         /// <returns></returns>
         [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [MongoEnableQuery]
+        // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
+        [EnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
         public virtual SingleResult Get([FromODataUri] string key, ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
@@ -248,7 +249,7 @@ namespace EIMSNext.Service.Host.OData
         where S : class, IApiService<T, V>
         where T : class, IEntity
         where V : class, T, new()
-        where R : class, IMongoEntity
+        where R : class, IEntityKey
     {
         /// <summary>
         /// 

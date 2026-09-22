@@ -1,14 +1,12 @@
-using EIMSNext.ApiCore.RateLimiting;
+﻿using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiCore.Idempotency;
 using EIMSNext.Cache;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Core.Mongo.Serialization;
+
 using EIMSNext.Json.Serialization;
 using EIMSNext.Storage;
 using EIMSNext.Storage.Abstractions;
@@ -49,14 +47,11 @@ namespace EIMSNext.ApiCore
 
         public static void AddBasicServices(this IServiceCollection services, IConfiguration configuration)
         {
-            MongoDatabase.RegisterConventions();
-            MongoDatabase.RegisterSerializers();
             Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
             services.Configure<IdempotencyOptions>(configuration.GetSection("Idempotency"));
-            services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
             services.Configure<StorageConfiguration>(configuration.GetSection("Storage"));
             services.Configure<CorsOptions>(configuration.GetSection("Cors"));
             services.AddSingleton<CorsPolicyHelper>();
@@ -70,11 +65,11 @@ namespace EIMSNext.ApiCore
                 opt.JsonSerializerOptions.ReferenceHandler = ReferenceHandler.IgnoreCycles;
                 opt.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 
-                opt.JsonSerializerOptions.Converters.Add(new BsonDocumentJsonConverter());
                 opt.JsonSerializerOptions.Converters.Add(new ExceptionJsonConverter());
                 opt.JsonSerializerOptions.Converters.Add(new FlexibleEnumConverterFactory());
                 opt.JsonSerializerOptions.Converters.Add(new ObjectJsonConverter());
                 opt.JsonSerializerOptions.Converters.Add(new ExpandoObjectJsonConverter());
+                opt.JsonSerializerOptions.Converters.Add(new DictionaryJsonConverter());
                 //opt.JsonSerializerOptions.Converters.Add(new UnixMillisecondsDateTimeJsonConverter());
 
             });
@@ -89,11 +84,11 @@ namespace EIMSNext.ApiCore
                 DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
             };
 
-            jsonOpt.Converters.Add(new BsonDocumentJsonConverter());
             jsonOpt.Converters.Add(new ExceptionJsonConverter());
             jsonOpt.Converters.Add(new FlexibleEnumConverterFactory());
             jsonOpt.Converters.Add(new ObjectJsonConverter());
             jsonOpt.Converters.Add(new ExpandoObjectJsonConverter());
+            jsonOpt.Converters.Add(new DictionaryJsonConverter());
 
             JsonSerializerExtension.SetOptions(jsonOpt);
 

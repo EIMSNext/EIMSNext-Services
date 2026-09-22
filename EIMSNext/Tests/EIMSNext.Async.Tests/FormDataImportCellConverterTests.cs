@@ -12,9 +12,16 @@ namespace EIMSNext.Async.Tests
         // ===== ConvertNumber =====
 
         [TestMethod]
-        public void ConvertNumber_TextualDigits_ParsesDouble()
+        public void ConvertNumber_TextualDigits_ParsesLong()
         {
-            Assert.AreEqual(123.0, (double)ImportCellConverters.ConvertNumber(null, "123"));
+            // 整数归一化为 long：与 jsonb 读回、API 请求路径保持一致（详见 DynamicValueParityTests）。
+            Assert.AreEqual(123L, ImportCellConverters.ConvertNumber(null, "123"));
+        }
+
+        [TestMethod]
+        public void ConvertNumber_TextualDecimal_ParsesDecimal()
+        {
+            Assert.AreEqual(12.5m, ImportCellConverters.ConvertNumber(null, "12.5"));
         }
 
         [TestMethod]
@@ -24,11 +31,18 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
-        public void ConvertNumber_NumericCell_ReturnsRaw()
+        public void ConvertNumber_NumericCell_NormalizesToDecimal()
         {
             var cell = NewNumericCell(42.5);
             var value = ImportCellConverters.ConvertNumber(cell, "42.5");
-            Assert.AreEqual(42.5, (double)value, 0.0001);
+            Assert.AreEqual(42.5m, value);
+        }
+
+        [TestMethod]
+        public void ConvertNumber_NumericCellIntegral_NormalizesToLong()
+        {
+            var cell = NewNumericCell(42);
+            Assert.AreEqual(42L, ImportCellConverters.ConvertNumber(cell, "42"));
         }
 
         // ===== ConvertTimestamp =====
@@ -156,19 +170,20 @@ namespace EIMSNext.Async.Tests
         // ===== ConvertEditableNumber / ConvertEditableTimestamp =====
 
         [TestMethod]
-        public void ConvertEditableNumber_NumericTypes_ReturnAsIs()
+        public void ConvertEditableNumber_NumericTypes_Normalized()
         {
-            Assert.AreEqual((byte)5, Convert.ToInt32(ImportCellConverters.ConvertEditableNumber((byte)5)));
-            Assert.AreEqual((short)5, Convert.ToInt32(ImportCellConverters.ConvertEditableNumber((short)5)));
-            Assert.AreEqual(5, Convert.ToInt32(ImportCellConverters.ConvertEditableNumber(5)));
-            Assert.AreEqual(5L, (long)ImportCellConverters.ConvertEditableNumber(5L));
-            Assert.AreEqual(5.5, (double)ImportCellConverters.ConvertEditableNumber(5.5), 0.0001);
+            // 整数统一为 long、小数统一为 decimal（与 jsonb 读回契约一致）。
+            Assert.AreEqual(5L, ImportCellConverters.ConvertEditableNumber((byte)5));
+            Assert.AreEqual(5L, ImportCellConverters.ConvertEditableNumber((short)5));
+            Assert.AreEqual(5L, ImportCellConverters.ConvertEditableNumber(5));
+            Assert.AreEqual(5L, ImportCellConverters.ConvertEditableNumber(5L));
+            Assert.AreEqual(5.5m, ImportCellConverters.ConvertEditableNumber(5.5));
         }
 
         [TestMethod]
         public void ConvertEditableNumber_String_Parses()
         {
-            Assert.AreEqual(5.0, (double)ImportCellConverters.ConvertEditableNumber("5"), 0.0001);
+            Assert.AreEqual(5L, ImportCellConverters.ConvertEditableNumber("5"));
         }
 
         [TestMethod]

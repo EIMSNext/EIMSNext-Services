@@ -1,14 +1,12 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 
 using EIMSNext.ApiCore;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Print;
 using EIMSNext.Print.Abstractions;
@@ -18,7 +16,6 @@ using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -35,7 +32,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLog(context, dataContext =>
+            return ExecuteWithLogAsync(context, dataContext =>
             {
                 var setting = Metadata?.EfNodeSetting?.PrintSetting
                     ?? throw new InvalidOperationException("打印节点未配置");
@@ -124,20 +121,19 @@ namespace EIMSNext.Flow.Core.Nodes
                     .Upload([new UploadedFileUpload(printResult.Content, fileName, fileSize)], dataContext.CorpId)
                     .Single();
 
-                var attachmentData = new ExpandoObject();
-                var attachmentValue = (IDictionary<string, object?>)attachmentData;
-                attachmentValue["id"] = attachment.Id;
-                attachmentValue["name"] = attachment.FileName;
-                attachmentValue["fileName"] = attachment.FileName;
-                attachmentValue["savePath"] = attachment.SavePath;
-                attachmentValue["thumbPath"] = attachment.ThumbPath;
-                attachmentValue["fileExt"] = attachment.FileExt;
-                attachmentValue["fileSize"] = attachment.FileSize;
-                attachmentValue["url"] = attachment.SavePath;
-                attachmentValue["thumbUrl"] = attachment.ThumbPath;
+                var attachmentData = new Dictionary<string, object?>();
+                attachmentData["id"] = attachment.Id;
+                attachmentData["name"] = attachment.FileName;
+                attachmentData["fileName"] = attachment.FileName;
+                attachmentData["savePath"] = attachment.SavePath;
+                attachmentData["thumbPath"] = attachment.ThumbPath;
+                attachmentData["fileExt"] = attachment.FileExt;
+                attachmentData["fileSize"] = attachment.FileSize;
+                attachmentData["url"] = attachment.SavePath;
+                attachmentData["thumbUrl"] = attachment.ThumbPath;
 
-                var outputData = new ExpandoObject();
-                ((IDictionary<string, object?>)outputData)["printFile"] = attachmentData;
+                var outputData = new Dictionary<string, object?>();
+                outputData["printFile"] = attachmentData;
                 var output = new FormData
                 {
                     AppId = dataContext.AppId,
@@ -157,8 +153,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     ActionDatas = [new ActionFormData { State = DataState.Unchanged, FormData = output }],
                 };
 
-                return ExecutionResult.Next();
-            }, "打印成功");
+                return Task.FromResult(ExecutionResult.Next());
+            }, "打印成功").GetAwaiter().GetResult();
         }
 
         private static string NormalizeFileName(string? fileName)

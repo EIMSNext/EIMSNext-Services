@@ -1,10 +1,11 @@
-using System.Dynamic;
-using EIMSNext.Core.Mongo.Repositories;
+﻿using System.Dynamic;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;
 using WorkflowCore.Interface;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Workflow.Repository
 {
@@ -34,7 +35,7 @@ namespace EIMSNext.Workflow.Repository
 
         public bool EvaluateOutcomeExpression(string sourceExpr, object data, object outcome)
         {
-            var wrapData = new ExpandoObject();
+            var wrapData = new Dictionary<string, object?>();
             var matchedResult = false;
             var needEval = true;
             if (data is EfDataContext efDataContext)
@@ -62,7 +63,7 @@ namespace EIMSNext.Workflow.Repository
             }
             else
             {
-                var wfDataContext = (ExpandoObject)data;
+                var wfDataContext = (IDictionary<string, object?>)data;
                 matchedResult = wfDataContext.GetValueOrDefault<bool>(WfConsts.MatchedResult);
 
                 if (wfDataContext.GetValueOrDefault<bool>(WfConsts.MatchParallel) || !matchedResult)
@@ -101,7 +102,7 @@ namespace EIMSNext.Workflow.Repository
                 }
                 else
                 {
-                    ((ExpandoObject)data).AddOrUpdate(WfConsts.MatchedResult, matchedResult || result);
+                    ((IDictionary<string, object?>)data).AddOrUpdate(WfConsts.MatchedResult, matchedResult || result);
                 }
 
                 return result;

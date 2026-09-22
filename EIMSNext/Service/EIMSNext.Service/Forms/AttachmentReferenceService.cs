@@ -1,21 +1,19 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
 using EIMSNext.Common.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -35,20 +33,27 @@ namespace EIMSNext.Service
             _resolver = resolver;
         }
 
-        public void Apply(FormData entity, FormData? old, IClientSessionHandle? session)
+        public void Apply(FormData entity, FormData? old)
         {
-            ApplyDelta(old == null ? [] : Count(old), Count(entity), session);
+            ApplyDelta(old == null ? [] : Count(old), Count(entity));
         }
 
-        public void Release(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        public void Release(IEnumerable<FormData> entities)
         {
             foreach (var entity in entities)
             {
-                ApplyDelta(Count(entity), EmptyCounts, session);
+                ApplyDelta(Count(entity), EmptyCounts);
             }
         }
 
-        private void ApplyDelta(IReadOnlyDictionary<string, int> oldCounts, IReadOnlyDictionary<string, int> newCounts, IClientSessionHandle? session)
+        /// <summary>
+        /// 按引用计数增量同步 <see cref="UploadedFile.RefCount"/>。
+        /// Mongo 时期靠服务端 $inc 保证原子性；EF Core 下改为「条件 UPDATE + 回退钳制」两步：
+        /// 先尝试带下界守卫的原子自减，未命中说明会减成负数，再单独把计数钳到 0。
+        /// </summary>
+        /// <param name="oldCounts">变更前的引用计数。</param>
+        /// <param name="newCounts">变更后的引用计数。</param>
+        private void ApplyDelta(IReadOnlyDictionary<string, int> oldCounts, IReadOnlyDictionary<string, int> newCounts)
         {
             foreach (var id in oldCounts.Keys.Concat(newCounts.Keys).Distinct(StringComparer.OrdinalIgnoreCase))
             {
@@ -56,31 +61,24 @@ namespace EIMSNext.Service
                 if (delta == 0) continue;
 
                 var repository = _repository ??= _resolver.GetRepository<UploadedFile>();
-                var idFilter = repository.FilterBuilder.Eq(x => x.Id, id);
                 if (delta > 0)
                 {
-                    var increment = repository.UpdateBuilder.Inc(x => x.RefCount, delta);
-                    if (session == null) repository.Collection.UpdateOne(idFilter, increment);
-                    else repository.Collection.UpdateOne(session, idFilter, increment);
+                    repository.UpdateMany(
+                        x => x.Id == id,
+                        setters => setters.SetProperty(x => x.RefCount, x => x.RefCount + delta));
                     continue;
                 }
 
                 var decrement = -delta;
-                var enoughReferences = repository.FilterBuilder.And(
-                    idFilter,
-                    repository.FilterBuilder.Gte(x => x.RefCount, decrement));
-                var decrementUpdate = repository.UpdateBuilder.Inc(x => x.RefCount, -decrement);
-                var result = session == null
-                    ? repository.Collection.UpdateOne(enoughReferences, decrementUpdate)
-                    : repository.Collection.UpdateOne(session, enoughReferences, decrementUpdate);
-                if (result.ModifiedCount == 0)
+                var affected = repository.UpdateMany(
+                    x => x.Id == id && x.RefCount >= decrement,
+                    setters => setters.SetProperty(x => x.RefCount, x => x.RefCount - decrement));
+                if (affected == 0)
                 {
-                    var belowZero = repository.FilterBuilder.And(
-                        idFilter,
-                        repository.FilterBuilder.Lt(x => x.RefCount, decrement));
-                    var clamp = repository.UpdateBuilder.Set(x => x.RefCount, 0);
-                    if (session == null) repository.Collection.UpdateOne(belowZero, clamp);
-                    else repository.Collection.UpdateOne(session, belowZero, clamp);
+                    // 引用数不足，直接钳到 0，避免出现负数计数。
+                    repository.UpdateMany(
+                        x => x.Id == id && x.RefCount < decrement,
+                        setters => setters.SetProperty(x => x.RefCount, 0));
                 }
             }
         }

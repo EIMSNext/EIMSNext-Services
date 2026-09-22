@@ -1,21 +1,19 @@
+﻿using System.Linq.Expressions;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using System.Text.RegularExpressions;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace EIMSNext.Service
 {
@@ -27,23 +25,23 @@ namespace EIMSNext.Service
             _flowClient = resolver.Resolve<FlowApiClient>();
         }
 
-        protected override async Task AfterAdd(IEnumerable<FormDef> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<FormDef> entities)
         {
-            await base.AfterAdd(entities, session);
+            await base.AfterAdd(entities);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entities.First().AppId, session)!;
+            var app = appRepo.Get(entities.First().AppId)!;
             var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
             {
                 maxIndex = maxIndex + 100;
                 app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = FormType.Form, Title = e.Name, SortIndex = maxIndex });
             });
-            appRepo.Replace(app, session);
+            appRepo.Replace(app);
 
             return;
         }
 
-        protected override Task BeforeAdd(IEnumerable<FormDef> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<FormDef> entities)
         {
             foreach (var entity in entities)
             {
@@ -51,17 +49,17 @@ namespace EIMSNext.Service
                 NormalizeFieldMetadata(entity);
                 ValidateFieldIds(entity);
             }
-            return base.BeforeAdd(entities, session);
+            return base.BeforeAdd(entities);
         }
 
-        protected override Task BeforeReplace(FormDef entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(FormDef entity)
         {
             var old = ScopeCache.Get<FormDef>(entity.Id, Cache.DataVersion.Old)
                 ?? GetFromStore<FormDef>(entity.Id, Cache.DataVersion.Old);
             ReconcileFieldChangeLogs(old?.Content, entity.Content, Context.Operator, DateTime.UtcNow.ToTimeStampMs());
             NormalizeFieldMetadata(entity);
             ValidateFieldIds(entity);
-            return base.BeforeReplace(entity, session);
+            return base.BeforeReplace(entity);
         }
 
         public async Task PurgeFieldChangeLogsAsync(string formId, IReadOnlyCollection<string> fieldIds, bool clearAll)
@@ -75,17 +73,31 @@ namespace EIMSNext.Service
                 throw new BadRequestException("请选择要彻底删除的字段");
             }
 
-            var filter = FilterBuilder.And(
-                FilterBuilder.Eq(x => x.Id, formId),
-                FilterBuilder.Eq(x => x.CorpId, Context.CorpId),
-                FilterBuilder.Eq(x => x.DeleteFlag, false));
-            var update = clearAll
-                ? UpdateBuilder.Set(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>())
-                : UpdateBuilder.PullFilter(x => x.Content.FieldChangeLogs, x => normalizedIds.Contains(x.FieldId));
-
-            await ExecuteWithTransactionRetryAsync(async session =>
+            await ExecuteWithTransactionRetryAsync(async () =>
             {
-                await PatchManyCoreAsync(filter, update, false, session).ConfigureAwait(false);
+                if (clearAll)
+                {
+                    // 清空全部字段变更日志。
+                    await PatchManyCoreAsync(
+                        x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag,
+                        setters => setters.SetProperty(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>()))
+                        .ConfigureAwait(false);
+                }
+                else
+                {
+                    // 仅移除指定的字段变更日志条目。EF Core 无法对 jsonb 内嵌集合做服务端 PullFilter，
+                    // 改为加载实体后在内存中过滤再整体替换。
+                    var target = Repository.Queryable
+                        .FirstOrDefault(x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag);
+                    if (target?.Content?.FieldChangeLogs is { Count: > 0 } logs)
+                    {
+                        var remaining = logs.Where(x => !normalizedIds.Contains(x.FieldId)).ToList();
+                        await PatchManyCoreAsync(
+                            x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag,
+                            setters => setters.SetProperty(x => x.Content.FieldChangeLogs, remaining))
+                            .ConfigureAwait(false);
+                    }
+                }
             }).ConfigureAwait(false);
         }
 
@@ -231,46 +243,55 @@ namespace EIMSNext.Service
             }
         }
 
-        protected override async Task AfterReplace(FormDef entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(FormDef entity)
         {
-            await base.AfterReplace(entity, session);
+            await base.AfterReplace(entity);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entity.AppId, session)!;
+            var app = appRepo.Get(entity.AppId)!;
 
             var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
             if (menu != null)
             {
                 menu.Title = entity.Name;
-                appRepo.Replace(app, session);
+                appRepo.Replace(app);
             }
         }
-        protected override async Task AfterUpdate(FilterDefinition<FormDef> filter, UpdateDefinition<FormDef> update, bool upsert, IClientSessionHandle? session)
+
+        protected override async Task AfterUpdate(
+            Expression<Func<FormDef, bool>> filter,
+            Action<UpdateSettersBuilder<FormDef>> setters)
         {
-            await base.AfterUpdate(filter, update, upsert, session);
+            await base.AfterUpdate(filter, setters);
             var updated = Context.ScopeCache.GetAll<FormDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
-                updated = await Collection.Find(filter).ToListAsync();
+                updated = FindCore(filter).ToList();
             }
             if (updated.Any())
             {
                 var appRepo = Resolver.GetRepository<AppDef>();
-                var app = appRepo.Get(updated.First().AppId, session)!;
+                var app = appRepo.Get(updated.First().AppId)!;
 
                 updated.ForEach(e =>
                 {
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
-                appRepo.Replace(app, session);
+                appRepo.Replace(app);
             }
         }
 
-        protected override async Task AfterDelete(FilterDefinition<FormDef> filter, IClientSessionHandle? session)
+        protected override async Task AfterDelete(Expression<Func<FormDef, bool>> filter)
         {
-            await base.AfterDelete(filter, session);
+            await base.AfterDelete(filter);
             // 找到被删除的 FormDef 实体
-            var deletedForms = Repository.Find(new MongoFindOptions<FormDef> { Filter = filter }, session).ToList();
+            // 注意：LogicDelete 在 AfterDelete 之前已经把 DeleteFlag 置 true，而模型层挂了全局
+            // `!DeleteFlag` 过滤器，不显式忽略就会读到空集合，下面的菜单清理、关联 FormData 逻辑删除、
+            // Wf_Task/PrintDef/CrossBinding/权限组/Dashboard 引用清理会被整条静默跳过。
+            var deletedForms = Repository.Queryable
+                .IgnoreQueryFilters()
+                .Where(filter)
+                .ToList();
             if (deletedForms.Count == 0)
                 return;
 
@@ -280,7 +301,7 @@ namespace EIMSNext.Service
             var appIds = deletedForms.Select(f => f.AppId).Distinct();
             foreach (var appId in appIds)
             {
-                var app = appRepo.Get(appId, session);
+                var app = appRepo.Get(appId);
                 if (app == null) continue;
 
                 var removedCount = 0;
@@ -295,14 +316,16 @@ namespace EIMSNext.Service
                 if (removedCount > 0)
                 {
                     AppMenuHelper.Normalize(app.AppMenus);
-                    appRepo.Replace(app, session);
+                    appRepo.Replace(app);
                 }
             }
 
-            var formIds = deletedForms.Select(x => x.Id);
+            var formIds = deletedForms.Select(x => x.Id).ToList();
             //更新所有相关数据为已删除
             var formDataRepo = Resolver.GetRepository<FormData>();
-            await formDataRepo.UpdateManyAsync(formDataRepo.FilterBuilder.And(formDataRepo.FilterBuilder.Eq(x => x.DeleteFlag, false), formDataRepo.FilterBuilder.In(x => x.FormId, formIds)), formDataRepo.UpdateBuilder.Set(x => x.DeleteFlag, true), session: session);
+            await formDataRepo.UpdateManyAsync(
+                x => !x.DeleteFlag && formIds.Contains(x.FormId),
+                setters => setters.SetProperty(x => x.DeleteFlag, true));
 
             var flowFormIds = deletedForms.Where(x => x.UsingWorkflow).Select(x => x.Id);
             if (flowFormIds.Any())
@@ -310,8 +333,7 @@ namespace EIMSNext.Service
                 var flowFormIdList = flowFormIds.Distinct().ToList();
                 //删除所有待办
                 var taskRepo = Resolver.GetRepository<Wf_Task>();
-                await taskRepo.DeleteAsync(taskRepo.FilterBuilder.In(x => x.FormId, flowFormIdList), session);
-
+                await taskRepo.DeleteManyAsync(x => flowFormIdList.Contains(x.FormId));
             }
 
             var corpIds = deletedForms.Select(x => x.CorpId).Distinct().ToList();
@@ -319,78 +341,91 @@ namespace EIMSNext.Service
             // 表单删除后，所有直接引用和嵌入引用都必须失效，避免孤儿配置继续被读取。
             var printRepo = Resolver.GetRepository<PrintDef>();
             await printRepo.UpdateManyAsync(
-                printRepo.FilterBuilder.And(
-                    printRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                    printRepo.FilterBuilder.In(x => x.FormId, formIds)),
-                printRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
-                session: session);
+                x => !x.DeleteFlag && formIds.Contains(x.FormId),
+                setters => setters.SetProperty(x => x.DeleteFlag, true));
 
             var bindingRepo = Resolver.GetRepository<CrossBinding>();
             await bindingRepo.UpdateManyAsync(
-                bindingRepo.FilterBuilder.And(
-                    bindingRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                    bindingRepo.FilterBuilder.In(x => x.SourceFormId, formIds)),
-                bindingRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
-                session: session);
+                x => !x.DeleteFlag && formIds.Contains(x.SourceFormId),
+                setters => setters.SetProperty(x => x.DeleteFlag, true));
 
             var permissionGroupRepo = Resolver.GetRepository<FormDataPermissionGroup>();
             await permissionGroupRepo.UpdateManyAsync(
-                permissionGroupRepo.FilterBuilder.And(
-                    permissionGroupRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                    permissionGroupRepo.FilterBuilder.In(x => x.FormId, formIds)),
-                permissionGroupRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
-                session: session);
+                x => !x.DeleteFlag && formIds.Contains(x.FormId),
+                setters => setters.SetProperty(x => x.DeleteFlag, true));
 
+            // DashboardItemDef.Details 内嵌引用了表单 ID。
+            // Mongo 时期用不区分大小写的正则匹配；EF Core 下按文本做忽略大小写包含判断。
             var itemRepo = Resolver.GetRepository<DashboardItemDef>();
-            var embeddedReferenceFilters = formIds
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .Select(id => itemRepo.FilterBuilder.Regex(
-                    x => x.Details,
-                    new BsonRegularExpression(Regex.Escape(id), "i")))
+            var detailsCandidates = itemRepo.Queryable
+                .Where(x => corpIds.Contains(x.CorpId) && !x.DeleteFlag)
+                .ToList()
+                .Where(x => ContainsAnyFormReference(x.Details, formIds))
+                .Select(x => x.Id)
                 .ToList();
-            if (embeddedReferenceFilters.Count > 0)
+            if (detailsCandidates.Count > 0)
             {
                 await itemRepo.UpdateManyAsync(
-                    itemRepo.FilterBuilder.And(
-                        itemRepo.FilterBuilder.In(x => x.CorpId, corpIds),
-                        itemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                        itemRepo.FilterBuilder.Or(embeddedReferenceFilters)),
-                    itemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
-                    session: session);
+                    x => detailsCandidates.Contains(x.Id),
+                    setters => setters.SetProperty(x => x.DeleteFlag, true));
             }
-
         }
 
-        public override async Task<object> DeleteAsync(string id)
+        /// <summary>
+        /// 判断明细内容中是否包含任一表单 ID 引用（忽略大小写）。
+        /// </summary>
+        /// <param name="details">明细内容文本。</param>
+        /// <param name="formIds">表单 ID 集合。</param>
+        /// <returns>包含任一引用时为 true。</returns>
+        private static bool ContainsAnyFormReference(string? details, IReadOnlyCollection<string> formIds)
         {
-            var flowFormIds = GetWorkflowFormIds(FilterBuilder.Eq(x => x.Id, id));
+            if (string.IsNullOrEmpty(details) || formIds.Count == 0)
+            {
+                return false;
+            }
+
+            return formIds.Any(id => details.Contains(id, StringComparison.OrdinalIgnoreCase));
+        }
+
+        public override async Task<int> DeleteAsync(string id)
+        {
+            var flowFormIds = GetWorkflowFormIds(x => x.Id == id);
             var result = await base.DeleteAsync(id);
             await ScheduleFlowDefinitionsCleanupAsync(flowFormIds);
             return result;
         }
 
-        public override async Task<object> DeleteAsync(IEnumerable<string> ids)
+        public override async Task<int> DeleteAsync(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            var flowFormIds = GetWorkflowFormIds(FilterBuilder.In(x => x.Id, idList));
+            var flowFormIds = GetWorkflowFormIds(x => idList.Contains(x.Id));
             var result = await base.DeleteAsync(idList);
             await ScheduleFlowDefinitionsCleanupAsync(flowFormIds);
             return result;
         }
 
-        public override async Task<object> DeleteAsync(DynamicFilter filter)
+        public override async Task<int> DeleteAsync(DynamicFilter filter)
         {
-            var mongoFilter = filter.ToFilterDefinition<FormDef>();
-            var flowFormIds = GetWorkflowFormIds(mongoFilter);
+            var flowFormIds = GetWorkflowFormIds(filter);
             var result = await base.DeleteAsync(filter);
             await ScheduleFlowDefinitionsCleanupAsync(flowFormIds);
             return result;
         }
 
-        private List<string> GetWorkflowFormIds(FilterDefinition<FormDef> filter)
+        private List<string> GetWorkflowFormIds(Expression<Func<FormDef, bool>> filter)
         {
-            return Repository.Collection.Find(filter)
+            return Repository.Find(new QueryFindOptions<FormDef> { Filter = filter, Take = int.MaxValue })
                 .ToList()
+                .Where(x => x.UsingWorkflow)
+                .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private List<string> GetWorkflowFormIds(DynamicFilter filter)
+        {
+            return Repository.Find(filter)
                 .Where(x => x.UsingWorkflow)
                 .Select(x => x.Id)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -405,9 +440,9 @@ namespace EIMSNext.Service
                 return Task.CompletedTask;
             }
 
-            if (MongoTransactionScope.IsInTransaction)
+            if (TransactionScope.IsInTransaction)
             {
-                MongoTransactionScope.RegisterAfterCommit(() => DeleteFlowDefinitionsAfterCommitAsync(formIds));
+                TransactionScope.RegisterAfterCommit(DbContext, () => DeleteFlowDefinitionsAfterCommitAsync(formIds));
                 return Task.CompletedTask;
             }
 

@@ -1,4 +1,4 @@
-using System.Composition.Hosting;
+﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
 using System.Text.Json;
 
@@ -6,11 +6,9 @@ using EIMSNext.ApiClient.Flow;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -18,14 +16,13 @@ using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 
-using MongoDB.Bson;
-using MongoDB.Driver;
-using MongoDB.Driver.Search;
+using EIMSNext.TestSupport;
 
 namespace EIMSNext.Service.Tests
 {
@@ -210,10 +207,12 @@ namespace EIMSNext.Service.Tests
         {
             private IReadOnlyList<FormData> _deleteTargets = [];
             private readonly RecordingRepository<AuditLog> _auditLogRepository;
+            private readonly QueryableRepository<FormData> _formDataRepository;
 
-            private TestableFormDataService(RecordingRepository<AuditLog> auditLogRepository) : base(BuildResolver(auditLogRepository))
+            private TestableFormDataService(RecordingRepository<AuditLog> auditLogRepository, QueryableRepository<FormData> formDataRepository) : base(BuildResolver(auditLogRepository, formDataRepository))
             {
                 _auditLogRepository = auditLogRepository;
+                _formDataRepository = formDataRepository;
             }
 
             public List<string> LogicDeletedIds { get; } = [];
@@ -224,43 +223,57 @@ namespace EIMSNext.Service.Tests
 
             public static TestableFormDataService Create()
             {
-                return new TestableFormDataService(new RecordingRepository<AuditLog>());
+                return new TestableFormDataService(new RecordingRepository<AuditLog>(), new QueryableRepository<FormData>());
             }
 
-        public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
-        {
-            _deleteTargets = targets;
-            DeleteCore(Builders<FormData>.Filter.Empty, null);
-        }
+            /// <summary>
+            /// <c>PurgeCoreAsync</c> 直接查询 <see cref="IRepository{T}.Queryable"/>（并要求
+            /// <c>IgnoreQueryFilters()</c>），因此目标的写入必须同时落到真实可查询的仓储上。
+            /// </summary>
+            private IReadOnlyList<FormData> DeleteTargets
+            {
+                get => _deleteTargets;
+                set
+                {
+                    _deleteTargets = value;
+                    _formDataRepository.SetItems(value);
+                }
+            }
 
-        public Task<object> InvokeDeleteCoreAsync(IReadOnlyList<FormData> targets)
-        {
-            _deleteTargets = targets;
-            return DeleteCoreAsync(Builders<FormData>.Filter.Empty, null);
-        }
+            public void InvokeDeleteCore(IReadOnlyList<FormData> targets)
+            {
+                DeleteTargets = targets;
+                DeleteCore(x => true);
+            }
 
-        public void InvokeEnsureCanEdit(FormData entity, bool usingWorkflow)
-        {
-            EnsureCanEdit(entity, new FormDef { UsingWorkflow = usingWorkflow });
-        }
+            public Task<int> InvokeDeleteCoreAsync(IReadOnlyList<FormData> targets)
+            {
+                DeleteTargets = targets;
+                return DeleteCoreAsync(x => true);
+            }
+
+            public void InvokeEnsureCanEdit(FormData entity, bool usingWorkflow)
+            {
+                EnsureCanEdit(entity, new FormDef { UsingWorkflow = usingWorkflow });
+            }
 
             public Task InvokePurgeCoreAsync(IEnumerable<string> requestedIds, IReadOnlyList<FormData> targets)
             {
-                _deleteTargets = targets;
-                return PurgeCoreAsync(requestedIds.ToList(), null);
+                DeleteTargets = targets;
+                return PurgeCoreAsync(requestedIds.ToList());
             }
 
-            protected override IReadOnlyList<FormData> FindDeleteTargets(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+            protected override IReadOnlyList<FormData> FindDeleteTargets(Expression<Func<FormData, bool>> filter)
             {
                 return _deleteTargets;
             }
 
-            protected override Task<IReadOnlyList<FormData>> FindDeleteTargetsAsync(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+            protected override Task<IReadOnlyList<FormData>> FindDeleteTargetsAsync(Expression<Func<FormData, bool>> filter)
             {
                 return Task.FromResult(_deleteTargets);
             }
 
-            protected override long DeleteFormDataByIds(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+            protected override long DeleteFormDataByIds(IReadOnlyCollection<string> ids, bool physical)
             {
                 if (physical)
                 {
@@ -274,17 +287,17 @@ namespace EIMSNext.Service.Tests
                 return ids.Count;
             }
 
-            protected override Task<long> DeleteFormDataByIdsAsync(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+            protected override Task<long> DeleteFormDataByIdsAsync(IReadOnlyCollection<string> ids, bool physical)
             {
-                return Task.FromResult(DeleteFormDataByIds(ids, physical, session));
+                return Task.FromResult(DeleteFormDataByIds(ids, physical));
             }
 
-            protected override void DeleteStronglyRelatedData(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+            protected override void DeleteStronglyRelatedData(IReadOnlyCollection<string> dataIds)
             {
                 RelatedDeletedIds.AddRange(dataIds);
             }
 
-            protected override Task DeleteStronglyRelatedDataAsync(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+            protected override Task DeleteStronglyRelatedDataAsync(IReadOnlyCollection<string> dataIds)
             {
                 RelatedDeletedIds.AddRange(dataIds);
                 return Task.CompletedTask;
@@ -296,7 +309,7 @@ namespace EIMSNext.Service.Tests
                 return Task.FromResult<WfResponse?>(new WfResponse { Id = string.Join(",", dataIds) });
             }
 
-            private static IResolver BuildResolver(RecordingRepository<AuditLog> auditLogRepository)
+            private static IResolver BuildResolver(RecordingRepository<AuditLog> auditLogRepository, QueryableRepository<FormData> formDataRepository)
             {
                 var scopeCache = new FakeScopeCache();
                 var context = new FakeServiceContext
@@ -310,7 +323,7 @@ namespace EIMSNext.Service.Tests
                 {
                     [typeof(IServiceContext)] = context,
                     [typeof(IScopeCache)] = scopeCache,
-                    [typeof(IRepository<FormData>)] = new StubRepository<FormData>(),
+                    [typeof(IRepository<FormData>)] = formDataRepository,
                     [typeof(IRepository<AuditLog>)] = auditLogRepository,
                     [typeof(ICacheClient)] = new FakeCacheClient(),
                     [typeof(ILogger<FormData>)] = NullLogger<FormData>.Instance,
@@ -381,155 +394,93 @@ namespace EIMSNext.Service.Tests
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
             public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
         }
 
-        private sealed class FakeSerialNoSequenceService : ISerialNoSequenceService
+        private sealed class FakeSerialNoSequenceService : StubEntityService<SerialNoSequence>, ISerialNoSequenceService
         {
-            public IMongoCollection<SerialNoSequence> Collection => throw new NotSupportedException();
             public string NextCorpCode(PlatformType platform) => throw new NotSupportedException();
             public int NextFormSerialNo(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle) => throw new NotSupportedException();
-            public SerialNoSequence? Get(string id) => throw new NotSupportedException();
-            public IQueryable<SerialNoSequence> All() => throw new NotSupportedException();
-            public IQueryable<SerialNoSequence> Query(Expression<Func<SerialNoSequence, bool>> where) => throw new NotSupportedException();
-            public IFindFluent<SerialNoSequence, SerialNoSequence> Find(DynamicFindOptions<SerialNoSequence> options) => throw new NotSupportedException();
-            public IFindFluent<SerialNoSequence, SerialNoSequence> Find(Expression<Func<SerialNoSequence, bool>> filter) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter) => throw new NotSupportedException();
-            public long Count(Expression<Func<SerialNoSequence, bool>> filter) => throw new NotSupportedException();
-            public bool Exists(Expression<Func<SerialNoSequence, bool>> where) => throw new NotSupportedException();
-            public bool Exists(DynamicFilter where) => throw new NotSupportedException();
-            public void Add(SerialNoSequence entity) => throw new NotSupportedException();
-            public void Add(IEnumerable<SerialNoSequence> entities) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(SerialNoSequence entity) => throw new NotSupportedException();
-            public object Delete(string id) => throw new NotSupportedException();
-            public object Delete(IEnumerable<string> ids) => throw new NotSupportedException();
-            public object Delete(DynamicFilter filter) => throw new NotSupportedException();
-            public Task<SerialNoSequence?> GetAsync(string id) => throw new NotSupportedException();
-            public Task<IAsyncCursor<SerialNoSequence>> FindAsync(DynamicFindOptions<SerialNoSequence> options) => throw new NotSupportedException();
-            public Task<IAsyncCursor<SerialNoSequence>> FindAsync(Expression<Func<SerialNoSequence, bool>> filter) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<SerialNoSequence, bool>> filter) => throw new NotSupportedException();
-            public Task<bool> ExistsAsync(Expression<Func<SerialNoSequence, bool>> where) => throw new NotSupportedException();
-            public Task<bool> ExistsAsync(DynamicFilter where) => throw new NotSupportedException();
-            public Task AddAsync(SerialNoSequence entity) => throw new NotSupportedException();
-            public Task AddAsync(IEnumerable<SerialNoSequence> entities) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(SerialNoSequence entity) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(string id) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
         }
 
-        private sealed class StubRepository<T> : IRepository<T> where T : class, IMongoEntity
+        /// <summary>
+        /// 迁移说明（MongoDB → PostgreSQL/EF Core）：原 <c>FakeSerialNoSequenceService</c> 逐个实现了
+        /// Mongo 时代的 <c>IService&lt;T&gt;</c> 成员（<c>IMongoCollection</c> / <c>IFindFluent</c> /
+        /// <c>IAsyncCursor</c> / <c>ReplaceOneResult</c>）。迁移后 <see cref="IService{T}"/> 已是 EF Core
+        /// 形态，这些成员由共享的 <see cref="StubEntityService{T}"/> 统一兜底。
+        /// </summary>
+        private sealed class QueryableRepository<T> : StubRepository<T> where T : class, IEntity
         {
-            public IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public IQueryable<T> Queryable => throw new NotSupportedException();
-            public FilterDefinitionBuilder<T> FilterBuilder => Builders<T>.Filter;
-            public SortDefinitionBuilder<T> SortBuilder => Builders<T>.Sort;
-            public SearchDefinitionBuilder<T> SearchBuilder => Builders<T>.Search;
-            public ProjectionDefinitionBuilder<T> ProjectionBuilder => Builders<T>.Projection;
-            public UpdateDefinitionBuilder<T> UpdateBuilder => Builders<T>.Update;
+            private List<T> _items = [];
 
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public T? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<T> EnsureId(IEnumerable<T> entities) => throw new NotSupportedException();
-            public T EnsureId(T entity) => throw new NotSupportedException();
-            public string NewId() => throw new NotSupportedException();
+            public void SetItems(IEnumerable<T> items) => _items = items.ToList();
+
+            // PurgeCoreAsync 走的是 Repository.Queryable.IgnoreQueryFilters()…ToListAsync()，
+            // 需要源同时具备同步与异步可枚举能力，故用 InMemoryAsyncQueryable 包装。
+            public override IQueryable<T> Queryable => new InMemoryAsyncQueryable<T>(_items);
+
+            public override IQueryable<T> Find(DynamicFilter filter) => Queryable;
+
+            public override List<T> FindList(DynamicFilter filter) => Queryable.ToList();
+
+            public override T? Get(string id) => _items.FirstOrDefault(x => x.Id == id);
+
+            public override Task<T?> GetAsync(string id, CancellationToken cancellationToken = default)
+                => Task.FromResult(Get(id));
+
+            public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
+
+            public override long Count(DynamicFilter filter) => Queryable.LongCount();
+
+            public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+                => Task.FromResult(Count(predicate));
+
+            public override Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
+                => Task.FromResult(SoftDeleteMany(ids));
+
+            public override Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+            {
+                var removed = Queryable.Where(predicate).ToList();
+                _items.RemoveAll(removed.Contains);
+                return Task.FromResult(removed.Count);
+            }
+
+            private int SoftDeleteMany(IEnumerable<string> ids)
+            {
+                var idSet = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
+                var affected = _items.Where(x => idSet.Contains(x.Id)).ToList();
+                foreach (var item in affected)
+                {
+                    item.DeleteFlag = true;
+                }
+
+                return affected.Count;
+            }
         }
 
-        private sealed class RecordingRepository<T> : IRepository<T> where T : class, IMongoEntity
+        private sealed class RecordingRepository<T> : StubRepository<T> where T : class, IEntityKey
         {
             private readonly List<T> _items = [];
 
             public IReadOnlyList<T> Items => _items;
-            public IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public IQueryable<T> Queryable => _items.AsQueryable();
-            public FilterDefinitionBuilder<T> FilterBuilder => Builders<T>.Filter;
-            public SortDefinitionBuilder<T> SortBuilder => Builders<T>.Sort;
-            public SearchDefinitionBuilder<T> SearchBuilder => Builders<T>.Search;
-            public ProjectionDefinitionBuilder<T> ProjectionBuilder => Builders<T>.Projection;
-            public UpdateDefinitionBuilder<T> UpdateBuilder => Builders<T>.Update;
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public T? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(T entity, IClientSessionHandle? session = null) => _items.Add(entity);
-            public void Insert(IEnumerable<T> entities, IClientSessionHandle? session = null) => _items.AddRange(entities);
-            public Task InsertAsync(T entity, IClientSessionHandle? session = null)
+
+            public override IQueryable<T> Queryable => _items.AsQueryable();
+
+            public override void Insert(T entity) => _items.Add(entity);
+
+            public override Task InsertAsync(T entity, CancellationToken cancellationToken = default)
             {
-                Insert(entity, session);
+                Insert(entity);
                 return Task.CompletedTask;
             }
-            public Task InsertAsync(IEnumerable<T> entities, IClientSessionHandle? session = null)
+
+            public override Task InsertAsync(IEnumerable<T> entities, CancellationToken cancellationToken = default)
             {
-                Insert(entities, session);
+                _items.AddRange(entities);
                 return Task.CompletedTask;
             }
-            public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<T> EnsureId(IEnumerable<T> entities) => entities;
-            public T EnsureId(T entity) => entity;
-            public string NewId() => ObjectId.GenerateNewId().ToString();
+
+            public override string NewId() => Guid.NewGuid().ToString("N");
         }
     }
 }

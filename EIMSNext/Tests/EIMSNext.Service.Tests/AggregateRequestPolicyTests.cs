@@ -1,6 +1,7 @@
 using System.Text.Json;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
+using EIMSNext.Common;
 using EIMSNext.Core.Query;
 
 namespace EIMSNext.Service.Tests
@@ -118,6 +119,56 @@ namespace EIMSNext.Service.Tests
             Assert.IsFalse(filter.ValueIsField);
             Assert.IsFalse(filter.Items[0].ValueIsExp);
             Assert.IsFalse(filter.Items[1].Items![0].ValueIsField);
+        }
+
+        [TestMethod]
+        public void AggregateRows_RetainFilterParameters()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = "data.status", Op = FilterOp.Eq, Value = "approved" };
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "@p0");
+            Assert.AreEqual(1, statement.Parameters.Count);
+            StringAssert.Contains(statement.Parameters[0]?.ToString() ?? string.Empty, "approved");
+        }
+
+        [TestMethod]
+        public void AggregateRows_UseJsonbTopLevelPathAndFormDataContract()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = "data.status", Op = FilterOp.Eq, Value = "approved" };
+            request.DisplayFields = ["status"];
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "\"Data\" @?");
+            StringAssert.Contains(statement.Sql, "\"Data\" as \"data\"");
+            StringAssert.Contains(statement.Sql, "null::text as \"dataTitle\"");
+            Assert.IsFalse(statement.Sql.Contains("\"DataTitle\"", StringComparison.Ordinal));
+            Assert.IsFalse(statement.Sql.Contains("-> 'data'", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public void AggregateRows_SortMetricUsesAggregateAlias()
+        {
+            var request = Request([new Dimension { Id = "category" }], [new Metric { Id = "amount", AggFun = "sum" }]);
+            request.Sort = [new SortItem { Id = "amount_sum", Dir = SortDir.Desc }];
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "\"amount_sum\" desc");
+            StringAssert.Contains(statement.Sql, "as \"category\"");
+        }
+
+        [TestMethod]
+        public void AggregateRows_RejectUnknownOperator()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = "data.status", Op = "legacy-eq", Value = "approved" };
+
+            Assert.ThrowsExactly<BadRequestException>(() => AggregateSqlBuilder.BuildRows(request));
         }
 
         private static JsonDocument Details(string json) => JsonDocument.Parse(json);

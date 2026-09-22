@@ -1,14 +1,13 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -28,38 +27,36 @@ namespace EIMSNext.Service
             });
         }
 
-        public Task MarkReadAsync(string id, string corpId, string empId)
+        public async Task MarkReadAsync(string id, string corpId, string empId)
         {
-            var update = UpdateBuilder
-                .Set(x => x.IsRead, true)
-                .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
-
-            Repository.UpdateMany(
-                Repository.FilterBuilder.And(
-                    Repository.FilterBuilder.Eq(x => x.Id, id),
-                    Repository.FilterBuilder.Eq(x => x.CorpId, corpId),
-                    Repository.FilterBuilder.Eq(x => x.ReceiverEmpId, empId),
-                    Repository.FilterBuilder.Eq(x => x.DeleteFlag, false)),
-                update,
-                upsert: false);
-            return Task.CompletedTask;
+            var readTime = DateTime.UtcNow.ToTimeStampMs();
+            await Repository.UpdateManyAsync(
+                x => x.Id == id
+                    && x.CorpId == corpId
+                    && x.ReceiverEmpId == empId
+                    && !x.DeleteFlag,
+                setters => setters
+                    .SetProperty(x => x.IsRead, true)
+                    .SetProperty(x => x.ReadTime, readTime));
         }
 
-        public Task MarkReadBatchAsync(IEnumerable<string> ids, string corpId, string empId)
+        public async Task MarkReadBatchAsync(IEnumerable<string> ids, string corpId, string empId)
         {
-            var update = UpdateBuilder
-                .Set(x => x.IsRead, true)
-                .Set(x => x.ReadTime, DateTime.UtcNow.ToTimeStampMs());
+            var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.Ordinal).ToList();
+            if (idList.Count == 0)
+            {
+                return;
+            }
 
-            Repository.UpdateMany(
-                Repository.FilterBuilder.And(
-                    Repository.FilterBuilder.In(x => x.Id, ids),
-                    Repository.FilterBuilder.Eq(x => x.CorpId, corpId),
-                    Repository.FilterBuilder.Eq(x => x.ReceiverEmpId, empId),
-                    Repository.FilterBuilder.Eq(x => x.DeleteFlag, false)),
-                update,
-                upsert: false);
-            return Task.CompletedTask;
+            var readTime = DateTime.UtcNow.ToTimeStampMs();
+            await Repository.UpdateManyAsync(
+                x => idList.Contains(x.Id)
+                    && x.CorpId == corpId
+                    && x.ReceiverEmpId == empId
+                    && !x.DeleteFlag,
+                setters => setters
+                    .SetProperty(x => x.IsRead, true)
+                    .SetProperty(x => x.ReadTime, readTime));
         }
     }
 }

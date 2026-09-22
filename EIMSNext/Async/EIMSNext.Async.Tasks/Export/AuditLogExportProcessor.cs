@@ -1,20 +1,19 @@
+﻿using System.Linq.Expressions;
 using System.Composition;
 using System.Text.Json;
 
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Mef;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Async.Tasks.Export
 {
@@ -89,41 +88,41 @@ namespace EIMSNext.Async.Tasks.Export
             return rowIndex;
         }
 
-        private static FilterDefinition<AuditLog> BuildFilter(string corpId, AuditLogExportRequest request)
+        private static Expression<Func<AuditLog, bool>> BuildFilter(string corpId, AuditLogExportRequest request)
         {
-            var builder = Builders<AuditLog>.Filter;
-            var filters = new List<FilterDefinition<AuditLog>>
-            {
-                builder.Eq(x => x.CorpId, corpId),
-                builder.Ne(x => x.DeleteFlag, true),
-            };
+            Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
 
             if (!string.IsNullOrWhiteSpace(request.EntityType))
             {
-                filters.Add(builder.Eq(x => x.EntityType, request.EntityType));
+                var entityType = request.EntityType;
+                filter = filter.AndAlso(x => x.EntityType == entityType);
             }
 
             if (!string.IsNullOrWhiteSpace(request.Action) && Enum.TryParse<DbAction>(request.Action, true, out var action))
             {
-                filters.Add(builder.Eq(x => x.Action, action));
+                filter = filter.AndAlso(x => x.Action == action);
             }
 
             if (!string.IsNullOrWhiteSpace(request.OperatorName))
             {
-                filters.Add(builder.Regex(x => x.CreateBy!.Label, new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
+                // Mongo 时期的 BsonRegularExpression(..., "i") 在 PostgreSQL 下用 ILIKE 表达。
+                var keyword = DynamicQueryExtensions.EscapeLikePattern(request.OperatorName);
+                filter = filter.AndAlso(x => x.CreateBy != null && EF.Functions.ILike(x.CreateBy.Label, keyword));
             }
 
             if (request.StartTime.HasValue)
             {
-                filters.Add(builder.Gte(x => x.CreateTime, request.StartTime.Value));
+                var startTime = request.StartTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime >= startTime);
             }
 
             if (request.EndTime.HasValue)
             {
-                filters.Add(builder.Lte(x => x.CreateTime, request.EndTime.Value));
+                var endTime = request.EndTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime <= endTime);
             }
 
-            return filters.Count == 1 ? filters[0] : builder.And(filters);
+            return filter;
         }
     }
 }

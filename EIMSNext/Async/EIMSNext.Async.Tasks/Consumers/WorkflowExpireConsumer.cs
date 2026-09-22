@@ -1,20 +1,17 @@
-using EIMSNext.ApiClient.Flow;
+﻿using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.System;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -53,12 +50,13 @@ namespace EIMSNext.Async.Tasks.Consumers
             if (args.TaskIds.Count > 0)
             {
                 var taskRepo = resolver.GetRepository<Wf_Task>();
-                taskRepo.UpdateMany(
-                    Builders<Wf_Task>.Filter.In(x => x.Id, args.TaskIds),
-                    Builders<Wf_Task>.Update
-                        .Set(x => x.ExpireHandled, true)
-                        .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()),
-                    upsert: false);
+                var taskIds = args.TaskIds;
+                var now = DateTime.UtcNow.ToTimeStampMs();
+                await taskRepo.UpdateManyAsync(
+                    x => taskIds.Contains(x.Id),
+                    setters => setters
+                        .SetProperty(x => x.ExpireHandled, true)
+                        .SetProperty(x => x.UpdateTime, now));
             }
         }
 

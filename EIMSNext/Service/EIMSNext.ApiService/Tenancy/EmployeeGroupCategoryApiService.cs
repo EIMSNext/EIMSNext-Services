@@ -1,17 +1,14 @@
-using HKH.Mef2.Integration;
+﻿using HKH.Mef2.Integration;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -33,7 +30,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体核心逻辑。
         /// </summary>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroupCategory entity)
+        protected override Task<int> ReplaceAsyncCore(EmployeeGroupCategory entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组分类的权限");
             return base.ReplaceAsyncCore(entity);
@@ -42,7 +39,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组分类的权限");
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();

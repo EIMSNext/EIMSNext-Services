@@ -33,7 +33,7 @@ namespace EIMSNext.Identity.Services
 
         public User? FindById(string id)
         {
-            return _dbContext.Users.FirstOrDefault(x => x.Id == id);
+            return WithCorps(_dbContext.Users.FirstOrDefault(x => x.Id == id));
         }
 
         public User? FindByEmailOrPhone(string emailOrPhone)
@@ -44,9 +44,9 @@ namespace EIMSNext.Identity.Services
                 return null;
             }
 
-            return _dbContext.Users.FirstOrDefault(x =>
+            return WithCorps(_dbContext.Users.FirstOrDefault(x =>
                 !x.Disabled &&
-                (string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase) || x.Phone == normalized));
+                (string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase) || x.Phone == normalized)));
         }
 
         public User? FindByEmail(string email)
@@ -54,8 +54,8 @@ namespace EIMSNext.Identity.Services
             var normalized = email?.Trim();
             return string.IsNullOrWhiteSpace(normalized)
                 ? null
-                : _dbContext.Users.FirstOrDefault(x =>
-                    !x.Disabled && string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase));
+                : WithCorps(_dbContext.Users.FirstOrDefault(x =>
+                    !x.Disabled && string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase)));
         }
 
         public User? FindByPhone(string phone)
@@ -63,7 +63,7 @@ namespace EIMSNext.Identity.Services
             var normalized = phone?.Trim();
             return string.IsNullOrWhiteSpace(normalized)
                 ? null
-                : _dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == normalized);
+                : WithCorps(_dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == normalized));
         }
 
         public User? FindByEmpNo(string corpId, string empNo)
@@ -81,7 +81,23 @@ namespace EIMSNext.Identity.Services
 
             return employee == null
                 ? null
-                : _dbContext.Users.FirstOrDefault(x => x.Id == employee.UserId && !x.Disabled);
+                : WithCorps(_dbContext.Users.FirstOrDefault(x => x.Id == employee.UserId && !x.Disabled));
+        }
+
+        /// <summary>
+        /// 填充用户的企业归属关系（来自关系表 "UserCorp"），取代原先内嵌的 jsonb 投影字段。
+        /// </summary>
+        private User? WithCorps(User? user)
+        {
+            if (user == null)
+            {
+                return null;
+            }
+
+            user.UserCorps = _dbContext.UserCorps
+                .Where(x => x.UserId == user.Id)
+                .ToList();
+            return user;
         }
 
         public Client? FindEnabledClient(string clientId)

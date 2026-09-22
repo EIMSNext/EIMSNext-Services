@@ -1,9 +1,9 @@
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 using EIMSNext.Identity.AccountSecurity;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Identity.Services

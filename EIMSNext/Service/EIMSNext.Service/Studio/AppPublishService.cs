@@ -1,14 +1,12 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Linq.Expressions;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -219,7 +217,7 @@ namespace EIMSNext.Service
             string appTemplateId,
             IEnumerable<string> currentIds,
             Expression<Func<T, string>> appTemplateIdSelector)
-            where T : class, IMongoEntity
+            where T : class, IEntityKey
         {
             var keepIds = currentIds.ToHashSet(StringComparer.Ordinal);
             var existingIds = repo.Queryable
@@ -232,7 +230,7 @@ namespace EIMSNext.Service
         }
 
         private static async Task DeleteTemplatesAsync<T>(IRepository<T> repo, IReadOnlyCollection<string> staleIds)
-            where T : class, IMongoEntity
+            where T : class, IEntityKey
         {
             if (staleIds.Count > 0)
             {
@@ -240,12 +238,12 @@ namespace EIMSNext.Service
             }
         }
 
-        private static string EnsureTemplateId<T>(IRepository<T> repo, string? templateId) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
+        private static string EnsureTemplateId<T>(IRepository<T> repo, string? templateId) where T : class, EIMSNext.Core.Abstractions.IEntityKey
         {
             return string.IsNullOrWhiteSpace(templateId) ? repo.NewId() : templateId;
         }
 
-        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity, bool exists) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
+        private static async Task UpsertAsync<T>(IRepository<T> repo, T entity, bool exists) where T : class, EIMSNext.Core.Abstractions.IEntityKey
         {
             if (!exists)
             {
@@ -258,7 +256,7 @@ namespace EIMSNext.Service
 
         private sealed record TemplateState(HashSet<string> ExistingIds, List<string> StaleIds);
 
-        private static async Task SetTemplateIdAsync<T>(IRepository<T> repo, T entity, string templateId) where T : class, EIMSNext.Core.Abstractions.IMongoEntity
+        private static async Task SetTemplateIdAsync<T>(IRepository<T> repo, T entity, string templateId) where T : class, EIMSNext.Core.Abstractions.IEntityKey
         {
             switch (entity)
             {

@@ -30,9 +30,9 @@ public sealed class QuartzPostgreSqlStoreTests
             await using (var setup = new NpgsqlConnection(settings.ConnectionString))
             {
                 await setup.OpenAsync();
-                foreach (var script in new[] { "006_CreateQuartzTables.sql", "007_CreateQuartzIndexes.sql" })
+                foreach (var script in ResolveQuartzStoreScripts(FindSolutionRoot()))
                 {
-                    var sql = await File.ReadAllTextAsync(Path.Combine(FindSolutionRoot(), "ApiHost", "EIMSNext.Tool.DbMaintenance", "Sql", script));
+                    var sql = await File.ReadAllTextAsync(script);
                     await using var command = new NpgsqlCommand(sql, setup);
                     await command.ExecuteNonQueryAsync();
                 }
@@ -94,6 +94,35 @@ public sealed class QuartzPostgreSqlStoreTests
         for (var directory = new DirectoryInfo(Environment.CurrentDirectory); directory != null; directory = directory.Parent)
             if (File.Exists(Path.Combine(directory.FullName, "EIMSNext.sln"))) return directory.FullName;
         throw new DirectoryNotFoundException("Run this test from the EIMSNext solution directory.");
+    }
+
+    /// <summary>
+    /// 定位 Quartz 存储表与索引脚本。
+    /// </summary>
+    /// <remarks>
+    /// 按<b>版本前缀</b>查找而不是写死文件名：迁移链重排过一次编号
+    /// （Quartz 段从 006/007 前移到 005/006），写死的名字在重命名后只会静默失配，
+    /// 而这条用例默认因缺少 <c>EIMS_TEST_POSTGRES</c> 而跳过，缺陷可以潜伏很久。
+    /// </remarks>
+    private static IReadOnlyList<string> ResolveQuartzStoreScripts(string root)
+        => ResolveScripts(root, "005_", "006_");
+
+    private static IReadOnlyList<string> ResolveScripts(string root, params string[] versionPrefixes)
+    {
+        var directory = Path.Combine(root, "ApiHost", "EIMSNext.Tool.DbMaintenance", "Sql");
+        var scripts = new List<string>(versionPrefixes.Length);
+
+        foreach (var prefix in versionPrefixes)
+        {
+            var matches = Directory.GetFiles(directory, prefix + "*.sql");
+            if (matches.Length != 1)
+                throw new InvalidOperationException(
+                    $"Sql 目录里版本前缀 {prefix} 的脚本应当唯一，实际找到 {matches.Length} 个。");
+
+            scripts.Add(matches[0]);
+        }
+
+        return scripts;
     }
 
     public sealed class PersistentNoopJob : IJob

@@ -1,6 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using MongoDB.Bson.Serialization.Attributes;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {

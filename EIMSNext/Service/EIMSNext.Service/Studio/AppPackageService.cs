@@ -1,4 +1,4 @@
-using System.IO.Compression;
+﻿using System.IO.Compression;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
@@ -6,8 +6,8 @@ using System.Text.Json.Serialization;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -398,7 +398,7 @@ namespace EIMSNext.Service
             }
         }
 
-        private static async Task DeleteAsync<T>(IRepository<T> repo, IReadOnlyCollection<string> ids) where T : class, IMongoEntity
+        private static async Task DeleteAsync<T>(IRepository<T> repo, IReadOnlyCollection<string> ids) where T : class, IEntityKey
         {
             if (ids.Count > 0)
             {
@@ -427,7 +427,7 @@ namespace EIMSNext.Service
             return clone;
         }
 
-        private static void EnsureId(MongoEntityBase entity, string resourceName)
+        private static void EnsureId(KeyedEntityBase entity, string resourceName)
         {
             if (string.IsNullOrWhiteSpace(entity.Id))
             {
@@ -436,7 +436,7 @@ namespace EIMSNext.Service
         }
 
         private static void EnsureResources<T>(IEnumerable<T> resources, string templateId, string resourceName, Func<T, string> appTemplateId)
-            where T : MongoEntityBase
+            where T : KeyedEntityBase
         {
             var ids = new HashSet<string>(StringComparer.Ordinal);
             foreach (var resource in resources)

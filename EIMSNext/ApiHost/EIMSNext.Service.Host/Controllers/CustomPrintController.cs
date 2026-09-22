@@ -13,7 +13,6 @@ using EIMSNext.Service.Host.Requests;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 
 namespace EIMSNext.Service.Host.Controllers
 {

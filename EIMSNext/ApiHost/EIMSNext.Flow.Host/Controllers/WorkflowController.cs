@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
@@ -654,7 +652,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
         private async Task<string> RestartWorkflowInstanceAsync(WorkflowInstance wfInst, WfDataContext data)
         {
-            var existingData = WfDataContext.FromExpando((ExpandoObject)wfInst.Data);
+            var existingData = WfDataContext.FromData((IDictionary<string, object?>)wfInst.Data);
             var restartData = new WfDataContext(
                 data.CorpId,
                 data.UserId,

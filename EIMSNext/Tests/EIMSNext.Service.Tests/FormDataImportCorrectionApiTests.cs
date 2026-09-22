@@ -10,11 +10,9 @@ using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -24,9 +22,7 @@ using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Driver;
+using EIMSNext.TestSupport;
 
 namespace EIMSNext.Service.Tests
 {
@@ -47,7 +43,7 @@ namespace EIMSNext.Service.Tests
                 CorpId = CorpId,
                 AppId = AppId,
                 FormId = FormId,
-                Data = ToExpando(new Dictionary<string, object?> { ["name"] = "old" }),
+                Data = NewData(new Dictionary<string, object?> { ["name"] = "old" }),
             });
 
             var importLog = NewImportLog(FormDataImportMode.AddOnly);
@@ -65,7 +61,7 @@ namespace EIMSNext.Service.Tests
                     new FormDataImportCorrectionRow
                     {
                         DataId = "existing-1",
-                        Data = ToExpando(new Dictionary<string, object?> { ["name"] = "new-row" }),
+                        Data = NewData(new Dictionary<string, object?> { ["name"] = "new-row" }),
                     }
                 ],
             });
@@ -95,7 +91,7 @@ namespace EIMSNext.Service.Tests
                 CorpId = CorpId,
                 AppId = AppId,
                 FormId = FormId,
-                Data = ToExpando(new Dictionary<string, object?> { ["code"] = "A", ["name"] = "before-a" }),
+                Data = NewData(new Dictionary<string, object?> { ["code"] = "A", ["name"] = "before-a" }),
             });
             formDataService.Seed(new FormData
             {
@@ -103,7 +99,7 @@ namespace EIMSNext.Service.Tests
                 CorpId = CorpId,
                 AppId = AppId,
                 FormId = FormId,
-                Data = ToExpando(new Dictionary<string, object?> { ["code"] = "B", ["name"] = "before-b" }),
+                Data = NewData(new Dictionary<string, object?> { ["code"] = "B", ["name"] = "before-b" }),
             });
 
             var importLog = NewImportLog(FormDataImportMode.Upsert, matchField: "code");
@@ -113,7 +109,7 @@ namespace EIMSNext.Service.Tests
             importLog.EditableErrorRowsJson =
                 new List<FormDataImportEditableErrorRow>
                 {
-                    new() { RecordIndex = 0, StartRowNumber = 10, DataId = "data-a", Data = ToExpando(new Dictionary<string, object?> { ["code"] = "A" }) },
+                    new() { RecordIndex = 0, StartRowNumber = 10, DataId = "data-a", Data = NewData(new Dictionary<string, object?> { ["code"] = "A" }) },
                 }.SerializeToJson();
             importLog.EditableErrorRowCount = 1;
 
@@ -127,12 +123,12 @@ namespace EIMSNext.Service.Tests
                     new FormDataImportCorrectionRow
                     {
                         DataId = "data-b",
-                        Data = ToExpando(new Dictionary<string, object?> { ["code"] = "B", ["name"] = "after-b" }),
+                        Data = NewData(new Dictionary<string, object?> { ["code"] = "B", ["name"] = "after-b" }),
                     },
                     new FormDataImportCorrectionRow
                     {
                         DataId = "data-a",
-                        Data = ToExpando(new Dictionary<string, object?> { ["code"] = "A", ["name"] = "after-a" }),
+                        Data = NewData(new Dictionary<string, object?> { ["code"] = "A", ["name"] = "after-a" }),
                     }
                 ],
             });
@@ -170,7 +166,7 @@ namespace EIMSNext.Service.Tests
                 [
                     new FormDataImportCorrectionRow
                     {
-                        Data = ToExpando(new Dictionary<string, object?> { ["name"] = "" }),
+                        Data = NewData(new Dictionary<string, object?> { ["name"] = "" }),
                     }
                 ],
             });
@@ -261,17 +257,7 @@ namespace EIMSNext.Service.Tests
             };
         }
 
-        private static ExpandoObject ToExpando(IDictionary<string, object?> source)
-        {
-            var expando = new ExpandoObject();
-            var dict = (IDictionary<string, object?>)expando;
-            foreach (var (key, value) in source)
-            {
-                dict[key] = value;
-            }
-
-            return expando;
-        }
+        private static Dictionary<string, object?> NewData(IDictionary<string, object?> source) => new(source);
 
         private sealed class TestResolver(IReadOnlyDictionary<Type, object> services) : IResolver
         {
@@ -327,6 +313,7 @@ namespace EIMSNext.Service.Tests
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
             public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
         }
 
         private sealed class FakeFormDefService(FormDef formDef) : FakeEntityService<FormDef>, IFormDefService
@@ -385,7 +372,14 @@ namespace EIMSNext.Service.Tests
 
             public override FormData? Get(string id) => Items.GetValueOrDefault(id);
             public override IQueryable<FormData> All() => Items.Values.AsQueryable();
-            public override IFindFluent<FormData, FormData> Find(DynamicFindOptions<FormData> options)
+
+            /// <summary>
+            /// 迁移说明：原实现返回 <c>IFindFluent&lt;FormData, FormData&gt;</c> 并用
+            /// <c>FindFluentStub</c> 模拟 Limit/Skip/ToCursor。EF Core 形态下
+            /// <see cref="IService{T}.Find(DynamicFindOptions{T})"/> 直接返回
+            /// <see cref="IQueryable{T}"/>，分页语义可由调用方 LINQ 表达。
+            /// </summary>
+            public override IQueryable<FormData> Find(DynamicFindOptions<FormData> options)
             {
                 var query = All();
                 if (options.Filter != null && !options.Filter.IsEmpty)
@@ -403,7 +397,7 @@ namespace EIMSNext.Service.Tests
                     query = query.Take(options.Take);
                 }
 
-                return new FindFluentStub<FormData>(query);
+                return query;
             }
             public override Task AddAsync(FormData entity)
             {
@@ -417,19 +411,16 @@ namespace EIMSNext.Service.Tests
                 return Task.CompletedTask;
             }
 
-            public override Task<ReplaceOneResult> ReplaceAsync(FormData entity)
+            public override Task<int> ReplaceAsync(FormData entity)
             {
                 Items[entity.Id] = entity;
                 ReplacedEntities.Add(entity);
-                return Task.FromResult<ReplaceOneResult>(null!);
+                return Task.FromResult(1);
             }
 
-            public void Add(IEnumerable<FormData> entities, IClientSessionHandle? session) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(FormData entity, IClientSessionHandle? session) => throw new NotSupportedException();
-            public object Delete(IEnumerable<string> ids, IClientSessionHandle? session) => throw new NotSupportedException();
             public Task RestoreAsync(IEnumerable<string> ids) => throw new NotSupportedException();
             public Task PurgeAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-            public Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, CascadeMode cascade, string? eventIds) => throw new NotSupportedException();
+            public Task SubmitAsync(IEnumerable<FormData> entities, CascadeMode cascade, string? eventIds) => throw new NotSupportedException();
             public Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query) => throw new NotSupportedException();
 
             private static bool Matches(FormData item, DynamicFilter filter)
@@ -473,90 +464,22 @@ namespace EIMSNext.Service.Tests
                 };
             }
 
-            private static object? ResolveDataField(ExpandoObject data, string field)
+            private static object? ResolveDataField(Dictionary<string, object?> data, string field)
             {
                 var dict = (IDictionary<string, object?>)data;
                 return dict.TryGetValue(field, out var value) ? value : null;
             }
         }
 
-        private class FakeEntityService<T> : IService<T> where T : class, IMongoEntity
+        /// <summary>
+        /// 迁移说明（MongoDB → PostgreSQL/EF Core）：原 <c>FakeEntityService&lt;T&gt;</c> 逐个实现了
+        /// Mongo 时代的 <c>IService&lt;T&gt;</c> 成员（<c>IMongoCollection</c> / <c>IFindFluent</c> /
+        /// <c>IAsyncCursor</c> / <c>ReplaceOneResult</c>），并配套 <c>FindFluentStub</c> /
+        /// <c>AsyncCursorStub</c> 伪造游标语义。迁移后 <see cref="IService{T}"/> 已是 EF Core 形态，
+        /// 这些成员由共享的 <see cref="StubEntityService{T}"/> 统一兜底。
+        /// </summary>
+        private class FakeEntityService<T> : StubEntityService<T>, IService<T> where T : class, IEntityKey
         {
-            public virtual IMongoCollection<T> Collection => throw new NotSupportedException();
-            public virtual T? Get(string id) => throw new NotSupportedException();
-            public virtual IQueryable<T> All() => throw new NotSupportedException();
-            public virtual IQueryable<T> Query(Expression<Func<T, bool>> where) => All().Where(where);
-            public virtual IFindFluent<T, T> Find(DynamicFindOptions<T> options) => throw new NotSupportedException();
-            public virtual IFindFluent<T, T> Find(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-            public virtual long Count(DynamicFilter filter) => throw new NotSupportedException();
-            public virtual long Count(Expression<Func<T, bool>> filter) => All().LongCount(filter);
-            public virtual bool Exists(Expression<Func<T, bool>> where) => All().Any(where);
-            public virtual bool Exists(DynamicFilter where) => throw new NotSupportedException();
-            public virtual void Add(T entity) => throw new NotSupportedException();
-            public virtual void Add(IEnumerable<T> entities) => throw new NotSupportedException();
-            public virtual ReplaceOneResult Replace(T entity) => throw new NotSupportedException();
-            public virtual object Delete(string id) => throw new NotSupportedException();
-            public virtual object Delete(IEnumerable<string> ids) => throw new NotSupportedException();
-            public virtual object Delete(DynamicFilter filter) => throw new NotSupportedException();
-            public virtual Task<T?> GetAsync(string id) => Task.FromResult(Get(id));
-            public virtual Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options) => throw new NotSupportedException();
-            public virtual Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-            public virtual Task<long> CountAsync(DynamicFilter filter) => throw new NotSupportedException();
-            public virtual Task<long> CountAsync(Expression<Func<T, bool>> filter) => Task.FromResult(Count(filter));
-            public virtual Task<bool> ExistsAsync(Expression<Func<T, bool>> where) => Task.FromResult(Exists(where));
-            public virtual Task<bool> ExistsAsync(DynamicFilter where) => throw new NotSupportedException();
-            public virtual Task AddAsync(T entity) => throw new NotSupportedException();
-            public virtual Task AddAsync(IEnumerable<T> entities) => throw new NotSupportedException();
-            public virtual Task<ReplaceOneResult> ReplaceAsync(T entity) => throw new NotSupportedException();
-            public virtual Task<object> DeleteAsync(string id) => throw new NotSupportedException();
-            public virtual Task<object> DeleteAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-            public virtual Task<object> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
-        }
-
-        private sealed class FindFluentStub<T>(IQueryable<T> data) : IFindFluent<T, T>
-        {
-            public FilterDefinition<T> Filter { get; set; } = Builders<T>.Filter.Empty;
-            public FindOptions<T, T> Options { get; } = new();
-            public IFindFluent<T, TNewProjection> As<TNewProjection>(IBsonSerializer<TNewProjection> resultSerializer) => throw new NotSupportedException();
-            public long Count(CancellationToken cancellationToken = default) => data.LongCount();
-            public Task<long> CountAsync(CancellationToken cancellationToken = default) => Task.FromResult(Count(cancellationToken));
-            public long CountDocuments(CancellationToken cancellationToken = default) => data.LongCount();
-            public Task<long> CountDocumentsAsync(CancellationToken cancellationToken = default) => Task.FromResult(CountDocuments(cancellationToken));
-            public IFindFluent<T, T> Limit(int? limit)
-            {
-                data = limit.HasValue ? data.Take(limit.Value) : data;
-                return this;
-            }
-            public IFindFluent<T, TNewProjection> Project<TNewProjection>(ProjectionDefinition<T, TNewProjection> projection) => throw new NotSupportedException();
-            public IFindFluent<T, T> Skip(int? skip)
-            {
-                data = skip.HasValue ? data.Skip(skip.Value) : data;
-                return this;
-            }
-            public IFindFluent<T, T> Sort(SortDefinition<T> sort) => this;
-            public IAsyncCursor<T> ToCursor(CancellationToken cancellationToken = default) => new AsyncCursorStub<T>(data);
-            public Task<IAsyncCursor<T>> ToCursorAsync(CancellationToken cancellationToken = default) => Task.FromResult(ToCursor(cancellationToken));
-            public string ToString(ExpressionTranslationOptions translationOptions) => ToString() ?? string.Empty;
-        }
-
-        private sealed class AsyncCursorStub<T>(IEnumerable<T> data) : IAsyncCursor<T>
-        {
-            private bool _moved;
-            public IEnumerable<T> Current { get; private set; } = [];
-            public void Dispose() { }
-            public bool MoveNext(CancellationToken cancellationToken = default)
-            {
-                if (_moved)
-                {
-                    Current = [];
-                    return false;
-                }
-
-                _moved = true;
-                Current = data.ToList();
-                return Current.Any();
-            }
-            public Task<bool> MoveNextAsync(CancellationToken cancellationToken = default) => Task.FromResult(MoveNext(cancellationToken));
         }
 
         private sealed record CorrectionResultCall(

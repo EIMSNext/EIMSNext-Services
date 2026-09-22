@@ -2,7 +2,6 @@ using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Mongo.Serialization;
 using EIMSNext.Json.Serialization;
 
 namespace EIMSNext.Core.Tests
@@ -21,7 +20,8 @@ namespace EIMSNext.Core.Tests
             opt.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             opt.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 
-            opt.Converters.Add(new BsonDocumentJsonConverter());
+            // 迁移说明：BsonDocumentJsonConverter 随 Mongo 序列化层一并删除，
+            // 不再参与 JSON 选项注册。
             opt.Converters.Add(new ExceptionJsonConverter());
             opt.Converters.Add(new FlexibleEnumConverterFactory());
             opt.Converters.Add(new ObjectJsonConverter());

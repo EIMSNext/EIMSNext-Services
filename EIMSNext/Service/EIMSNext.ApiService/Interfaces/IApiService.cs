@@ -1,11 +1,8 @@
-using System.Linq.Expressions;
+﻿using System.Linq.Expressions;
 
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -18,10 +15,10 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 泛型 API 服务接口，定义实体 <typeparamref name="T"/> 的基础查询与增删改操作。
     /// </summary>
-    /// <typeparam name="T">实现 <see cref="IMongoEntity"/> 的实体类型。</typeparam>
+    /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
     /// <typeparam name="V">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
     public interface IApiService<T, V> : IApiService
-        where T : IMongoEntity
+        where T : IEntityKey
         where V : T, new()
     {
         /// <summary>
@@ -48,15 +45,22 @@ namespace EIMSNext.ApiService
         /// 根据动态查询选项查找实体。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
-        /// <returns>可进一步链式操作的查询流。</returns>
-        IFindFluent<T, T> Find(DynamicFindOptions<T> options);
+        /// <returns>可进一步链式操作的查询。</returns>
+        IQueryable<T> Find(DynamicFindOptions<T> options);
 
         /// <summary>
         /// 根据表达式过滤条件查找实体。
         /// </summary>
         /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>可进一步链式操作的查询流。</returns>
-        IFindFluent<T, T> Find(Expression<Func<T, bool>> filter);
+        /// <returns>可进一步链式操作的查询。</returns>
+        IQueryable<T> Find(Expression<Func<T, bool>> filter);
+
+        /// <summary>
+        /// 根据动态过滤条件查找实体。
+        /// </summary>
+        /// <param name="filter">动态过滤条件。</param>
+        /// <returns>可进一步链式操作的查询。</returns>
+        IQueryable<T> Find(DynamicFilter filter);
 
         /// <summary>
         /// 统计满足动态过滤条件的实体数量。
@@ -94,18 +98,20 @@ namespace EIMSNext.ApiService
         Task<T?> GetAsync(string id);
 
         /// <summary>
-        /// 异步根据动态查询选项查找实体。
+        /// 异步根据动态查询选项查找实体列表。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
-        /// <returns>异步游标。</returns>
-        Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options);
+        /// <param name="cancellationToken">取消令牌。</param>
+        /// <returns>实体列表。</returns>
+        Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default);
 
         /// <summary>
-        /// 异步根据表达式过滤条件查找实体。
+        /// 异步根据表达式过滤条件查找实体列表。
         /// </summary>
         /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>异步游标。</returns>
-        Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter);
+        /// <param name="cancellationToken">取消令牌。</param>
+        /// <returns>实体列表。</returns>
+        Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 异步统计满足动态过滤条件的实体数量。
@@ -142,31 +148,31 @@ namespace EIMSNext.ApiService
         Task AddAsync(T entity);
 
         /// <summary>
-        /// 异步替换单个实体。
+        /// 异步替换（整行更新）单个实体。
         /// </summary>
         /// <param name="entity">要替换的实体。</param>
-        /// <returns>替换结果。</returns>
-        Task<ReplaceOneResult> ReplaceAsync(T entity);
+        /// <returns>受影响行数。</returns>
+        Task<int> ReplaceAsync(T entity);
 
         /// <summary>
         /// 异步根据主键 ID 删除实体。
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
-        /// <returns>删除结果。</returns>
-        Task<object> DeleteAsync(string id);
+        /// <returns>受影响行数。</returns>
+        Task<int> DeleteAsync(string id);
 
         /// <summary>
         /// 异步根据多个主键 ID 批量删除实体。
         /// </summary>
         /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>删除结果。</returns>
-        Task<object> DeleteAsync(IEnumerable<string> ids);
+        /// <returns>受影响行数。</returns>
+        Task<int> DeleteAsync(IEnumerable<string> ids);
 
         /// <summary>
         /// 异步根据动态过滤条件批量删除实体。
         /// </summary>
         /// <param name="filter">动态过滤条件。</param>
-        /// <returns>删除结果。</returns>
-        Task<object> DeleteAsync(DynamicFilter filter);
+        /// <returns>受影响行数。</returns>
+        Task<int> DeleteAsync(DynamicFilter filter);
     }
 }

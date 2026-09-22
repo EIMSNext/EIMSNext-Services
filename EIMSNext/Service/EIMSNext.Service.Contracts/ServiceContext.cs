@@ -1,11 +1,9 @@
-using EIMSNext.Entities;
+﻿using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 
 using HKH.Mef2.Integration;

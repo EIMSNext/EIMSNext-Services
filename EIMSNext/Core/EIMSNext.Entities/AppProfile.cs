@@ -1,8 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -103,10 +100,12 @@ namespace EIMSNext.Entities
 
         /// <summary>
         /// 发布状态。
-        /// <para>BSON 仍以字符串形式持久化（<c>BsonRepresentation(BsonType.String)</c>），
-        /// 兼容历史数据 <c>"Published"</c>，无需数据迁移。</para>
+        /// <para>
+        /// 迁移说明：原用 <c>[BsonRepresentation(BsonType.String)]</c> 强制以字符串持久化，
+        /// 兼容历史数据 <c>"Published"</c>。EF Core 侧改为在 <c>PostgreSqlDbContext.OnModelCreating</c>
+        /// 中对本属性配置 <c>HasConversion&lt;string&gt;()</c>，同样落字符串列，无需数据迁移。
+        /// </para>
         /// </summary>
-        [BsonRepresentation(BsonType.String)]
         public AppProfileStatus Status { get; set; } = AppProfileStatus.Draft;
 
         /// <summary>

@@ -48,7 +48,11 @@ public sealed class PostgreSqlMaintenanceTests
 
             await File.WriteAllTextAsync(file, initialSql + " -- modified");
             await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => runner.ApplyAsync());
+            // 有意修正历史脚本时可通过 --accept-checksum-change 放行，并同步更新台账校验和。
+            await runner.ApplyAsync(acceptChecksumChange: true);
+            await runner.ApplyAsync(verifyOnly: true);
             await File.WriteAllTextAsync(file, initialSql);
+            await runner.ApplyAsync(acceptChecksumChange: true);
 
             var second = Path.Combine(directory, "002_Fail.sql");
             await File.WriteAllTextAsync(second, "CREATE TABLE rollback_probe (id bigint); SELECT definitely_missing_function();");
@@ -63,6 +67,23 @@ public sealed class PostgreSqlMaintenanceTests
             config["DbMaintenance:AllowDestructiveChanges"] = "true";
             await runner.ApplyAsync();
             await runner.ApplyAsync(verifyOnly: true);
+
+            // --target-version：超出目标的脚本不执行；目标版本不存在时直接报错。
+            var third = Path.Combine(directory, "003_Third.sql");
+            await File.WriteAllTextAsync(third, "CREATE TABLE target_probe (id bigint);");
+            await runner.ApplyAsync(targetVersion: "002_Fail");
+            await using (var check = new NpgsqlCommand($"SELECT to_regclass('{schema}.target_probe') IS NULL", admin))
+                Assert.AreEqual(true, await check.ExecuteScalarAsync());
+            await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => runner.ApplyAsync(targetVersion: "999_Missing"));
+
+            // 003 尚未应用，此时 --verify 必须拒绝：库不是最新状态（有 pending 脚本）。
+            await Assert.ThrowsExactlyAsync<InvalidOperationException>(() => runner.ApplyAsync(verifyOnly: true));
+
+            // 全量应用补齐 003，之后 --verify 才通过。
+            await runner.ApplyAsync();
+            await runner.ApplyAsync(verifyOnly: true);
+            await using (var check = new NpgsqlCommand($"SELECT to_regclass('{schema}.target_probe') IS NOT NULL", admin))
+                Assert.AreEqual(true, await check.ExecuteScalarAsync());
         }
         finally
         {

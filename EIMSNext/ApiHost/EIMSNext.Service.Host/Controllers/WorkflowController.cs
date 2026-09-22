@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -17,7 +15,6 @@ using EIMSNext.Service.Host.Models;
 using EIMSNext.Service.Host.Requests;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 using EIMSNext.Common.Extensions;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -436,11 +433,12 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (resp != null && string.IsNullOrEmpty(resp.Error))
             {
-                Resolver.GetRepository<FormData>().Update(
+                var updateTime = DateTime.UtcNow.ToTimeStampMs();
+                await Resolver.GetRepository<FormData>().UpdateAsync(
                     data.Id,
-                    Builders<FormData>.Update
-                        .Set(x => x.FlowStatus, FlowStatus.Discarded)
-                        .Set(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
+                    setters => setters
+                        .SetProperty(x => x.FlowStatus, FlowStatus.Discarded)
+                        .SetProperty(x => x.UpdateTime, updateTime));
                 return Ok(resp);
             }
 

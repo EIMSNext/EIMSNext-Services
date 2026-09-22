@@ -1,5 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -43,7 +43,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 平台能力的统一定价。
     /// </summary>
-    public class ECoinPrice : MongoEntityBase
+    public class ECoinPrice : KeyedEntityBase
     {
         /// <summary>
         /// 被定价能力的目标类别。

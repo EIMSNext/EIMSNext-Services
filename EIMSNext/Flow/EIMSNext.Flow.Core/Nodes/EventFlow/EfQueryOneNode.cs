@@ -3,10 +3,8 @@ using System.Text.Json;
 using HKH.Mef2.Integration;
 
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Entities;
 
-using MongoDB.Driver;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -22,7 +20,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLog(context, dataContext =>
+            return ExecuteWithLogAsync(context, dataContext =>
             {
                 var querySetting = Metadata!.EfNodeSetting!.QueryOneSetting!;
                 var findOpt = querySetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
@@ -41,8 +39,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     });
                 }
 
-                return ExecutionResult.Next();
-            });
+                return Task.FromResult(ExecutionResult.Next());
+            }).GetAwaiter().GetResult();
         }
     }
 }

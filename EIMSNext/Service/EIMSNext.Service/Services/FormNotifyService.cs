@@ -1,12 +1,11 @@
+﻿using System.Linq.Expressions;
 using EIMSNext.Component;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Core.Services;
@@ -14,8 +13,6 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Driver;
 using System.Text.Json;
 
 namespace EIMSNext.Service
@@ -26,7 +23,7 @@ namespace EIMSNext.Service
 
         private IRepository<FormNotifyScheduleItem> ScheduleRepository => Resolver.GetRepository<FormNotifyScheduleItem>();
 
-        protected override Task BeforeAdd(IEnumerable<FormNotify> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<FormNotify> entities)
         {
             var entity = entities.First();
 
@@ -35,41 +32,42 @@ namespace EIMSNext.Service
             return Task.CompletedTask;
         }
 
-        protected override Task BeforeReplace(FormNotify entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(FormNotify entity)
         {
             PrepareEntity(entity);
 
             return Task.CompletedTask;
         }
 
-        protected override async Task AfterAdd(IEnumerable<FormNotify> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<FormNotify> entities)
         {
             foreach (var entity in entities)
             {
-                await RebuildScheduleAsync(entity, session);
+                await RebuildScheduleAsync(entity);
             }
 
-            await base.AfterAdd(entities, session);
+            await base.AfterAdd(entities);
         }
 
-        protected override async Task AfterReplace(FormNotify entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(FormNotify entity)
         {
-            await RebuildScheduleAsync(entity, session);
-            await base.AfterReplace(entity, session);
+            await RebuildScheduleAsync(entity);
+            await base.AfterReplace(entity);
         }
 
-        protected override Task BeforeDelete(FilterDefinition<FormNotify> filter, IClientSessionHandle? session)
+        protected override async Task BeforeDelete(Expression<Func<FormNotify, bool>> filter)
         {
-            var deletingNotifyIds = Repository.Find(new MongoFindOptions<FormNotify> { Filter = filter }, session)
-                .Project(x => x.Id)
+            var deletingNotifyIds = FindCore(filter)
+                .Select(x => x.Id)
                 .ToList();
 
             if (deletingNotifyIds.Count > 0)
             {
-                return ScheduleRepository.DeleteAsync(ScheduleRepository.FilterBuilder.In(x => x.NotifyId, deletingNotifyIds), session);
+                await ScheduleRepository.DeleteManyAsync(x => deletingNotifyIds.Contains(x.NotifyId));
+                return;
             }
 
-            return base.BeforeDelete(filter, session);
+            await base.BeforeDelete(filter);
         }
 
         private void PrepareEntity(FormNotify entity)
@@ -189,9 +187,9 @@ namespace EIMSNext.Service
             entity.ChangeFields = [];
         }
 
-        private async Task RebuildScheduleAsync(FormNotify entity, IClientSessionHandle? session)
+        private async Task RebuildScheduleAsync(FormNotify entity)
         {
-            await ScheduleRepository.DeleteAsync(ScheduleRepository.FilterBuilder.Eq(x => x.NotifyId, entity.Id), session);
+            await ScheduleRepository.DeleteManyAsync(x => x.NotifyId == entity.Id);
             if (entity.Disabled)
             {
                 return;
@@ -215,7 +213,7 @@ namespace EIMSNext.Service
                     ScheduleVersion = entity.ScheduleVersion,
                     TriggerTime = entity.NextTriggerTime.Value,
                     AnchorTime = entity.StartTime.Value
-                }, session);
+                });
                 return;
             }
 
@@ -225,59 +223,51 @@ namespace EIMSNext.Service
             }
 
             var formDataRepo = Resolver.GetRepository<FormData>();
-            var filter = BuildTimeFieldDataFilter(entity);
             var items = new List<FormNotifyScheduleItem>();
-            var find = session == null
-                ? formDataRepo.Collection.Find(filter)
-                : formDataRepo.Collection.Find(session, filter);
-            using var cursor = await find.ToCursorAsync();
-            while (await cursor.MoveNextAsync())
+            foreach (var data in formDataRepo.Find(BuildTimeFieldDataFilter(entity)))
             {
-                foreach (var data in cursor.Current)
+                var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
+                if (!rawAnchor.HasValue)
                 {
-                    var rawAnchor = FormNotifyRuntime.ExtractTimeFieldValue(data, entity.TimeField!);
-                    if (!rawAnchor.HasValue)
-                    {
-                        continue;
-                    }
+                    continue;
+                }
 
-                    var anchor = FormNotifyRuntime.ResolveAdjustedAnchor(entity, rawAnchor.Value) ?? rawAnchor.Value;
-                    var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchor);
-                    if (!nextTriggerTime.HasValue)
-                    {
-                        continue;
-                    }
+                var anchor = FormNotifyRuntime.ResolveAdjustedAnchor(entity, rawAnchor.Value) ?? rawAnchor.Value;
+                var nextTriggerTime = FormNotifyScheduleCalculator.CalculateNextTriggerTime(entity, anchor);
+                if (!nextTriggerTime.HasValue)
+                {
+                    continue;
+                }
 
-                    items.Add(new FormNotifyScheduleItem
-                    {
-                        NotifyId = entity.Id,
-                        CorpId = entity.CorpId,
-                        AppId = entity.AppId,
-                        FormId = entity.FormId,
-                        TargetType = entity.TargetType,
-                        DataId = data.Id,
-                        TriggerMode = entity.TriggerMode,
-                        ScheduleVersion = entity.ScheduleVersion,
-                        TriggerTime = nextTriggerTime.Value,
-                        AnchorTime = anchor,
-                        TimeField = entity.TimeField
-                    });
+                items.Add(new FormNotifyScheduleItem
+                {
+                    NotifyId = entity.Id,
+                    CorpId = entity.CorpId,
+                    AppId = entity.AppId,
+                    FormId = entity.FormId,
+                    TargetType = entity.TargetType,
+                    DataId = data.Id,
+                    TriggerMode = entity.TriggerMode,
+                    ScheduleVersion = entity.ScheduleVersion,
+                    TriggerTime = nextTriggerTime.Value,
+                    AnchorTime = anchor,
+                    TimeField = entity.TimeField
+                });
 
-                    if (items.Count >= ScheduleInsertBatchSize)
-                    {
-                        await ScheduleRepository.InsertAsync(items, session);
-                        items.Clear();
-                    }
+                if (items.Count >= ScheduleInsertBatchSize)
+                {
+                    await ScheduleRepository.InsertAsync(items);
+                    items.Clear();
                 }
             }
 
             if (items.Count > 0)
             {
-                await ScheduleRepository.InsertAsync(items, session);
+                await ScheduleRepository.InsertAsync(items);
             }
         }
 
-        private FilterDefinition<FormData> BuildTimeFieldDataFilter(FormNotify entity)
+        private static Expression<Func<FormData, bool>> BuildTimeFieldDataFilter(FormNotify entity)
         {
             var filters = new List<DynamicFilter>
             {
@@ -296,7 +286,7 @@ namespace EIMSNext.Service
             }
 
             return new DynamicFilter { Rel = FilterRel.And, Items = filters }
-                .ToFilterDefinition<FormData>();
+                .ToPredicate<FormData>();
         }
 
         private static FieldDef? ResolveTimeFieldDef(FormDef? formDef, string timeField)

@@ -1,13 +1,13 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -26,81 +26,82 @@ namespace EIMSNext.Service
         protected override bool LogicDelete => false;
         protected override bool TransNeeded => false;
 
-        protected override async Task AfterAdd(IEnumerable<WorkbenchRecentVisit> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<WorkbenchRecentVisit> entities)
         {
-            await base.AfterAdd(entities, session);
+            await base.AfterAdd(entities);
             foreach (var employee in entities
                 .Where(x => !string.IsNullOrWhiteSpace(x.EmployeeId))
                 .Select(x => new { x.CorpId, x.EmployeeId })
                 .Distinct())
             {
-                await PruneRecentVisitsAsync(employee.CorpId, employee.EmployeeId, session);
+                await PruneRecentVisitsAsync(employee.CorpId, employee.EmployeeId);
             }
         }
 
-        public async Task<ReplaceOneResult> TouchRecentVisitAsync(WorkbenchRecentVisit entity)
+        /// <summary>
+        /// 更新（或插入后更新）最近访问记录，VisitCount 自增。
+        /// </summary>
+        /// <param name="entity">最近访问实体。</param>
+        /// <returns>受影响行数。</returns>
+        public async Task<int> TouchRecentVisitAsync(WorkbenchRecentVisit entity)
         {
-            using var suppression = MongoTransactionScope.SuppressAmbient();
+            // 与 Mongo 时期一致：该操作自带隐式事务，不参与外层环境事务。
+            using var suppression = TransactionScope.SuppressAmbient();
             var now = DateTime.UtcNow.ToTimeStampMs();
-            IClientSessionHandle? session = null;
-            var filter = Builders<WorkbenchRecentVisit>.Filter.And(
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.Id, entity.Id),
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.CorpId, entity.CorpId),
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.EmployeeId, entity.EmployeeId),
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.DeleteFlag, false));
-            var update = Builders<WorkbenchRecentVisit>.Update.Combine(
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.TargetType, entity.TargetType),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.TargetId, entity.TargetId),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.AppId, entity.AppId),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.Title, entity.Title),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.Icon, entity.Icon),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.IconColor, entity.IconColor),
-                Builders<WorkbenchRecentVisit>.Update.Inc(x => x.VisitCount, 1),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.LastVisitTime, now),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.UpdateBy, Context.Operator),
-                Builders<WorkbenchRecentVisit>.Update.Set(x => x.UpdateTime, now));
-            await BeforeReplace(entity, session);
-            var old = await GetRecentVisitAsync(filter, session);
-            var options = new FindOneAndUpdateOptions<WorkbenchRecentVisit>
+            var op = Context.Operator;
+
+            await BeforeReplace(entity);
+            var old = Repository.Queryable
+                .FirstOrDefault(x => x.Id == entity.Id
+                    && x.CorpId == entity.CorpId
+                    && x.EmployeeId == entity.EmployeeId
+                    && !x.DeleteFlag);
+            if (old is null)
             {
-                ReturnDocument = ReturnDocument.After
-            };
-            var updated = session == null
-                ? await Repository.Collection.FindOneAndUpdateAsync(filter, update, options)
-                : await Repository.Collection.FindOneAndUpdateAsync(session, filter, update, options);
-            if (updated == null)
-            {
-                return new ReplaceOneResult.Acknowledged(0, 0, null);
+                return 0;
             }
 
-            updated.CopyTo(entity);
-            CreateAuditLog(DbAction.Update, old == null ? null : [old], [updated], null, null, session);
-            await AfterReplace(entity, session);
-            await PruneRecentVisitsAsync(entity.CorpId, entity.EmployeeId, session);
-            return new ReplaceOneResult.Acknowledged(1, 1, null);
+            var affected = await Repository.UpdateManyAsync(
+                x => x.Id == entity.Id
+                    && x.CorpId == entity.CorpId
+                    && x.EmployeeId == entity.EmployeeId
+                    && !x.DeleteFlag,
+                setters => setters
+                    .SetProperty(x => x.TargetType, entity.TargetType)
+                    .SetProperty(x => x.TargetId, entity.TargetId)
+                    .SetProperty(x => x.AppId, entity.AppId)
+                    .SetProperty(x => x.Title, entity.Title)
+                    .SetProperty(x => x.Icon, entity.Icon)
+                    .SetProperty(x => x.IconColor, entity.IconColor)
+                    .SetProperty(x => x.VisitCount, x => x.VisitCount + 1)
+                    .SetProperty(x => x.LastVisitTime, now)
+                    .SetProperty(x => x.UpdateBy, op)
+                    .SetProperty(x => x.UpdateTime, now));
+            if (affected == 0)
+            {
+                return 0;
+            }
+
+            // 回读最新状态供审计与后续裁剪使用。
+            var updated = Repository.Queryable.FirstOrDefault(x => x.Id == entity.Id && !x.DeleteFlag);
+            if (updated is not null)
+            {
+                updated.CopyTo(entity);
+            }
+
+            CreateAuditLog(DbAction.Update, old is null ? null : [old], updated is null ? null : [updated]);
+            await AfterReplace(entity);
+            await PruneRecentVisitsAsync(entity.CorpId, entity.EmployeeId);
+            return affected;
         }
 
-        private async Task<WorkbenchRecentVisit?> GetRecentVisitAsync(
-            FilterDefinition<WorkbenchRecentVisit> filter,
-            IClientSessionHandle? session)
+        private async Task PruneRecentVisitsAsync(string? corpId, string employeeId)
         {
-            return session == null
-                ? await Repository.Collection.Find(filter).FirstOrDefaultAsync()
-                : await Repository.Collection.Find(session, filter).FirstOrDefaultAsync();
-        }
-
-        private async Task PruneRecentVisitsAsync(string? corpId, string employeeId, IClientSessionHandle? session)
-        {
-            var filter = Builders<WorkbenchRecentVisit>.Filter.And(
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.CorpId, corpId),
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.EmployeeId, employeeId),
-                Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.DeleteFlag, false));
-            var records = await (session == null
-                ? Repository.Collection.Find(filter)
-                : Repository.Collection.Find(session, filter))
-                .SortByDescending(x => x.LastVisitTime)
+            var records = Repository.Queryable
+                .Where(x => x.CorpId == corpId && x.EmployeeId == employeeId && !x.DeleteFlag)
+                .OrderByDescending(x => x.LastVisitTime)
                 .ThenByDescending(x => x.CreateTime)
-                .ToListAsync();
+                .ToList();
 
             var seenTargets = new HashSet<string>();
             var keptCount = 0;
@@ -119,11 +120,7 @@ namespace EIMSNext.Service
 
             if (idsToDelete.Count > 0)
             {
-                var deleteFilter = Builders<WorkbenchRecentVisit>.Filter.In(x => x.Id, idsToDelete);
-                if (session == null)
-                    await Repository.Collection.DeleteManyAsync(deleteFilter);
-                else
-                    await Repository.Collection.DeleteManyAsync(session, deleteFilter);
+                await Repository.DeleteManyAsync(x => idsToDelete.Contains(x.Id));
             }
         }
     }
