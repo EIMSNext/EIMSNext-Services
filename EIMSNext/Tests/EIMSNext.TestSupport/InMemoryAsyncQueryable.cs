@@ -8,7 +8,7 @@ namespace EIMSNext.TestSupport
     /// </summary>
     /// <remarks>
     /// <para>
-    /// 用途：PostgreSQL/EF Core 迁移后，生产代码里出现了
+    /// 用途：生产代码里出现了
     /// <c>Repository.Queryable.IgnoreQueryFilters().Where(...).ToListAsync()</c> 这类<b>异步 LINQ</b> 写法。
     /// EF Core 的异步算子要求源必须实现 <see cref="IAsyncEnumerable{T}"/>，而
     /// <c>List&lt;T&gt;.AsQueryable()</c>（<c>EnumerableQuery</c>）并不实现，
@@ -26,7 +26,6 @@ namespace EIMSNext.TestSupport
     /// 由本 Provider 编译执行，不会出现「创建查询 → 再编译 → 再创建查询」的递归。
     /// </para>
     /// </remarks>
-    /// <typeparam name="T">元素类型。</typeparam>
     public sealed class InMemoryAsyncQueryable<T> : IQueryable<T>, IAsyncEnumerable<T>, IOrderedQueryable<T>
     {
         private readonly IQueryProvider _provider;
@@ -34,7 +33,6 @@ namespace EIMSNext.TestSupport
         /// <summary>
         /// 初始化 <see cref="InMemoryAsyncQueryable{T}"/> 类的新实例。
         /// </summary>
-        /// <param name="source">内存序列。</param>
         public InMemoryAsyncQueryable(IEnumerable<T> source)
             : this(source.AsQueryable().Expression, new InMemoryAsyncQueryProvider())
         {

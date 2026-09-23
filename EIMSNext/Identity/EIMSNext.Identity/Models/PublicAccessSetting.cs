@@ -2,11 +2,6 @@ namespace EIMSNext.Identity.Models
 {
     /// <summary>
     /// 公开访问设置。
-    /// <para>
-    /// 迁移说明：本类不再是 Mongo 的根文档，原 <c>[BsonId]</c> /
-    /// <c>[BsonRepresentation(BsonType.String)]</c> 两个特性已移除——<see cref="Id"/> 的
-    /// <c>string</c> 契约由 EF Core 的 <c>text</c> 主键直接承载，无需再声明序列化器。
-    /// </para>
     /// </summary>
     public sealed class PublicAccessSetting
     {

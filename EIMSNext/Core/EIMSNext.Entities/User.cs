@@ -60,7 +60,7 @@ namespace EIMSNext.Entities
 
     /// <summary>
     /// 用户与企业的关系（独立表 "UserCorp"），是唯一事实来源。
-    /// 通过 <see cref="UserId"/> 关联所属用户，不再以 jsonb 形式内嵌在 <see cref="User"/> 内。
+    /// 通过 <see cref="UserId"/> 关联所属用户。
     /// 实现 <see cref="IEntityKey"/> 以便经 <c>IRepository&lt;UserCorp&gt;</c> 读写。
     /// </summary>
     public class UserCorp : IEntityKey

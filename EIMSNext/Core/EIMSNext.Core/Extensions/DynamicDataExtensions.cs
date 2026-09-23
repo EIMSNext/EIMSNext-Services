@@ -22,9 +22,6 @@ namespace EIMSNext.Core.Extensions
     public static class DynamicDataExtensions
     {
         /// <summary>存在则更新、不存在则新增。</summary>
-        /// <param name="data">动态字典。</param>
-        /// <param name="key">键。</param>
-        /// <param name="value">值。</param>
         public static void AddOrUpdate(this IDictionary<string, object?> data, string key, object? value)
         {
             if (data.ContainsKey(key))
@@ -34,8 +31,6 @@ namespace EIMSNext.Core.Extensions
         }
 
         /// <summary>按键读取值，不存在返回 <c>null</c>。</summary>
-        /// <param name="data">动态字典。</param>
-        /// <param name="key">键。</param>
         /// <returns>值或 <c>null</c>。</returns>
         public static object? GetValueOrDefault(this IDictionary<string, object?> data, string key)
         {
@@ -43,9 +38,6 @@ namespace EIMSNext.Core.Extensions
         }
 
         /// <summary>按键读取值并强转为 <typeparamref name="T"/>，不存在返回默认值。</summary>
-        /// <typeparam name="T">目标类型。</typeparam>
-        /// <param name="data">动态字典。</param>
-        /// <param name="key">键。</param>
         /// <returns>值或默认值。</returns>
         /// <remarks>保持原有的强转语义：类型不匹配会抛 <see cref="InvalidCastException"/>，便于尽早暴露契约问题。</remarks>
         public static T? GetValueOrDefault<T>(this IDictionary<string, object?> data, string key)
@@ -54,11 +46,6 @@ namespace EIMSNext.Core.Extensions
         }
 
         /// <summary>按键读取值并强转为 <typeparamref name="T"/>，取不到时返回 <paramref name="defaultValue"/>。</summary>
-        /// <typeparam name="T">目标类型。</typeparam>
-        /// <param name="data">动态字典。</param>
-        /// <param name="key">键。</param>
-        /// <param name="defaultValue">兜底值。</param>
-        /// <returns>值或兜底值。</returns>
         /// <remarks>保持原有的强转语义，与 <see cref="GetValueOrDefault{T}"/> 一致。</remarks>
         public static T GetValue<T>(this IDictionary<string, object?> data, string key, T defaultValue)
         {
@@ -68,8 +55,6 @@ namespace EIMSNext.Core.Extensions
         /// <summary>
         /// 读取子表单行集合，统一归一化为 <see cref="List{Dictionary}"/>。
         /// </summary>
-        /// <param name="data">动态字典。</param>
-        /// <param name="field">子表单字段名。</param>
         /// <returns>行集合；字段缺失或为空时返回空列表。</returns>
         /// <remarks>
         /// 兼容内存构造的 <c>List&lt;Dictionary&lt;string, object?&gt;&gt;</c>、
@@ -125,7 +110,6 @@ namespace EIMSNext.Core.Extensions
         /// <summary>
         /// 把动态容器里的任意值当作「行/字典」看待，能还原成字典则返回字典，否则返回 <c>null</c>。
         /// </summary>
-        /// <param name="value">待转换的值。</param>
         /// <returns>字典或 <c>null</c>。</returns>
         /// <remarks>
         /// 覆盖三种来源：CLR 字典（<c>Dictionary</c> / <c>ExpandoObject</c> 等 <c>IDictionary</c> 实现）、
@@ -158,8 +142,6 @@ namespace EIMSNext.Core.Extensions
         }
 
         /// <summary>把动态字典转成脚本引擎的入参（剔除 null 值）。</summary>
-        /// <param name="data">动态字典。</param>
-        /// <returns>脚本入参字典。</returns>
         public static Dictionary<string, object> ToScriptData(this IDictionary<string, object?> data)
         {
             var scriptData = new Dictionary<string, object>();

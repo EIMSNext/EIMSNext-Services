@@ -25,36 +25,6 @@ namespace EIMSNext.Service.Tests
 {
     /// <summary>
     /// <see cref="FormDataImportLogService"/> 状态机测试。
-    /// <para>
-    /// 迁移说明（MongoDB → PostgreSQL/EF Core）：
-    /// <list type="bullet">
-    /// <item><description>
-    /// 原实现把 <c>UpdateDefinition&lt;T&gt;</c> / <c>FilterDefinition&lt;T&gt;</c> 通过
-    /// <c>BsonSerializer</c> 渲染成 <see cref="MongoDB.Bson.BsonDocument"/>，
-    /// 再断言 <c>"$set"</c> / <c>"$inc"</c> 的具体键值，甚至断言
-    /// <c>set["FinishTime"].IsBsonNull</c> 这类 BSON 空值语义。
-    /// 迁移后更新语义由 <see cref="UpdateSettersBuilder{T}"/> 表达，
-    /// 因此改为<b>解析表达式树</b>：EF Core 10 的 <c>ExecuteUpdate</c> 收的是
-    /// <c>Action&lt;UpdateSettersBuilder&lt;T&gt;&gt;</c> 委托，测试把该委托重放到一个
-    /// 新建的 <see cref="UpdateSettersBuilder{T}"/> 上，再用
-    /// <c>BuildSettersExpression()</c> 取回表达式树，逐层剥出 <c>SetProperty</c>
-    /// 调用，得到「属性名 → 值」的映射。
-    /// </description></item>
-    /// <item><description>
-    /// <c>UpdateResult.ModifiedCount</c> 变成 <c>Task&lt;int&gt;</c> 受影响行数，
-    /// 于是 <c>TryMarkProcessingAsync_ReturnsFalseWhenStateNotAcquired</c> 用
-    /// <c>AffectedRows = 0</c> 表达。
-    /// </description></item>
-    /// <item><description>
-    /// <c>LastUpsert</c> 断言被删除：EF Core 的 <c>UpdateAsync(id, setters)</c> 没有
-    /// upsert 参数，语义上恒为「按主键 UPDATE，不插入」。
-    /// </description></item>
-    /// <item><description>
-    /// 原 <c>ClassInitialize</c> 里的 <c>BsonClassMap.TryRegisterClassMap</c> 已无必要——
-    /// 不再有 BSON 序列化参与。
-    /// </description></item>
-    /// </list>
-    /// </para>
     /// </summary>
     [TestClass]
     public class FormDataImportLogServiceStateMachineTests
@@ -275,7 +245,6 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(1, setters.Count, "自增重试次数只应产生一个 SetProperty。");
             Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.RetryCount)));
 
-            // EF Core 的 SetProperty 支持表达式自增，等价于 Mongo 的 $inc。
             // 记录下来的原始值是一个 Lambda（而非常量 1），据此确认语义确实是「读旧值 +1」。
             Assert.IsTrue(repo.LastRawIncrement, $"期望自增表达式，实际为: {repo.LastSetters}");
         }
@@ -339,9 +308,6 @@ namespace EIMSNext.Service.Tests
             return builder.BuildSettersExpression();
         }
 
-        /// <summary>
-        /// 判断 setter 里是否含 <c>x =&gt; x.Prop + N</c> 这类表达式自增，等价于 Mongo 的 <c>$inc</c>。
-        /// </summary>
         private static bool ContainsIncrement<T>(Action<UpdateSettersBuilder<T>> setters)
             => HasAdd(BuildSetters(setters));
 
@@ -467,11 +433,6 @@ namespace EIMSNext.Service.Tests
 
         /// <summary>
         /// 记录型仓储，捕获 EF Core 更新调用的谓词与 setter 表达式树。
-        /// <para>
-        /// 迁移说明：原实现捕获并渲染 <c>UpdateDefinition</c> / <c>FilterDefinition</c>，
-        /// 用 <c>UpdateResult.Acknowledged(1, ModifiedCount, new BsonDocument())</c> 返回结果。
-        /// 现在改为捕获 <see cref="Expression{TDelegate}"/> 并返回 <c>int</c> 受影响行数。
-        /// </para>
         /// </summary>
         private sealed class RecordingRepository<T> : StubRepository<T> where T : class, IEntityKey
         {

@@ -6,11 +6,6 @@ namespace EIMSNext.Core.Tests
 {
     /// <summary>
     /// 仓储读写测试。
-    /// <para>
-    /// 迁移说明：原实现用 <c>Insert(data, session)</c> + <c>Find(...).CountDocuments()</c>
-    /// 这套 Mongo 会话 API；EF Core 下事务由 <c>TransactionScope</c> 隐式承载，仓储调用不再带
-    /// session，计数改用 LINQ <c>Count()</c>。
-    /// </para>
     /// </summary>
     [TestClass]
     public class EntityRepositoryTest : TestBase
@@ -39,7 +34,6 @@ namespace EIMSNext.Core.Tests
 
             _scope?.CommitTransaction();
 
-            // 迁移说明：这里不能把 DateTime.Today.ToTimeStampMs() 直接写进 Where，
             // 那是自定义扩展方法，EF Core 无法翻译（会报 could not be translated）。
             // 先求值成局部变量，表达式里只剩常量比较。
             var cnt = resp.Queryable.Where(x => x.CreateTime > todayStart).Count();

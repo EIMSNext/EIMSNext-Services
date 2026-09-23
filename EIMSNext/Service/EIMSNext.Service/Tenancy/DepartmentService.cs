@@ -77,7 +77,6 @@ namespace EIMSNext.Service
 
             var roots = deletingDepartments.Select(x => x.Id).ToList();
             var corpIds = deletingDepartments.Select(x => x.CorpId).Distinct().ToList();
-            // Mongo 用正则匹配层级路径；EF Core 下改为对每层路径做 Contains（等价于旧的 Regex.Escape($"|{root}|")）。
             var protectedDepartmentIds = Repository.Queryable
                 .Where(x => corpIds.Contains(x.CorpId))
                 .ToList()

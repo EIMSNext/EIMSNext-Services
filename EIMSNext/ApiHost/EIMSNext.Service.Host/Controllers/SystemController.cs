@@ -129,7 +129,7 @@ namespace EIMSNext.Service.Host.Controllers
             if (IdentityContext.CurrentUser is not User user)
                 return Unauthorized();
 
-            // 企业归属由关系表 UserCorp 承载（jsonb 投影 User.Crops 已移除），
+            // 企业归属由关系表 UserCorp 承载，
             // 切换企业即把目标企业设为默认、其余取消默认。
             var userCorpRepo = Resolver.GetRepository<UserCorp>();
             var userCorps = userCorpRepo.Queryable

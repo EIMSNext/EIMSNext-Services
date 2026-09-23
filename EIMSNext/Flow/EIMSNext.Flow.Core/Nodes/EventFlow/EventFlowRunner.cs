@@ -80,7 +80,6 @@ namespace EIMSNext.Flow.Core.Nodes
                 var now = DateTime.UtcNow.ToTimeStampMs();
                 if (transition is null)
                 {
-                    // 原实现用 UpdateMany(..., upsert: true) + SetOnInsert/Set 混合完成「有则更新、无则插入」。
                     // PostgreSQL 下没有等价的 upsert 语义（部分列 SetOnInsert、部分列 Set），
                     // 因此改用「先查后插/改」——外层已在事务内（由 SubmitAsync 打开），
                     // 并发竞态由 ExecutionId 上的唯一约束在提交时兜底。

@@ -101,7 +101,6 @@ namespace EIMSNext.Core.Tests
         /// 回归用例：排序键若走 <c>eims_json_text</c>（返回 text），字典序会把 <c>"10"</c> 排在
         /// <c>"9"</c> 前面，得到 10, 100, 2, 9；现在走 <c>eims_json_sort</c>（返回 jsonb），
         /// 数字按数值序。同时覆盖「字段缺失」的落位：jsonb 的 <c>'null'</c> 是最小一类，
-        /// 升序排最前、降序排最后，与 Mongo 的 null 语义一致。
         /// </remarks>
         [TestMethod]
         public void SortByJsonbNumericFieldTest()

@@ -16,10 +16,6 @@ namespace EIMSNext.Core.Query;
 /// 表达式由 <see cref="DynamicPathAccessor"/> 构造，而依赖方向是 Persistence → Core，
 /// 反向引用会成环。
 /// </para>
-/// <para>
-/// 两个函数都在 JSONPath 的 lax 模式下工作，数组会被自动展开，因此
-/// <c>data.items.name</c> 这类「跨数组」路径与 Mongo 的 <c>items.name</c> 语义一致。
-/// </para>
 /// </remarks>
 public static class PgJsonFunctions
 {
@@ -45,7 +41,6 @@ public static class PgJsonFunctions
     /// <returns>存在满足条件的元素时为 <c>true</c>。</returns>
     /// <remarks>
     /// 映射到 <c>"eims_json_match"(jsonb, text)</c>，底层是 <c>jsonb_path_exists</c>。
-    /// lax 模式下数组自动展开，因此「存在任意一个元素满足」正好对应 Mongo 的数组元素匹配。
     /// </remarks>
     public static bool JsonMatch(object json, string jsonPath)
         => throw new NotSupportedException(
@@ -62,11 +57,6 @@ public static class PgJsonFunctions
     /// 映射到 <c>"eims_json_sort"(jsonb, text)</c>，返回类型在数据库侧是 <c>jsonb</c>。
     /// 声明为 <see cref="string"/> 只是给表达式树一个 CLR 载体——函数调用出现在
     /// <c>ORDER BY</c> 里，不会被投影回客户端，因此不涉及 jsonb → string 的反序列化。
-    /// </para>
-    /// <para>
-    /// 与 <see cref="JsonPath"/> 的区别：那个返回 text，排序会退化成字典序
-    /// （<c>"10" &lt; "9"</c>）；这个返回 jsonb，走 jsonb 的 btree 比较，
-    /// 数字按数值、字符串按排序规则，与 Mongo 一致。
     /// </para>
     /// </remarks>
     public static string? JsonSort(object json, string jsonPath)

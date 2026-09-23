@@ -12,25 +12,12 @@ namespace EIMSNext.Core.Repositories
     /// </summary>
     /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
     /// <remarks>
-    /// <para>
-    /// <b>事务语义</b>：迁移到 PostgreSQL 后不再有 Mongo 的 <c>session</c> 参数。
-    /// 业务层原有的 <c>Repository.XxxAsync(..., session)</c> 调用点改为只调用不带 session
-    /// 的版本，由仓储在写方法内部通过 <see cref="BeginWriteScope"/> 判断是否需要参与事务：
-    /// <list type="bullet">
-        /// <item><description>已处于环境事务中（由 <c>TransactionScope</c> 建立）
-    /// → 只 SaveChanges，不提交，等外层统一提交。</description></item>
-    /// <item><description>不在事务中 → 自建一个短事务，SaveChanges 后立即提交。</description></item>
-    /// </list>
-    /// 这样既保留「多次写入在同一事务内原子提交」的既有行为，又不需要给每个仓储方法
-    /// 再补一套带事务参数的重载。
-    /// </para>
     /// </remarks>
     public class DbRepository<T> : RepositoryBase<T> where T : class, IEntityKey
     {
         /// <summary>
         /// 初始化 <see cref="DbRepository{T}"/> 类的新实例。
         /// </summary>
-        /// <param name="dbContext">数据库上下文。</param>
         public DbRepository(DbContext dbContext)
             : base(dbContext)
         {
@@ -99,11 +86,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 取某动态字段的去重值，供筛选选项下拉使用。
         /// </summary>
-        /// <param name="filter">动态筛选条件。</param>
-        /// <param name="fieldPath">字段路径。</param>
-        /// <param name="limit">最大返回条数，0 表示不限。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>去重后的字段值集合。</returns>
         /// <remarks>
         /// PostgreSQL 下 <c>Data</c> 是 jsonb，无法用 <c>SELECT DISTINCT</c> 直接取内部键，
         /// 因此这里在物化后于内存里去重。调用方（筛选选项）本身就带 limit，
@@ -159,8 +141,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 构造从 <typeparamref name="T"/> 到指定属性值的投影表达式。
         /// </summary>
-        /// <param name="property">属性信息。</param>
-        /// <returns>投影表达式。</returns>
         private static Expression<Func<T, object?>> BuildProjection(System.Reflection.PropertyInfo property)
         {
             var parameter = Expression.Parameter(typeof(T), "x");
@@ -176,10 +156,8 @@ namespace EIMSNext.Core.Repositories
         #region 写入
 
         /// <summary>
-        /// 新增。写入前统一补齐主键，与 Mongo 时期的语义保持一致。
         /// </summary>
         /// <remarks>
-        /// Mongo 驱动会在 <c>InsertOne</c> 时给空的 <c>_id</c> 自动生成 ObjectId，
         /// 因此当时的 <c>Insert</c> 是 <c>InsertCore(EnsureId(entity))</c>；
         /// 换到 PostgreSQL 后主键是普通 <c>text</c> 列，数据库不会代生成，
         /// 少了这一步就会插入 <c>Id = ''</c>，第二条直接撞主键唯一约束
@@ -216,13 +194,10 @@ namespace EIMSNext.Core.Repositories
         }
 
         /// <summary>
-        /// 整体替换。与 Mongo 的 <c>ReplaceOne</c> 对齐：不关心上下文里是否已经有同键实例。
         /// </summary>
         /// <remarks>
         /// EF Core 的 <c>Update</c> 在「另一个同键实例已在跟踪中」时会抛
         /// <c>another instance with the same key value for {'Id'} is already being tracked</c>。
-        /// Mongo 没有变更跟踪，插完再替换是常见写法（同一 <c>DbContext</c> 内先 Insert 后 Replace），
-        /// 因此这里先摘掉旧的跟踪项，保证 Replace 语义与 Mongo 一致。
         /// </remarks>
         public override void Replace(T entity)
         {
@@ -242,7 +217,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 摘掉上下文中同主键的跟踪实例，避免 Update 时触发主键冲突。
         /// </summary>
-        /// <param name="id">主键。</param>
         private void DetachTracked(string id)
         {
             if (string.IsNullOrEmpty(id)) return;
@@ -384,9 +358,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 应用查询选项：过滤 → 排序 → 分页。
         /// </summary>
-        /// <param name="options">查询选项。</param>
-        /// <param name="source">查询源。</param>
-        /// <returns>应用后的查询。</returns>
         private static IQueryable<T> Apply(QueryFindOptions<T> options, IQueryable<T> source)
         {
             var query = options.Filter is null ? source : source.Where(options.Filter);
@@ -403,10 +374,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 执行批量更新。ExecuteUpdate 会直接走数据库，不经过变更跟踪。
         /// </summary>
-        /// <param name="predicate">过滤谓词。</param>
-        /// <param name="setters">字段更新表达式。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>受影响行数。</returns>
         private Task<int> BatchUpdateAsync(
             Expression<Func<T, bool>> predicate,
             Action<UpdateSettersBuilder<T>> setters,
@@ -416,9 +383,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 在写作用域中执行操作（同步版）：已在环境事务中则直接执行，否则开启短事务并在成功后提交。
         /// </summary>
-        /// <typeparam name="TResult">结果类型。</typeparam>
-        /// <param name="operation">操作。</param>
-        /// <returns>操作结果。</returns>
         private TResult InWriteScope<TResult>(Func<TResult> operation)
         {
             if (TransactionScope.IsInTransactionFor(Context))
@@ -435,9 +399,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 在写作用域中执行操作：已在环境事务中则直接执行，否则开启短事务并在成功后提交。
         /// </summary>
-        /// <typeparam name="TResult">结果类型。</typeparam>
-        /// <param name="operation">操作。</param>
-        /// <returns>操作结果。</returns>
         private async Task<TResult> InWriteScopeAsync<TResult>(Func<Task<TResult>> operation)
         {
             if (TransactionScope.IsInTransactionFor(Context))
@@ -469,7 +430,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 异步提交变更：语义同 <see cref="CommitOwnScope"/>。
         /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
         private async Task CommitOwnScopeAsync(CancellationToken cancellationToken)
         {
             if (TransactionScope.IsInTransactionFor(Context))
@@ -496,7 +456,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 新增时若实体处于 Detached 状态需要显式 Add；否则 Update 会因为找不到已有实体而抛错。
         /// </summary>
-        /// <param name="entity">实体。</param>
         private void AttachForWrite(T entity)
         {
             var entry = Context.Entry(entity);

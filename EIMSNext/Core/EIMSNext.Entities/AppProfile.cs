@@ -100,11 +100,6 @@ namespace EIMSNext.Entities
 
         /// <summary>
         /// 发布状态。
-        /// <para>
-        /// 迁移说明：原用 <c>[BsonRepresentation(BsonType.String)]</c> 强制以字符串持久化，
-        /// 兼容历史数据 <c>"Published"</c>。EF Core 侧改为在 <c>PostgreSqlDbContext.OnModelCreating</c>
-        /// 中对本属性配置 <c>HasConversion&lt;string&gt;()</c>，同样落字符串列，无需数据迁移。
-        /// </para>
         /// </summary>
         public AppProfileStatus Status { get; set; } = AppProfileStatus.Draft;
 

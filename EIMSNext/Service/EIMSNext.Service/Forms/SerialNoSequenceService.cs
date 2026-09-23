@@ -44,7 +44,6 @@ namespace EIMSNext.Service
         private int NextCorporateSerialNo(DateTime utcToday)
         {
             // 当日首先生成时把计数器重置为 1，否则自增。
-            // PostgreSQL 用 ON CONFLICT DO UPDATE 复现 Mongo 的 findOneAndUpdate(upsert: true) 语义：
             // 同一语句内完成「不存在则插入、存在则按条件重置或自增」，天然原子。
             const string sql = """
                 insert into "SerialNoSequence" as s
@@ -135,9 +134,6 @@ namespace EIMSNext.Service
         /// <summary>
         /// 在当前 DbContext 连接上执行返回单个整数的计数语句。
         /// </summary>
-        /// <param name="sql">SQL 文本。</param>
-        /// <param name="bind">参数绑定回调。</param>
-        /// <returns>语句返回的计数值。</returns>
         private int ExecuteScalarInt(string sql, Action<NpgsqlCommand> bind)
         {
             using var command = PostgreSqlCommandBuilder.Create(Repository.DbContext, sql);

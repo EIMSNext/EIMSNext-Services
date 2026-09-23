@@ -477,26 +477,8 @@ namespace EIMSNext.Service.Tests
         }
 
         /// <summary>
-        /// 纯内存仓储，语义对齐 PostgreSQL 迁移后的 <see cref="IRepository{T}"/>。
-        /// <para>
-        /// 迁移说明：原实现是 Mongo 版本——依赖 <c>IMongoCollection</c> /
-        /// <c>FilterDefinitionBuilder</c> / <c>UpdateDefinition</c> / <c>IClientSessionHandle</c> /
-        /// <c>IFindFluent</c> / <c>BsonValue</c>，并用 <c>RuntimeHelpers.GetUninitializedObject</c>
-        /// 伪造一个未初始化的 <c>MongoTransactionScope</c> 来充当「无操作事务」。
-        /// 迁移后：
-        /// <list type="bullet">
-        /// <item><description>事务改由 <see cref="EIMSNext.Core.Repositories.TransactionScope"/>
-        /// 的隐式上下文承载，仓储调用不再传 Mongo 会话；本内存仓储不模拟事务，测试也不依赖回滚。</description></item>
-        /// <item><description>整行更新为 <see cref="ReplaceAsync(T, CancellationToken)"/>，
-        /// 受影响行数返回 <c>int</c>。</description></item>
-        /// <item><description>批量删除为 <see cref="DeleteManyAsync(IEnumerable{string}, CancellationToken)"/>。</description></item>
-        /// <item><description><c>UpdateAsync(id, update)</c> 由 <c>UpdateDefinition</c> 改成
-        /// <c>UpdateSettersBuilder</c> 表达式；本测试只用它把 <c>AppProfile.InstallCount</c> 加一，
-        /// 直接改写字段后保存即等价。</description></item>
-        /// </list>
-        /// </para>
+        /// 纯内存仓储，语义对齐 <see cref="IRepository{T}"/>。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
         private sealed class InMemoryRepository<T> : StubRepository<T> where T : class, IEntityKey
         {
             private readonly Dictionary<string, T> _items = new(StringComparer.Ordinal);

@@ -112,7 +112,6 @@ namespace EIMSNext.ApiService
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {
-                // 原 Mongo 为 BsonRegularExpression(..., "i")，PostgreSQL 下等价于 ILIKE。
                 var keyword = DynamicQueryExtensions.EscapeLikePattern(request.UserName);
                 filter = filter.AndAlso(x => EF.Functions.ILike(x.UserName, keyword));
             }

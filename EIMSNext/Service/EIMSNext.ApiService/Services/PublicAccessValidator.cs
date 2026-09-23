@@ -357,8 +357,7 @@ namespace EIMSNext.ApiService
 
             try
             {
-                // item.Details 存的是 JSON 文本（原 Mongo 下按 BsonDocument 解析）。
-                // 迁移到 PostgreSQL 后统一用 System.Text.Json 解析，取值语义保持一致：
+                // 统一用 System.Text.Json 解析，取值语义保持一致：
                 // 仅当 datasource 是对象且存在 id 时才返回。
                 using var doc = System.Text.Json.JsonDocument.Parse(item.Details);
                 if (!doc.RootElement.TryGetProperty("datasource", out var datasource) ||

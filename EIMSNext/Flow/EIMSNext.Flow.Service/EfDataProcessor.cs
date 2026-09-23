@@ -60,9 +60,7 @@ namespace EIMSNext.Flow.Service
             var dataContext = (EfDataContext)inst.Data;
             var executionId = string.IsNullOrWhiteSpace(dataContext.ExecutionId) ? inst.Id : dataContext.ExecutionId;
             var completionKey = BuildNodeCompletionKey(executionId, dataContext.EventFlowId, nodeId);
-            // 迁移说明：原实现把 Mongo 会话显式传入，用于把读取挂到调用方的事务上。
             // EF Core 下事务由 Ambient TransactionScope 隐式承载（同一 DbContext 实例共享连接与事务），
-            // 因此不再需要 session 参数。
             var completion = NodeExecutionRepository.Find(x => x.ExecutionKey == completionKey)
                 .FirstOrDefault();
             if (completion?.Status != EventFlowNodeExecutionStatus.Completed || string.IsNullOrWhiteSpace(completion.ResultSnapshot))
@@ -77,11 +75,6 @@ namespace EIMSNext.Flow.Service
 
         /// <summary>
         /// 执行 EventFlow 节点的写数据动作。
-        /// <para>
-        /// 迁移说明：原实现走 <c>TransactionScope.ExecuteWithRetry</c>（同步版本）并传入 session。
-        /// EF Core 版本只有异步 <see cref="TransactionScope.ExecuteWithRetryAsync(DbContext, Func{Task{TResult}}, int, CancellationToken)"/>，
-        /// 因此整个调用链改为 async；<c>maxRetries: 1</c> 保持不变。
-        /// </para>
         /// </summary>
         public async Task<EfNodeData> ProcessNodeAsync(WorkflowInstance inst, EfNodeData nodeData, string actionType)
         {
@@ -162,11 +155,9 @@ namespace EIMSNext.Flow.Service
                     }
                     else
                     {
-                        // 迁移说明：原实现用 FindOneAndUpdate 一步完成「条件校验 + 续租 + 自增」。
                         // PostgreSQL 的 UPDATE 不能返回整行（ExecuteUpdate 不产出 RETURNING），
                         // 因此拆成「条件 UPDATE 抢锁 → 按受影响行数判定是否抢到 → 抢到后按主键回读」。
-                        // 条件 UPDATE 自带行锁，多个并发执行者只有一个能拿到 affected == 1，语义与
-                        // FindOneAndUpdate 等价；抢不到的一方直接抛异常，与原实现一致。
+                        // 条件 UPDATE 自带行锁，多个并发执行者只有一个能拿到 affected == 1；抢不到的一方直接抛异常。
                         var affected = await NodeExecutionRepository.UpdateManyAsync(
                             x => x.Id == execution.Id
                                 && x.Status == existing.Status
@@ -289,12 +280,6 @@ namespace EIMSNext.Flow.Service
 
         /// <summary>
         /// 判断异常是否为 <c>EventFlowNodeExecution.ExecutionKey</c> 唯一索引冲突。
-        /// <para>
-        /// 迁移说明：Mongo 版本检查 <c>MongoWriteException.WriteError.Category == DuplicateKey</c>
-        /// 且消息里含集合名。PostgreSQL 下唯一约束冲突的 SQLSTATE 是 <c>23505</c>，
-        /// Npgsql 把它包成 <c>PostgresException</c> 再由 EF Core 包成 <see cref="DbUpdateException"/>；
-        /// 这里同时校验 <c>ConstraintName</c> 与集合名，避免把其它唯一索引冲突误判成本节点的重复。
-        /// </para>
         /// </summary>
         private static bool IsExecutionKeyDuplicate(DbUpdateException exception)
         {

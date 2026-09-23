@@ -41,11 +41,8 @@ namespace EIMSNext.Service
         /// <summary>
         /// 更新（或插入后更新）最近访问记录，VisitCount 自增。
         /// </summary>
-        /// <param name="entity">最近访问实体。</param>
-        /// <returns>受影响行数。</returns>
         public async Task<int> TouchRecentVisitAsync(WorkbenchRecentVisit entity)
         {
-            // 与 Mongo 时期一致：该操作自带隐式事务，不参与外层环境事务。
             using var suppression = TransactionScope.SuppressAmbient();
             var now = DateTime.UtcNow.ToTimeStampMs();
             var op = Context.Operator;

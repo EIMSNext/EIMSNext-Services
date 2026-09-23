@@ -9,7 +9,7 @@ namespace EIMSNext.Core.Entities
     /// 持久化实体公共字段。
     /// <para>
     /// 主键由 PostgreSQL/EF Core 的 Fluent API 映射为 <c>text</c> 列；
-    /// <see cref="Id"/> 的 <c>string</c> 契约保持不变（未迁移为整型）。
+    /// <see cref="Id"/> 的 <c>string</c> 契约保持不变。
     /// </para>
     /// </summary>
     public abstract class KeyedEntityBase : IEntityKey

@@ -5,7 +5,6 @@ using System.Text.Json;
 namespace EIMSNext.Core.Repositories
 {
     /// <summary>
-    /// 动态路径取值器。取代 Mongo 时期的 <c>BsonValue</c> 遍历逻辑：
     /// PostgreSQL 下 jsonb 读回来可能是 <see cref="JsonElement"/>、
     /// <see cref="ExpandoObject"/> 或普通 CLR 标量，这里统一按路径取到目标值。
     /// </summary>
@@ -14,8 +13,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 按路径从对象上取值。
         /// </summary>
-        /// <param name="root">根对象。</param>
-        /// <param name="path">路径段集合。</param>
         /// <returns>取到的值；路径不存在时为 null。</returns>
         public static object? Read(object? root, IReadOnlyList<string> path)
         {
@@ -31,10 +28,7 @@ namespace EIMSNext.Core.Repositories
 
         /// <summary>
         /// 展开值为扁平序列：数组展开为多元素，其它值原样返回单元素。
-        /// 对应 Mongo 时期 <c>ExpandOptionValues</c> 对 <c>BsonArray</c> 的处理。
         /// </summary>
-        /// <param name="value">值。</param>
-        /// <returns>扁平化后的值序列。</returns>
         public static IEnumerable<object?> Flatten(object? value)
         {
             switch (value)
@@ -84,8 +78,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 生成用于去重的稳定键。
         /// </summary>
-        /// <param name="value">值。</param>
-        /// <returns>去重键。</returns>
         public static string ToDedupKey(object? value)
         {
             return value switch
@@ -104,8 +96,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 递归降级为 CLR 对象，便于后续统一处理。
         /// </summary>
-        /// <param name="element">JSON 元素。</param>
-        /// <returns>CLR 值。</returns>
         private static object? JsonToClr(JsonElement element)
         {
             switch (element.ValueKind)
@@ -144,9 +134,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 沿单段路径取值。
         /// </summary>
-        /// <param name="current">当前对象。</param>
-        /// <param name="segment">路径段。</param>
-        /// <returns>取到的值。</returns>
         private static object? Step(object? current, string segment)
         {
             switch (current)

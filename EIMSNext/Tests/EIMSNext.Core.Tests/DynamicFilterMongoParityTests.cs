@@ -7,18 +7,6 @@ using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Tests
 {
-    /// <summary>
-    /// DynamicFilter 解析：PostgreSQL 条件 与 Mongo 条件 逻辑一致性验证。
-    /// <para>
-    /// 验证方法：用与「原 Mongo 测试」同构的数据种子化测试库（jsonb 内部键的缺失 / 显式 null /
-    /// 数组 / 空数组 / 标量 null 等边界都覆盖到），对每个运算符分别跑
-    /// (1) 真实 PostgreSQL 路径（<see cref="FormDataRepository"/> + <see cref="DynamicQueryExtensions.ToPredicate{T}"/>）
-    /// (2) 一份内存里忠实复刻的 Mongo 语义参考实现（<see cref="MongoReference"/>，逻辑取自
-    ///     git HEAD 的 <c>Core/EIMSNext.Core/Mongo/Query/DynamicFilterMongoExtensions.cs</c> 之
-    ///     <c>BuildFilter</c>：非系统字段一律前置 <c>Exists(field,true)</c>，系统字段不过滤）。
-    /// 二者返回的行 Id 集合应当一致；不一致即逻辑漂移。
-    /// </para>
-    /// </summary>
     [TestClass]
     public class DynamicFilterMongoParityTests : TestBase
     {
@@ -56,10 +44,6 @@ namespace EIMSNext.Core.Tests
         private static DynamicFilter F(string field, string op, object? value = null, string? type = null)
             => new DynamicFilter { Field = field, Op = op, Value = value, Type = type };
 
-        /// <summary>
-        /// jsonb 内部键（data.x）的全部运算符：PG 与 Mongo 参考实现应逐条一致。
-        /// 这是「原 Mongo 测试」数据的同构版本，重点覆盖缺失键 / 显式 null / 空数组等边界。
-        /// </summary>
         [TestMethod]
         public void JsonbOperators_AreConsistentWithMongo()
         {
@@ -107,16 +91,6 @@ namespace EIMSNext.Core.Tests
                 "jsonb 运算符逻辑不一致（PG vs Mongo）：\n" + string.Join("\n", failures));
         }
 
-        /// <summary>
-        /// 标量列（corpId，可空系统字段）的 ne/nin：验证 PG 与 Mongo 逻辑一致。
-        /// <para>
-        /// 早期曾怀疑此处存在漂移——Mongo 的 <c>$ne</c> / <c>$nin</c> 会命中字段为 NULL 的文档，
-        /// 而朴素 SQL 的 <c>corpId &lt;&gt; 'C1'</c> 对 NULL 求值为 unknown 会把它们排除。
-        /// 实测发现当前 PG 翻译对可空标量列已经采用「NULL 安全」语义（等价于 <c>IS DISTINCT FROM</c>），
-        /// 因此 corpId 为 NULL 的行（R3、R5）在 PG 与 Mongo 下都命中，二者返回集合完全一致。
-        /// 此用例固化这一结论，防止后续有人把标量 ne/nin 改成不安全的 <c>&lt;&gt;</c> 而引入漂移。
-        /// </para>
-        /// </summary>
         [TestMethod]
         public void ScalarNullNeNin_AreConsistentWithMongo()
         {
@@ -145,13 +119,10 @@ namespace EIMSNext.Core.Tests
     }
 
     /// <summary>
-    /// 内存版 Mongo 语义参考实现，逻辑忠实复刻 git HEAD 的
-    /// <c>Core/EIMSNext.Core/Mongo/Query/DynamicFilterMongoExtensions.BuildFilter</c>：
     /// <list type="bullet">
     /// <item><description>非系统字段一律前置 <c>Exists(field,true)</c>（缺失键直接排除）；</description></item>
     /// <item><description>系统字段（id/formId/corpId/createBy/...）不加 Exists，因此 ne/nin 会命中 null；</description></item>
     /// <item><description>empty = <c>Exists(false) OR Eq(null)</c>，即「键缺失 或 值为 null」；</description></item>
-    /// <item><description>保留的 PostgreSQL 操作符按 Mongo 比较语义验证；数组字段使用 PostgreSQL 支持的集合条件。</description></item>
     /// </list>
     /// </summary>
     internal static class MongoReference
@@ -186,7 +157,6 @@ namespace EIMSNext.Core.Tests
             var isSystem = Fields.IsSystemField(field);
             var present = isSystem || exists;
 
-            // Mongo：非系统字段缺失时，除 empty 外所有运算符都被 Exists(field,true) 前置条件挡掉。
             if (!present && op != FilterOp.Empty)
                 return false;
 

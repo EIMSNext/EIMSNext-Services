@@ -101,7 +101,7 @@ namespace EIMSNext.Core.Tests
         private static string InvokeGetChangeDetail(TestEntityService<TestAuditEntity> service, TestAuditEntity oldT, TestAuditEntity newT)
         {
             // GetChangeDetail 是 ServiceCore<T> 上的私有方法，使用 closed generic 类型的 MethodInfo。
-            // 注意：PostgreSQL 迁移期间它由实例方法改成了 static（内部已不依赖任何实例状态），
+            // 注意：该方法为 static（内部已不依赖任何实例状态），
             // 因此这里同时带上 Instance 与 Static 标志，两种形态都能取到。
             var method = typeof(ServiceCore<TestAuditEntity>).GetMethod(
                     "GetChangeDetail", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)

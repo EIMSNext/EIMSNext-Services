@@ -5,9 +5,7 @@ namespace EIMSNext.Entities
 {
     /// <summary>
     /// 员工与员工组的归属关系（独立关系表 "EmployeeGroupMember"）。
-    /// 原来该关系内嵌在 <c>Employee.EmployeeGroups</c> 的 jsonb 数组里；
-    /// 迁移到 PostgreSQL 后提升为独立关系表，是该关系的唯一事实来源
-    /// （jsonb 投影已删除，读写一律走本表）。
+    /// 提升为独立关系表，是该关系的唯一事实来源
     /// </summary>
     public class EmployeeGroupMember : CorpEntityBase
     {

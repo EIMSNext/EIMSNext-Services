@@ -148,19 +148,10 @@ namespace EIMSNext.Async.Tasks.Export
         /// <summary>
         /// 在基础过滤条件上叠加 seek（keyset）分页条件。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="baseFilter">基础过滤谓词。</param>
         /// <param name="lastCreateTime">上一批最后一行的 CreateTime。</param>
-        /// <param name="lastId">上一批最后一行的 Id。</param>
-        /// <returns>叠加后的过滤谓词。</returns>
         /// <remarks>
         /// <para>
-        /// 原实现用 <c>FilterDefinitionBuilder.Or/And/Lt/Eq</c> 构造 Mongo 过滤定义；
-        /// EF Core 只能接受表达式树，因此这里改为用 <see cref="DynamicQueryExtensions.AndAlso{T}"/>
-        /// 组合 <see cref="Expression{TDelegate}"/>。
-        /// </para>
-        /// <para>
-        /// 语义与原实现完全一致：排序键为 <c>(CreateTime desc, Id desc)</c>，seek 条件是
+        /// 排序键为 <c>(CreateTime desc, Id desc)</c>，seek 条件是
         /// <c>CreateTime &lt; lastCreateTime OR (CreateTime == lastCreateTime AND Id &lt; lastId)</c>。
         /// 这是为了在导出大表时避免 <c>OFFSET</c> 逐页扫描——PostgreSQL 的 <c>OFFSET</c>
         /// 需要丢弃前面所有行，深分页会退化成 O(n²)。

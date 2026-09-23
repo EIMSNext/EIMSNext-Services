@@ -20,7 +20,6 @@ namespace EIMSNext.Core.Tests
             opt.ReferenceHandler = ReferenceHandler.IgnoreCycles;
             opt.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
 
-            // 迁移说明：BsonDocumentJsonConverter 随 Mongo 序列化层一并删除，
             // 不再参与 JSON 选项注册。
             opt.Converters.Add(new ExceptionJsonConverter());
             opt.Converters.Add(new FlexibleEnumConverterFactory());

@@ -181,7 +181,6 @@ namespace EIMSNext.Service
 
         public Task IncrementRetryAsync(string id)
         {
-            // EF Core 的 SetProperty 支持表达式自增，等价于 Mongo 的 $inc。
             return Repository.UpdateAsync(
                 id,
                 setters => setters.SetProperty(x => x.RetryCount, x => x.RetryCount + 1));

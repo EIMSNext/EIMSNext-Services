@@ -171,6 +171,29 @@ namespace EIMSNext.Service.Tests
             Assert.ThrowsExactly<BadRequestException>(() => AggregateSqlBuilder.BuildRows(request));
         }
 
+        [TestMethod]
+        public void AggregateRows_IgnoreIncompleteValueCondition()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = "data.status", Op = FilterOp.In, Value = null };
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            Assert.AreEqual(0, statement.Parameters.Count);
+            Assert.IsFalse(statement.Sql.Contains("@p0", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
+        public void AggregateRows_EmptyAllInIsFalse()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = "data.status", Op = FilterOp.AllIn, Value = Array.Empty<string>() };
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "false");
+        }
+
         private static JsonDocument Details(string json) => JsonDocument.Parse(json);
 
         private static AggCalcRequest Request(List<Dimension> dimensions, List<Metric> metrics) => new()

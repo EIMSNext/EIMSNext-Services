@@ -5,8 +5,6 @@ namespace EIMSNext.Core.Query
 {
     /// <summary>
     /// 通用查询选项，包含过滤、排序、分页配置。
-    /// 这是原 <c>MongoFindOptions&lt;T&gt;</c> 的 EF Core 等价物：
-    /// 过滤与排序不再用 Mongo 的字符串定义，而是表达式树 + <see cref="DynamicSortDefinition"/>。
     /// </summary>
     /// <typeparam name="T">实体类型。</typeparam>
     public class QueryFindOptions<T>
@@ -21,7 +19,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 使用过滤谓词初始化 <see cref="QueryFindOptions{T}"/> 类的新实例。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
         public QueryFindOptions(Expression<Func<T, bool>> filter) => Filter = filter;
 
         /// <summary>

@@ -8,12 +8,13 @@ namespace EIMSNext.Core.Tests;
 public sealed class DynamicFilterValidationTests
 {
     [TestMethod]
-    public void NullEqualityValueBuildsNullPredicate()
+    public void NullEqualityValueIsIgnored()
     {
         var filter = new DynamicFilter { Field = "data.name", Op = FilterOp.Eq, Value = null };
 
         var predicate = filter.ToPredicate<FormData>();
         Assert.IsNotNull(predicate);
+        StringAssert.Contains(predicate.ToString(), "True");
     }
 
     [TestMethod]
@@ -29,10 +30,38 @@ public sealed class DynamicFilterValidationTests
     }
 
     [TestMethod]
-    public void MissingOperatorIsRejectedInsteadOfBecomingMatchAll()
+    public void MissingOperatorIsIgnored()
     {
         var filter = new DynamicFilter { Field = "data.name", Value = "x" };
 
-        Assert.ThrowsExactly<BadRequestException>(() => filter.ToPredicate<FormData>());
+        var predicate = filter.ToPredicate<FormData>();
+        StringAssert.Contains(predicate.ToString(), "True");
+    }
+
+    [TestMethod]
+    public void EmptyAllInIsFalse()
+    {
+        var filter = new DynamicFilter { Field = "data.items", Op = FilterOp.AllIn, Value = Array.Empty<string>() };
+
+        var predicate = filter.ToPredicate<FormData>();
+        StringAssert.Contains(predicate.ToString(), "False");
+    }
+
+    [TestMethod]
+    public void InWithoutValueIsIgnored()
+    {
+        var filter = new DynamicFilter { Field = "data.items", Op = FilterOp.In, Value = null };
+
+        var predicate = filter.ToPredicate<FormData>();
+        StringAssert.Contains(predicate.ToString(), "True");
+    }
+
+    [TestMethod]
+    public void BetweenWithOneValueIsIgnored()
+    {
+        var filter = new DynamicFilter { Field = "data.amount", Op = FilterOp.Between, Value = new[] { 10 } };
+
+        var predicate = filter.ToPredicate<FormData>();
+        StringAssert.Contains(predicate.ToString(), "True");
     }
 }

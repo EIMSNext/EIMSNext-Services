@@ -86,7 +86,7 @@ namespace EIMSNext.Service
                 else
                 {
                     // 仅移除指定的字段变更日志条目。EF Core 无法对 jsonb 内嵌集合做服务端 PullFilter，
-                    // 改为加载实体后在内存中过滤再整体替换。
+                    // 加载实体后在内存中过滤再整体替换。
                     var target = Repository.Queryable
                         .FirstOrDefault(x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag);
                     if (target?.Content?.FieldChangeLogs is { Count: > 0 } logs)
@@ -355,7 +355,6 @@ namespace EIMSNext.Service
                 setters => setters.SetProperty(x => x.DeleteFlag, true));
 
             // DashboardItemDef.Details 内嵌引用了表单 ID。
-            // Mongo 时期用不区分大小写的正则匹配；EF Core 下按文本做忽略大小写包含判断。
             var itemRepo = Resolver.GetRepository<DashboardItemDef>();
             var detailsCandidates = itemRepo.Queryable
                 .Where(x => corpIds.Contains(x.CorpId) && !x.DeleteFlag)
@@ -374,8 +373,6 @@ namespace EIMSNext.Service
         /// <summary>
         /// 判断明细内容中是否包含任一表单 ID 引用（忽略大小写）。
         /// </summary>
-        /// <param name="details">明细内容文本。</param>
-        /// <param name="formIds">表单 ID 集合。</param>
         /// <returns>包含任一引用时为 true。</returns>
         private static bool ContainsAnyFormReference(string? details, IReadOnlyCollection<string> formIds)
         {

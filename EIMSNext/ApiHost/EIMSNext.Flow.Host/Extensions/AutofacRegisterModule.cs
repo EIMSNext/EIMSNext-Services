@@ -24,7 +24,6 @@ namespace EIMSNext.Flow.Host.Extensions
 
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
 
-            // 迁移说明：原来这里注册 Mongo 时期的 EIMSDbContext。PostgreSQL 迁移后
             // 数据库上下文由 AutofacRegisterModuleBase 统一注册的 PostgreSqlDbContext 提供
             // （与 File.Host 保持一致），无需在此重复注册。
             builder.RegisterOutboxPublisher();

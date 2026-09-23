@@ -28,8 +28,7 @@ namespace EIMSNext.Service
                 return 0;
             }
 
-            // 员工与员工组的归属由关系表 EmployeeGroupMember 承载（jsonb 投影
-            // Employee.EmployeeGroups 已移除）：先排除已在组内的员工，再补齐缺失的关系行。
+            // 员工与员工组的归属由关系表 EmployeeGroupMember 承载：先排除已在组内的员工，再补齐缺失的关系行。
             var memberRepo = Resolver.GetRepository<EmployeeGroupMember>();
             var joinedEmployeeIds = memberRepo.Queryable
                 .Where(x => idList.Contains(x.EmployeeId)
@@ -223,7 +222,6 @@ namespace EIMSNext.Service
                 throw new NotFoundException("未找到待处理的邀请");
             }
 
-            // Mongo 时期用大小写不敏感的正则做全等匹配（^...$ + Regex.Escape）。
             // 这里用 lower() = lower() 表达同样的语义：ILike 会把值里的 % 与 _ 当成通配符，
             // 邮箱里带下划线时会误命中别的员工，因此不能用 ILike。
             var phoneKey = normalizedPhone?.ToLowerInvariant();
@@ -272,7 +270,7 @@ namespace EIMSNext.Service
         }
 
         /// <summary>
-        /// 把用户与企业的绑定写入关系表 UserCorp（jsonb 投影 User.Crops 已移除）。
+        /// 把用户与企业的绑定写入关系表 UserCorp。
         /// 已绑定该企业时仅在缺少默认企业的情况下补设为默认；否则取消其它默认并新增。
         /// </summary>
         private async Task AppendUserCorpAsync(User user, string corpId)

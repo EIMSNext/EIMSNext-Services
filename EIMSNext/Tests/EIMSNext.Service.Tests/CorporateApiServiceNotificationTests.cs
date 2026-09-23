@@ -165,15 +165,7 @@ public class CorporateApiServiceNotificationTests
 
     /// <summary>
     /// 只读的内存实体服务。
-    /// <para>
-    /// 迁移说明：原实现逐个实现了 Mongo 时代的 <c>IService&lt;T&gt;</c> 成员
-    /// （<c>IMongoCollection</c> / <c>IFindFluent</c> / <c>IAsyncCursor</c> /
-    /// <c>ReplaceOneResult</c> 等）。迁移后 <see cref="IService{T}"/> 已是 EF Core 形态，
-    /// 本测试只用到 <see cref="StubEntityService{T}.GetAsync(string)"/>，
-    /// 因此直接继承共享桩即可。
-    /// </para>
     /// </summary>
-    /// <typeparam name="T">实体类型。</typeparam>
     private class RecordingEntityService<T>(T? item = null) : StubEntityService<T>
         where T : class, EIMSNext.Core.Abstractions.IEntityKey
     {

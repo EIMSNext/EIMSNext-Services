@@ -165,12 +165,6 @@ namespace EIMSNext.Async.Tests
 
             public int MarkFailedCalls { get; private set; }
 
-            /// <summary>
-            /// 迁移说明：原实现暴露 <c>IMongoCollection&lt;FormDataImportLog&gt; Collection</c>
-            /// 且所有查询返回 <c>IFindFluent</c> / <c>IAsyncCursor</c>；<see cref="IService{T}"/>
-            /// 已改为纯 EF Core 形态，这里同步改成 <c>IQueryable&lt;T&gt;</c> / <c>List&lt;T&gt;</c>
-            /// / <c>int</c> 受影响行数，并移除不再存在的 <c>Collection</c> 成员。
-            /// </summary>
             public FormDataImportLog? Get(string id) => ImportLog?.Id == id ? ImportLog : null;
 
             public Task<bool> TryMarkProcessingAsync(string id, int retryCount)

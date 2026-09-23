@@ -8,14 +8,7 @@ using EIMSNext.Core.Services;
 namespace EIMSNext.TestSupport
 {
     /// <summary>
-    /// 最小实体服务桩，实现 PostgreSQL 迁移后的 <see cref="IService{T}"/>。
-    /// <para>
-    /// 迁移说明：Mongo 时代 <c>IService&lt;T&gt;</c> 暴露 <c>IMongoCollection&lt;T&gt; Collection</c>、
-    /// <c>IFindFluent&lt;T,T&gt;</c>、<c>IAsyncCursor&lt;T&gt;</c>、<c>ReplaceOneResult</c> 与
-    /// <c>object</c> 删除结果；迁移后统一为 <see cref="IQueryable{T}"/>、<c>List&lt;T&gt;</c>
-    /// 与 <c>int</c> 受影响行数。本桩提供基于内存列表的默认实现，
-    /// 测试只需覆写真正关心的一两个成员。
-    /// </para>
+    /// 最小实体服务桩，实现 <see cref="IService{T}"/>。
     /// <para>
     /// 所有成员声明为 <c>virtual</c>，便于派生类按需覆写（例如只读的内存假服务）。
     /// </para>

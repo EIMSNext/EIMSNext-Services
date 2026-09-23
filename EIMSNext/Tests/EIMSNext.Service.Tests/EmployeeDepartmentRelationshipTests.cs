@@ -556,10 +556,7 @@ namespace EIMSNext.Service.Tests
         }
 
         /// <summary>
-        /// 迁移说明（MongoDB → PostgreSQL/EF Core）：原 <c>FakeEntityService&lt;T&gt;</c> 逐个实现了
-        /// Mongo 时代的 <c>IService&lt;T&gt;</c> 成员（<c>IMongoCollection</c> / <c>IFindFluent</c> /
-        /// <c>IAsyncCursor</c> / <c>ReplaceOneResult</c>）。迁移后 <see cref="IService{T}"/> 已是 EF Core
-        /// 形态，读路径由共享的 <see cref="StubEntityService{T}"/> 基于内存仓储兜底。
+        /// 读路径由共享的 <see cref="StubEntityService{T}"/> 基于内存仓储兜底。
         /// </summary>
         private class FakeEntityService<T>(InMemoryRepository<T> repository) : StubEntityService<T>, IService<T>
             where T : class, IEntityKey
@@ -580,7 +577,7 @@ namespace EIMSNext.Service.Tests
 
             public override int Replace(T entity)
             {
-                // 迁移：仓储层的 Replace 是「跟踪后提交」，不返回受影响行数；
+                // 仓储层的 Replace 是「跟踪后提交」，不返回受影响行数；
                 // 受影响行数由 Service 层语义决定——内存仓储里按主键是否已存在折算。
                 var affected = repository.Get(entity.Id) is null ? 0 : 1;
                 repository.Replace(entity);
@@ -616,13 +613,6 @@ namespace EIMSNext.Service.Tests
             public override Task<int> DeleteAsync(IEnumerable<string> ids) => repository.DeleteAsync(ids);
         }
 
-        /// <summary>
-        /// 内存仓储。迁移说明：原实现是 Mongo 版本——<c>IMongoCollection</c> /
-        /// <c>FilterDefinitionBuilder</c> / <c>UpdateDefinition</c> / <c>IClientSessionHandle</c> /
-        /// <c>IFindFluent</c> / <c>BsonValue</c>，并用 <c>FindFluentStub</c>/<c>AsyncCursorStub</c>
-        /// 伪造游标语义。迁移后 <see cref="IRepository{T}"/> 完全基于 EF Core，
-        /// 游标与 BSON 相关成员全部消失，这里只需覆写真正被用到的读写路径。
-        /// </summary>
         private sealed class InMemoryRepository<T> : StubRepository<T> where T : class, IEntityKey
         {
             private readonly Dictionary<string, T> _items = new(StringComparer.Ordinal);

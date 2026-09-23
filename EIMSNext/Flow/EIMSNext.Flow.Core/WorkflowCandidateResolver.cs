@@ -355,11 +355,8 @@ namespace EIMSNext.Flow.Core
         /// <summary>
         /// 在给定条件上叠加「非虚拟 + 在职」的通用员工过滤。
         /// </summary>
-        /// <param name="predicate">业务过滤谓词。</param>
-        /// <returns>叠加后的过滤谓词。</returns>
         /// <remarks>
-        /// 原实现是 <c>Builders&lt;Employee&gt;.Filter.And(IsDummy=false, Status=Active, filter)</c>；
-        /// EF Core 下用表达式组合表达，语义一致。
+        /// 用表达式组合表达，语义一致。
         /// </remarks>
         private static Expression<Func<Employee, bool>> BuildActiveEmployeeFilter(Expression<Func<Employee, bool>> predicate)
         {

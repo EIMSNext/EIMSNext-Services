@@ -14,7 +14,6 @@ namespace EIMSNext.Core.Tests
             Assert.AreEqual(200, zero.GetEffectiveTake());
             Assert.AreEqual(200, negative.GetEffectiveTake());
             Assert.AreEqual(25, new DynamicFindOptions<object> { Take = 25 }.GetEffectiveTake());
-            // 迁移说明：MongoFindOptions<T> 已随 Mongo 查询层删除，
             // 其 EF Core 等价物是 QueryFindOptions<T>（同一套 Take 语义）。
             Assert.AreEqual(200, new QueryFindOptions<object> { Take = 0 }.GetEffectiveTake());
         }

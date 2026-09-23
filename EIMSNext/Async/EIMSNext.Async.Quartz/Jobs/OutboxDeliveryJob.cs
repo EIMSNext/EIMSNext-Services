@@ -42,7 +42,6 @@ namespace EIMSNext.Async.Quartz.Jobs
         {
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
-            // Mongo 时期的 FilterDefinition.And(...) + Sort.Ascending(...) + Take 已换成
             // IQueryable 的 Where/OrderBy/Take。查询直接在数据库端翻译为
             // SELECT ... WHERE "Status" = 'Pending' AND "OutAt" <= @now ORDER BY "OutAt" LIMIT 200
             var ready = await _outboxRepo.Queryable

@@ -1,4 +1,4 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Globalization;
 using System.Linq.Expressions;
 using System.Text.Json;
@@ -13,37 +13,17 @@ namespace EIMSNext.Core.Query
     /// 动态筛选 / 排序 / 投影到 EF Core 表达式的转换扩展。
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// 这是 PostgreSQL 迁移中替换 <c>DynamicFilterMongoExtensions</c> 的核心件。
-    /// 原实现依赖 Mongo 可以用字符串字段名直接构造 <c>FilterDefinition&lt;T&gt;</c>；
-    /// EF Core 只能接受表达式树，所以这里把「字段名 + 运算符 + 值」翻译为
-    /// <see cref="Expression{TDelegate}"/>。
-    /// </para>
-    /// <para>
-    /// <b>语义对齐要点：</b>
-    /// <list type="number">
-    /// <item><description><b>不存在的字段</b>：Mongo 中「字段不存在」不匹配任何 eq/gt 条件，
-    /// 只匹配 <c>empty</c>。这里对未知属性直接返回 <c>false</c> 常量，保持同一语义，
-    /// 同时避免抛出异常泄露实体结构。</description></item>
-    /// <item><description><b>jsonb 内部键</b>：<c>Data</c> 是 jsonb，内部键不参与数据库级索引，
-    /// 过滤会退化为扫描，计划第 7 条已注明这是已知代价。</description></item>
-        /// <item><description><b>数组语义</b>：支持的集合条件使用 <c>IEnumerable.Contains</c> 或 jsonb 数组展开表达；
-        /// 未登记的运算符会直接拒绝，避免过滤条件被静默放弃。</description></item>
-    /// </list>
-    /// </para>
     /// </remarks>
     public static class DynamicQueryExtensions
     {
         /// <summary>
         /// 将动态筛选条件转换为 EF Core 过滤表达式。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="filter">动态筛选条件。</param>
         /// <returns>过滤表达式；条件为空时返回 <c>x =&gt; true</c>。</returns>
         public static Expression<Func<T, bool>> ToPredicate<T>(this DynamicFilter? filter)
         {
-            if (filter is null || filter.IsEmpty && !filter.IsGroup &&
-                string.IsNullOrWhiteSpace(filter.Field) && string.IsNullOrWhiteSpace(filter.Op))
+            filter = DynamicFilterRules.Normalize(filter);
+            if (filter is null)
             {
                 return True<T>();
             }
@@ -58,11 +38,8 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 将动态查询选项转换为 EF Core 仓储可消费的查询选项。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="options">动态查询选项。</param>
         /// <returns>等价的 <see cref="QueryFindOptions{T}"/>。</returns>
         /// <remarks>
-        /// 这是 Mongo 时期 <c>IRepository.Find(MongoFindOptions&lt;T&gt;)</c> 的等价入口：
         /// 过滤由 <see cref="ToPredicate{T}"/> 翻译，排序由 <see cref="ToSortDefinition{T}"/> 翻译，
         /// 分页沿用 <see cref="DynamicFindOptions{T}.GetEffectiveSkip"/> /
         /// <see cref="DynamicFindOptions{T}.GetEffectiveTake"/> 的归一化规则（Take &lt;= 0 视为默认 200）。
@@ -82,8 +59,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 将动态排序字段列表转换为排序描述。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="sortList">动态排序字段列表。</param>
         /// <returns>排序定义；列表为空时返回 null。</returns>
         public static DynamicSortDefinition? ToSortDefinition<T>(this DynamicSortList? sortList)
         {
@@ -105,11 +80,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 按动态排序定义对查询排序。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="source">查询源。</param>
-        /// <param name="sort">排序定义。</param>
-        /// <param name="parameter">与 <paramref name="source"/> 无关的公共参数。</param>
-        /// <returns>排序后的查询。</returns>
         public static IQueryable<T> OrderBy<T>(this IQueryable<T> source, DynamicSortDefinition? sort, ParameterExpression? parameter = null)
         {
             if (sort is null || sort.IsEmpty) return source;
@@ -121,7 +91,6 @@ namespace EIMSNext.Core.Query
             {
                 // 排序 lambda 也必须与表达式体共用同一个参数实例，理由同 ToPredicate。
                 // jsonb 内部键（data.xxx）走返回 jsonb 的取值函数：用 eims_json_text 的话
-                // 排序会退化成字典序（"10" 排在 "9" 前面），而 Mongo 是按值类型比较的。
                 Expression body;
                 if (DynamicPathAccessor.TryBuildJsonbSortKey<T>(item.Field, lambdaParameter, out var jsonbKey))
                 {
@@ -133,7 +102,6 @@ namespace EIMSNext.Core.Query
                 }
 
                 // 字段不存在时 BuildBody 返回常量 false，此时跳过该排序项，
-                // 否则会生成 ORDER BY false 这种无意义排序（Mongo 下则是全等排序）。
                 if (body is ConstantExpression { Value: false }) continue;
 
                 var lambda = Expression.Lambda(body, lambdaParameter);
@@ -159,12 +127,6 @@ namespace EIMSNext.Core.Query
             return source;
         }
 
-        /// <summary>
-        /// 格式化排序字段（按字段类型补后缀），与 Mongo 时期行为保持一致。
-        /// </summary>
-        /// <param name="field">字段名。</param>
-        /// <param name="fieldType">字段类型。</param>
-        /// <returns>格式化后的字段名。</returns>
         private static string FormatSortField(string field, string? fieldType)
         {
             if (string.IsNullOrEmpty(fieldType)) return field;
@@ -196,10 +158,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 构建筛选条件的表达式体。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="filter">筛选条件。</param>
-        /// <param name="parameter">lambda 参数。</param>
-        /// <returns>布尔表达式体。</returns>
         private static Expression BuildPredicateBody<T>(DynamicFilter filter, ParameterExpression parameter)
         {
             if (filter.IsGroup)
@@ -237,7 +195,6 @@ namespace EIMSNext.Core.Query
                 fieldPath = FormatTextSearchField(fieldPath, filter.Type);
             }
 
-            // 值的安全校验必须先于「字段是否存在」的短路：否则「字段不存在 + Mongo 操作符注入值」
             // 会在下面那条恒假分支里被直接吞掉，绕过 EnsureSafeValues 的拒绝逻辑。
             var values = NormalizeValues(filter.Value);
             EnsureSafeValues(values);
@@ -251,7 +208,6 @@ namespace EIMSNext.Core.Query
                 return BuildJsonbPredicate(jsonbPath, operation, values);
             }
 
-            // Mongo 时期的 <c>parent&gt;child</c> 元素匹配语法，在 PostgreSQL 下
             // 语义等价于「沿路径进入子表列」，路径拆分已由 PathAccessor 处理。
             // 必须复用外层 lambda 的参数实例，否则 EF Core 会判定为无法翻译的自由变量。
             var (body, staticType) = DynamicPathAccessor.BuildBody<T>(fieldPath, parameter);
@@ -269,27 +225,7 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 构建 jsonb 内部键的过滤谓词。
         /// </summary>
-        /// <param name="jsonb">jsonb 容器与 JSONPath。</param>
-        /// <param name="op">小写运算符。</param>
-        /// <param name="values">归一化后的值集合。</param>
-        /// <returns>布尔表达式体。</returns>
         /// <remarks>
-        /// <para>
-        /// 一律翻译成 <c>jsonb_path_exists(容器, '$."a"."b" ? (谓词)')</c>，而不是「先取值再比较」。
-        /// 原因是 Mongo 的点号路径在遇到数组时表示「任意元素」：<c>a.b &gt; 1</c> 在
-        /// <c>a = [{b:1},{b:2}]</c> 上应当成立。lax 模式的 JSONPath 会把数组展开，
-        /// 谓词落在展开后的每个值上，语义正好对应。
-        /// </para>
-        /// <para>
-        /// 两个刻意的语义选择（与 Mongo 对齐）：
-        /// <list type="bullet">
-        /// <item><description><c>ne</c> / <c>nin</c> 用「否定 eq / in」而不是 <c>@ != 值</c>：
-        /// Mongo 的 <c>$ne</c> 会匹配「字段根本不存在」的文档，而 <c>@ != 值</c> 对空路径序列
-        /// 返回 false，会漏掉这些行。</description></item>
-        /// <item><description><c>empty</c> 用「不存在非 null 的值」表达，覆盖「键缺失」与「键为 null」
-        /// 两种情况，与 Mongo 的 <c>$exists:false</c> / <c>$eq:null</c> 组合一致。</description></item>
-        /// </list>
-        /// </para>
         /// </remarks>
         private static Expression BuildJsonbPredicate(
             DynamicPathAccessor.JsonbPathResolution jsonb,
@@ -325,23 +261,19 @@ namespace EIMSNext.Core.Query
                 case FilterOp.AllIn:
                     // 「所有给定值都必须出现」不能用单个过滤器表达（过滤器是逐元素求值的），
                     // 只能拆成若干个「存在等于该值的元素」再取与。
-                    if (values.Count == 0) return Expression.Constant(true, typeof(bool));
+                    if (values.Count == 0) return Expression.Constant(false, typeof(bool));
                     return values
                         .Select(value => Match($"{path} ? (@ == {ToJsonLiteral(value)})"))
                         .Aggregate(Expression.AndAlso);
 
                 case FilterOp.Ne:
-                    // 对齐 Mongo $ne：非系统字段前置 Exists(field,true)，因此语义为「字段存在且逐元素都不等于 v」。
                     // 不能用 @ != v：lax JSONPath 下 @ 会逐元素求反，把「恰好含有一个等于 v 的元素的数组」也判为命中，
-                    // 与 Mongo「无元素等于 v」语义相反；且对「字段存在但值为 null」的情况 @ != v 会得到 false 而被漏掉。
                     if (values.Count == 0) return Expression.Constant(true, typeof(bool));
                     var neEq = Match($"{path} ? (@ == {ToJsonLiteral(values[0])})");
                     return Expression.AndAlso(Match(path), Expression.Not(neEq));
 
                 case FilterOp.Nin:
-                    // 对齐 Mongo $nin：字段存在且没有任何元素落在给定值集合内。
                     // 必须写成「Exists AND NOT(任一元素 ∈ 集合)」，否则 @ != 集合 会被 lax 模式逐元素求反，
-                    // 把「恰好含有一个集合元素的数组」也判为命中（与 Mongo「无元素等于」语义相反）。
                     if (values.Count == 0) return Expression.Constant(true, typeof(bool));
                     var ninEqualities = string.Join(" || ", values.Select(v => $"@ == {ToJsonLiteral(v)}"));
                     var ninAny = Match($"{path} ? ({ninEqualities})");
@@ -390,8 +322,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 构建 JSONPath 过滤器里的比较表达式文本；不支持的运算符返回 <c>null</c>。
         /// </summary>
-        /// <param name="op">小写运算符。</param>
-        /// <param name="values">归一化后的值集合。</param>
         /// <returns>JSONPath 谓词文本，或 <c>null</c>。</returns>
         private static string? BuildJsonbPredicateBody(string op, List<object> values)
         {
@@ -410,7 +340,6 @@ namespace EIMSNext.Core.Query
                 case FilterOp.Gte:
                     return $"@ >= {literals[0]}";
                 case FilterOp.Lt:
-                    // Mongo 把 null 视为最小，故 < / <= 包含 null 值（与标量分支的 SQL 处理相反，此处为 jsonb 对齐）。
                     return $"@ < {literals[0]} || @ == null";
                 case FilterOp.Lte:
                     return $"@ <= {literals[0]} || @ == null";
@@ -431,21 +360,14 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 把值序列化为可嵌进 JSONPath 的字面量：字符串带引号、数字与布尔按 JSON 写法。
         /// </summary>
-        /// <param name="value">归一化后的值。</param>
-        /// <returns>JSON 字面量文本。</returns>
         private static string ToJsonLiteral(object? value) => JsonSerializer.Serialize(value);
 
         /// <summary>把字符串转义成 JSONPath 里的字符串字面量（含引号）。</summary>
-        /// <param name="value">原始值。</param>
         /// <returns>形如 <c>"abc"</c> 的字面量。</returns>
         private static string ToJsonPathStringLiteral(string value)
             => "\"" + value.Replace("\\", "\\\\").Replace("\"", "\\\"") + "\"";
 
         /// <summary>构建空值过滤表达式。</summary>
-        /// <param name="body">字段访问表达式。</param>
-        /// <param name="staticType">字段静态类型。</param>
-        /// <param name="op">小写运算符。</param>
-        /// <returns>布尔表达式体。</returns>
         private static Expression BuildNullComparison(Expression body, Type staticType, string op)
         {
             if (op is not (FilterOp.Eq or FilterOp.Ne or FilterOp.Nin or FilterOp.Empty or FilterOp.NotEmpty or FilterOp.Exists))
@@ -501,12 +423,6 @@ namespace EIMSNext.Core.Query
         }
 
         /// <summary>构建单个字段的比较表达式。</summary>
-        /// <param name="body">字段访问表达式。</param>
-        /// <param name="staticType">字段静态类型。</param>
-        /// <param name="op">小写运算符。</param>
-        /// <param name="values">归一化后的值集合。</param>
-        /// <param name="elementType">集合元素类型。</param>
-        /// <returns>布尔表达式体。</returns>
         private static Expression BuildComparison(Expression body, Type staticType, string op, List<object> values, Type elementType)
         {
             var isNullable = !body.Type.IsValueType || Nullable.GetUnderlyingType(body.Type) is not null;
@@ -526,7 +442,6 @@ namespace EIMSNext.Core.Query
                         return Expression.Equal(body, Expression.Constant(null, body.Type));
                     }
 
-                    // 非空值类型在数据库中不可能为空，与 Mongo「字段缺失」语义一致：恒不匹配。
                     return Expression.Constant(false, typeof(bool));
 
                 case FilterOp.NotEmpty:
@@ -596,7 +511,6 @@ namespace EIMSNext.Core.Query
 
             if (IsCollectionType(target))
             {
-                // 集合字段的 eq：Mongo 语义为「集合中任意元素等于」，转为 Contains。
                 return BuildContainsCall(body, values[0]);
             }
 
@@ -652,7 +566,6 @@ namespace EIMSNext.Core.Query
             var rightConverted = Convert(right, left.Type);
             var comparisonType = leftConverted.Type;
 
-            // 字符串比较必须显式走 Compare，才能让 EF Core 生成与 Mongo 一致的排序规则比较。
             if (comparisonType == typeof(string))
             {
                 var compare = typeof(string).GetMethod(nameof(string.Compare), [typeof(string), typeof(string)])!;
@@ -764,7 +677,7 @@ namespace EIMSNext.Core.Query
         /// </summary>
         private static Expression BuildAllIn(Expression body, Type staticType, List<object> values)
         {
-            if (values.Count == 0) return Expression.Constant(true, typeof(bool));
+            if (values.Count == 0) return Expression.Constant(false, typeof(bool));
 
             Expression? result = null;
             foreach (var value in values)
@@ -806,9 +719,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 按元素类型构造强类型 <see cref="List{T}"/>，供 EF Core 翻译成 <c>IN (...)</c>。
         /// </summary>
-        /// <param name="values">已归一化的值。</param>
-        /// <param name="elementType">列表元素类型。</param>
-        /// <returns>元素类型正确的列表实例。</returns>
         private static IList BuildTypedList(IEnumerable<object> values, Type elementType)
         {
             var list = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(elementType))!;
@@ -821,7 +731,6 @@ namespace EIMSNext.Core.Query
         }
 
         /// <summary>
-        /// 构建文本搜索比较。Mongo 时期使用带 <c>i</c> 选项的正则；
         /// PostgreSQL 下翻译为 <c>ILike</c> 便于使用 pg_trgm 索引。
         /// </summary>
         private static Expression BuildTextComparison(Expression body, Type staticType, List<object> values)
@@ -911,8 +820,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 归一化过滤值。标量包装为单元素列表，集合展开为多元素列表。
         /// </summary>
-        /// <param name="value">原始值。</param>
-        /// <returns>归一化后的值集合。</returns>
         private static List<object> NormalizeValues(object? value)
         {
             var normalized = DynamicValueNormalizer.Normalize(value);
@@ -930,10 +837,6 @@ namespace EIMSNext.Core.Query
             return [normalized];
         }
 
-        /// <summary>
-        /// 拒绝 Mongo 操作符形态的注入值。
-        /// </summary>
-        /// <param name="values">过滤值集合。</param>
         private static void EnsureSafeValues(IEnumerable<object> values)
         {
             foreach (var value in values)
@@ -1036,12 +939,7 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 以逻辑与组合两个谓词表达式。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="left">左谓词。</param>
-        /// <param name="right">右谓词。</param>
-        /// <returns>组合后的谓词。</returns>
         /// <remarks>
-        /// 这是 Mongo 时期 <c>FilterDefinition &amp; FilterDefinition</c> 的等价物。
         /// 不能直接用 <c>Expression.AndAlso(left.Body, right.Body)</c>，因为两个 lambda 的参数实例不同，
         /// 必须先把右式参数替换为左式参数，否则 EF Core 会因「多个参数」而无法翻译。
         /// </remarks>
@@ -1061,10 +959,6 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 以逻辑或组合两个谓词表达式。
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
-        /// <param name="left">左谓词。</param>
-        /// <param name="right">右谓词。</param>
-        /// <returns>组合后的谓词。</returns>
         public static Expression<Func<T, bool>> OrElse<T>(
             this Expression<Func<T, bool>> left,
             Expression<Func<T, bool>> right)
@@ -1081,10 +975,8 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 把用户输入转义为可安全嵌入 <c>LIKE</c>/<c>ILIKE</c> 模式的关键字。
         /// </summary>
-        /// <param name="keyword">用户输入的原始关键字。</param>
         /// <returns>已转义的 <c>%keyword%</c> 模式。</returns>
         /// <remarks>
-        /// Mongo 的 <c>BsonRegularExpression(pattern, "i")</c> 是**正则**语义，而
         /// <c>ILIKE</c> 是**通配符**语义，两者的元字符集合不同：
         /// <list type="bullet">
         /// <item><description>正则元字符（<c>. * + ? ( ) [ ] { } ^ $ | \</c>）在 LIKE 中是普通字符，

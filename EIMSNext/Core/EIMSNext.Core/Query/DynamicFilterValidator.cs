@@ -55,10 +55,8 @@ public static class DynamicFilterValidator
             return;
         }
 
-        if (string.IsNullOrWhiteSpace(filter.Field))
-            throw new BadRequestException("过滤字段不能为空");
-        if (string.IsNullOrWhiteSpace(filter.Op))
-            throw new BadRequestException("过滤运算符不能为空");
+        if (string.IsNullOrWhiteSpace(filter.Field) || string.IsNullOrWhiteSpace(filter.Op))
+            return;
         if (!SupportedOperators.Contains(filter.Op))
             throw new BadRequestException($"不支持的过滤运算符: {filter.Op}");
     }

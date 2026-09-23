@@ -48,8 +48,6 @@ namespace EIMSNext.File
                 // Uploading files is not transactional with the storage provider. Avoid
                 // wrapping the metadata/audit writes in a multi-statement transaction: the
                 // storage side has already committed by the time we get here, so a rollback
-                // would only orphan files. 迁移说明：Mongo 时代的 session/隐式集合创建
-                // 问题在 PostgreSQL 下不复存在，AddCore 也不再接受 session 参数。
                 AddCore(attachments);
                 return attachments;
             }

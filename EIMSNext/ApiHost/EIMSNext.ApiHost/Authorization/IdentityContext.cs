@@ -158,7 +158,7 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
-                    // 企业归属来自关系表 UserCorp（jsonb 投影 User.Crops 已移除），
+                    // 企业归属来自关系表 UserCorp，
                     // 取到用户后填充到非映射属性 User.UserCorps 供后续身份解析使用。
                     _user.UserCorps = _resolver.GetRepository<UserCorp>().Queryable
                         .Where(x => x.UserId == _user.Id)

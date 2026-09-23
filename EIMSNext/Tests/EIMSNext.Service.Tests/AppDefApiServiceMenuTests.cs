@@ -242,16 +242,7 @@ namespace EIMSNext.Service.Tests
 
         /// <summary>
         /// 内存字典版实体服务。
-        /// <para>
-        /// 迁移说明：原实现逐个实现了 Mongo 时代的 <c>IService&lt;T&gt;</c> 成员
-        /// （<c>IMongoCollection</c> / <c>IFindFluent</c> / <c>IAsyncCursor</c> /
-        /// <c>ReplaceOneResult</c>）、以及全部返回 <c>object</c> 的删除方法。
-        /// 迁移后 <see cref="IService{T}"/> 已是 EF Core 形态，返回值统一为
-        /// <see cref="IQueryable{T}"/> 与 <c>int</c> 受影响行数；本测试只依赖
-        /// 「按 Id 存取」这一语义，因此直接继承共享桩并覆写对应成员。
-        /// </para>
         /// </summary>
-        /// <typeparam name="T">实体类型。</typeparam>
         private class FakeEntityService<T> : StubEntityService<T>
             where T : class, IEntityKey
         {

@@ -6,8 +6,6 @@ namespace EIMSNext.ApiService
     /// 聚合计算 API 服务接口。
     /// </summary>
     /// <remarks>
-    /// PostgreSQL 迁移后本接口不再返回 Mongo 游标：
-    /// <c>IAsyncCursor&lt;BsonDocument&gt;</c> 换为 <see cref="Dictionary{TKey,TValue}"/> 列表，
     /// 聚合由 SQL <c>group by</c> 直接完成。
     /// </remarks>
     public interface IAggregateApiService : IApiService

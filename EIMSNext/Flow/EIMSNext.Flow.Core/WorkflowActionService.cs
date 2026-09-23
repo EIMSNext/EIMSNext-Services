@@ -49,7 +49,6 @@ namespace EIMSNext.Flow.Core
             _departmentRepo = resolver.GetRepository<Department>();
             _workflowHost = resolver.Resolve<IWorkflowHost>();
             _dbContext = resolver.Resolve<IWfDbContext>();
-            // 原 Mongo 时期是 IMongoCollection<WorkflowInstance>；
             // 现在 WorkflowCore 的存储已落在 EF Core 上，直接用 DbSet。
             _workflowInstances = _dbContext.WorkflowInstances;
             _eventSubscriptions = _dbContext.EventSubscriptions;
@@ -458,8 +457,7 @@ namespace EIMSNext.Flow.Core
 
         private IDictionary<string, object?> GetWorkflowInstanceData(string dataId)
         {
-            // 原 Mongo: _workflowCollection.Find(x => x.Reference == dataId).SortByDescending(x => x.CreateTime).FirstOrDefault()
-            // EF Core 下换成 Where + OrderByDescending + FirstOrDefault，翻译为 ORDER BY ... LIMIT 1。
+            // 翻译为 ORDER BY ... LIMIT 1。
             var wfInst = _workflowInstances
                 .Where(x => x.Reference == dataId)
                 .OrderByDescending(x => x.CreateTime)
@@ -745,14 +743,10 @@ namespace EIMSNext.Flow.Core
         }
 
         /// <summary>
-        /// 整行覆盖工作流实例。EF Core 下等价于 Mongo 的 <c>ReplaceOne</c>。
         /// </summary>
-        /// <param name="workflowInstance">工作流实例。</param>
         /// <remarks>
-        /// Mongo 的 <c>ReplaceOne</c> 是「按主键整行 upsert」，这里用
         /// <c>DbSet.Update</c> + <c>SaveChangesAsync</c> 表达：实体已带主键，
         /// EF 会生成 <c>UPDATE ... WHERE "Id" = @id</c>。若实例不存在则会抛
-        /// <c>DbUpdateConcurrencyException</c>，这与 Mongo 的「匹配 0 行」在语义上略有差异，
         /// 但本方法的所有调用者都刚从上下文里取出该实例，实例必然存在。
         /// </remarks>
         private async Task ReplaceWorkflowInstanceAsync(WorkflowInstance workflowInstance)
@@ -779,8 +773,6 @@ namespace EIMSNext.Flow.Core
             wfInst.ExecutionPointers.Add(new ExecutionPointer
             {
                 // ExecutionPointer.Id 是 WorkflowCore 自己用的字符串指针标识，不落业务表主键，
-                // 只要唯一即可。原实现借用了 Mongo 的 ObjectId（24 位十六进制）；
-                // 迁移后改用项目统一的 32 位无连字符 GUID 契约，避免保留 Mongo 依赖。
                 Id = Guid.NewGuid().ToString("N"),
                 StepId = stepId,
                 StepName = targetStep.Name,

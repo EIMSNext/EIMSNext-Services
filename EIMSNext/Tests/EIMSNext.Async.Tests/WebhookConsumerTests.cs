@@ -141,13 +141,6 @@ namespace EIMSNext.Async.Tests
 
         /// <summary>
         /// 内存版 Webhook 仓储。
-        /// <para>
-        /// 迁移说明：原实现逐个实现了 Mongo 时代的 <c>IRepository&lt;T&gt;</c> 成员
-        /// （<c>IMongoCollection</c> / <c>FilterDefinitionBuilder</c> / <c>IClientSessionHandle</c> /
-        /// <c>IFindFluent</c> / <c>BsonValue</c> 等）。PostgreSQL/EF Core 迁移后仓储接口只基于
-        /// EF Core，除 <see cref="Queryable"/> 之外的能力对本测试都无意义，因此改为继承
-        /// <see cref="StubRepository{T}"/> 并只覆写真正被用到的 <see cref="Queryable"/>。
-        /// </para>
         /// </summary>
         private sealed class FakeWebhookRepository(List<Webhook> webhooks)
             : StubRepository<Webhook>

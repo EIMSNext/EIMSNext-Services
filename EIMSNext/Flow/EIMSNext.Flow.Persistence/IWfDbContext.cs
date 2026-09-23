@@ -10,14 +10,7 @@ namespace EIMSNext.Flow.Persistence;
 /// <remarks>
 /// <para>
 /// 这里保留 <see cref="Database"/> 与 <see cref="SaveChangesAsync"/> 等成员，是为了让使用方
-/// 不必依赖具体的 <c>WfDbContext</c> 类型。迁移到 PostgreSQL 后新增了 <see cref="Context"/>：
-/// </para>
-/// <para>
-/// <b>为什么需要 <see cref="Context"/></b>：<c>TransactionScope</c> 与
-/// <c>TransactionScope.ExecuteWithRetryAsync</c> 的入参是 <see cref="DbContext"/>。
-/// 原 Mongo 时期把 <c>IClientSessionHandle</c> 一路透传，现在改由 <see cref="DbContext"/>
-/// 承载事务，因此接口必须能给出这个上下文对象。实现类本就是 <see cref="DbContext"/> 子类
-/// （<c>WfDbContext : DbContext, IWfDbContext</c>），所以这里只是一个类型收窄。
+/// 不必依赖具体的 <c>WfDbContext</c> 类型。新增了 <see cref="Context"/>：
 /// </para>
 /// </remarks>
 public interface IWfDbContext : IAsyncDisposable

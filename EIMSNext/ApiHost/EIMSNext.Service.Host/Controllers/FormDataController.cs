@@ -820,12 +820,6 @@ namespace EIMSNext.Service.Host.Controllers
 
         /// <summary>
         /// 校验表单数据序列化后是否超出单文档上限。
-        /// <para>
-        /// 迁移说明：原实现用 Mongo 驱动的 <c>EntityExtension.ToBson(entity).ToBson().Length</c>
-        /// 取 BSON 字节数，与 MongoDB 16MB 单文档硬限制对齐。PostgreSQL 没有这个硬限制，
-        /// 但 <c>FormData.Data</c> 落 JSONB，过大的单行会让 TOAST/更新代价急剧上升，
-        /// 因此保留同样的 16MB 业务阈值，改用 UTF-8 JSON 字节数度量。
-        /// </para>
         /// </summary>
         private static bool IsFormDataSizeAllowed(FormData entity)
         {

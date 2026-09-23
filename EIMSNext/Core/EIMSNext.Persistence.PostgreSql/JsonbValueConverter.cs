@@ -14,18 +14,6 @@ namespace EIMSNext.Persistence.PostgreSql;
 /// 「复杂对象 / 对象集合 ↔ jsonb 文本」值转换器的工厂。
 /// </summary>
 /// <remarks>
-/// <para>
-/// Mongo 时代这些结构是内嵌数组/文档，迁移到 PostgreSQL 后统一落 jsonb 单列。
-/// EF Core 默认会把 <c>List&lt;复杂类型&gt;</c> 当成关联集合去另建一张表，
-/// 因此每个这样的属性都必须显式挂转换器；<c>List&lt;string&gt;</c> 这类简单集合
-/// 若列类型已声明为 jsonb，同样需要转换器，否则 Npgsql 会按 <c>text[]</c> 发送参数。
-/// </para>
-/// <para>
-/// 序列化用 <see cref="JsonSerializer"/> 默认选项（成员名 PascalCase），
-/// 与 <see cref="ExpandoObjectJsonConverter"/>、<see cref="OperatorJsonConverter"/>
-/// 以及 MongoDB.Bson 时期的字段名保持一致，读写两端互相自洽。
-/// EF Core 对 null 值不调用转换器，可空属性无需额外处理。
-/// </para>
 /// </remarks>
 public static class JsonbValueConverter
 {
@@ -135,7 +123,6 @@ public sealed class DynamicJsonbValueConverter() : ValueConverter<Dictionary<str
 public static class DynamicJsonbReader
 {
     /// <summary>把 jsonb 文本解析为内部值带 CLR 类型的 Dictionary；顶层不是对象时返回 null。</summary>
-    /// <param name="json">jsonb 文本。</param>
     /// <returns>还原后的 Dictionary。</returns>
     public static Dictionary<string, object?>? Parse(string json)
     {

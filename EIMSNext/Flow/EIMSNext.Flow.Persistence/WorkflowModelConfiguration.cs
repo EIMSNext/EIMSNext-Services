@@ -19,9 +19,7 @@ public static class WorkflowModelConfiguration
         workflow.Property(x => x.Id).ValueGeneratedNever();
         Json(workflow.Property(x => x.Data));
 
-        // ExecutionPointer 不再整体存 jsonb 列（旧实现每次 PersistWorkflow 都全量重写整个指针数组，
-        // 写放大随流程长度线性增长），改为拆成独立子表、每指针一行；由 PostgreSqlPersistenceProvider
-        // 负责逐指针的差量同步，这里必须把导航属性从映射中拿掉，避免 EF 按关系约定自动生成外键。
+        // 指针由 PostgreSqlPersistenceProvider 逐指针差量同步，这里必须把导航属性从映射中拿掉，避免 EF 按关系约定自动生成外键。
         workflow.Ignore(x => x.ExecutionPointers);
         workflow.HasIndex(x => new { x.Status, x.NextExecution });
         workflow.HasIndex(x => new { x.Reference, x.Status, x.CreateTime });

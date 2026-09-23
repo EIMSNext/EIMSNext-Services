@@ -24,7 +24,6 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            // 迁移说明：节点内部写执行日志改为异步（IRepository.InsertAsync），
             // 而 WorkflowCore 的 Run 契约是同步的，因此在此处统一同步等待。
             return RunAsync(context).GetAwaiter().GetResult();
         }

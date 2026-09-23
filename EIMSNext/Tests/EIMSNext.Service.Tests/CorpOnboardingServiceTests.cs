@@ -315,10 +315,7 @@ namespace EIMSNext.Service.Tests
         }
 
         /// <summary>
-        /// 内存仓储。迁移说明：原实现是 Mongo 版本——<c>IMongoCollection</c> /
         /// <c>FilterDefinitionBuilder</c> / <c>UpdateDefinition</c> / <c>IClientSessionHandle</c> /
-        /// <c>BsonValue</c>。迁移后 <see cref="IRepository{T}"/> 完全基于 EF Core，
-        /// 会话与 BSON 相关成员全部消失，这里只需覆写真正被用到的读写路径。
         /// </summary>
         private sealed class InMemoryRepository<T> : StubRepository<T> where T : class, IEntityKey
         {

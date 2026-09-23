@@ -22,19 +22,6 @@ namespace EIMSNext.Core.Services
     /// </summary>
     /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
     /// <remarks>
-    /// <para>
-    /// PostgreSQL 迁移要点：
-    /// <list type="number">
-    /// <item><description>原有的 6 个 Mongo 定义构建器（Filter/Sort/Search/Projection/Update）已移除。
-    /// 过滤条件改为表达式树，由 <see cref="IRepository{T}.Find(Expression{Func{T, bool}})"/> 承载；
-    /// 动态条件走 <see cref="IRepository{T}.Find(QueryFindOptions{T})"/>。</description></item>
-    /// <item><description><c>session</c> 参数全部去除。事务由仓储在写方法内部按需借用环境事务
-    /// （见 <c>DbRepository</c>），需要跨多次写入原子提交时由 <see cref="TransactionScope"/>
-    /// 建立外层事务。</description></item>
-    /// <item><description>Mongo 的 <c>ReplaceOneResult</c>/<c>UpdateResult</c>/<c>DeleteResult</c>
-    /// 统一替换为 <see cref="int"/> 受影响行数，语义更直白且不引入驱动类型。</description></item>
-    /// </list>
-    /// </para>
     /// </remarks>
     public abstract class ServiceCore<T> where T : class, IEntityKey
     {
@@ -151,11 +138,6 @@ namespace EIMSNext.Core.Services
         /// 在事务中执行操作，并对瞬态冲突（序列化失败、死锁）自动重试。
         /// 已处于事务中时直接执行，不重复开启。
         /// </summary>
-        /// <typeparam name="TResult">结果类型。</typeparam>
-        /// <param name="operation">操作。</param>
-        /// <param name="maxRetries">最大重试次数。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>操作结果。</returns>
         protected Task<TResult> ExecuteWithTransactionRetryAsync<TResult>(
             Func<Task<TResult>> operation,
             int? maxRetries = null,
@@ -165,9 +147,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 在事务中执行操作（无返回值），并对瞬态冲突自动重试。
         /// </summary>
-        /// <param name="operation">操作。</param>
-        /// <param name="maxRetries">最大重试次数。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         protected Task ExecuteWithTransactionRetryAsync(
             Func<Task> operation,
             int? maxRetries = null,
@@ -177,11 +156,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 记录审计日志。
         /// </summary>
-        /// <param name="action">数据库操作类型。</param>
-        /// <param name="oldData">变更前的实体集合。</param>
-        /// <param name="newData">变更后的实体集合。</param>
-        /// <param name="dataFilter">操作对应的过滤条件描述。</param>
-        /// <param name="update">操作对应的更新描述。</param>
         protected virtual void CreateAuditLog(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
         {
             if (!LogAudit) return;
@@ -256,10 +230,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据更新前后的数据构建更新审计日志。
         /// </summary>
-        /// <param name="oldData">变更前的实体集合。</param>
-        /// <param name="newData">变更后的实体集合。</param>
-        /// <param name="dataFilter">更新对应的过滤条件描述。</param>
-        /// <param name="update">更新描述。</param>
         /// <returns>更新审计日志列表。</returns>
         protected virtual List<AuditLog> CreateUpdateLog(IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
         {
@@ -317,8 +287,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据删除前的数据构建删除审计日志。
         /// </summary>
-        /// <param name="oldData">删除前的实体集合。</param>
-        /// <param name="dataFilter">删除对应的过滤条件描述。</param>
         /// <returns>删除审计日志列表。</returns>
         protected virtual List<AuditLog> CreateDeleteLog(IEnumerable<T>? oldData, string? dataFilter = null)
         {
@@ -396,8 +364,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 按过滤谓词查询实体。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <returns>可继续链式操作的查询。</returns>
         protected virtual IQueryable<T> FindCore(Expression<Func<T, bool>> filter)
         {
             return Repository.Find(filter);
@@ -406,8 +372,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 按动态过滤条件查询实体。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         protected virtual IQueryable<T> FindCore(DynamicFilter filter)
         {
             return Repository.Find(filter);
@@ -416,8 +380,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 按动态查询选项查询实体。
         /// </summary>
-        /// <param name="options">动态查询选项。</param>
-        /// <returns>可继续链式操作的查询。</returns>
         protected virtual IQueryable<T> FindCore(DynamicFindOptions<T> options)
         {
             return Repository.Find(options.ToQueryFindOptions<T>());
@@ -468,8 +430,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 替换单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual int ReplaceCore(T entity)
         {
             var entityId = entity.Id;
@@ -485,9 +445,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 按过滤谓词批量更新实体。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <param name="setters">字段更新表达式。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual int PatchManyCore(
             Expression<Func<T, bool>> filter,
             Action<UpdateSettersBuilder<T>> setters)
@@ -502,8 +459,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据过滤谓词删除实体（支持逻辑删除）。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual int DeleteCore(Expression<Func<T, bool>> filter)
         {
             BeforeDelete(filter).GetAwaiter().GetResult();
@@ -525,8 +480,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据动态过滤条件删除实体（支持逻辑删除）。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual int DeleteCore(DynamicFilter filter)
         {
             var predicate = filter.ToPredicate<T>();
@@ -586,9 +539,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 填充系统字段（实体）。
         /// </summary>
-        /// <param name="entity">要填充的实体。</param>
-        /// <param name="isEdit">是否为编辑操作。</param>
-        /// <returns>填充后的实体。</returns>
         protected virtual T FillSystemField(T entity, bool isEdit)
         {
             return entity;
@@ -612,18 +562,12 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步按过滤谓词查询实体列表。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         protected virtual Task<List<T>> FindCoreAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
             => Repository.FindAsync(filter, cancellationToken);
 
         /// <summary>
         /// 异步按动态查询选项查询实体列表。
         /// </summary>
-        /// <param name="options">动态查询选项。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         protected virtual Task<List<T>> FindCoreAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
             => Repository.FindAsync(options.ToQueryFindOptions<T>(), cancellationToken);
 
@@ -644,8 +588,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步判断是否存在满足表达式过滤条件的实体。
         /// </summary>
-        /// <param name="where">过滤条件表达式。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         protected virtual Task<bool> ExistsCoreAsync(Expression<Func<T, bool>> where, CancellationToken cancellationToken = default)
             => Repository.AnyAsync(where, cancellationToken);
@@ -653,8 +595,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步判断是否存在满足动态过滤条件的实体。
         /// </summary>
-        /// <param name="where">动态过滤条件。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         protected virtual Task<bool> ExistsCoreAsync(DynamicFilter where, CancellationToken cancellationToken = default)
             => Repository.AnyAsync(where, cancellationToken);
@@ -676,8 +616,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步替换单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual async Task<int> ReplaceCoreAsync(T entity)
         {
             var entityId = entity.Id;
@@ -693,9 +631,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步按过滤谓词批量更新实体。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <param name="setters">字段更新表达式。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual async Task<int> PatchManyCoreAsync(
             Expression<Func<T, bool>> filter,
             Action<UpdateSettersBuilder<T>> setters)
@@ -710,8 +645,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据过滤谓词删除实体（支持逻辑删除）。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual async Task<int> DeleteCoreAsync(Expression<Func<T, bool>> filter)
         {
             await BeforeDelete(filter).ConfigureAwait(false);
@@ -733,8 +666,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据动态过滤条件删除实体（支持逻辑删除）。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         protected virtual async Task<int> DeleteCoreAsync(DynamicFilter filter)
         {
             var predicate = filter.ToPredicate<T>();
@@ -773,7 +704,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 替换前的钩子方法，子类可重写。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
         protected virtual Task BeforeReplace(T entity) { return Task.CompletedTask; }
 
         /// <summary>
@@ -785,8 +715,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 更新前的钩子方法，子类可重写。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <param name="setters">字段更新表达式。</param>
         protected virtual Task BeforeUpdate(
             Expression<Func<T, bool>> filter,
             Action<UpdateSettersBuilder<T>> setters) { return Task.CompletedTask; }
@@ -794,8 +722,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 更新后的钩子方法，子类可重写。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
-        /// <param name="setters">字段更新表达式。</param>
         protected virtual Task AfterUpdate(
             Expression<Func<T, bool>> filter,
             Action<UpdateSettersBuilder<T>> setters) { return Task.CompletedTask; }
@@ -803,13 +729,11 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 删除前的钩子方法，子类可重写。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
         protected virtual Task BeforeDelete(Expression<Func<T, bool>> filter) { return Task.CompletedTask; }
 
         /// <summary>
         /// 删除后的钩子方法，子类可重写。
         /// </summary>
-        /// <param name="filter">过滤谓词。</param>
         protected virtual Task AfterDelete(Expression<Func<T, bool>> filter) { return Task.CompletedTask; }
 
         #endregion

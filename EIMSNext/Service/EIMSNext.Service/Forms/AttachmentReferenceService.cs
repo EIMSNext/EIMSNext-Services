@@ -48,11 +48,8 @@ namespace EIMSNext.Service
 
         /// <summary>
         /// 按引用计数增量同步 <see cref="UploadedFile.RefCount"/>。
-        /// Mongo 时期靠服务端 $inc 保证原子性；EF Core 下改为「条件 UPDATE + 回退钳制」两步：
         /// 先尝试带下界守卫的原子自减，未命中说明会减成负数，再单独把计数钳到 0。
         /// </summary>
-        /// <param name="oldCounts">变更前的引用计数。</param>
-        /// <param name="newCounts">变更后的引用计数。</param>
         private void ApplyDelta(IReadOnlyDictionary<string, int> oldCounts, IReadOnlyDictionary<string, int> newCounts)
         {
             foreach (var id in oldCounts.Keys.Concat(newCounts.Keys).Distinct(StringComparer.OrdinalIgnoreCase))

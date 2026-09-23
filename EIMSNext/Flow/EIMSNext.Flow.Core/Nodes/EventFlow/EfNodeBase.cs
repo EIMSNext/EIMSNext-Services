@@ -43,10 +43,6 @@ namespace EIMSNext.Flow.Core.Nodes
 
         /// <summary>
         /// 带执行日志的节点执行包装（异步）。
-        /// <para>
-        /// 迁移说明：PostgreSQL 迁移后 EventFlow 节点的写数据路径（<see cref="Interfaces.IEfDataProcessor.ProcessNodeAsync"/>）
-        /// 只能异步调用，因此本包装器同步版本改为异步版本，执行日志的写入也随之 await。
-        /// </para>
         /// </summary>
         protected async Task<ExecutionResult> ExecuteWithLogAsync(IStepExecutionContext context, Func<EfDataContext, Task<ExecutionResult>> action, string successSummary = "执行成功")
         {
@@ -129,12 +125,10 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 取一份带 <c>createBy</c> 的数据副本供脚本使用。
         /// </summary>
-        /// <param name="formData">表单数据。</param>
-        /// <returns>数据副本。</returns>
         /// <remarks>
         /// 原先直接对 <see cref="FormData.Data"/> 做 <c>TryAdd("createBy", …)</c>，
         /// 把审计对象写进了业务数据字典：它会随 Data 序列化进 jsonb，还会改动被 EF 跟踪的实体。
-        /// 改为在副本上补充，脚本表达式照旧可以引用 createBy。
+        /// 在副本上补充，脚本表达式照旧可以引用 createBy。
         /// </remarks>
         private static Dictionary<string, object?> WithCreateBy(FormData formData)
         {
@@ -145,10 +139,6 @@ namespace EIMSNext.Flow.Core.Nodes
 
         /// <summary>
         /// 写入节点执行日志（异步）。
-        /// <para>
-        /// 迁移说明：<c>IRepository&lt;T&gt;.Insert</c> 已改为异步契约，日志写入用 <c>InsertAsync</c>；
-        /// 与同步版本一致，写日志失败不影响整个数据流程。
-        /// </para>
         /// </summary>
         protected async Task CreateExecLogAsync(
             WorkflowInstance wfInst,

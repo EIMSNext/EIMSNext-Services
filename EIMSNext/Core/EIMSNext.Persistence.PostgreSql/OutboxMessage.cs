@@ -5,7 +5,6 @@ namespace EIMSNext.Persistence.PostgreSql.Outbox;
 /// <summary>
 /// 发件箱消息。Id 为字符串契约（不使用数据库自增），因此仍继承
 /// <see cref="KeyedEntityBase"/> 以获得统一的 Id 定义；该基类只提供 Id 属性，
-/// 不引入任何 MongoDB 依赖。
 /// </summary>
 public sealed class OutboxMessage : KeyedEntityBase
 {

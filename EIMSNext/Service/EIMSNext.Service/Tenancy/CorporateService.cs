@@ -101,7 +101,7 @@ namespace EIMSNext.Service
             emp.UpdateBy = emp.CreateBy;
             emp.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
 
-            // 用户与企业的绑定由关系表 UserCorp 承载（jsonb 投影 User.Crops 已移除），
+            // 用户与企业的绑定由关系表 UserCorp 承载，
             // 绑定时必须显式写入 UserId。
             var userCorpRepo = Resolver.GetRepository<UserCorp>();
             var userCorps = userCorpRepo.Queryable

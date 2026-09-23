@@ -30,8 +30,6 @@ namespace EIMSNext.Json.Serialization
     public static class DynamicValueReader
     {
         /// <summary>读取当前 token 所代表的值；reader 需已定位到该值的起始 token。</summary>
-        /// <param name="reader">JSON 读取器。</param>
-        /// <returns>还原后的 CLR 值。</returns>
         public static object? ReadValue(ref Utf8JsonReader reader)
         {
             switch (reader.TokenType)
@@ -54,8 +52,6 @@ namespace EIMSNext.Json.Serialization
         }
 
         /// <summary>读取一个对象；reader 需已定位到 <see cref="JsonTokenType.StartObject"/>，返回时已消费 EndObject。</summary>
-        /// <param name="reader">JSON 读取器。</param>
-        /// <returns>还原后的字典。</returns>
         public static Dictionary<string, object?> ReadObject(ref Utf8JsonReader reader)
         {
             var dictionary = new Dictionary<string, object?>();
@@ -76,8 +72,6 @@ namespace EIMSNext.Json.Serialization
         }
 
         /// <summary>从 <see cref="JsonElement"/> 还原值（文档式入口，与流式入口等价）。</summary>
-        /// <param name="element">JSON 元素。</param>
-        /// <returns>还原后的 CLR 值。</returns>
         public static object? FromJsonElement(JsonElement element)
         {
             switch (element.ValueKind)
@@ -101,7 +95,6 @@ namespace EIMSNext.Json.Serialization
 
         /// <summary>从 <see cref="JsonElement"/> 还原对象（文档式入口）。</summary>
         /// <param name="element">处于 Object 值的 JSON 元素。</param>
-        /// <returns>还原后的字典。</returns>
         public static Dictionary<string, object?> ToDictionary(JsonElement element)
         {
             var dictionary = new Dictionary<string, object?>();
@@ -115,7 +108,6 @@ namespace EIMSNext.Json.Serialization
 
         /// <summary>把任意数值归一化为动态字段的统一表示：整数→long、小数→decimal、溢出→double。</summary>
         /// <param name="value">待归一化的值；非数值原样返回。</param>
-        /// <returns>归一化后的值。</returns>
         /// <remarks>
         /// 供非 JSON 来源的数值使用（Excel 导入的 <see cref="double"/> 单元格值、各宽度整型等）。
         /// 它们最终会落进 FormData.Data，必须与 JSON 还原路径的类型一致，否则变更日志会误判。
@@ -140,7 +132,6 @@ namespace EIMSNext.Json.Serialization
         }
 
         /// <summary>把 <see cref="double"/> 归一化为 long / decimal / double。</summary>
-        /// <param name="value">双精度值。</param>
         /// <returns>整数值→<see cref="long"/>；可表示的小数→<see cref="decimal"/>；超出范围→原值。</returns>
         public static object NormalizeNumber(double value)
         {

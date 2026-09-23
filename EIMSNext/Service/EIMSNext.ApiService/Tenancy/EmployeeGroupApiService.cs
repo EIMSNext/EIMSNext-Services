@@ -172,7 +172,7 @@ namespace EIMSNext.ApiService
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组的权限");
 
             var employeeGroupIds = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            // 引用检查改看关系表 EmployeeGroupMember（jsonb 投影 Employee.EmployeeGroups 已移除）。
+            // 引用检查看关系表 EmployeeGroupMember。
             var referenced = Resolver.GetRepository<EmployeeGroupMember>().Queryable
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
                 .Any(x => employeeGroupIds.Contains(x.EmployeeGroupId));

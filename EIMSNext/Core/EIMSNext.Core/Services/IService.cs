@@ -11,12 +11,8 @@ namespace EIMSNext.Core.Services
     /// </summary>
     /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
     /// <remarks>
-    /// PostgreSQL 迁移后本接口不再暴露 Mongo 驱动类型：
     /// <list type="bullet">
-    /// <item><description><c>IMongoCollection&lt;T&gt; Collection</c> 已移除——业务代码不应直接操作集合，
     /// 需要时用 <see cref="All"/> / <see cref="Query"/> 拿 <see cref="IQueryable{T}"/>。</description></item>
-    /// <item><description><c>IFindFluent&lt;T,T&gt;</c>/<c>IAsyncCursor&lt;T&gt;</c> 替换为
-    /// <see cref="IQueryable{T}"/> 与 <c>Task&lt;List&lt;T&gt;&gt;</c>。</description></item>
     /// <item><description><c>ReplaceOneResult</c> 与 <c>object</c> 删除结果统一为受影响行数 <see cref="int"/>。</description></item>
     /// </list>
     /// </remarks>
@@ -48,28 +44,22 @@ namespace EIMSNext.Core.Services
         /// 根据动态查询选项查找实体。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         IQueryable<T> Find(DynamicFindOptions<T> options);
 
         /// <summary>
         /// 根据表达式过滤条件查找实体。
         /// </summary>
         /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         IQueryable<T> Find(Expression<Func<T, bool>> filter);
 
         /// <summary>
         /// 根据动态过滤条件查找实体。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         IQueryable<T> Find(DynamicFilter filter);
 
         /// <summary>
         /// 根据动态筛选条件查找实体列表。
         /// </summary>
-        /// <param name="filter">动态筛选条件。</param>
-        /// <returns>实体列表。</returns>
         List<T> FindList(DynamicFilter filter);
 
         /// <summary>
@@ -115,29 +105,24 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 替换（整行更新）单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         int Replace(T entity);
 
         /// <summary>
         /// 根据主键 ID 删除实体。
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
-        /// <returns>受影响行数。</returns>
         int Delete(string id);
 
         /// <summary>
         /// 根据多个主键 ID 批量删除实体。
         /// </summary>
         /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>受影响行数。</returns>
         int Delete(IEnumerable<string> ids);
 
         /// <summary>
         /// 根据动态过滤条件批量删除实体。
         /// </summary>
         /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         int Delete(DynamicFilter filter);
 
         #endregion
@@ -154,25 +139,16 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据动态查询选项查找实体列表。
         /// </summary>
-        /// <param name="options">动态查询选项。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 异步根据表达式过滤条件查找实体列表。
         /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// 异步根据动态筛选条件查找实体列表。
         /// </summary>
-        /// <param name="filter">动态筛选条件。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
 
         /// <summary>
@@ -218,29 +194,24 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步替换（整行更新）单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         Task<int> ReplaceAsync(T entity);
 
         /// <summary>
         /// 异步根据主键 ID 删除实体。
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
-        /// <returns>受影响行数。</returns>
         Task<int> DeleteAsync(string id);
 
         /// <summary>
         /// 异步根据多个主键 ID 批量删除实体。
         /// </summary>
         /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>受影响行数。</returns>
         Task<int> DeleteAsync(IEnumerable<string> ids);
 
         /// <summary>
         /// 异步根据动态过滤条件批量删除实体。
         /// </summary>
         /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         Task<int> DeleteAsync(DynamicFilter filter);
 
         #endregion

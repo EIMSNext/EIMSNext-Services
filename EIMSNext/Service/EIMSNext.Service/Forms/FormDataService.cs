@@ -961,11 +961,8 @@ namespace EIMSNext.Service
         /// 展开选项值。PostgreSQL 下 <c>Data</c> 是 jsonb，读回来是
         /// <c>JsonElement</c> / <c>ExpandoObject</c> / 标量三类，这里统一处理。
         /// </summary>
-        /// <param name="value">原始值。</param>
-        /// <returns>选项条目序列。</returns>
         private static IEnumerable<FilterOptionItem> ExpandOptionValues(object? value)
         {
-            // 对齐 Bson 版对 BsonNull 的优雅跳过：jsonb 数组/序列里可能含 C# null 元素，
             // 直接落到方法末尾 value.ToString() 会抛 NRE。
             if (value is null) yield break;
 

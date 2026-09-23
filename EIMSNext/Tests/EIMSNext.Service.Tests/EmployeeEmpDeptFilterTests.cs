@@ -6,13 +6,6 @@ namespace EIMSNext.Service.Tests
 {
     /// <summary>
     /// 员工按部门过滤的关系表语义。
-    /// <para>
-    /// Mongo 时期过滤的是 <c>Employee.Depts</c> 这个 jsonb 内嵌数组；迁移到 PostgreSQL 后
-    /// 该投影已删除，过滤改走关系表 <c>EmployeeDepartment</c> 的层级路径快照
-    /// <c>HeriarchyId</c>（创建归属关系时从部门写入，部门层级变动时由 DepartmentService 同步），
-    /// 级联按部门查员工不再需要 EmployeeDepartment → Department 的导航/联表。
-    /// 这里用内存 LINQ 守住语义，真实 SQL 翻译由 OData 集成路径覆盖。
-    /// </para>
     /// </summary>
     [TestClass]
     public class EmployeeEmpDeptFilterTests

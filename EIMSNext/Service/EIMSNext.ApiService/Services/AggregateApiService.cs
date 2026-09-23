@@ -21,8 +21,6 @@ namespace EIMSNext.ApiService
     /// 聚合的 API 服务。
     /// </summary>
     /// <remarks>
-        /// PostgreSQL 迁移后本服务不再使用 Mongo 聚合管道：
-    /// <c>PipelineBuilder</c> 生成的 <c>$match/$group/$project/$sort</c> 阶段改为等价 SQL，
         /// 由 PostgreSQL 命令执行器在 <c>"FormData"</c> 表上执行（jsonb 字段用 <c>-&gt;&gt;</c> 取值）。
     /// </remarks>
     public class AggregateApiService : ApiServiceBase, IAggregateApiService
@@ -85,10 +83,6 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 在 "FormData" 表上执行聚合 SQL。
         /// </summary>
-        /// <param name="statement">聚合 SQL 与其参数。</param>
-        /// <param name="corpId">企业 ID，作为 SQL 中的显式过滤条件。</param>
-        /// <param name="formId">表单 ID，用于恢复明细数据标题。</param>
-        /// <returns>结果行集合。</returns>
         private async Task<List<Dictionary<string, object?>>> ExecuteAsync(
             AggregateSqlBuilder.SqlStatement statement,
             string corpId,
@@ -167,7 +161,7 @@ namespace EIMSNext.ApiService
 
         private static void NormalizeJsonObject(Dictionary<string, object?> row, string name)
         {
-            if (row[name] is not string json || string.IsNullOrWhiteSpace(json)) return;
+            if (!row.TryGetValue(name, out var raw) || raw is not string json || string.IsNullOrWhiteSpace(json)) return;
             try
             {
                 row[name] = JsonSerializer.Deserialize<Operator>(json);
@@ -181,10 +175,6 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 创建绑定到当前 DbContext 连接的 PostgreSQL 命令。
         /// </summary>
-        /// <param name="sql">SQL 文本。</param>
-        /// <param name="corpId">企业 ID，作为 SQL 中的显式过滤条件。</param>
-        /// <param name="parameters">额外的位置参数。</param>
-        /// <returns>已配置好的命令。</returns>
         private DbCommand CreateCommand(string sql, string corpId, IReadOnlyList<object?>? parameters = null)
         {
             var dbContext = Resolver.GetRepository<FormData>().DbContext;
@@ -854,7 +844,6 @@ namespace EIMSNext.ApiService
     /// 把聚合请求编译为 PostgreSQL 语句。
     /// </summary>
     /// <remarks>
-    /// 取代 Mongo 时期的 <c>PipelineBuilder</c>：
     /// <c>$match</c> → <c>where</c>、<c>$group</c> → <c>group by</c>、
     /// <c>$project</c> → <c>select</c> 列表、<c>$sort</c> → <c>order by</c>、
     /// <c>$skip/$limit</c> → <c>offset/fetch</c>。
@@ -872,8 +861,6 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 生成明细行查询（含聚合度量时为 group by 结果集，否则为投影明细）。
         /// </summary>
-        /// <param name="request">聚合请求。</param>
-        /// <returns>可执行的 SQL 语句。</returns>
         public static SqlStatement BuildRows(AggCalcRequest request)
         {
             var parameters = new List<object?>();
@@ -931,9 +918,6 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 生成计数语句。
         /// </summary>
-        /// <param name="request">聚合请求。</param>
-        /// <param name="extraFilter">额外的数据权限过滤条件。</param>
-        /// <returns>SQL 语句与参数。</returns>
         public static SqlStatement BuildCount(AggCalcRequest request, DynamicFilter? extraFilter)
         {
             var parameters = new List<object?>();
@@ -945,11 +929,10 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 生成 where 子句。企业隔离与软删除条件始终注入。
         /// </summary>
-        /// <param name="filter">业务过滤条件。</param>
-        /// <param name="parameters">参数收集器，条件值按顺序追加。</param>
         /// <returns>where 子句正文（不含关键字）。</returns>
         private static string BuildWhere(DynamicFilter? filter, List<object?> parameters)
         {
+            filter = DynamicFilterRules.Normalize(filter);
             DynamicFilterValidator.Validate(filter);
             var clauses = new List<string>
             {
@@ -970,8 +953,6 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 递归把动态过滤条件编译为 SQL 谓词。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <param name="parameters">参数收集器。</param>
         /// <returns>SQL 谓词；无法编译时退化为 true。</returns>
         private static string BuildFilterBody(DynamicFilter? filter, List<object?> parameters)
         {
@@ -1071,7 +1052,7 @@ namespace EIMSNext.ApiService
                         : $"{column} = any({Add(values.Select(ToSqlText).ToList())})";
                 case FilterOp.AllIn:
                     return values.Count == 0
-                        ? "true"
+                        ? "false"
                         : string.Join(" and ", values.Select(value => $"exists (select 1 from jsonb_array_elements_text({JsonArrayExpression(filter.Field)}) as elem where elem = {Add(ToSqlText(value))})"));
                 case FilterOp.Nin:
                     if (IsDynamicField(filter.Field))
@@ -1135,7 +1116,6 @@ namespace EIMSNext.ApiService
             foreach (var rule in sort)
             {
                 if (string.IsNullOrEmpty(rule.Id)) continue;
-                // rule.Dir 沿用 Mongo 约定（1 升序 / -1 降序）。
                 var direction = rule.Dir < 0 ? "desc" : "asc";
                 var metricAlias = (request.Metrics ?? [])
                     .Where(metric => !string.IsNullOrWhiteSpace(metric.Id) && !string.IsNullOrWhiteSpace(metric.AggFun))
@@ -1179,7 +1159,6 @@ namespace EIMSNext.ApiService
         /// 系统字段直取同名列；业务字段走 jsonb <c>"Data"</c>。
         /// </summary>
         /// <param name="field">字段路径，形如 <c>createTime</c> 或 <c>data.name</c>。</param>
-        /// <returns>SQL 表达式文本。</returns>
         private static string FieldExpression(string field)
         {
             var normalized = NormalizePath(field);

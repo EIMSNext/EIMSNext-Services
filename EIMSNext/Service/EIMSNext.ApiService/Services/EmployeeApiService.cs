@@ -261,7 +261,7 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
-        /// 把用户与企业的绑定写入关系表 UserCorp（jsonb 投影 User.Crops 已移除）。
+        /// 把用户与企业的绑定写入关系表 UserCorp。
         /// 已存在同企业绑定时不重复写入，否则把新企业设为默认并取消其它默认。
         /// </summary>
         private async Task AppendUserCorpAsync(User user, string corpId)

@@ -29,8 +29,6 @@ namespace EIMSNext.ApiHost.Extensions
         {
             builder.RegisterType<AppSetting>().AsSelf().SingleInstance();
 
-            // 仓储实现已切换到 PostgreSQL：DbRepository<T> 直接消费 EF Core 的 DbContext。
-            // 旧 Mongo 实现（MongoRepository）不再注册，避免同一接口出现两个实现导致解析歧义。
             builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).InstancePerLifetimeScope();
             builder.Register(c =>
             {

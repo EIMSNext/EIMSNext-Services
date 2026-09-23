@@ -19,7 +19,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 初始化 <see cref="EntityServiceBaseCore{T}"/> 类的新实例。
         /// </summary>
-        /// <param name="resolver">依赖解析器。</param>
         public EntityServiceBaseCore(IResolver resolver)
             : base(resolver)
         {
@@ -30,89 +29,69 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据主键 ID 获取实体。
         /// </summary>
-        /// <param name="id">实体主键 ID。</param>
         /// <returns>匹配的实体，未找到时为 null。</returns>
         public T? Get(string id) => GetCore(id);
 
         /// <summary>
         /// 获取全部实体的可查询对象。
         /// </summary>
-        /// <returns>实体的可查询对象。</returns>
         public IQueryable<T> All() => Repository.Queryable;
 
         /// <summary>
         /// 根据表达式过滤条件查询实体。
         /// </summary>
-        /// <param name="where">过滤条件表达式。</param>
-        /// <returns>实体的可查询对象。</returns>
         public IQueryable<T> Query(Expression<Func<T, bool>> where) => Repository.Queryable.Where(where);
 
         /// <summary>
         /// 根据动态查询选项查找实体。
         /// </summary>
-        /// <param name="options">动态查询选项。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         public IQueryable<T> Find(DynamicFindOptions<T> options) => FindCore(options);
 
         /// <summary>
         /// 根据表达式过滤条件查找实体。
         /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         public IQueryable<T> Find(Expression<Func<T, bool>> filter) => FindCore(filter);
 
         /// <summary>
         /// 根据动态过滤条件查找实体。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>可进一步链式操作的查询。</returns>
         public IQueryable<T> Find(DynamicFilter filter) => FindCore(filter);
 
         /// <summary>
         /// 根据动态筛选条件查找实体列表。
         /// </summary>
-        /// <param name="filter">动态筛选条件。</param>
-        /// <returns>实体列表。</returns>
         public List<T> FindList(DynamicFilter filter) => Repository.FindList(filter);
 
         /// <summary>
         /// 统计满足动态过滤条件的实体数量。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>实体数量。</returns>
         public long Count(DynamicFilter filter) => CountCore(filter);
 
         /// <summary>
         /// 统计满足表达式过滤条件的实体数量。
         /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>实体数量。</returns>
         public long Count(Expression<Func<T, bool>> filter) => CountCore(filter);
 
         /// <summary>
         /// 判断是否存在满足表达式过滤条件的实体。
         /// </summary>
-        /// <param name="where">过滤条件表达式。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         public bool Exists(Expression<Func<T, bool>> where) => ExistsCore(where);
 
         /// <summary>
         /// 判断是否存在满足动态过滤条件的实体。
         /// </summary>
-        /// <param name="where">动态过滤条件。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         public bool Exists(DynamicFilter where) => ExistsCore(where);
 
         /// <summary>
         /// 新增单个实体。
         /// </summary>
-        /// <param name="entity">要新增的实体。</param>
         public virtual void Add(T entity) => Add([entity]);
 
         /// <summary>
         /// 批量新增实体。
         /// </summary>
-        /// <param name="entities">要新增的实体集合。</param>
         public virtual void Add(IEnumerable<T> entities)
         {
             using var scope = NewTransactionScope();
@@ -123,22 +102,16 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 替换（整行更新）单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         public virtual int Replace(T entity) => ReplaceCore(entity);
 
         /// <summary>
         /// 根据主键 ID 删除实体。
         /// </summary>
-        /// <param name="id">实体主键 ID。</param>
-        /// <returns>受影响行数。</returns>
         public virtual int Delete(string id) => DeleteCore(x => x.Id == id);
 
         /// <summary>
         /// 根据多个主键 ID 批量删除实体。
         /// </summary>
-        /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>受影响行数。</returns>
         public virtual int Delete(IEnumerable<string> ids)
         {
             var idList = ids.Distinct().ToList();
@@ -153,8 +126,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据动态过滤条件批量删除实体。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         public virtual int Delete(DynamicFilter filter)
         {
             using var scope = NewTransactionScope();
@@ -170,75 +141,57 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据主键 ID 获取实体。
         /// </summary>
-        /// <param name="id">实体主键 ID。</param>
         /// <returns>匹配的实体，未找到时为 null。</returns>
         public Task<T?> GetAsync(string id) => GetCoreAsync(id);
 
         /// <summary>
         /// 异步根据动态查询选项查找实体列表。
         /// </summary>
-        /// <param name="options">动态查询选项。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         public Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
             => FindCoreAsync(options, cancellationToken);
 
         /// <summary>
         /// 异步根据表达式过滤条件查找实体列表。
         /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         public Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
             => FindCoreAsync(filter, cancellationToken);
 
         /// <summary>
         /// 异步根据动态筛选条件查找实体列表。
         /// </summary>
-        /// <param name="filter">动态筛选条件。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>实体列表。</returns>
         public Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
             => Repository.FindAsync(filter, cancellationToken);
 
         /// <summary>
         /// 异步统计满足动态过滤条件的实体数量。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>实体数量。</returns>
         public Task<long> CountAsync(DynamicFilter filter) => CountCoreAsync(filter);
 
         /// <summary>
         /// 异步统计满足表达式过滤条件的实体数量。
         /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        /// <returns>实体数量。</returns>
         public Task<long> CountAsync(Expression<Func<T, bool>> filter) => CountCoreAsync(filter);
 
         /// <summary>
         /// 异步判断是否存在满足表达式过滤条件的实体。
         /// </summary>
-        /// <param name="where">过滤条件表达式。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         public Task<bool> ExistsAsync(Expression<Func<T, bool>> where) => ExistsCoreAsync(where);
 
         /// <summary>
         /// 异步判断是否存在满足动态过滤条件的实体。
         /// </summary>
-        /// <param name="where">动态过滤条件。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
         public Task<bool> ExistsAsync(DynamicFilter where) => ExistsCoreAsync(where);
 
         /// <summary>
         /// 异步新增单个实体。
         /// </summary>
-        /// <param name="entity">要新增的实体。</param>
         public virtual Task AddAsync(T entity) => AddAsync([entity]);
 
         /// <summary>
         /// 异步批量新增实体。
         /// </summary>
-        /// <param name="entities">要新增的实体集合。</param>
         public virtual async Task AddAsync(IEnumerable<T> entities)
         {
             await using var scope = NewTransactionScope();
@@ -249,22 +202,16 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步替换（整行更新）单个实体。
         /// </summary>
-        /// <param name="entity">要替换的实体。</param>
-        /// <returns>受影响行数。</returns>
         public virtual Task<int> ReplaceAsync(T entity) => ReplaceCoreAsync(entity);
 
         /// <summary>
         /// 异步根据主键 ID 删除实体。
         /// </summary>
-        /// <param name="id">实体主键 ID。</param>
-        /// <returns>受影响行数。</returns>
         public virtual Task<int> DeleteAsync(string id) => DeleteCoreAsync(x => x.Id == id);
 
         /// <summary>
         /// 异步根据多个主键 ID 批量删除实体。
         /// </summary>
-        /// <param name="ids">实体主键 ID 集合。</param>
-        /// <returns>受影响行数。</returns>
         public virtual async Task<int> DeleteAsync(IEnumerable<string> ids)
         {
             var idList = ids.Distinct().ToList();
@@ -279,8 +226,6 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据动态过滤条件批量删除实体。
         /// </summary>
-        /// <param name="filter">动态过滤条件。</param>
-        /// <returns>受影响行数。</returns>
         public virtual async Task<int> DeleteAsync(DynamicFilter filter)
         {
             await using var scope = NewTransactionScope();

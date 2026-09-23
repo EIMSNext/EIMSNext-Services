@@ -6,17 +6,6 @@ namespace EIMSNext.Core.Tests
 {
     /// <summary>
     /// 测试数据库上下文工厂。
-    /// <para>
-    /// 迁移说明：原测试有一个继承 <c>MongoDbContextBase</c> 的 <c>DbContext</c> 类，直连
-    /// localhost:27017 的 EIMSTest 库。PostgreSQL 迁移后：
-    /// <list type="bullet">
-    /// <item><description><see cref="Create"/> 返回生产上下文 <see cref="PostgreSqlDbContext"/>
-    /// （它是 sealed，因此这里只提供工厂，不再派生子类），用于事务、表结构一致性等与真实业务表相关的用例；</description></item>
-    /// <item><description><see cref="CreateTest"/> 返回只含测试自有实体的 <see cref="TestPostgreSqlDbContext"/>，
-    /// 供 <c>DbRepository&lt;T&gt;</c> / 动态查询用例使用。</description></item>
-    /// </list>
-    /// 连接串可由环境变量 <c>EIMS_TEST_POSTGRES</c> 覆盖。
-    /// </para>
     /// </summary>
     public static class TestDbFactory
     {

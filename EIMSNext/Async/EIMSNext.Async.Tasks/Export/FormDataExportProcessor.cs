@@ -31,7 +31,6 @@ namespace EIMSNext.Async.Tasks.Export
             var formDef = resolver.Resolve<IFormDefService>().Get(request.FormId)
                 ?? throw new InvalidOperationException("表单不存在或已被删除");
             var fields = formDef.Content?.Items?.Where(x => !x.Hidden).ToList() ?? [];
-            // 原 Mongo 时期用 request.Filter?.ToFilterDefinition<FormData>() ?? Builders<FormData>.Filter.Empty；
             // EF Core 下统一走表达式树（ToPredicate 对 null/空条件是恒真，语义等价于 Empty）。
             var filter = request.Filter.ToPredicate<FormData>();
             var fileNamePrefix = SanitizeFileName(formDef.Name);

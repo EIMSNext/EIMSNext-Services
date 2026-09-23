@@ -4,22 +4,10 @@ using Microsoft.EntityFrameworkCore.Storage;
 namespace EIMSNext.Core.Repositories
 {
     /// <summary>
-    /// 事务作用域。对标 Mongo 时期的 <c>MongoTransactionScope</c>，
     /// 保留同名 API（<see cref="IsInTransaction"/>、<see cref="RegisterAfterCommitAsync(System.Func{System.Threading.Tasks.Task})"/>、
     /// <see cref="ExecuteWithRetryAsync{TResult}"/>），去掉 <c>SessionHandle</c>。
     /// </summary>
     /// <remarks>
-    /// <para>
-    /// <b>为什么去掉 SessionHandle</b>：Mongo 的事务通过把 <c>IClientSessionHandle</c> 逐层
-    /// 传进每个驱动调用实现；PostgreSQL 下事务绑在 <see cref="DbContext"/> 的当前连接上，
-    /// 所有基于同一上下文的操作自动参与事务。因此业务代码只需「在作用域内执行」，
-    /// 不再需要把 session 当参数一路传递——这正是 48 处 <c>(..., session)</c> 调用点
-    /// 得以简化为无 session 形式的原因。
-    /// </para>
-    /// <para>
-    /// <b>嵌套语义</b>：PostgreSQL 没有真正的嵌套事务。内层作用域复用外层事务，
-    /// 只有最外层提交或回滚，与 Mongo 时期的行为一致。
-    /// </para>
     /// </remarks>
     public sealed class TransactionScope : IDisposable, IAsyncDisposable
     {
@@ -44,8 +32,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 初始化 <see cref="TransactionScope"/> 类的新实例。
         /// </summary>
-        /// <param name="dbContext">数据库上下文。</param>
-        /// <param name="enabled">是否启用事务。为 false 时只登记一个「无事务」标记，
         /// 用于明确表达「这段操作不需要事务」。</param>
         public TransactionScope(DbContext dbContext, bool enabled = true)
         {
@@ -137,7 +123,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 异步提交事务，并暂存提交后回调。
         /// </summary>
-        /// <param name="cancellationToken">取消令牌。</param>
         public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
         {
             if (!_isRootScope || _ownTransaction is null) return;
@@ -152,7 +137,6 @@ namespace EIMSNext.Core.Repositories
         /// 注册事务提交后的回调。无事务时立即执行，
         /// 这样调用方不必区分「是否在事务里」两种路径。
         /// </summary>
-        /// <param name="callback">回调。</param>
         /// <returns>表示回调登记或执行完成的任务。</returns>
         public static Task RegisterAfterCommitAsync(Func<Task> callback)
         {
@@ -185,7 +169,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 同步版本，语义同 <see cref="RegisterAfterCommitAsync(System.Func{System.Threading.Tasks.Task})"/>。
         /// </summary>
-        /// <param name="callback">回调。</param>
         public static void RegisterAfterCommit(Func<Task> callback)
             => RegisterAfterCommitAsync(callback).GetAwaiter().GetResult();
 
@@ -197,12 +180,6 @@ namespace EIMSNext.Core.Repositories
         /// 在事务中执行操作，并对瞬态冲突（序列化失败 40001、死锁 40P01）自动重试。
         /// 已处于事务中时直接执行，不重复开启。
         /// </summary>
-        /// <typeparam name="TResult">结果类型。</typeparam>
-        /// <param name="dbContext">数据库上下文。</param>
-        /// <param name="operation">操作。</param>
-        /// <param name="maxRetries">最大重试次数。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
-        /// <returns>操作结果。</returns>
         /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxRetries"/> 为负数。</exception>
         public static async Task<TResult> ExecuteWithRetryAsync<TResult>(
             DbContext dbContext,
@@ -213,7 +190,6 @@ namespace EIMSNext.Core.Repositories
             ArgumentNullException.ThrowIfNull(dbContext);
             ArgumentNullException.ThrowIfNull(operation);
 
-            // 与原 MongoTransactionScope 的契约保持一致：负的重试次数是调用方错误，
             // 必须显式拒绝。若放任其进入下面的 for 循环，循环体一次都不会执行，
             // 最终 `throw last!` 会抛出毫无信息量的 NullReferenceException。
             if (maxRetries < 0) throw new ArgumentOutOfRangeException(nameof(maxRetries));
@@ -250,10 +226,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 无返回值版本。
         /// </summary>
-        /// <param name="dbContext">数据库上下文。</param>
-        /// <param name="operation">操作。</param>
-        /// <param name="maxRetries">最大重试次数。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         public static Task ExecuteWithRetryAsync(
             DbContext dbContext,
             Func<Task> operation,

@@ -12,19 +12,11 @@ namespace EIMSNext.TestSupport
     /// <summary>
     /// 最小仓储桩。
     /// <para>
-    /// 迁移说明：原桩实现的是 Mongo 时代的 <c>IRepository&lt;T&gt;</c>
-    /// （<c>IMongoCollection</c> / <c>FilterDefinition</c> / <c>IClientSessionHandle</c> /
-    /// <c>MongoFindOptions</c> 等）。PostgreSQL 迁移后仓储接口完全基于 EF Core，
-    /// 本桩只需实现新的 <see cref="IRepository{T}"/> 成员，并且和以前一样——
-    /// 只要不被真正调用，一律 <see cref="NotSupportedException"/>。
-    /// </para>
-    /// <para>
     /// 全成员声明为 <c>virtual</c>：测试里的内存假仓储（如仅需要 <see cref="Queryable"/>
     /// 的 Webhook 假仓储）可以直接继承本桩并只覆写真正被用到的一两个成员，
     /// 避免每个测试文件重复实现几十个 <c>throw new NotSupportedException()</c>。
     /// </para>
     /// </summary>
-    /// <typeparam name="T">实体类型。</typeparam>
     public class StubRepository<T> : IRepository<T> where T : class, IEntityKey
     {
         #region 查询

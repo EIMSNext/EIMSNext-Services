@@ -18,7 +18,6 @@ namespace EIMSNext.File.Host.Extensions
         {
             base.Load(builder);
 
-            // 迁移说明：UploadDbContext 已随 Mongo 基础设施一并移除；
             // File.Host 的仓储由 PostgreSqlDbContext 统一提供，无需单独注册上下文。
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
         }

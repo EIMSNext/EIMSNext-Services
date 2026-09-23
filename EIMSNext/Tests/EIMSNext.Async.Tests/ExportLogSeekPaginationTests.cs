@@ -5,14 +5,6 @@ namespace EIMSNext.Async.Tests
 {
     /// <summary>
     /// 导出 seek 分页过滤条件的单元测试。
-    /// <para>
-    /// 迁移说明：原实现被测对象是 <c>ExportProcessorBase.BuildSeekFilter(FilterDefinition&lt;T&gt;,
-    /// FilterDefinitionBuilder&lt;T&gt;, ...)</c>，断言方式是把 Mongo 过滤定义
-    /// <c>Render(...).ToJson()</c> 后做字符串匹配。PostgreSQL/EF Core 迁移后
-    /// <c>BuildSeekFilter</c> 的入参/出参都变成 <see cref="System.Linq.Expressions.Expression{TDelegate}"/>，
-    /// 因此这里改为用表达式树的 <c>ToString()</c> 做结构化断言——
-    /// EF Core 最终会把它翻译成 SQL，表达式结构即等价于原本的 BSON 文档结构。
-    /// </para>
     /// </summary>
     [TestClass]
     public class ExportLogSeekPaginationTests
@@ -39,7 +31,7 @@ namespace EIMSNext.Async.Tests
         /// <c>createTime</c>/<c>id</c> 这类局部变量编译成闭包字段访问，表达式渲染结果是
         /// <c>value(命名空间+&lt;&gt;c__DisplayClassX).createTime</c> 这种字段名，
         /// 不会再出现 <c>"1000"</c>/<c>"id-002"</c> 字面量，因此对字面量断言是脆弱的。
-        /// 改为直接把表达式编译成委托并按边界样本求值，断言的就是真实运行语义
+        /// 直接把表达式编译成委托并按边界样本求值，断言的就是真实运行语义
         /// （EF 最终翻译 SQL 时该表达式即为被翻译对象，语义等价）。
         /// </para>
         /// </summary>

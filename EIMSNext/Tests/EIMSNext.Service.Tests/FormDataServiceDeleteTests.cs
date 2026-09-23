@@ -404,10 +404,7 @@ namespace EIMSNext.Service.Tests
         }
 
         /// <summary>
-        /// 迁移说明（MongoDB → PostgreSQL/EF Core）：原 <c>FakeSerialNoSequenceService</c> 逐个实现了
-        /// Mongo 时代的 <c>IService&lt;T&gt;</c> 成员（<c>IMongoCollection</c> / <c>IFindFluent</c> /
-        /// <c>IAsyncCursor</c> / <c>ReplaceOneResult</c>）。迁移后 <see cref="IService{T}"/> 已是 EF Core
-        /// 形态，这些成员由共享的 <see cref="StubEntityService{T}"/> 统一兜底。
+        /// 这些成员由共享的 <see cref="StubEntityService{T}"/> 统一兜底。
         /// </summary>
         private sealed class QueryableRepository<T> : StubRepository<T> where T : class, IEntity
         {

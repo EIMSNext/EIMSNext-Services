@@ -14,22 +14,14 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
     /// <summary>
     /// 消费幂等仓储。用租约（lease）+ 唯一键实现「同一 eventKey + target 只允许一个消费者处理」。
     /// </summary>
-    /// <param name="repository">幂等表仓储。</param>
     public sealed class MessageProcessingRepository(IRepository<ProcessedMessage> repository) : IMessageProcessingRepository
     {
         /// <summary>
         /// 尝试获取处理租约。
         /// </summary>
-        /// <param name="eventKey">事件键。</param>
-        /// <param name="target">目标标识。</param>
         /// <param name="leaseUntil">租约到期时间。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>租约令牌；已被他人持有或已完成时为 null。</returns>
         /// <remarks>
-        /// <para>
-        /// Mongo 时期的实现是「<c>FindOneAndUpdate</c> 抢占 + 插入捕获 11000 唯一键冲突」两步。
-        /// PostgreSQL 下换成单条原子语句：
-        /// </para>
         /// <code language="sql">
         /// insert into "ProcessedMessage" (...) values (...)
         /// on conflict ("EventKey", "Target") do update
@@ -43,16 +35,9 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         /// <list type="bullet">
         /// <item><description><b>原子性天然成立</b>：<c>insert ... on conflict do update</c> 在 PostgreSQL 里
         /// 会先对该唯一索引加行级排他锁，两个并发消费者不可能同时拿到令牌，无需再依赖捕获异常。</description></item>
-        /// <item><description><b>少了异常开销</b>：原实现在高并发下用异常做控制流，会打日志、触发第一次事务回滚；
-        /// 新实现正常路径就是一条 SQL。</description></item>
         /// <item><description><b>失败可判定</b>：<c>do update ... where ...</c> 的 <c>where</c> 不满足时不更新，
         /// <c>returning</c> 不返回任何行，与「没抢到」一一对应，不再需要 <c>result != null</c> 的隐式判定。</description></item>
         /// </list>
-        /// </para>
-        /// <para>
-        /// <b>语义差异（有意为之）：</b>原 Mongo 判断「字段不存在」用 <c>Exists(false)</c>，
-        /// 这里用 <c>"LeaseUntil" is null</c>。PG 的 <c>timestamptz</c> 可空，两种情况合并后语义相同，
-        /// 且能命中 <c>UX_ProcessedMessage_EventKey_Target</c> 的唯一索引。
         /// </para>
         /// </remarks>
         public async Task<string?> TryAcquireAsync(string eventKey, string target, DateTime leaseUntil, CancellationToken cancellationToken = default)
@@ -97,16 +82,12 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         /// <summary>
         /// 标记处理完成，并释放租约。
         /// </summary>
-        /// <param name="eventKey">事件键。</param>
-        /// <param name="target">目标标识。</param>
         /// <param name="leaseToken">租约令牌，必须与当前持有者一致。</param>
         /// <param name="processedTime">处理时间（Unix 毫秒）。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>成功接管并标记时为 true。</returns>
         /// <remarks>
         /// <c>where "LeaseToken" = @token</c> 是租约续约的核心约束：如果租约已过期并被其他消费者抢走，
-        /// 持有者不能覆盖别人的状态。<c>ModifiedCount == 1</c> 对应原来的
-        /// <c>UpdateMany(...).ModifiedCount == 1</c>。
+        /// 持有者不能覆盖别人的状态。
         /// </remarks>
         public async Task<bool> MarkCompletedAsync(string eventKey, string target, string leaseToken, long processedTime, CancellationToken cancellationToken = default)
         {
@@ -129,9 +110,6 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         /// <summary>
         /// 在 DbContext 的底层连接上执行单值原生 SQL。
         /// </summary>
-        /// <param name="sql">SQL 文本。</param>
-        /// <param name="bind">参数绑定回调。</param>
-        /// <param name="cancellationToken">取消令牌。</param>
         /// <returns>首行首列的值；无结果时为 null。</returns>
         /// <remarks>
         /// <c>insert ... on conflict ... returning</c> 无法用 EF Core 的 <c>ExecuteUpdate</c> 表达

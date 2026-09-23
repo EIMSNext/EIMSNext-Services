@@ -93,7 +93,6 @@ namespace EIMSNext.Async.Tasks.Export
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {
-                // Mongo 时期的 BsonRegularExpression(..., "i") 在 PostgreSQL 下用 ILIKE 表达。
                 var keyword = DynamicQueryExtensions.EscapeLikePattern(request.UserName);
                 filter = filter.AndAlso(x => EF.Functions.ILike(x.UserName, keyword));
             }

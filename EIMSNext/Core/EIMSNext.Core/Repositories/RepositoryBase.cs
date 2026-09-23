@@ -15,7 +15,6 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 初始化 <see cref="RepositoryBase{T}"/> 类的新实例。
         /// </summary>
-        /// <param name="context">数据库上下文。</param>
         protected RepositoryBase(DbContext context) => Context = context;
 
         /// <summary>
@@ -51,9 +50,8 @@ namespace EIMSNext.Core.Repositories
             => Queryable.AnyAsync(predicate, cancellationToken);
 
         /// <summary>
-        /// 主键生成。Id 保持 string 契约（未迁移为整型），因此仍产出 32 位无连字符 GUID。
+        /// 主键生成。Id 保持 string 契约，因此仍产出 32 位无连字符 GUID。
         /// </summary>
-        /// <returns>新的主键值。</returns>
         public string NewId() => Guid.NewGuid().ToString("N");
 
         /// <inheritdoc />
@@ -72,7 +70,6 @@ namespace EIMSNext.Core.Repositories
 
         /// <inheritdoc />
         /// <remarks>
-        /// 仓储级事务作用域。对标 Mongo 时期 <c>IRepository.NewTransactionScope()</c>：
         /// 用底层上下文开启环境事务，嵌套调用复用最外层事务。
         /// </remarks>
         public TransactionScope NewTransactionScope() => new(Context);

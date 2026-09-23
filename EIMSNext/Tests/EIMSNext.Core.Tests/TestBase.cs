@@ -12,12 +12,6 @@ namespace EIMSNext.Core.Tests
 {
     /// <summary>
     /// 集成测试基类。
-    /// <para>
-    /// 迁移说明：原基类用 <c>MongoTransactionScope</c> + <c>GetCollection&lt;T&gt;().DeleteMany()</c>
-    /// 做前置清理。PostgreSQL 侧改用 <see cref="TransactionScope"/>（持 <see cref="DbContext"/>）
-    /// 与 <c>ExecuteDelete</c>；<c>BsonDocumentJsonConverter</c> 已随 Mongo 序列化层删除，
-    /// 因此不再注册该转换器。
-    /// </para>
     /// </summary>
     public class TestBase
     {
@@ -89,7 +83,7 @@ namespace EIMSNext.Core.Tests
             // 两个程序集都提供 ExpandoObjectJsonConverter（Json 层通用版 / PostgreSql 层 jsonb 版），
             // 这里显式限定 Json 层版本：本方法是给业务 JSON 序列化全局注册转换器。
             opt.Converters.Add(new EIMSNext.Json.Serialization.ExpandoObjectJsonConverter());
-            // 动态字段容器（FormData.Data）已改为 Dictionary<string, object?>，请求/往返路径需要同样的深度还原。
+            // 动态字段容器（FormData.Data）为 Dictionary<string, object?>，请求/往返路径需要同样的深度还原。
             opt.Converters.Add(new EIMSNext.Json.Serialization.DictionaryJsonConverter());
 
             JsonSerializerExtension.SetOptions(opt);

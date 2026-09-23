@@ -11,16 +11,6 @@ namespace EIMSNext.Core.Tests
 {
     /// <summary>
     /// 事务作用域行为测试。
-    /// <para>
-    /// 迁移说明：原文件名为 <c>MongoTransactionScopeTest</c>，被测对象是 <c>MongoTransactionScope</c>。
-    /// 现已改为被测 EF Core 版 <see cref="TransactionScope"/>，并同步调整了断言：
-    /// <list type="bullet">
-    /// <item><description><c>scope.SessionHandle</c> / <c>Find(...).CountDocuments()</c>
-    /// 已随 Mongo API 移除，改为 <see cref="TransactionScope.Transaction"/> 与 LINQ <c>Count()</c>。</description></item>
-    /// <item><description><c>ExecuteWithRetry</c>（同步）已删除，只保留
-    /// <see cref="TransactionScope.ExecuteWithRetryAsync{TResult}"/>，对应测试合并为异步版本。</description></item>
-    /// </list>
-    /// </para>
     /// </summary>
     [TestClass]
     public class TransactionScopeTests
@@ -72,7 +62,6 @@ namespace EIMSNext.Core.Tests
 
                 scope.CommitTransaction();
 
-                // 提交后同一上下文仍可查询（EF Core 的事务绑在连接上，无 Mongo 的会话限制）。
                 Assert.AreEqual(1, _dbContext.FormDatas.Count(x => x.CreateTime >= today));
             }
         }
@@ -203,7 +192,6 @@ namespace EIMSNext.Core.Tests
         [TestMethod]
         public async Task RetryExecutorRejectsNegativeRetryCount()
         {
-            // 契约与原 MongoTransactionScope 一致：负的重试次数属于调用方错误，
             // 由 ExecuteWithRetryAsync 入口直接拒绝（ArgumentOutOfRangeException）。
             // 若缺少该校验，for 循环一次都不进入，最终会抛出 NullReferenceException。
             var ex = await Assert.ThrowsExactlyAsync<ArgumentOutOfRangeException>(async () =>

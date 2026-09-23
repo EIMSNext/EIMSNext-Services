@@ -196,7 +196,6 @@ namespace EIMSNext.ApiService
             ValidateImportMappings(request, fieldSnapshot);
             var importLogService = Resolver.Resolve<IFormDataImportLogService>();
             var storage = Resolver.Resolve<IStorageProvider>();
-            // 迁移说明：原用 Mongo 的 ObjectId 作为导入任务 ID，PostgreSQL 下主键是
             // 32 位无连字符 GUID（与 RepositoryBase.NewId 一致）。
             var importLogId = Guid.NewGuid().ToString("N");
             var normalizedFileName = NormalizeFileName(fileName);

@@ -94,14 +94,12 @@ namespace EIMSNext.Service
                 }
             }
 
-            // 对应 Mongo 版的 filters.Count == 0 短路：三类候选都为空时不查库直接返回。
             if (empIds.Count == 0 && deptIds.Count == 0 && employeeGroupIds.Count == 0)
             {
                 return [];
             }
 
             // 员工候选与部门候选最终都是「Id 命中」，可合并为同一个集合。
-            // Mongo 版用 In(x => x.Id, empIds)，字符串精确（大小写敏感）匹配；这里保持一致。
             // 注意快路径走 SQL IN（数据库端大小写敏感），内存路径也必须大小写敏感，否则两条路径行为不一致。
             var empIdFilter = empIds.ToHashSet();
             if (deptIds.Count > 0)
@@ -131,8 +129,7 @@ namespace EIMSNext.Service
                 return receivers.Values.Take(200).ToList();
             }
 
-            // 员工组候选由关系表 EmployeeGroupMember 承载（jsonb 投影 Employee.EmployeeGroups
-            // 已移除），先在服务端求出属于任一目标员工组的员工。注意三类候选之间是「或」关系：
+            // 员工组候选由关系表 EmployeeGroupMember 承载，先在服务端求出属于任一目标员工组的员工。注意三类候选之间是「或」关系：
             // 不能只对已按 empIdFilter 过滤过的结果再筛员工组。
             var groupIdList = employeeGroupIds.ToList();
             var groupEmployeeIds = EmployeeRepository.Queryable

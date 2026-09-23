@@ -83,12 +83,6 @@ namespace EIMSNext.Async.Quartz.Jobs
 
         /// <summary>
         /// 判断异常是否为 <c>FormNotifyDispatchLog</c> 的幂等唯一索引冲突。
-        /// <para>
-        /// 迁移说明：Mongo 版本检查 <c>MongoWriteException.WriteError.Category == DuplicateKey</c>。
-        /// PostgreSQL 下唯一约束冲突的 SQLSTATE 是 <c>23505</c>，Npgsql 把它包成
-        /// <c>PostgresException</c>，再由 EF Core 包成 <see cref="DbUpdateException"/>。
-        /// 这里额外校验约束名，避免把其它唯一索引冲突误判成本表的重复。
-        /// </para>
         /// </summary>
         private static bool IsDispatchLogDuplicate(DbUpdateException exception)
         {
@@ -108,7 +102,6 @@ namespace EIMSNext.Async.Quartz.Jobs
             var next = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, item.AnchorTime, item.TriggerTime);
             if (notify.TriggerMode == FormNotifyTriggerMode.CustomScheduled)
             {
-                // 迁移说明：Mongo 的 UpdateBuilder.Set(...) 在 EF Core 下等价于
                 // UpdateAsync(id, setters => setters.SetProperty(...))，同样翻译成单条 UPDATE。
                 await notifyRepo.UpdateAsync(
                     notify.Id,

@@ -123,7 +123,6 @@ namespace EIMSNext.ApiService
 
 			if (!string.IsNullOrWhiteSpace(request.OperatorName))
 			{
-				// 原 Mongo 使用 BsonRegularExpression(..., "i") 做不区分大小写的子串匹配，
 				// PostgreSQL 下等价写法为 ILIKE '%pattern%'。
 				var keyword = DynamicQueryExtensions.EscapeLikePattern(request.OperatorName);
 				filter = filter.AndAlso(x => x.CreateBy != null && EF.Functions.ILike(x.CreateBy.Label, keyword));

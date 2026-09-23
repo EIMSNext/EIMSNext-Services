@@ -41,8 +41,6 @@ public static class EIMSNextModelConfiguration
         // SharedTypeEntityType 异常，只能在 ApplyEIMSNextModel 里用 HasConversion 逐属性配置。
         configurationBuilder.Properties<Operator>().HaveConversion<OperatorJsonConverter>();
 
-        // 枚举按字符串落库，与 MongoDB 时代 Bson 的默认约定保持一致
-        // （AppProfile.Status 曾显式标注 [BsonRepresentation(BsonType.String)] 即为此）。
         // EF Core 默认落整数，会让历史数据 "Published" 读不回来，因此必须显式转换。
         configurationBuilder.Properties<Enum>().HaveConversion<string>();
     }
@@ -114,11 +112,10 @@ public static class EIMSNextModelConfiguration
         Mapped<AppDef>(modelBuilder)?.Property(x => x.AppMenus).HasConversion(Jsonb<List<AppMenu>>()).HasColumnType("jsonb");
         Mapped<DashboardDef>(modelBuilder)?.Property(x => x.PublishMembers).HasConversion(Jsonb<List<Member>>()).HasColumnType("jsonb");
 
-        // Client 聚合：ClientSecrets / AllowedGrantTypes / AllowedScopes 在 Mongo 时期都是内嵌数组，
         // 必须显式挂转换器，否则 EF 会把 ClientGrantType / ClientSecret / ClientScope
         // 当成独立实体去要主键，模型校验阶段直接抛异常。
         // 注意 ClientScope 是 { Scope } 值对象，与旧脚本里同名的那张 "ClientScope" 表不是一回事
-        // （C# 侧没有对应实体，该表已随基线重建移除）。
+        //（C# 侧没有对应实体，该表已移除）。
         Mapped<Client>(modelBuilder)?.Property(x => x.ClientSecrets).HasConversion(Jsonb<List<ClientSecret>>()).HasColumnType("jsonb");
         Mapped<Client>(modelBuilder)?.Property(x => x.AllowedGrantTypes).HasConversion(Jsonb<List<ClientGrantType>>()).HasColumnType("jsonb");
         Mapped<Client>(modelBuilder)?.Property(x => x.AllowedScopes).HasConversion(Jsonb<List<ClientScope>>()).HasColumnType("jsonb");
@@ -174,7 +171,6 @@ public static class EIMSNextModelConfiguration
         //      invalid input syntax for type json / The input string ended unexpectedly。
         //      而 CorporateSettingService.Normalize 明确把 Value 归一化成 string.Empty，
         //      即「保存一条没填值的配置」必然 500。
-        //   2) 任意文本非法：Mongo 时期这些字段可以存任何字符串，收紧成 jsonb 属于语义回归。
         // 因此这里保持 text，与 CLR 类型一一对应；真正的结构化字段（FormData.Data、
         // FormDef.Content 等）仍然按 jsonb 映射，见上文。
         Mapped<CorporateSetting>(modelBuilder)?.Property(x => x.Value).HasColumnType("text");
@@ -187,7 +183,7 @@ public static class EIMSNextModelConfiguration
         Mapped<WorkflowTransitionExecution>(modelBuilder)?.Property(x => x.Error).HasColumnType("text");
 
         // ------------------------------------------------------------ 主键
-        // Id 保持 string 契约（未迁移为整型），映射为 text 列，不使用数据库自增。
+        // Id 保持 string 契约，映射为 text 列，不使用数据库自增。
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
             var idProperty = entity.FindProperty(nameof(IEntityKey.Id));
@@ -249,8 +245,6 @@ public static class EIMSNextModelConfiguration
     }
 
     /// <summary>仅当实体已在本上下文的模型中时返回其构建器，否则返回 <c>null</c>。</summary>
-    /// <typeparam name="TEntity">实体类型。</typeparam>
-    /// <param name="modelBuilder">模型构建器。</param>
     /// <returns>实体构建器或 <c>null</c>。</returns>
     private static EntityTypeBuilder<TEntity>? Mapped<TEntity>(ModelBuilder modelBuilder) where TEntity : class
         => modelBuilder.Model.FindEntityType(typeof(TEntity)) is null ? null : modelBuilder.Entity<TEntity>();

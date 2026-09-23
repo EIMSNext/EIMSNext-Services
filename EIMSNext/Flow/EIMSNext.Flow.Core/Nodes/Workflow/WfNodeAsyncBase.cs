@@ -54,13 +54,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 写入审批日志。
         /// </summary>
-        /// <param name="wfInst">工作流实例。</param>
-        /// <param name="task">审批任务。</param>
-        /// <param name="dataContext">数据上下文。</param>
-        /// <param name="wfStep">节点定义。</param>
-        /// <param name="approveData">审批数据。</param>
         /// <remarks>
-        /// 原签名末尾有一个 <c>IClientSessionHandle? session</c> 参数：Mongo 需要它才能把写入
         /// 挂到调用方的事务上。PostgreSQL 下事务绑在 <see cref="DbContext"/> 的当前连接上，
         /// 仓储写方法会自行判断 <see cref="TransactionScope.IsInTransaction"/> 决定是
         /// 加入外层事务还是开一个短事务，因此 session 参数被整体移除。
@@ -221,10 +215,6 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 删除指定节点下某人/某数据的所有待办任务。
         /// </summary>
-        /// <param name="corpId">企业 ID。</param>
-        /// <param name="dataId">数据 ID。</param>
-        /// <param name="nodeId">节点 ID。</param>
-        /// <returns>受影响行数。</returns>
         public async Task<int> DeleteTasks(string corpId, string dataId, string nodeId)
         {
             return await TaskRepository.DeleteManyAsync(x =>
@@ -234,19 +224,11 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 抢占并删除一条待办任务（原子「领取」语义）。
         /// </summary>
-        /// <param name="workflowInstanceId">工作流实例 ID。</param>
-        /// <param name="dataId">数据 ID。</param>
-        /// <param name="nodeId">节点 ID。</param>
-        /// <param name="employeeId">员工 ID。</param>
         /// <returns>被抢到的任务；不存在时为 null。</returns>
         /// <remarks>
         /// <para>
-        /// 原实现是 Mongo 的 <c>FindOneAndDelete</c>——「查到就删、删掉的那条返回给你」，
-        /// 天然原子，是多人并发审批同一节点时防重复提交的关键。
-        /// </para>
-        /// <para>
         /// PostgreSQL 下 EF Core 没有等价的 <c>DELETE ... RETURNING *</c> 高层 API
-        /// （<c>ExecuteDelete</c> 只返回行数），因此改为「先取行 → 按主键条件删除 → 只在
+        ///（<c>ExecuteDelete</c> 只返回行数），因此采用「先取行 → 按主键条件删除 → 只在
         /// 删除成功时返回该行」：
         /// </para>
         /// <code language="csharp">
@@ -285,10 +267,6 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 更新表单数据的流程状态。
         /// </summary>
-        /// <param name="corpId">企业 ID。</param>
-        /// <param name="dataId">数据 ID。</param>
-        /// <param name="flowStatus">流程状态。</param>
-        /// <returns>受影响行数。</returns>
         public async Task<int> UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus)
         {
             return await FormDataRepository.UpdateAsync(
@@ -319,7 +297,6 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)
             {
-                // Mongo 时期的 SortByDescending(...).FirstOrDefault() 换成
                 // OrderByDescending(...).FirstOrDefault()，两者都翻译为 ORDER BY ... LIMIT 1。
                 var lastApproval = TaskLogRepository
                     .Find(x => x.DataId == dataContext.DataId

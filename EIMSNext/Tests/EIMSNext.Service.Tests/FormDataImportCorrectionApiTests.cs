@@ -374,7 +374,6 @@ namespace EIMSNext.Service.Tests
             public override IQueryable<FormData> All() => Items.Values.AsQueryable();
 
             /// <summary>
-            /// 迁移说明：原实现返回 <c>IFindFluent&lt;FormData, FormData&gt;</c> 并用
             /// <c>FindFluentStub</c> 模拟 Limit/Skip/ToCursor。EF Core 形态下
             /// <see cref="IService{T}.Find(DynamicFindOptions{T})"/> 直接返回
             /// <see cref="IQueryable{T}"/>，分页语义可由调用方 LINQ 表达。
@@ -472,10 +471,7 @@ namespace EIMSNext.Service.Tests
         }
 
         /// <summary>
-        /// 迁移说明（MongoDB → PostgreSQL/EF Core）：原 <c>FakeEntityService&lt;T&gt;</c> 逐个实现了
-        /// Mongo 时代的 <c>IService&lt;T&gt;</c> 成员（<c>IMongoCollection</c> / <c>IFindFluent</c> /
         /// <c>IAsyncCursor</c> / <c>ReplaceOneResult</c>），并配套 <c>FindFluentStub</c> /
-        /// <c>AsyncCursorStub</c> 伪造游标语义。迁移后 <see cref="IService{T}"/> 已是 EF Core 形态，
         /// 这些成员由共享的 <see cref="StubEntityService{T}"/> 统一兜底。
         /// </summary>
         private class FakeEntityService<T> : StubEntityService<T>, IService<T> where T : class, IEntityKey

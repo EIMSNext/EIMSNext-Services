@@ -38,7 +38,7 @@ public sealed class EmployeeAccessSubjectResolver(IResolver resolver) : IEmploye
             .SelectMany(x => x.HeriarchyId.Split('|', StringSplitOptions.RemoveEmptyEntries))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
-        // 员工组归属由关系表 EmployeeGroupMember 承载（jsonb 投影 Employee.EmployeeGroups 已移除）。
+        // 员工组归属由关系表 EmployeeGroupMember 承载。
         var employeeGroupIds = resolver.GetRepository<EmployeeGroupMember>().Queryable
             .Where(x => x.CorpId == context.CorpId && x.EmployeeId == employee.Id && !x.DeleteFlag)
             .Select(x => x.EmployeeGroupId)
