@@ -84,12 +84,30 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
             catch (TaskRequeueException)
             {
+                await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                 throw;
             }
             catch (Exception ex)
             {
+                await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                 Logger.LogWarning(ex, "Email external effect failed; message will be requeued. key={Key}, target={Target}", baseKey, target);
                 throw new TaskRequeueException("Email external effect failed.", TimeSpan.FromSeconds(30));
+            }
+        }
+
+        private async Task ReleaseLeaseAsync(
+            IMessageProcessingRepository processingRepository,
+            string eventKey,
+            string target,
+            string leaseToken)
+        {
+            try
+            {
+                await processingRepository.ReleaseAsync(eventKey, target, leaseToken, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to release email processing lease. key={Key}, target={Target}", eventKey, target);
             }
         }
 

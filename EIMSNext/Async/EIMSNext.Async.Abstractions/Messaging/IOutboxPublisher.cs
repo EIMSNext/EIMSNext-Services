@@ -24,5 +24,10 @@ namespace EIMSNext.Async.Abstractions.Messaging
         Task<string?> TryAcquireAsync(string eventKey, string target, DateTime leaseUntil, CancellationToken cancellationToken = default);
 
         Task<bool> MarkCompletedAsync(string eventKey, string target, string leaseToken, long processedTime, CancellationToken cancellationToken = default);
+
+        /// <summary>
+        /// 释放当前消费者持有的租约。令牌必须匹配，避免误释放其他消费者的租约。
+        /// </summary>
+        Task<bool> ReleaseAsync(string eventKey, string target, string leaseToken, CancellationToken cancellationToken = default);
     }
 }

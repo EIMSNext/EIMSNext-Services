@@ -108,6 +108,24 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         }
 
         /// <summary>
+        /// 释放失败处理的租约，使 RabbitMQ 重投后可以立即重新获取。
+        /// </summary>
+        public async Task<bool> ReleaseAsync(string eventKey, string target, string leaseToken, CancellationToken cancellationToken = default)
+        {
+            var affected = await repository.UpdateManyAsync(
+                x => x.EventKey == eventKey
+                     && x.Target == target
+                     && x.Status == ProcessedMessageStatus.Processing
+                     && x.LeaseToken == leaseToken,
+                setters => setters
+                    .SetProperty(x => x.LeaseUntil, (DateTime?)null)
+                    .SetProperty(x => x.LeaseToken, (string?)null),
+                cancellationToken);
+
+            return affected == 1;
+        }
+
+        /// <summary>
         /// 在 DbContext 的底层连接上执行单值原生 SQL。
         /// </summary>
         /// <returns>首行首列的值；无结果时为 null。</returns>

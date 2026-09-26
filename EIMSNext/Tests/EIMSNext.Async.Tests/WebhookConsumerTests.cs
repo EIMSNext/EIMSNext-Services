@@ -126,6 +126,7 @@ namespace EIMSNext.Async.Tests
             await Assert.ThrowsExactlyAsync<EIMSNext.Async.RabbitMQ.Messaging.TaskRequeueException>(
                 () => consumer.ExecuteInScopeAsync(message, CancellationToken.None));
             Assert.AreEqual(0, processingRepository.CompletedTargets.Count);
+            CollectionAssert.AreEqual(new[] { "wh-1" }, processingRepository.ReleasedTargets);
         }
 
         private sealed class RecordingEventHub : IEventHub
@@ -157,6 +158,7 @@ namespace EIMSNext.Async.Tests
         private sealed class FakeMessageProcessingRepository : IMessageProcessingRepository
         {
             public List<string> CompletedTargets { get; } = [];
+            public List<string> ReleasedTargets { get; } = [];
 
             public Task<string?> TryAcquireAsync(string eventKey, string target, DateTime leaseUntil, CancellationToken cancellationToken = default)
             {
@@ -166,6 +168,12 @@ namespace EIMSNext.Async.Tests
             public Task<bool> MarkCompletedAsync(string eventKey, string target, string leaseToken, long processedTime, CancellationToken cancellationToken = default)
             {
                 CompletedTargets.Add(target);
+                return Task.FromResult(true);
+            }
+
+            public Task<bool> ReleaseAsync(string eventKey, string target, string leaseToken, CancellationToken cancellationToken = default)
+            {
+                ReleasedTargets.Add(target);
                 return Task.FromResult(true);
             }
         }
