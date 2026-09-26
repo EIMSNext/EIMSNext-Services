@@ -17,6 +17,7 @@ using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OData.UriParser;
 
 
@@ -450,7 +451,16 @@ namespace EIMSNext.Service.Host.OData
             {
                 if (batch?.Keys?.Count > 0)
                 {
-                    await ApiService.DeleteAsync(batch.Keys);
+                    // 仅删除落在当前租户数据权限范围内的主键，越权主键会被过滤掉
+                    var ownedKeys = await ApiService.All()
+                        .Where(v => batch.Keys.Contains(v.Id))
+                        .Select(v => v.Id)
+                        .ToListAsync<string>();
+                    if (ownedKeys.Count == 0)
+                    {
+                        return NotFound();
+                    }
+                    await ApiService.DeleteAsync(ownedKeys);
                 }
                 else
                 {
@@ -459,6 +469,12 @@ namespace EIMSNext.Service.Host.OData
             }
             else
             {
+                // 单条删除同样需校验归属，不存在或越权均视为 NotFound
+                T? entity = await ApiService.GetAsync(key);
+                if (entity == null)
+                {
+                    return NotFound();
+                }
                 await ApiService.DeleteAsync(key);
             }
             return NoContent();

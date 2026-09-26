@@ -8,6 +8,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.ApiService
@@ -181,13 +182,15 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
-        /// 异步根据主键 ID 获取实体。
+        /// 
         /// </summary>
-        /// <param name="id">实体主键 ID。</param>
-        /// <returns>匹配的实体，未找到时为 null。</returns>
+        /// <param name="id"></param>
+        /// <returns></returns>
         public Task<T?> GetAsync(string id)
         {
-            return CoreService.GetAsync(id);
+            return CoreService.All()
+                .FilterByCorpId(IdentityContext.CurrentCorpId)
+                .FirstOrDefaultAsync(t => t.Id == id);
         }
 
         /// <summary>

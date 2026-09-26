@@ -412,8 +412,8 @@ namespace EIMSNext.Service
         private List<string> GetWorkflowFormIds(Expression<Func<FormDef, bool>> filter)
         {
             return Repository.Find(new QueryFindOptions<FormDef> { Filter = filter, Take = int.MaxValue })
-                .ToList()
                 .Where(x => x.UsingWorkflow)
+                .ToList()
                 .Select(x => x.Id)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

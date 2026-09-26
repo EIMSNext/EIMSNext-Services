@@ -36,7 +36,6 @@ namespace EIMSNext.Identity.Services
 
             var setting = _dbContext.PublicSettings
                 .Where(x => !x.DeleteFlag && x.TargetId == targetId)
-                .ToList()
                 .FirstOrDefault();
 
             if (setting == null || string.IsNullOrWhiteSpace(setting.CorpId))

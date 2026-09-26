@@ -119,7 +119,6 @@ namespace EIMSNext.Flow.Host.Controllers
             var workerId = IdentityContext.CurrentEmployee.Id;
             var workerCode = IdentityContext.CurrentEmployee.Code;
             var task = _taskService.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
-                .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
             if (task == null)
             {
@@ -638,7 +637,6 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return _taskService.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
-                .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }
 
