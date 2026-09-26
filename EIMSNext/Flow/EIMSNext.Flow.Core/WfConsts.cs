@@ -29,6 +29,10 @@ namespace EIMSNext.Flow.Core
         public const string ApproveLogId = "approve_log_id";
         public const string MatchedResult = "matched_result";
         public const string MatchParallel = "match_parallel";
+        /// <summary>
+        /// 分支节点兜底（Else）分支的判定表达式：此前没有任何条件分支命中。
+        /// </summary>
+        public const string NoMatchExpression = " (data.matched_result==false) ";
         public const string EfCascade = "ef_cascade";
         public const string EventIds = "event_ids";
         public const string ApprovalRounnd = "approval_round";

@@ -44,6 +44,7 @@ dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintena
 
 | 脚本 | 内容 | 来源 |
 | --- | --- | --- |
+| `000_CreateCaseInsensitiveType.sql` | 创建 `citext` 扩展（业务字符列用它实现大小写无关比较） | 本项目 |
 | `001_CreateTables.sql` | 全部业务实体表（65 张） | `PostgreSqlBaselineScript.RenderCreateTables()` 自动生成 |
 | `002_CreateIndexes.sql` | 模型声明索引段（自动）+ 手写业务索引（含 GIN） | 模型段自动生成，手写区人工维护 |
 | `003_CreateWorkflowTables.sql` | WorkflowCore 存储表 | 第三方 |
@@ -112,7 +113,7 @@ dotnet test Tests/EIMSNext.Core.Tests --filter RegenerateBaselineScripts
   $env:PostgreSql__ConnectionString = "Host=localhost;Port=5432;Database=EIMSTest;Username=postgres;Password=sa123"
   dotnet run --project ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj
   ```
-  预期输出 `Applied 7 migration(s).`，全链一次通过。
+  预期输出 `Applied 11 migration(s).`，全链一次通过。
 
 ## 硬性约定
 

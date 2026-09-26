@@ -39,17 +39,76 @@ namespace EIMSNext.Core.Extensions
 
         /// <summary>按键读取值并强转为 <typeparamref name="T"/>，不存在返回默认值。</summary>
         /// <returns>值或默认值。</returns>
-        /// <remarks>保持原有的强转语义：类型不匹配会抛 <see cref="InvalidCastException"/>，便于尽早暴露契约问题。</remarks>
+        /// <remarks>
+        /// 数值类型跨数据库兼容：PG 的 jsonb 整数读回为 <see cref="long"/>、小数为 <see cref="double"/>，
+        /// 而 SQL Server / MongoDB 下多为 <see cref="int"/> / <see cref="decimal"/>。这里对数值目标类型做
+        /// <see cref="Convert.ChangeType"/> 归一，避免 <c>Int64→Int32</c> 这类纯表示层差异抛异常；
+        /// 非数值类型仍保留原强转语义（如 string→int 不匹配会抛 <see cref="InvalidCastException"/>，暴露契约问题）。
+        /// </remarks>
         public static T? GetValueOrDefault<T>(this IDictionary<string, object?> data, string key)
         {
-            return data.TryGetValue(key, out var value) ? (T?)value : default;
+            if (!data.TryGetValue(key, out var value) || value is null)
+                return default;
+            return CoerceNumeric<T>(value);
         }
 
         /// <summary>按键读取值并强转为 <typeparamref name="T"/>，取不到时返回 <paramref name="defaultValue"/>。</summary>
-        /// <remarks>保持原有的强转语义，与 <see cref="GetValueOrDefault{T}"/> 一致。</remarks>
+        /// <remarks>数值归一规则同 <see cref="GetValueOrDefault{T}"/>。</remarks>
         public static T GetValue<T>(this IDictionary<string, object?> data, string key, T defaultValue)
         {
-            return data.TryGetValue(key, out var value) ? (T?)value ?? defaultValue : defaultValue;
+            if (!data.TryGetValue(key, out var value) || value is null)
+                return defaultValue;
+            var coerced = CoerceNumeric<T>(value);
+            return coerced ?? defaultValue;
+        }
+
+        private static bool IsNumericType(Type t)
+        {
+            return t == typeof(int) || t == typeof(long) || t == typeof(short) || t == typeof(byte)
+                || t == typeof(uint) || t == typeof(ulong) || t == typeof(ushort) || t == typeof(sbyte)
+                || t == typeof(float) || t == typeof(double) || t == typeof(decimal);
+        }
+
+        /// <summary>
+        /// 数值目标类型下跨库归一；非数值或无法转换时退回原强转语义（不匹配即抛）。
+        /// </summary>
+        private static T? CoerceNumeric<T>(object value)
+        {
+            if (value is T t)
+                return t;
+            var target = typeof(T);
+            if (IsNumericType(target))
+            {
+                try
+                {
+                    return (T)Convert.ChangeType(value, target);
+                }
+                catch
+                {
+                    return default;
+                }
+            }
+            // 枚举目标：PG 的 jsonb 枚举值读回是 long/double，这里按底层整型还原。
+            var underlying = Nullable.GetUnderlyingType(target) ?? target;
+            if (underlying.IsEnum && IsNumericType(value.GetType()))
+            {
+                return (T)Enum.ToObject(underlying, value);
+            }
+            // 其余类型（可空数值、包装类型等）尝试一次受控转换，失败再退回原强转语义。
+            var nullableUnderlying = Nullable.GetUnderlyingType(target);
+            if (nullableUnderlying is not null && IsNumericType(nullableUnderlying) && value is IConvertible)
+            {
+                try
+                {
+                    return (T)Convert.ChangeType(value, nullableUnderlying);
+                }
+                catch
+                {
+                    return default;
+                }
+            }
+            // 非数值类型：保留原有强转语义，真实契约不匹配仍抛 InvalidCastException。
+            return (T)value;
         }
 
         /// <summary>

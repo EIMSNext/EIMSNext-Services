@@ -57,6 +57,7 @@ public static class PostgreSqlBaselineScript
     {
         ["text"] = "''",
         ["character varying"] = "''",
+        ["citext"] = "''",
         ["integer"] = "0",
         ["bigint"] = "0",
         ["smallint"] = "0",
@@ -99,7 +100,7 @@ public static class PostgreSqlBaselineScript
         {
             ModelIndexesBeginMarker,
             "-- 本段由 EF 模型投影生成，请勿手工编辑；新增索引优先写在模型里，模型无法表达的（GIN、" +
-            "部分索引、text_pattern_ops）写在本标记段之下的手写区。",
+            "部分索引、citext_pattern_ops）写在本标记段之下的手写区。",
             $"-- 重新生成：{RegenerateCommand}",
         };
 

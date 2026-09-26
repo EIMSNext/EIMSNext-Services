@@ -28,10 +28,19 @@ public static class PostgreSqlCommandBuilder
         if (dbContext.Database.CurrentTransaction is { } transaction)
             command.Transaction = (NpgsqlTransaction)transaction.GetDbTransaction();
         if (corpId is not null)
-            command.Parameters.AddWithValue("corpId", corpId);
+        {
+            command.Parameters.AddWithValue("corpId", corpId).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+        }
 
         for (var index = 0; index < (parameters?.Count ?? 0); index++)
-            command.Parameters.AddWithValue($"p{index}", parameters![index] ?? DBNull.Value);
+        {
+            var value = parameters![index] ?? DBNull.Value;
+            var parameter = command.Parameters.AddWithValue($"p{index}", value);
+
+            // Npgsql 默认把 string 参数按 text 发送，而字符列已是 citext：PG 会把 citext 列
+            // 降级成 (col)::text 比较，索引条件随之消失（实测 Index Cond 变 Filter）。
+            if (value is string) parameter.DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+        }
 
         return command;
     }

@@ -1,6 +1,7 @@
 using System.Text.Json;
 using System.Text.Json.Nodes;
 
+using EIMSNext.Common;
 using EIMSNext.Entities;
 
 namespace EIMSNext.Service
@@ -101,7 +102,7 @@ namespace EIMSNext.Service
                         var oldId = idValue.GetValue<string>();
                         if (!layoutMap.TryGetValue(oldId, out var newId))
                         {
-                            newId = Guid.NewGuid().ToString("N");
+                            newId = TsidIdGenerator.NewId();
                             layoutMap[oldId] = newId;
                         }
                         obj["i"] = newId;
@@ -138,7 +139,7 @@ namespace EIMSNext.Service
                         var oldId = idValue.GetValue<string>();
                         if (!layoutMap.ContainsKey(oldId))
                         {
-                            layoutMap[oldId] = Guid.NewGuid().ToString("N");
+                            layoutMap[oldId] = TsidIdGenerator.NewId();
                         }
                     }
                     foreach (var property in obj.ToList())

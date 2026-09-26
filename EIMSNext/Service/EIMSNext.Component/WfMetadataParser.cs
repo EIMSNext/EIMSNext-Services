@@ -433,11 +433,13 @@ namespace EIMSNext.Component
                         branch.ChildNodes.ForEach(b => ParseFlowNode(corpId, steps, flowType, b, nextStepId, otherFormIds));
                     }
                 }
+                //Else 分支只经 NextStepId 下发，由 WorkflowLoader 追加为最后一个 outcome。
+                //不能放进 SelectNextStep：Metadata 以 jsonb 存储，PostgreSQL 不保证对象键顺序，
+                //Else 一旦排到条件分支之前，其 matched_result==false 会在条件求值前恒成立，
+                //导致条件命中的同时兜底分支也命中。
                 if (otherCondNode != null && otherCondNode.ChildNodes?.Count > 0)
                 {
-                    selectNext.Add(defaultNextStepId, $" (data.matched_result==false) ");
                     otherCondNode.ChildNodes.ForEach(b => ParseFlowNode(corpId, steps, flowType, b, nextStepId, otherFormIds));
-                    step.NextStepId = "";
                 }
                 step.SelectNextStep = selectNext;
             }

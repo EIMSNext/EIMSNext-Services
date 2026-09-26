@@ -10,6 +10,7 @@ using EIMSNext.Persistence.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
@@ -45,7 +46,11 @@ namespace EIMSNext.Identity.Extensions
                 .Validate(options => options.ShutdownDrainSeconds > 0, "IdentityLoginAuditQueue:ShutdownDrainSeconds must be greater than zero.")
                 .ValidateOnStart();
             services.AddSingleton<IdentityLoginAuditQueue>();
-            services.AddHostedService<IdentityLoginAuditWriterService>();
+            services.AddHostedService(sp => new IdentityLoginAuditWriterService(
+                sp.GetRequiredService<IdentityLoginAuditQueue>(),
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IOptions<IdentityLoginAuditQueueOptions>>(),
+                sp.GetRequiredService<ILogger<IdentityLoginAuditWriterService>>()));
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
             services.AddScoped<PublicSettingLookupService>();

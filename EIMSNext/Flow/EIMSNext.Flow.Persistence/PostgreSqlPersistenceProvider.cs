@@ -1,3 +1,5 @@
+using System;
+using EIMSNext.Common;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WorkflowCore.Models;
@@ -11,6 +13,8 @@ public sealed class PostgreSqlPersistenceProvider(
 {
     public async Task<string> CreateNewWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken = default)
     {
+        // WorkflowCore 的 StartWorkflow 不赋值 Id，PG 也没有默认主键，落库前由 provider 生成。
+        workflow.Id = workflow.Id ?? TsidIdGenerator.NewId();
         await using var db = await createContext(cancellationToken);
         db.WorkflowInstances.Add(workflow);
         AddPointers(db, workflow.Id, workflow.ExecutionPointers);
@@ -38,10 +42,17 @@ public sealed class PostgreSqlPersistenceProvider(
         await using var db = await createContext(cancellationToken);
         await db.Database.CreateExecutionStrategy().ExecuteAsync(async () =>
         {
-            // One transaction persists the instance, its pointers and its subscriptions.
+            // 实例行与指针行的更新必须在同一事务里，否则引擎在两步之间崩溃会留下
+            // 「实例状态前进了、指针还是旧的」的脏状态。
             await using var transaction = await db.Database.BeginTransactionAsync(cancellationToken);
             db.WorkflowInstances.Update(workflow);
             await SyncPointers(db, workflow.Id, workflow.ExecutionPointers, cancellationToken);
+            // 等待活动的节点会随实例一起提交订阅；PG 无默认主键，这里同样要补 Id，
+            // 否则 AddRange 会抛「主键为空」，整次持久化失败、实例被反复重跑。
+            foreach (var subscription in subscriptions ?? [])
+            {
+                subscription.Id = subscription.Id ?? TsidIdGenerator.NewId();
+            }
             db.EventSubscriptions.AddRange(subscriptions ?? []);
             await db.SaveChangesAsync(cancellationToken);
             await transaction.CommitAsync(cancellationToken);
@@ -110,6 +121,10 @@ public sealed class PostgreSqlPersistenceProvider(
 
     public async Task<string> CreateEventSubscription(EventSubscription subscription, CancellationToken cancellationToken = default)
     {
+        // 同 CreateNewWorkflow：PG 无默认主键，订阅 Id 由 provider 生成。
+        // 缺了这一步，等待活动的节点（如审批节点）会因主键为空使整次持久化失败，
+        // 实例状态无法前进而被调度器反复重跑。
+        subscription.Id = subscription.Id ?? Guid.NewGuid().ToString("N");
         await using var db = await createContext(cancellationToken);
         db.EventSubscriptions.Add(subscription);
         await db.SaveChangesAsync(cancellationToken);
@@ -167,6 +182,8 @@ public sealed class PostgreSqlPersistenceProvider(
 
     public async Task<string> CreateEvent(Event newEvent, CancellationToken cancellationToken = default)
     {
+        // 同上：PG 无默认主键，事件 Id 由 provider 生成。
+        newEvent.Id = newEvent.Id ?? TsidIdGenerator.NewId();
         await using var db = await createContext(cancellationToken);
         db.Events.Add(newEvent);
         await db.SaveChangesAsync(cancellationToken);
@@ -265,7 +282,7 @@ public sealed class PostgreSqlPersistenceProvider(
     {
         foreach (var pointer in pointers ?? Enumerable.Empty<ExecutionPointer>())
         {
-            if (string.IsNullOrEmpty(pointer.Id)) pointer.Id = Guid.NewGuid().ToString();
+            if (string.IsNullOrEmpty(pointer.Id)) pointer.Id = TsidIdGenerator.NewId();
             db.Context.Entry(pointer).Property("WorkflowId").CurrentValue = workflowId;
             db.ExecutionPointers.Add(pointer);
         }
@@ -275,8 +292,13 @@ public sealed class PostgreSqlPersistenceProvider(
     /// 差量同步指针：新增的插入、消失的删除、仍在的逐列更新（含 jsonb 载荷）。
     /// 引擎每步只前进少量指针，这样比旧实现「整块 jsonb 全量重写」的写放大小得多，
     /// 也让单个指针可被索引、可被单独更新。
+    /// <para>
+    /// WfDbContext 全局配置了 <c>QueryTrackingBehavior.NoTracking</c>，这里查出的行都是游离实体，
+    /// 必须先 <c>Attach</c> 再改，否则对游离条目调用 SetValues/Remove 不产生任何 UPDATE/DELETE，
+    /// 指针状态将永远停在插入时的值（表现为流程被调度器反复重跑）。
+    /// </para>
     /// </summary>
-    private static async Task SyncPointers(IWfDbContext db, string workflowId, IEnumerable<ExecutionPointer>? pointers, CancellationToken cancellationToken)
+    private async Task SyncPointers(IWfDbContext db, string workflowId, IEnumerable<ExecutionPointer>? pointers, CancellationToken cancellationToken)
     {
         var incoming = pointers?.ToList() ?? [];
         var existing = await db.ExecutionPointers
@@ -284,19 +306,25 @@ public sealed class PostgreSqlPersistenceProvider(
             .ToListAsync(cancellationToken);
 
         foreach (var stale in existing.Where(e => incoming.All(p => p.Id != e.Id)))
+        {
+            db.ExecutionPointers.Attach(stale);
             db.ExecutionPointers.Remove(stale);
+        }
 
         foreach (var pointer in incoming)
         {
             var tracked = existing.Find(e => e.Id == pointer.Id);
             if (tracked is null)
             {
-                if (string.IsNullOrEmpty(pointer.Id)) pointer.Id = Guid.NewGuid().ToString();
+                if (string.IsNullOrEmpty(pointer.Id)) pointer.Id = TsidIdGenerator.NewId();
                 db.Context.Entry(pointer).Property("WorkflowId").CurrentValue = workflowId;
                 db.ExecutionPointers.Add(pointer);
             }
             else
             {
+                var entry = db.Context.Entry(tracked);
+                if (entry.State == EntityState.Detached)
+                    db.ExecutionPointers.Attach(tracked);
                 db.Context.Entry(tracked).CurrentValues.SetValues(pointer);
             }
         }

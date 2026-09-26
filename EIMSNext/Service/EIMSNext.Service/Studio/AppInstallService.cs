@@ -228,7 +228,7 @@ namespace EIMSNext.Service
             }
             else if (menuType == (int)FormType.Group)
             {
-                menuId = Guid.NewGuid().ToString("N");
+                menuId = TsidIdGenerator.NewId();
             }
 
             var subMenus = obj["subMenus"] as JsonArray;

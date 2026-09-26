@@ -772,8 +772,8 @@ namespace EIMSNext.Flow.Core
             wfInst.ExecutionPointers.Clear();
             wfInst.ExecutionPointers.Add(new ExecutionPointer
             {
-                // ExecutionPointer.Id 是 WorkflowCore 自己用的字符串指针标识，不落业务表主键，
-                Id = Guid.NewGuid().ToString("N"),
+                // ExecutionPointer.Id 是 WorkflowCore 自己用的字符串指针标识，不落业务表主键
+                Id = TsidIdGenerator.NewId(),
                 StepId = stepId,
                 StepName = targetStep.Name,
                 Active = true,

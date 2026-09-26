@@ -37,7 +37,7 @@ namespace EIMSNext.ApiHost.Extensions
                 PostgreSqlPersistenceRegistration.ConfigurePostgreSql(options, settings);
                 return options.Options;
             }).As<DbContextOptions<PostgreSqlDbContext>>().InstancePerLifetimeScope();
-            builder.RegisterType<PostgreSqlDbContext>().AsSelf().InstancePerLifetimeScope();
+            builder.RegisterType<PostgreSqlDbContext>().AsSelf().As<DbContext>().InstancePerLifetimeScope();
 
             builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterType<IdentityContext>().AsImplementedInterfaces().InstancePerLifetimeScope();

@@ -307,7 +307,7 @@ namespace EIMSNext.ApiService
 
             if (!string.IsNullOrWhiteSpace(email))
             {
-                var duplicated = userService.Query(x => !x.Disabled && x.Email.ToLower() == email.ToLower()).FirstOrDefault();
+                var duplicated = userService.Query(x => !x.Disabled && x.Email == email).FirstOrDefault();
                 if (duplicated != null && duplicated.Id != excludeUserId)
                 {
                     throw new InvalidOperationException("邮箱已存在");

@@ -1,6 +1,7 @@
 ﻿using System.Data;
 
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Persistence.PostgreSql.Outbox;
 
@@ -42,7 +43,7 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         /// </remarks>
         public async Task<string?> TryAcquireAsync(string eventKey, string target, DateTime leaseUntil, CancellationToken cancellationToken = default)
         {
-            var token = Guid.NewGuid().ToString("N");
+            var token = TsidIdGenerator.NewId();
 
             const string sql = """
                 insert into "ProcessedMessage"

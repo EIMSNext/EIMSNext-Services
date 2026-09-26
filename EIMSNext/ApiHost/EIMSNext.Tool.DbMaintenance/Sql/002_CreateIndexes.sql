@@ -3,7 +3,7 @@
 -- 分两部分：
 --   1) 模型声明段：夹在 >>> / <<< generated 两行标记之间，由 EF 模型投影生成，勿手工编辑；
 --   2) 手写业务索引：企业维度查询以 CorpId 打头、DeleteFlag 收尾，部分带 where 的部分索引，
---      以及模型表达不了的 GIN / text_pattern_ops。
+--      以及模型表达不了的 GIN / citext_pattern_ops。
 -- 命名规则：UX_ 唯一 / IX_ 普通，表名用精确实体名单数，字段顺序与查询顺序一致。
 --
 -- 与 001 同理：索引也应优先在模型里声明；模型未覆盖的只能写在这里。
@@ -11,7 +11,7 @@
 
 
 -- >>> generated: model-declared indexes
--- 本段由 EF 模型投影生成，请勿手工编辑；新增索引优先写在模型里，模型无法表达的（GIN、部分索引、text_pattern_ops）写在本标记段之下的手写区。
+-- 本段由 EF 模型投影生成，请勿手工编辑；新增索引优先写在模型里，模型无法表达的（GIN、部分索引、citext_pattern_ops）写在本标记段之下的手写区。
 -- 重新生成：dotnet test Tests/EIMSNext.Core.Tests --filter RegenerateBaselineScripts（需先置环境变量 EIMS_REGENERATE_BASELINE=1）
 create index if not exists "IX_Department_CorpId_Code" on "Department" ("CorpId", "Code");
 
@@ -41,7 +41,7 @@ create index if not exists "IX_Employee_CorpId_UserId" on "Employee" ("CorpId", 
 
 create index if not exists "IX_Department_CorpId_DeleteFlag" on "Department" ("CorpId", "DeleteFlag");
 
-create index if not exists "IX_Department_HeriarchyId" on "Department" ("HeriarchyId" text_pattern_ops);
+create index if not exists "IX_Department_HeriarchyId" on "Department" ("HeriarchyId" citext_pattern_ops);
 
 create index if not exists "IX_EmployeeDepartment_CorpId_DepartmentId_EmployeeId" on "EmployeeDepartment" ("CorpId", "DepartmentId", "EmployeeId");
 
@@ -149,7 +149,7 @@ create index if not exists "IX_ExportLog_CorpId_CreateTime" on "ExportLog" ("Cor
 create index if not exists "IX_Ef_RunLog_CorpId_EventFlowId_StartTime" on "Ef_RunLog" ("CorpId", "EventFlowId", "StartTime");
 
 -- 客户端唯一性：原索引列为 ClientId，实体上改用 ApiKey 作为应用凭证。
-create unique index if not exists "UX_Client_ApiKey" on "Client" ("ApiKey") where "DeleteFlag" = false;
+create unique index if not exists "UX_Client_ApiKey" on "Client" ("ApiKey") where "DeleteFlag" = false and "ApiKey" <> '';
 
 -- 调度扫描：只索引未执行的触发点。原索引列为 ExecuteTime，实体上是 TriggerTime。
 create index if not exists "IX_FormNotifyScheduleItem_TriggerTime" on "FormNotifyScheduleItem" ("TriggerTime") where "TriggerTime" is not null;

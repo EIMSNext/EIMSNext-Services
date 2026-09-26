@@ -1,3 +1,4 @@
+using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -24,9 +25,7 @@ namespace EIMSNext.Identity.Services
         {
             if (string.IsNullOrWhiteSpace(entity.Id))
             {
-                // PostgreSQL 侧 Id 保持 string 契约，统一产出 32 位无连字符 GUID，
-                // 与 IRepository<T>.NewId() 的取值规则一致。
-                entity.Id = Guid.NewGuid().ToString("N");
+                entity.Id = TsidIdGenerator.NewId();
             }
 
             if (_queue.TryEnqueue(entity))

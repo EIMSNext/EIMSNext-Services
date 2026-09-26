@@ -147,7 +147,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 
-            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
+            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, TsidIdGenerator.NewId());
 
             await _wfHost.SubmitActivitySuccess(act.Token, approveData.ToExpando());
             var errMsg = WaitForComplete(approveData.ExecLogId);

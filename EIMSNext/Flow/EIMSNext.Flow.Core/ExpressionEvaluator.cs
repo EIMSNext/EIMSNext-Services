@@ -86,6 +86,10 @@ namespace EIMSNext.Workflow.Repository
 
             if (needEval)
             {
+                // 解析器为「其他分支」生成的条件是 `data.matched_result==false`，因此 data 顶层必须
+                // 暴露当前匹配结果。前一个条件分支求值后已把 matched_result 写回工作流数据，
+                // 这里读到的即是更新后的值：命中过任一条件分支时为 true，否则保持 false。
+                wrapData[WfConsts.MatchedResult] = matchedResult;
                 var resolvedValue = _scriptEngine.Evaluate(sourceExpr, new Dictionary<string, object>()
                 {
                     ["data"] = wrapData,

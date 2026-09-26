@@ -4,6 +4,7 @@ using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
@@ -57,7 +58,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var execResult = new EfExecResult();
             if (string.IsNullOrWhiteSpace(paramter.ExecutionId))
             {
-                paramter.WithExecutionId(Guid.NewGuid().ToString("N"));
+                paramter.WithExecutionId(TsidIdGenerator.NewId());
             }
             if (paramter.Cascade == CascadeMode.Never || (paramter.Cascade == CascadeMode.Specified && string.IsNullOrEmpty(paramter.EventIds)))
             {
@@ -297,7 +298,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 EventFlowId = eventFlow.Id,
                 RunLogId = runLog?.Id ?? string.Empty,
                 ExecutionId = string.IsNullOrWhiteSpace(paramter.ExecutionId)
-                    ? runLog?.Id ?? Guid.NewGuid().ToString("N")
+                    ? runLog?.Id ?? TsidIdGenerator.NewId()
                     : paramter.ExecutionId,
                 WorkflowInstanceId = paramter.WorkflowInstanceId,
                 WorkflowTransition = paramter.WorkflowTransition

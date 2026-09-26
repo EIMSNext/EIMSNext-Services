@@ -46,7 +46,7 @@ namespace EIMSNext.Identity.Services
 
             return WithCorps(_dbContext.Users.FirstOrDefault(x =>
                 !x.Disabled &&
-                (string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase) || x.Phone == normalized)));
+                (x.Email == normalized || x.Phone == normalized)));
         }
 
         public User? FindByEmail(string email)
@@ -55,7 +55,7 @@ namespace EIMSNext.Identity.Services
             return string.IsNullOrWhiteSpace(normalized)
                 ? null
                 : WithCorps(_dbContext.Users.FirstOrDefault(x =>
-                    !x.Disabled && string.Equals(x.Email, normalized, StringComparison.OrdinalIgnoreCase)));
+                    !x.Disabled && x.Email == normalized));
         }
 
         public User? FindByPhone(string phone)

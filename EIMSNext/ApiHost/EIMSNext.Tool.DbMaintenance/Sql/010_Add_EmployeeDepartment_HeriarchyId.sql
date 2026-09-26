@@ -5,7 +5,7 @@
 -- 幂等性：ADD COLUMN IF NOT EXISTS 保证重复执行安全；回填仅处理仍为空的行。
 -- 全新库（由 001 直接建表）本脚本为 no-op（列已存在、无历史行需要回填）。
 
-ALTER TABLE "EmployeeDepartment" ADD COLUMN IF NOT EXISTS "HeriarchyId" text NOT NULL DEFAULT '';
+ALTER TABLE "EmployeeDepartment" ADD COLUMN IF NOT EXISTS "HeriarchyId" citext NOT NULL DEFAULT '';
 
 -- 存量数据回填：从 Department 表取当前层级路径。
 UPDATE "EmployeeDepartment" ed

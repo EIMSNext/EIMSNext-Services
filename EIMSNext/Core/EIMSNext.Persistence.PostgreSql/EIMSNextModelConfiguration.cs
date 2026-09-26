@@ -29,14 +29,15 @@ namespace EIMSNext.Persistence.PostgreSql;
 /// </remarks>
 public static class EIMSNextModelConfiguration
 {
-    /// <summary>
-    /// 标识符列（主键与外键）使用的排序规则：<c>C</c> 即按字节比较，不做语言学处理。
-    /// </summary>
-    /// <remarks>
-    /// 字符集与排序规则是正交的两件事，这里只动后者，库的编码仍为 UTF8。
-    /// Windows 版 PostgreSQL 上没有 Linux 常见的 <c>C.UTF-8</c>，可用值里 <c>C</c> 面向任意编码。
-    /// </remarks>
+    /// <summary>标识符列（主键与外键）在 citext 之上再挂的排序规则：<c>C</c>，按字节比较。</summary>
     private const string IdentifierCollation = "C";
+
+    /// <summary>
+    /// 字符列的类型：<c>citext</c>，由
+    /// <c>Sql/000_CreateCaseInsensitiveType.sql</c> 在库里创建。手写原生命令时也应把字符串参数
+    /// 按这个类型发送，否则 PG 会把 citext 列降级成 <c>(col)::text</c> 比较（丢索引条件）。
+    /// </summary>
+    public const string CaseInsensitiveType = "citext";
 
     /// <summary>
     /// 注册跨上下文通用的属性转换约定。
@@ -191,37 +192,25 @@ public static class EIMSNextModelConfiguration
         // WorkflowTransitionExecution.Error 存放异常描述，同样是普通文本。
         Mapped<WorkflowTransitionExecution>(modelBuilder)?.Property(x => x.Error).HasColumnType("text");
 
-        // ------------------------------------------------------------ 主键
-        // Id 保持 string 契约，映射为 text 列，不使用数据库自增。
-        foreach (var entity in modelBuilder.Model.GetEntityTypes())
-        {
-            var idProperty = entity.FindProperty(nameof(IEntityKey.Id));
-            if (idProperty is not null) idProperty.SetColumnType("text");
-        }
-
-        // ------------------------------------------------------------ 标识符列的排序规则
-        // 主键与所有引用它的外键统一按字节比较，不使用库级的中文排序规则。
-        // 实测依据（本机 PostgreSQL 18.6，EIMS 库原为 Chinese_China.936，50 万行主键 + 1 万次点查）：
-        // 建索引 1306ms → 198ms（快 6.6 倍），点查 21,030 → 27,733 ops/s。原因是这些列只承载
-        // TSID / GUID 这类纯 base32 字符串，从不需要语言学语义，而默认排序规则每次比较都要
-        // 走 strcoll——这部分开销纯粹是白付的。
-        //
-        // 覆盖范围刻意取「全部名为 Id 或以 Id 结尾的 string 列」，而不是只枚举已声明关系的
-        // 外键：PostgreSQL 在比较两个排序规则不同的列时会抛
-        //   could not determine which collation to use for string comparison
-        // 只要漏掉任何一个引用方，对应的 JOIN / 子查询就会在运行时报错而不是编译期报错，
-        // 且报错点离改动处很远——只有当真实查询落到那张表时才会炸。本模型里大量外键是
-        // 纯标量（只存被引用的主键值、没有反向导航属性），靠 GetForeignKeys() 拿不全；
-        // 按命名约定整体覆盖才能保证主键与其引用方的排序规则必然一致。
-        //
-        // 业务文本列（Name / Remark / Value / Title 等）保持库级默认排序，不受影响。
+        // ------------------------------------------------------------ 字符列
+        // 全部字符列（主键与外键、业务文本、以文本落库的枚举列，见 ConfigureEIMSNextConventions
+        // 的 Properties<Enum>）统一用 citext：EF 会把对应参数一并按 citext 发送，等值 / IN / LIKE
+        // 天然大小写无关且走索引，不必在 LINQ 里包 ToLower()，也不必在写路径折叠大小写。
+        // 只挑当前已是字符型的列，避免把 jsonb 列改掉。
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var property in entity.GetProperties())
             {
-                if (property.ClrType != typeof(string)) continue;
-                if (!IsIdentifierName(property.Name)) continue;
-                property.SetCollation(IdentifierCollation);
+                if (!IsTextualClrType(property.ClrType)) continue;
+                if (!IsCharacterColumn(property.GetColumnType())) continue;
+
+                property.SetColumnType(CaseInsensitiveType);
+
+                // 标识符列再按字节比较：只承载 TSID，不需要语言学语义，且 TSID 靠 ASCII 序表达时间序，
+                // 确定性字节序才是对的。取「名为 Id 或以 Id 结尾」而不是只枚举已声明关系的外键：
+                // PG 比较两个排序规则不同的列会抛 could not determine which collation to use，
+                // 而 GetForeignKeys() 拿不全纯标量外键，漏掉任一引用方只会等真实查询落到那张表时才炸。
+                if (IsIdentifierName(property.Name)) property.SetCollation(IdentifierCollation);
             }
         }
 
@@ -294,6 +283,36 @@ public static class EIMSNextModelConfiguration
     private static bool IsIdentifierName(string name)
         => string.Equals(name, "Id", StringComparison.Ordinal)
            || (name.EndsWith("Id", StringComparison.Ordinal) && name.Length > 2);
+
+    /// <summary>
+    /// 判断 CLR 类型是否可能落成字符列：<c>string</c> 或枚举（枚举经
+    /// <c>Properties&lt;Enum&gt;().HaveConversion&lt;string&gt;()</c> 落成 text）。
+    /// </summary>
+    /// <remarks>
+    /// 可空枚举的 <see cref="Type.IsEnum"/> 为 false，因此先剥掉 <see cref="Nullable{T}"/>。
+    /// </remarks>
+    private static bool IsTextualClrType(Type clrType)
+    {
+        var type = Nullable.GetUnderlyingType(clrType) ?? clrType;
+        return type == typeof(string) || type.IsEnum;
+    }
+
+    /// <summary>
+    /// 判断列类型是否为字符型（可换成 citext）。
+    /// </summary>
+    /// <remarks>
+    /// 未显式声明列类型时（<see cref="Microsoft.EntityFrameworkCore.Metadata.IReadOnlyProperty.GetColumnType"/> 返回 <c>null</c>），
+    /// string 属性按 Npgsql 约定映射为 <c>text</c>，同样算字符型。
+    /// </remarks>
+    private static bool IsCharacterColumn(string? columnType)
+    {
+        if (string.IsNullOrEmpty(columnType)) return true;
+
+        return columnType.StartsWith("text", StringComparison.OrdinalIgnoreCase)
+               || columnType.StartsWith("character", StringComparison.OrdinalIgnoreCase)
+               || columnType.StartsWith("varchar", StringComparison.OrdinalIgnoreCase)
+               || columnType.StartsWith("citext", StringComparison.OrdinalIgnoreCase);
+    }
 
     /// <summary>生成 jsonb 值转换器，见 <see cref="JsonbValueConverter.Create{TValue}"/>。</summary>
     /// <remarks>

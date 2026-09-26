@@ -13,6 +13,7 @@
     <PackageReference Include="Newtonsoft.Json" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
   </ItemGroup>
 </Project>
 

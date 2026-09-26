@@ -319,7 +319,7 @@ namespace EIMSNext.Service
                         var layoutId = idValue.GetValue<string>();
                         if (!layoutMap.ContainsKey(layoutId))
                         {
-                            layoutMap[layoutId] = Guid.NewGuid().ToString("N");
+                            layoutMap[layoutId] = TsidIdGenerator.NewId();
                         }
                     }
 

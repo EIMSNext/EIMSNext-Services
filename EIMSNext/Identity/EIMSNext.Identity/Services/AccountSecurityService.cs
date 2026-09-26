@@ -375,7 +375,6 @@ namespace EIMSNext.Identity.Services
                 return normalizedTarget;
             }
 
-            normalizedTarget = normalizedTarget.ToLowerInvariant();
             if (!EmailRegex.IsMatch(normalizedTarget))
             {
                 throw new InvalidOperationException("邮箱格式不正确");

@@ -49,6 +49,7 @@ namespace EIMSNext.Core.Tests
 
             db.Database.ExecuteSqlRaw(
                 """
+                create extension if not exists citext;
                 drop table if exists "TestFormData" cascade;
                 drop table if exists "TestEntityData" cascade;
                 drop table if exists "TestFormDef" cascade;

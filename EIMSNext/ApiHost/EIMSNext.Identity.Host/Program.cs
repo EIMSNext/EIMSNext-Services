@@ -84,7 +84,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     {
         foreach (var client in seedClients)
         {
-            context.AddClient(client);
+            context.AddClient(client).GetAwaiter().GetResult();
         }
     }
     else
@@ -147,7 +147,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     {
         foreach (var user in SeedData.GetUsers())
         {
-            context.AddUser(user);
+            context.AddUser(user).GetAwaiter().GetResult();
         }
     }
 

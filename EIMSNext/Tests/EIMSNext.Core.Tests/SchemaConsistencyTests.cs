@@ -91,7 +91,7 @@ namespace EIMSNext.Core.Tests
             {
                 using var command = db.Database.GetDbConnection().CreateCommand();
                 command.CommandText = """
-                    select table_name, column_name, data_type
+                    select table_name, column_name, data_type, udt_name
                     from information_schema.columns
                     where table_schema = 'public'
                     """;
@@ -101,13 +101,14 @@ namespace EIMSNext.Core.Tests
                     var table = reader.GetString(0);
                     var column = reader.GetString(1);
                     var dataType = reader.GetString(2);
+                    var udtName = reader.GetString(3);
 
                     if (!result.TryGetValue(table, out var columns))
                     {
                         columns = new SortedDictionary<string, string>(StringComparer.Ordinal);
                         result[table] = columns;
                     }
-                    columns[column] = NormalizeDbType(dataType);
+                    columns[column] = NormalizeDbType(dataType, udtName);
                 }
             }
             finally
@@ -128,8 +129,15 @@ namespace EIMSNext.Core.Tests
             return type;
         }
 
-        /// <summary>把 information_schema 的 data_type 折算到同一口径。</summary>
-        private static string NormalizeDbType(string dataType)
-            => dataType.Trim().ToLowerInvariant();
+        /// <summary>把 information_schema 的类型折算到同一口径。</summary>
+        /// <remarks>
+        /// citext 这类扩展类型上报的 <c>data_type</c> 是 <c>USER-DEFINED</c>，真实类型名只在
+        /// <c>udt_name</c> 里，因此需要回退到它才能和 EF 的列类型比对上。
+        /// </remarks>
+        private static string NormalizeDbType(string dataType, string udtName)
+        {
+            var type = dataType.Trim().ToLowerInvariant();
+            return type == "user-defined" ? udtName.Trim().ToLowerInvariant() : type;
+        }
     }
 }

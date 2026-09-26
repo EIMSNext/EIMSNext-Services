@@ -222,16 +222,14 @@ namespace EIMSNext.Service
                 throw new NotFoundException("未找到待处理的邀请");
             }
 
-            // 这里用 lower() = lower() 表达同样的语义：ILike 会把值里的 % 与 _ 当成通配符，
-            // 邮箱里带下划线时会误命中别的员工，因此不能用 ILike。
-            var phoneKey = normalizedPhone?.ToLowerInvariant();
-            var emailKey = normalizedEmail?.ToLowerInvariant();
+            // WorkPhone / WorkEmail 是 citext，直接等值比较即可；
+            // 不能用 ILike——它会把值里的 % 与 _ 当通配符（邮箱含下划线时会误命中别的员工）。
             var invites = Repository.Queryable
                 .Where(x => !x.DeleteFlag
                     && x.Status == EmployeeStatus.Active
                     && !x.UserBound
-                    && ((phoneKey != null && x.WorkPhone.ToLower() == phoneKey)
-                        || (emailKey != null && x.WorkEmail.ToLower() == emailKey)))
+                    && ((normalizedPhone != null && x.WorkPhone == normalizedPhone)
+                        || (normalizedEmail != null && x.WorkEmail == normalizedEmail)))
                 .ToList();
             if (invites.Count == 0)
             {
