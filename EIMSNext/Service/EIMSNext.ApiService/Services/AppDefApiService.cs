@@ -31,7 +31,7 @@ namespace EIMSNext.ApiService
             var app = await GetManageableAppAsync(request.AppId);
             var menu = new AppMenu
             {
-                MenuId = Guid.NewGuid().ToString("N"),
+                MenuId = TsidIdGenerator.NewId(),
                 Title = request.Name.Trim(),
                 MenuType = FormType.Group,
                 SortIndex = (app.AppMenus.Count + 1) * 100,

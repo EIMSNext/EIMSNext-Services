@@ -195,7 +195,7 @@ namespace EIMSNext.Service
             var outboxPublisher = Resolver.Resolve<IOutboxPublisher>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var entity = entities.First();
-            var webhookEventId = Guid.NewGuid().ToString("N");
+            var webhookEventId = TsidIdGenerator.NewId();
             var webhookPayload = (entity).SerializeToJson();
             TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId));
 
@@ -522,7 +522,7 @@ namespace EIMSNext.Service
             var formExp = entity.SerializeToJson().DeserializeFromJson<Dictionary<string, object?>>()
                 ?? new Dictionary<string, object?>();
             formExp.TryAdd("oridata", oriValue);
-            var webhookEventId = Guid.NewGuid().ToString("N");
+            var webhookEventId = TsidIdGenerator.NewId();
             TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId));
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);

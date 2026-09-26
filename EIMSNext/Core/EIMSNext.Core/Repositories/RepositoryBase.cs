@@ -1,4 +1,5 @@
 ﻿using System.Linq.Expressions;
+using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using Microsoft.EntityFrameworkCore;
@@ -50,9 +51,9 @@ namespace EIMSNext.Core.Repositories
             => Queryable.AnyAsync(predicate, cancellationToken);
 
         /// <summary>
-        /// 主键生成。Id 保持 string 契约，因此仍产出 32 位无连字符 GUID。
+        /// 主键生成。Id 保持 string 契约，产出 <see cref="TsidIdGenerator"/> 的 TSID 字符串。
         /// </summary>
-        public string NewId() => Guid.NewGuid().ToString("N");
+        public string NewId() => TsidIdGenerator.NewId();
 
         /// <inheritdoc />
         public T EnsureId(T entity)

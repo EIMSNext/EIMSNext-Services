@@ -24,13 +24,13 @@
 
 
 CREATE TABLE "AppDef" (
-    "Id" text not null default '',
-    "TemplateId" text,
+    "Id" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
     "Name" text not null default '',
     "Description" text not null default '',
     "Icon" text not null default '',
     "IconColor" text not null default '',
-    "GroupId" text,
+    "GroupId" text COLLATE "C",
     "SortIndex" integer not null default 0,
     "HomeEntryIds" jsonb not null,
     "AppMenus" jsonb not null,
@@ -39,13 +39,13 @@ CREATE TABLE "AppDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_AppDef" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "AppProfile" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Summary" text not null default '',
     "Description" text not null default '',
@@ -63,7 +63,7 @@ CREATE TABLE "AppProfile" (
     "IsHot" boolean not null default false,
     "IsRecommended" boolean not null default false,
     "ThemeColor" text not null default '',
-    "TemplateId" text not null default '',
+    "TemplateId" text COLLATE "C" not null default '',
     "Status" text not null default '',
     "PublishedAt" timestamp with time zone,
     "CreateBy" jsonb,
@@ -76,7 +76,7 @@ CREATE TABLE "AppProfile" (
 
 
 CREATE TABLE "AppTemplate" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Description" text not null default '',
     "Icon" text not null default '',
@@ -91,10 +91,10 @@ CREATE TABLE "AppTemplate" (
 
 
 CREATE TABLE "AuditLog" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Action" text not null default '',
     "EntityType" text,
-    "DataId" text,
+    "DataId" text COLLATE "C",
     "Detail" text,
     "OldData" text,
     "NewData" text,
@@ -106,13 +106,13 @@ CREATE TABLE "AuditLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_AuditLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Client" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Enabled" boolean not null default false,
     "ClientSecrets" jsonb not null,
     "RequireClientSecret" boolean not null default false,
@@ -127,14 +127,14 @@ CREATE TABLE "Client" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Client" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "ClientGrant" (
-    "Id" text not null default '',
-    "ClientId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "ClientId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "AppScope" text not null default '',
     "AppIds" jsonb not null,
@@ -147,21 +147,21 @@ CREATE TABLE "ClientGrant" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_ClientGrant" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "CorpOnboardingRequest" (
-    "Id" text not null default '',
-    "UserId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "UserId" text COLLATE "C" not null default '',
     "UserName" text not null default '',
-    "TargetCorpId" text not null default '',
+    "TargetCorpId" text COLLATE "C" not null default '',
     "TargetCorpName" text not null default '',
     "ApplicantName" text not null default '',
     "Phone" text not null default '',
     "Email" text not null default '',
-    "EmployeeId" text not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
     "SourceType" text not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
@@ -173,7 +173,7 @@ CREATE TABLE "CorpOnboardingRequest" (
 
 
 CREATE TABLE "Corporate" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Description" text not null default '',
     "Code" text not null default '',
@@ -188,7 +188,7 @@ CREATE TABLE "Corporate" (
 
 
 CREATE TABLE "CorporateSetting" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Value" text not null default '',
     "Desc" text not null default '',
@@ -197,30 +197,30 @@ CREATE TABLE "CorporateSetting" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_CorporateSetting" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "CrossBinding" (
-    "Id" text not null default '',
-    "TargetAppId" text not null default '',
-    "SourceAppId" text not null default '',
-    "SourceFormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "TargetAppId" text COLLATE "C" not null default '',
+    "SourceAppId" text COLLATE "C" not null default '',
+    "SourceFormId" text COLLATE "C" not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_CrossBinding" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "DashboardDef" (
-    "Id" text not null default '',
-    "TemplateId" text,
-    "AppId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
+    "AppId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Layout" text not null default '',
     "AutoRefreshEnabled" boolean not null default false,
@@ -232,18 +232,18 @@ CREATE TABLE "DashboardDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_DashboardDef" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "DashboardItemDef" (
-    "Id" text not null default '',
-    "TemplateId" text,
-    "AppId" text not null default '',
-    "DashboardId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
+    "AppId" text COLLATE "C" not null default '',
+    "DashboardId" text COLLATE "C" not null default '',
     "ItemType" text not null default '',
-    "LayoutId" text not null default '',
+    "LayoutId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Details" text not null default '',
     "CreateBy" jsonb,
@@ -251,17 +251,17 @@ CREATE TABLE "DashboardItemDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_DashboardItemDef" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "DashboardItemTemplate" (
-    "Id" text not null default '',
-    "AppTemplateId" text not null default '',
-    "DashboardTemplateId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
+    "DashboardTemplateId" text COLLATE "C" not null default '',
     "ItemType" text not null default '',
-    "LayoutId" text not null default '',
+    "LayoutId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Details" text not null default '',
     "CreateBy" jsonb,
@@ -274,8 +274,8 @@ CREATE TABLE "DashboardItemTemplate" (
 
 
 CREATE TABLE "DashboardTemplate" (
-    "Id" text not null default '',
-    "AppTemplateId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Layout" text not null default '',
     "CreateBy" jsonb,
@@ -288,43 +288,43 @@ CREATE TABLE "DashboardTemplate" (
 
 
 CREATE TABLE "Department" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Code" text not null default '',
     "Name" text not null default '',
     "IsCompany" boolean not null default false,
-    "ParentId" text not null default '',
+    "ParentId" text COLLATE "C" not null default '',
     "ParentName" text not null default '',
-    "HeriarchyId" text not null default '',
+    "HeriarchyId" text COLLATE "C" not null default '',
     "HeriarchyName" text not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Department" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "ECoinPrice" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
-    "FeatureId" text not null default '',
+    "FeatureId" text COLLATE "C" not null default '',
     "FeatureDesc" text not null default '',
     "Price" numeric not null default 0,
     "ChargeType" text not null default '',
-    "PluginId" text not null default '',
+    "PluginId" text COLLATE "C" not null default '',
     CONSTRAINT "PK_ECoinPrice" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Ef_RunLog" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "EventFlowId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "EventFlowId" text COLLATE "C" not null default '',
     "EventFlowName" text not null default '',
     "EventFlowVersion" integer not null default 0,
-    "WfInstanceId" text not null default '',
+    "WfInstanceId" text COLLATE "C" not null default '',
     "TriggerKind" text not null default '',
     "EventSource" text not null default '',
     "EventType" text not null default '',
@@ -339,18 +339,18 @@ CREATE TABLE "Ef_RunLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Ef_RunLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Ef_RunLogNode" (
-    "Id" text not null default '',
-    "RunLogId" text not null default '',
-    "EventFlowId" text not null default '',
-    "WfInstanceId" text not null default '',
-    "DataId" text not null default '',
-    "NodeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "RunLogId" text COLLATE "C" not null default '',
+    "EventFlowId" text COLLATE "C" not null default '',
+    "WfInstanceId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C" not null default '',
+    "NodeId" text COLLATE "C" not null default '',
     "NodeName" text not null default '',
     "NodeType" text not null default '',
     "StartTime" bigint not null default 0,
@@ -366,14 +366,14 @@ CREATE TABLE "Ef_RunLogNode" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Ef_RunLogNode" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Employee" (
-    "Id" text not null default '',
-    "UserId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "UserId" text COLLATE "C" not null default '',
     "UserName" text not null default '',
     "Code" text not null default '',
     "EmpName" text not null default '',
@@ -388,24 +388,24 @@ CREATE TABLE "Employee" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Employee" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "EmployeeDepartment" (
-    "Id" text not null default '',
-    "EmployeeId" text not null default '',
-    "DepartmentId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
+    "DepartmentId" text COLLATE "C" not null default '',
     "IsManager" boolean not null default false,
     "SortValue" integer not null default 0,
-    "HeriarchyId" text not null default '',
+    "HeriarchyId" text COLLATE "C" not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EmployeeDepartment" PRIMARY KEY ("Id"),
     CONSTRAINT "FK_EmployeeDepartment_Department_DepartmentId" FOREIGN KEY ("DepartmentId") REFERENCES "Department" ("Id") ON DELETE CASCADE,
     CONSTRAINT "FK_EmployeeDepartment_Employee_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employee" ("Id") ON DELETE CASCADE
@@ -413,23 +413,23 @@ CREATE TABLE "EmployeeDepartment" (
 
 
 CREATE TABLE "EmployeeGroup" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Description" text not null default '',
-    "EmployeeGroupCategoryId" text not null default '',
+    "EmployeeGroupCategoryId" text COLLATE "C" not null default '',
     "SortValue" integer not null default 0,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EmployeeGroup" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "EmployeeGroupCategory" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Description" text not null default '',
     "SortValue" integer not null default 0,
@@ -438,15 +438,15 @@ CREATE TABLE "EmployeeGroupCategory" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EmployeeGroupCategory" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "EmployeeGroupMember" (
-    "Id" text not null default '',
-    "EmployeeId" text not null default '',
-    "EmployeeGroupId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
+    "EmployeeGroupId" text COLLATE "C" not null default '',
     "EmployeeGroupName" text not null default '',
     "SortValue" integer not null default 0,
     "CreateBy" jsonb,
@@ -454,16 +454,16 @@ CREATE TABLE "EmployeeGroupMember" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EmployeeGroupMember" PRIMARY KEY ("Id"),
     CONSTRAINT "FK_EmployeeGroupMember_Employee_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employee" ("Id") ON DELETE CASCADE
 );
 
 
 CREATE TABLE "EventFlowHookSample" (
-    "Id" text not null default '',
-    "EventFlowId" text not null default '',
-    "AppId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EventFlowId" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
     "ClientIp" text not null default '',
     "RawJson" text not null default '',
     "FlattenedFieldsJson" text not null default '',
@@ -473,24 +473,24 @@ CREATE TABLE "EventFlowHookSample" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EventFlowHookSample" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "EventFlowNodeExecution" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "ExecutionKey" text not null default '',
-    "ExecutionId" text not null default '',
-    "WorkflowInstanceId" text not null default '',
-    "RunLogId" text not null default '',
-    "CorpId" text not null default '',
-    "EventFlowId" text not null default '',
-    "NodeId" text not null default '',
+    "ExecutionId" text COLLATE "C" not null default '',
+    "WorkflowInstanceId" text COLLATE "C" not null default '',
+    "RunLogId" text COLLATE "C" not null default '',
+    "CorpId" text COLLATE "C" not null default '',
+    "EventFlowId" text COLLATE "C" not null default '',
+    "NodeId" text COLLATE "C" not null default '',
     "ActionType" text not null default '',
     "TargetKey" text not null default '',
     "Ordinal" integer not null default 0,
-    "FormId" text,
+    "FormId" text COLLATE "C",
     "SingleResult" boolean not null default false,
     "Status" text not null default '',
     "ProcessingOwner" text not null default '',
@@ -504,11 +504,11 @@ CREATE TABLE "EventFlowNodeExecution" (
 
 
 CREATE TABLE "EventFlowScheduleItem" (
-    "Id" text not null default '',
-    "EventFlowId" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text,
-    "DataId" text,
+    "Id" text COLLATE "C" not null default '',
+    "EventFlowId" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C",
+    "DataId" text COLLATE "C",
     "TriggerTime" bigint not null default 0,
     "AnchorTime" bigint not null default 0,
     "ScheduleVersion" bigint not null default 0,
@@ -518,13 +518,13 @@ CREATE TABLE "EventFlowScheduleItem" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_EventFlowScheduleItem" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "ExportLog" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "ExportType" text not null default '',
     "RequestedFormat" text not null default '',
     "ActualFormat" text not null default '',
@@ -542,32 +542,32 @@ CREATE TABLE "ExportLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_ExportLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormData" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "FlowStatus" text not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     "Data" jsonb not null,
     CONSTRAINT "PK_FormData" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormDataChangeLog" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
-    "DataId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C" not null default '',
     "Operator" jsonb,
     "OperateTime" bigint not null default 0,
     "Content" jsonb not null,
@@ -576,17 +576,17 @@ CREATE TABLE "FormDataChangeLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormDataChangeLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormDataImportLog" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "FormName" text,
-    "PermissionGroupId" text,
+    "PermissionGroupId" text COLLATE "C",
     "FormUsingWorkflow" boolean not null default false,
     "Mode" text not null default '',
     "TriggerValidation" boolean not null default false,
@@ -623,15 +623,15 @@ CREATE TABLE "FormDataImportLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormDataImportLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormDataPermissionGroup" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Desc" text not null default '',
     "Type" text not null default '',
@@ -640,21 +640,21 @@ CREATE TABLE "FormDataPermissionGroup" (
     "DataFilter" text,
     "FormFieldPermissions" jsonb not null,
     "Disabled" boolean not null default false,
-    "TemplateId" text,
+    "TemplateId" text COLLATE "C",
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormDataPermissionGroup" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormDataPermissionGroupTemplate" (
-    "Id" text not null default '',
-    "AppTemplateId" text not null default '',
-    "FormTemplateId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
+    "FormTemplateId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Desc" text not null default '',
     "Type" text not null default '',
@@ -672,9 +672,9 @@ CREATE TABLE "FormDataPermissionGroupTemplate" (
 
 
 CREATE TABLE "FormDef" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "TemplateId" text,
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
     "Name" text not null default '',
     "Content" jsonb not null,
     "UsingWorkflow" boolean not null default false,
@@ -685,15 +685,15 @@ CREATE TABLE "FormDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormDef" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormListView" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "PcType" text not null default '',
     "MobileType" text not null default '',
@@ -708,15 +708,15 @@ CREATE TABLE "FormListView" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormListView" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormNotify" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
     "TimeField" text,
     "FixedTime" text,
@@ -745,32 +745,32 @@ CREATE TABLE "FormNotify" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormNotify" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormNotifyDispatchLog" (
-    "Id" text not null default '',
-    "NotifyId" text not null default '',
-    "DataId" text,
+    "Id" text COLLATE "C" not null default '',
+    "NotifyId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C",
     "TriggerTime" bigint not null default 0,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormNotifyDispatchLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormNotifyScheduleItem" (
-    "Id" text not null default '',
-    "NotifyId" text not null default '',
-    "DataId" text,
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "NotifyId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C",
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
     "TriggerMode" text not null default '',
     "ScheduleVersion" bigint not null default 0,
@@ -782,17 +782,17 @@ CREATE TABLE "FormNotifyScheduleItem" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_FormNotifyScheduleItem" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "FormTemplate" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Type" text not null default '',
     "Icon" text not null default '',
-    "AppTemplateId" text not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
     "Content" jsonb not null,
     "UsingWorkflow" boolean not null default false,
     "FormSettings" jsonb not null,
@@ -806,11 +806,11 @@ CREATE TABLE "FormTemplate" (
 
 
 CREATE TABLE "IdentityLoginAudit" (
-    "Id" text not null default '',
-    "LoginId" text,
+    "Id" text COLLATE "C" not null default '',
+    "LoginId" text COLLATE "C",
     "GrantType" text,
-    "UserId" text,
-    "ClientId" text,
+    "UserId" text COLLATE "C",
+    "ClientId" text COLLATE "C",
     "UserName" text,
     "ClientIp" text,
     "FailReason" text,
@@ -819,13 +819,13 @@ CREATE TABLE "IdentityLoginAudit" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_IdentityLoginAudit" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "OutboxMessage" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "QueueName" text not null default '',
     "MessageType" text not null default '',
     "IdempotencyKey" text not null default '',
@@ -842,20 +842,20 @@ CREATE TABLE "OutboxMessage" (
 
 
 CREATE TABLE "Payment" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Payment" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "PluginInstall" (
-    "Id" text not null default '',
-    "PluginId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "PluginId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Summary" text not null default '',
     "Icon" text not null default '',
@@ -875,14 +875,14 @@ CREATE TABLE "PluginInstall" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_PluginInstall" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "PluginProfile" (
-    "Id" text not null default '',
-    "PluginId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "PluginId" text COLLATE "C" not null default '',
     "Version" text not null default '',
     "Name" text not null default '',
     "Summary" text not null default '',
@@ -895,7 +895,7 @@ CREATE TABLE "PluginProfile" (
     "Scenario" text not null default '',
     "Tags" text[] not null,
     "DeveloperName" text not null default '',
-    "DeveloperCorpId" text not null default '',
+    "DeveloperCorpId" text COLLATE "C" not null default '',
     "IsOfficial" boolean not null default false,
     "IsHot" boolean not null default false,
     "IsRecommended" boolean not null default false,
@@ -915,10 +915,10 @@ CREATE TABLE "PluginProfile" (
 
 
 CREATE TABLE "PrintDef" (
-    "Id" text not null default '',
-    "TemplateId" text,
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Content" text not null default '',
     "PrintType" text not null default '',
@@ -927,15 +927,15 @@ CREATE TABLE "PrintDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_PrintDef" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "PrintDefTemplate" (
-    "Id" text not null default '',
-    "AppTemplateId" text not null default '',
-    "FormTemplateId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
+    "FormTemplateId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Content" text not null default '',
     "PrintType" text not null default '',
@@ -949,7 +949,7 @@ CREATE TABLE "PrintDefTemplate" (
 
 
 CREATE TABLE "ProcessedMessage" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "EventKey" text not null default '',
     "Target" text not null default '',
     "Status" text not null default '',
@@ -962,10 +962,10 @@ CREATE TABLE "ProcessedMessage" (
 
 
 CREATE TABLE "PublicSetting" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
-    "TargetId" text not null default '',
+    "TargetId" text COLLATE "C" not null default '',
     "Form" jsonb not null,
     "Dashboard" jsonb not null,
     "CreateBy" jsonb,
@@ -973,15 +973,15 @@ CREATE TABLE "PublicSetting" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_PublicSetting" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "SerialNoSequence" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "Key" text not null default '',
     "CurrDate" timestamp with time zone,
     "CurrId" integer,
@@ -991,18 +991,18 @@ CREATE TABLE "SerialNoSequence" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_SerialNoSequence" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "SystemMessage" (
-    "Id" text not null default '',
-    "NotifyId" text,
+    "Id" text COLLATE "C" not null default '',
+    "NotifyId" text COLLATE "C",
     "Title" text,
     "Detail" text,
     "Url" text,
-    "ReceiverEmpId" text,
+    "ReceiverEmpId" text COLLATE "C",
     "ReceiverName" text,
     "IsRead" boolean not null default false,
     "ReadTime" bigint,
@@ -1014,17 +1014,17 @@ CREATE TABLE "SystemMessage" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_SystemMessage" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "TenantAdminGroup" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "Description" text not null default '',
     "Type" text not null default '',
-    "ParentId" text not null default '',
+    "ParentId" text COLLATE "C" not null default '',
     "SortValue" integer not null default 0,
     "EmployeeIds" jsonb not null,
     "AppIds" text[] not null,
@@ -1044,13 +1044,13 @@ CREATE TABLE "TenantAdminGroup" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_TenantAdminGroup" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "UploadedFile" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "FileName" text not null default '',
     "SavePath" text not null default '',
     "ThumbPath" text,
@@ -1062,13 +1062,13 @@ CREATE TABLE "UploadedFile" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_UploadedFile" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "User" (
-    "Id" text not null default '',
+    "Id" text COLLATE "C" not null default '',
     "CreateTime" bigint not null default 0,
     "Name" text not null default '',
     "Email" text not null default '',
@@ -1083,9 +1083,9 @@ CREATE TABLE "User" (
 
 
 CREATE TABLE "UserCorp" (
-    "Id" text not null default '',
-    "UserId" text not null default '',
-    "CorpId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "UserId" text COLLATE "C" not null default '',
+    "CorpId" text COLLATE "C" not null default '',
     "IsCorpOwner" boolean not null default false,
     "CorpType" text not null default '',
     "IsDefault" boolean not null default false,
@@ -1094,14 +1094,14 @@ CREATE TABLE "UserCorp" (
 
 
 CREATE TABLE "WebPushLog" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
-    "WebHookId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
+    "WebHookId" text COLLATE "C" not null default '',
     "SourceType" text not null default '',
     "TriggerType" text not null default '',
     "Url" text not null default '',
-    "EventId" text not null default '',
+    "EventId" text COLLATE "C" not null default '',
     "PushObject" text,
     "HttpCode" integer not null default 0,
     "PushResult" text,
@@ -1111,15 +1111,15 @@ CREATE TABLE "WebPushLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_WebPushLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Webhook" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "Name" text,
     "SourceType" text not null default '',
     "Url" text not null default '',
@@ -1132,37 +1132,37 @@ CREATE TABLE "Webhook" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Webhook" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WebhookAlias" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "FieldAlias" jsonb not null,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_WebhookAlias" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WfDefinitionTemplate" (
-    "Id" text not null default '',
-    "AppTemplateId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppTemplateId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "FlowType" text not null default '',
-    "ExternalTemplateId" text not null default '',
+    "ExternalTemplateId" text COLLATE "C" not null default '',
     "Description" text not null default '',
     "Content" text not null default '',
     "Metadata" jsonb not null,
     "EventSource" text not null default '',
-    "SourceTemplateId" text,
+    "SourceTemplateId" text COLLATE "C",
     "EventSetting" jsonb,
     "Disabled" boolean not null default false,
     "CreateBy" jsonb,
@@ -1175,12 +1175,12 @@ CREATE TABLE "WfDefinitionTemplate" (
 
 
 CREATE TABLE "Wf_Definition" (
-    "Id" text not null default '',
-    "TemplateId" text,
-    "AppId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "TemplateId" text COLLATE "C",
+    "AppId" text COLLATE "C" not null default '',
     "Name" text not null default '',
     "FlowType" text not null default '',
-    "ExternalId" text not null default '',
+    "ExternalId" text COLLATE "C" not null default '',
     "Description" text not null default '',
     "Version" integer not null default 0,
     "IsCurrent" boolean not null default false,
@@ -1188,7 +1188,7 @@ CREATE TABLE "Wf_Definition" (
     "Content" text not null default '',
     "Metadata" jsonb not null,
     "EventSource" text not null default '',
-    "SourceId" text,
+    "SourceId" text COLLATE "C",
     "EventSetting" jsonb,
     "Disabled" boolean not null default false,
     "CreateBy" jsonb,
@@ -1196,17 +1196,17 @@ CREATE TABLE "Wf_Definition" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Wf_Definition" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Wf_ExecLog" (
-    "Id" text not null default '',
-    "WfInstanceId" text not null default '',
-    "DataId" text not null default '',
-    "NodeId" text not null default '',
-    "EmpId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "WfInstanceId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C" not null default '',
+    "NodeId" text COLLATE "C" not null default '',
+    "EmpId" text COLLATE "C" not null default '',
     "Success" boolean not null default false,
     "ErrMsg" text not null default '',
     "ExecTime" bigint not null default 0,
@@ -1215,14 +1215,14 @@ CREATE TABLE "Wf_ExecLog" (
 
 
 CREATE TABLE "Wf_Task" (
-    "Id" text not null default '',
-    "WfInstanceId" text not null default '',
-    "ApproveNodeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "WfInstanceId" text COLLATE "C" not null default '',
+    "ApproveNodeId" text COLLATE "C" not null default '',
     "ApproveNodeName" text not null default '',
-    "EmployeeId" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
-    "DataId" text not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
+    "DataId" text COLLATE "C" not null default '',
     "FormType" integer not null default 0,
     "Starter" jsonb,
     "ApproveNodeStartTime" bigint not null default 0,
@@ -1234,19 +1234,19 @@ CREATE TABLE "Wf_Task" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Wf_Task" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "Wf_TaskLog" (
-    "Id" text not null default '',
-    "AppId" text not null default '',
-    "FormId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
+    "FormId" text COLLATE "C" not null default '',
     "FormName" text not null default '',
-    "DataId" text not null default '',
+    "DataId" text COLLATE "C" not null default '',
     "WfVersion" integer not null default 0,
-    "NodeId" text not null default '',
+    "NodeId" text COLLATE "C" not null default '',
     "NodeName" text not null default '',
     "NodeType" text not null default '',
     "Round" integer not null default 0,
@@ -1261,14 +1261,14 @@ CREATE TABLE "Wf_TaskLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_Wf_TaskLog" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WorkbenchConfig" (
-    "Id" text not null default '',
-    "EmployeeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
     "Layout" text not null default '',
     "PageStyle" text not null default '',
     "CreateBy" jsonb,
@@ -1276,17 +1276,17 @@ CREATE TABLE "WorkbenchConfig" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_WorkbenchConfig" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WorkbenchFavorite" (
-    "Id" text not null default '',
-    "EmployeeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
-    "TargetId" text not null default '',
-    "AppId" text not null default '',
+    "TargetId" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
     "Title" text not null default '',
     "Icon" text not null default '',
     "IconColor" text not null default '',
@@ -1296,17 +1296,17 @@ CREATE TABLE "WorkbenchFavorite" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_WorkbenchFavorite" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WorkbenchRecentVisit" (
-    "Id" text not null default '',
-    "EmployeeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "EmployeeId" text COLLATE "C" not null default '',
     "TargetType" text not null default '',
-    "TargetId" text not null default '',
-    "AppId" text not null default '',
+    "TargetId" text COLLATE "C" not null default '',
+    "AppId" text COLLATE "C" not null default '',
     "Title" text not null default '',
     "Icon" text not null default '',
     "IconColor" text not null default '',
@@ -1317,17 +1317,17 @@ CREATE TABLE "WorkbenchRecentVisit" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
-    "CorpId" text,
+    "CorpId" text COLLATE "C",
     CONSTRAINT "PK_WorkbenchRecentVisit" PRIMARY KEY ("Id")
 );
 
 
 CREATE TABLE "WorkflowTransitionExecution" (
-    "Id" text not null default '',
-    "ExecutionId" text not null default '',
-    "WorkflowInstanceId" text not null default '',
-    "CorpId" text not null default '',
-    "WfNodeId" text not null default '',
+    "Id" text COLLATE "C" not null default '',
+    "ExecutionId" text COLLATE "C" not null default '',
+    "WorkflowInstanceId" text COLLATE "C" not null default '',
+    "CorpId" text COLLATE "C" not null default '',
+    "WfNodeId" text COLLATE "C" not null default '',
     "NodeAction" text not null default '',
     "Status" text not null default '',
     "Error" text not null default '',

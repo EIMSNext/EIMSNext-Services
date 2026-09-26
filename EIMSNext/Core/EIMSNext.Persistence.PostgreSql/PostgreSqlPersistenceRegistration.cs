@@ -34,7 +34,9 @@ public static class PostgreSqlPersistenceRegistration
 
         options.UseNpgsql(settings.ConnectionString, npgsql =>
         {
-            npgsql.EnableRetryOnFailure(settings.MaxRetryCount);
+            // TransactionScope 在工作单元执行前就已开启事务，而 EF 的重试策略要求整个事务运行在
+            // Execute/ExecuteAsync 内部，两者叠加会让用户事务在 SaveChanges 时失败。
+            // 事务级重试由 TransactionScope.ExecuteWithRetryAsync 负责，此处不再启用 EF 重试。
             npgsql.MigrationsHistoryTable("__EfMigrationsHistory");
         });
         options.UseEimsJsonPathOperators();

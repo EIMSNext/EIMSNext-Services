@@ -1,4 +1,4 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Linq;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
@@ -404,7 +404,7 @@ namespace EIMSNext.Flow.Core
                 action,
                 comment,
                 string.Empty,
-                Guid.NewGuid().ToString());
+                TsidIdGenerator.NewId());
 
             await _workflowHost.SubmitActivitySuccess(activity.Token, approveData.ToExpando());
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };

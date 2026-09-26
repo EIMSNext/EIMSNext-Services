@@ -196,8 +196,8 @@ namespace EIMSNext.ApiService
             ValidateImportMappings(request, fieldSnapshot);
             var importLogService = Resolver.Resolve<IFormDataImportLogService>();
             var storage = Resolver.Resolve<IStorageProvider>();
-            // 32 位无连字符 GUID（与 RepositoryBase.NewId 一致）。
-            var importLogId = Guid.NewGuid().ToString("N");
+            // 与 RepositoryBase.NewId 保持一致的 TSID 主键。
+            var importLogId = TsidIdGenerator.NewId();
             var normalizedFileName = NormalizeFileName(fileName);
             var objectKey = $"Import\\{IdentityContext.CurrentCorpId}\\{DateTime.UtcNow:yyyyMMdd}\\{importLogId}_{normalizedFileName}";
             if (!storage.Upload(source, objectKey))

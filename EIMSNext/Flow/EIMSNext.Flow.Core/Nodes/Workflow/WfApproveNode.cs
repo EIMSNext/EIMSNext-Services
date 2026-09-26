@@ -16,6 +16,7 @@ using Microsoft.EntityFrameworkCore;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using EIMSNext.Common;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -161,7 +162,7 @@ namespace EIMSNext.Flow.Core.Nodes
                         ApproveAction.AutoApprove,
                         "系统自动同意",
                         string.Empty,
-                        Guid.NewGuid().ToString());
+                        TsidIdGenerator.NewId());
 
                     await TransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, async () =>
                     {
@@ -192,7 +193,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             ApproveAction.AutoApprove,
                             "找不到节点负责人，系统自动提交",
                             string.Empty,
-                            Guid.NewGuid().ToString());
+                            TsidIdGenerator.NewId());
 
                         await TransactionScope.ExecuteWithRetryAsync(TaskRepository.DbContext, async () =>
                         {
@@ -212,7 +213,7 @@ namespace EIMSNext.Flow.Core.Nodes
                         ApproveAction.None,
                         string.Empty,
                         string.Empty,
-                        Guid.NewGuid().ToString());
+                        TsidIdGenerator.NewId());
                     CreateExecLog(context.Workflow, dataContext, meta, noApproverData, "找不到节点负责人");
                     throw new UnLogException("找不到节点负责人");
                 }

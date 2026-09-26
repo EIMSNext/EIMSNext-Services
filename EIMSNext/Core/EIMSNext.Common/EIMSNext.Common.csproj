@@ -16,6 +16,7 @@
     <PackageReference Include="Microsoft.Extensions.Options" />
     <PackageReference Include="PinYinConverter.Core" />
     <PackageReference Include="RestSharp" />
+    <PackageReference Include="TSID.Creator.NET" />
   </ItemGroup>
 </Project>
 

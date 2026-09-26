@@ -276,13 +276,40 @@ public static class PostgreSqlBaselineScript
 
         if (!body.EndsWith(notNullSuffix, StringComparison.Ordinal)) return line;
 
-        var declaration = body[..^notNullSuffix.Length];
-        var type = ReadColumnType(declaration);
+        // 标识符列带了 COLLATE "C" 之后，列定义形如 `"Id" text COLLATE "C"`：
+        // 直接把 COLLATE 子句当成类型的一部分会匹配不上 NeutralDefaults（那里只有裸的 text），
+        // NOT NULL 列就会静默丢掉 default ''。因此先把排序规则子句摘出来，补完默认值再拼回去。
+        var withoutCollation = ExtractCollation(body[..^notNullSuffix.Length], out var collation);
+        var type = ReadColumnType(withoutCollation);
 
         var defaultValue = NeutralDefaults.TryGetValue(type, out var value) ? $" default {value}" : string.Empty;
-        var result = declaration + " not null" + defaultValue;
+        var restored = collation.Length == 0 ? withoutCollation : withoutCollation + " " + collation;
+        var result = restored + " not null" + defaultValue;
 
         return hasComma ? result + "," : result;
+    }
+
+    /// <summary>列定义行里 <c>COLLATE</c> 子句的起始标记（EF 生成时大写，这里按大小写无关匹配）。</summary>
+    private const string CollationClause = "COLLATE";
+
+    /// <summary>
+    /// 把列定义中的 <c>COLLATE "C"</c> 子句摘出来。
+    /// </summary>
+    /// <param name="declaration">去掉 <c>NOT NULL</c> 之后的列定义，形如 <c>"Id" text COLLATE "C"</c>。</param>
+    /// <param name="collation">摘出的排序规则子句；无 <c>COLLATE</c> 时为空串。</param>
+    /// <returns>去掉排序规则子句后的列定义。</returns>
+    private static string ExtractCollation(string declaration, out string collation)
+    {
+        var index = declaration.IndexOf(CollationClause, StringComparison.OrdinalIgnoreCase);
+        if (index < 0)
+        {
+            collation = string.Empty;
+            return declaration;
+        }
+
+        // 子句一定延伸到行尾（列定义里 COLLATE 之后不会再有其它修饰符了），直接取剩余部分。
+        collation = declaration[index..].Trim();
+        return declaration[..index].TrimEnd();
     }
 
     /// <summary>从 <c>    "Name" text</c> 提取列类型（引号之后、去空白、保留原大小写）。</summary>
