@@ -135,6 +135,19 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void AggregateRows_FlowStatusFilterUsesIntegerParameter()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = Fields.FlowStatus, Op = FilterOp.Eq, Value = "3" };
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "\"FlowStatus\" = @p0");
+            Assert.AreEqual(3, statement.Parameters[0]);
+            Assert.IsInstanceOfType<int>(statement.Parameters[0]);
+        }
+
+        [TestMethod]
         public void AggregateRows_UseJsonbTopLevelPathAndFormDataContract()
         {
             var request = Request([], []);

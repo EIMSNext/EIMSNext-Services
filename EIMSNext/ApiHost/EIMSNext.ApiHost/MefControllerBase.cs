@@ -118,11 +118,8 @@ namespace EIMSNext.ApiHost.Controllers
         protected bool TryGetId<R>(Delta<R> delta, out string id) where R : class
         {
             id = string.Empty;
-            object _id;
-            if (delta.TryGetPropertyValue("Id", out _id) && _id != null)
-                id = _id.ToString()!;
-            else if (delta.TryGetPropertyValue("_id", out _id) && _id != null)
-                id = _id.ToString()!;
+            if (delta.TryGetPropertyValue("Id", out var idValue) && idValue != null)
+                id = idValue.ToString()!;
 
             return !string.IsNullOrEmpty(id);
         }

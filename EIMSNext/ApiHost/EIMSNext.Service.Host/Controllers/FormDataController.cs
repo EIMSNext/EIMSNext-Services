@@ -445,7 +445,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var options = new DynamicFindOptions<FormData>
             {
-                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                 Take = 1,
                 Scope = string.IsNullOrWhiteSpace(permissionGroupId) ? null : new DataScope { PermissionGroupId = permissionGroupId }
             };
@@ -464,7 +464,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             var data = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
             {
-                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                 Take = 1,
             })).FirstOrDefault();
             if (data == null)
@@ -552,13 +552,13 @@ namespace EIMSNext.Service.Host.Controllers
 
             var queryOptions = new DynamicFindOptions<FormData>()
             {
-                Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key }
             };
             if (IdentityContext.IdentityType != IdentityType.Public)
             {
                 var accessProbe = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
                 {
-                    Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                    Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                     Take = 1,
                 })).FirstOrDefault();
                 if (accessProbe == null)
@@ -884,7 +884,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             return new DynamicFilter
             {
-                Field = Fields.BsonId,
+                Field = Fields.Id,
                 Op = FilterOp.Eq,
                 Value = "__no_permission__",
             };
@@ -1072,7 +1072,6 @@ namespace EIMSNext.Service.Host.Controllers
             if (field.Equals(Fields.FormId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.CorpId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.DeleteFlag, StringComparison.OrdinalIgnoreCase) ||
-                field.Equals(Fields.BsonId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
@@ -1170,7 +1169,7 @@ namespace EIMSNext.Service.Host.Controllers
                 IncludeDeleted = true,
                 Filter = new DynamicFilter
                 {
-                    Field = Fields.BsonId,
+                    Field = Fields.Id,
                     Op = FilterOp.In,
                     Value = requested.Cast<object>().ToList(),
                 },
@@ -1388,7 +1387,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return true;
             }
 
-            var filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = dataId }.And(
+            var filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = dataId }.And(
                 rangeFilter);
 
             var result = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>

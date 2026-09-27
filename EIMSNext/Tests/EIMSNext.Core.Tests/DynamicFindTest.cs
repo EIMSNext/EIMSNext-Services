@@ -10,14 +10,14 @@ namespace EIMSNext.Core.Tests
         [TestMethod]
         public void DeserializeTest()
         {
-            var jsonFilter = "{\"filter\":{\"rel\":\"And\",\"field\":\"_id\",\"type\":\"None\",\"op\":\"Eq\",\"value\":[\"67de5e1ace67843829f57205\"]},\"skip\":0,\"take\":20}";
+            var jsonFilter = "{\"filter\":{\"rel\":\"And\",\"field\":\"id\",\"type\":\"None\",\"op\":\"Eq\",\"value\":[\"67de5e1ace67843829f57205\"]},\"skip\":0,\"take\":20}";
             var opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
 
             Assert.IsNotNull(opt);
             Assert.IsNotNull(opt.Filter);
             var predicate = opt.Filter.ToPredicate<FormData>();
  
-            jsonFilter = "{\"filter\":{\"rel\":\"Or\",\"items\":[{\"rel\":\"And\",\"field\":\"_id\",\"type\":\"None\",\"op\":\"Eq\",\"value\":[\"67de5e1ace67843829f57205\"]},{\"rel\":\"And\",\"field\":\"code\",\"type\":\"None\",\"op\":\"In\",\"value\":[1,2]}],\"type\":\"None\",\"op\":\"Eq\"},\"skip\":0,\"take\":20}";
+            jsonFilter = "{\"filter\":{\"rel\":\"Or\",\"items\":[{\"rel\":\"And\",\"field\":\"id\",\"type\":\"None\",\"op\":\"Eq\",\"value\":[\"67de5e1ace67843829f57205\"]},{\"rel\":\"And\",\"field\":\"code\",\"type\":\"None\",\"op\":\"In\",\"value\":[1,2]}],\"type\":\"None\",\"op\":\"Eq\"},\"skip\":0,\"take\":20}";
             opt = jsonFilter.DeserializeFromJson<DynamicFindOptions<FormData>>();
 
             Assert.IsNotNull(opt);

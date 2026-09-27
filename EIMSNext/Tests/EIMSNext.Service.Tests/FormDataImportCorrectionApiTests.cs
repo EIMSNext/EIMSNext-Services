@@ -453,7 +453,7 @@ namespace EIMSNext.Service.Tests
             {
                 return field switch
                 {
-                    Fields.Id or Fields.BsonId or "_id" => item.Id,
+                    Fields.Id => item.Id,
                     Fields.CorpId => item.CorpId,
                     Fields.FormId => item.FormId,
                     Fields.DeleteFlag => item.DeleteFlag,

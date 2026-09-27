@@ -8,11 +8,6 @@ namespace EIMSNext.Common
     public static class Fields
     {
         /// <summary>
-        /// MongoDB 内部主键字段名。
-        /// </summary>
-        public const string BsonId = "_id";
-
-        /// <summary>
         /// 主键字段名。
         /// </summary>
         public const string Id = "id";
@@ -30,7 +25,7 @@ namespace EIMSNext.Common
         /// <summary>
         /// 创建人 Id 字段名。
         /// </summary>
-        public const string CreateById = $"{CreateBy}.{BsonId}";
+        public const string CreateById = $"{CreateBy}.{Id}";
 
         /// <summary>
         /// 创建时间字段名。
@@ -80,7 +75,7 @@ namespace EIMSNext.Common
         /// <summary>
         /// 所有系统字段名列表。
         /// </summary>
-        public static readonly string[] SystemFields = { Id, BsonId, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
+        public static readonly string[] SystemFields = { Id, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
 
         /// <summary>
         /// 判断指定字段名是否为系统字段。

@@ -110,6 +110,7 @@ public static class EimsJsonPathTranslationExtensions
     public static TBuilder UseEimsJsonPathOperators<TBuilder>(this TBuilder optionsBuilder)
         where TBuilder : DbContextOptionsBuilder
         => (TBuilder)optionsBuilder
+            .AddInterceptors(CitextParameterInterceptor.Instance)
             .ReplaceService<IQuerySqlGeneratorFactory, EimsNpgsqlQuerySqlGeneratorFactory>()
             .ReplaceService<IRelationalParameterBasedSqlProcessorFactory, EimsNpgsqlParameterBasedSqlProcessorFactory>();
 }

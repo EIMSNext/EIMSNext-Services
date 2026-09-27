@@ -40,8 +40,18 @@ public static class PostgreSqlCommandBuilder
             // Npgsql 默认把 string 参数按 text 发送，而字符列已是 citext：PG 会把 citext 列
             // 降级成 (col)::text 比较，索引条件随之消失（实测 Index Cond 变 Filter）。
             if (value is string) parameter.DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+            else if ((value is string[] || value is IEnumerable<string>) && UsesCitextArrayColumn(sql))
+                parameter.DataTypeName = "citext[]";
         }
 
         return command;
     }
+
+    private static bool UsesCitextArrayColumn(string sql)
+        => sql.Contains("PermissionGroupIds", StringComparison.Ordinal)
+           || sql.Contains("AppDepartmentIds", StringComparison.Ordinal)
+           || sql.Contains("AppEmployeeGroupIds", StringComparison.Ordinal)
+           || sql.Contains("ContactDepartmentIds", StringComparison.Ordinal)
+           || sql.Contains("ContactEmployeeGroupIds", StringComparison.Ordinal)
+           || sql.Contains("\"AppIds\"", StringComparison.Ordinal);
 }

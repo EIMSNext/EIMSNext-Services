@@ -277,18 +277,10 @@ namespace EIMSNext.Core.Query
         /// </summary>
         /// <returns>属性信息；未找到时为 null。</returns>
         /// <remarks>
-        /// <para>
-        /// 该别名只用于顶层实体键。jsonb 内部（<c>Data["_id"]</c>）不走这里，
-        /// 仍保持原样，因为历史表单数据里确实可能存了名为 <c>_id</c> 的业务字段。
-        /// </para>
+        /// jsonb 内部字段不走这里；业务 JSON 字段仍按原名解析。
         /// </remarks>
         public static PropertyInfo? FindProperty(Type type, string name)
         {
-            if (string.Equals(name, Fields.BsonId, StringComparison.Ordinal))
-            {
-                return type.GetProperty(Fields.Id, InstanceFlags);
-            }
-
             return type.GetProperty(name, InstanceFlags)
                 ?? type.GetProperties(InstanceFlags)
                     .FirstOrDefault(x => string.Equals(x.Name, name, StringComparison.OrdinalIgnoreCase));

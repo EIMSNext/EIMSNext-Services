@@ -199,6 +199,7 @@ public static class EIMSNextModelConfiguration
             {
                 if (property.ClrType != typeof(string)) continue;
                 if (!IsCharacterColumn(property.GetColumnType())) continue;
+                if (IsCaseSensitiveText(entity.ClrType, property.Name)) continue;
 
                 property.SetColumnType(CaseInsensitiveType);
 
@@ -208,6 +209,13 @@ public static class EIMSNextModelConfiguration
                 // 而 GetForeignKeys() 拿不全纯标量外键，漏掉任一引用方只会等真实查询落到那张表时才炸。
                 if (IsIdentifierName(property.Name)) property.SetCollation(IdentifierCollation);
             }
+
+            foreach (var property in entity.GetProperties())
+            {
+                if (property.ClrType == typeof(List<string>) && IsCaseInsensitiveStringArray(entity.ClrType, property.Name))
+                    property.SetColumnType("citext[]");
+            }
+
         }
 
         // ------------------------------------------------------------ 运算符值对象
@@ -265,7 +273,6 @@ public static class EIMSNextModelConfiguration
     }
 
     /// <summary>仅当实体已在本上下文的模型中时返回其构建器，否则返回 <c>null</c>。</summary>
-    /// <returns>实体构建器或 <c>null</c>。</returns>
     private static EntityTypeBuilder<TEntity>? Mapped<TEntity>(ModelBuilder modelBuilder) where TEntity : class
         => modelBuilder.Model.FindEntityType(typeof(TEntity)) is null ? null : modelBuilder.Entity<TEntity>();
 
@@ -295,6 +302,36 @@ public static class EIMSNextModelConfiguration
                || columnType.StartsWith("character", StringComparison.OrdinalIgnoreCase)
                || columnType.StartsWith("varchar", StringComparison.OrdinalIgnoreCase)
                || columnType.StartsWith("citext", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 保持需要精确匹配的文本列为 text。密码、凭证和 JSON/模板正文不能因为 citext
+    /// 改变比较语义；这些列在上面的通用字符列约定中必须显式排除。
+    /// </summary>
+    private static bool IsCaseSensitiveText(Type entityType, string propertyName)
+    {
+        if (entityType == typeof(User) && propertyName == nameof(User.Password)) return true;
+        if (entityType == typeof(Webhook) && propertyName == nameof(Webhook.Secret)) return true;
+        if (entityType == typeof(Client) && propertyName == nameof(Client.ApiKey)) return true;
+
+        return entityType == typeof(CorporateSetting) && propertyName == nameof(CorporateSetting.Value)
+            || entityType == typeof(WorkbenchConfig) && propertyName == nameof(WorkbenchConfig.Layout)
+            || entityType == typeof(DashboardItemDef) && propertyName == nameof(DashboardItemDef.Details)
+            || entityType == typeof(PrintDef) && propertyName == nameof(PrintDef.Content)
+            || entityType == typeof(Wf_Definition) && propertyName == nameof(Wf_Definition.Content)
+            || entityType == typeof(EventFlowNodeExecution) && propertyName == nameof(EventFlowNodeExecution.ResultSnapshot)
+            || entityType == typeof(WorkflowTransitionExecution) && propertyName == nameof(WorkflowTransitionExecution.Error);
+    }
+
+    private static bool IsCaseInsensitiveStringArray(Type entityType, string propertyName)
+    {
+        if (entityType == typeof(FormListView) && propertyName == nameof(FormListView.PermissionGroupIds)) return true;
+        return entityType == typeof(TenantAdminGroup) && propertyName is
+            nameof(TenantAdminGroup.AppIds) or
+            nameof(TenantAdminGroup.AppDepartmentIds) or
+            nameof(TenantAdminGroup.AppEmployeeGroupIds) or
+            nameof(TenantAdminGroup.ContactDepartmentIds) or
+            nameof(TenantAdminGroup.ContactEmployeeGroupIds);
     }
 
     /// <summary>生成 jsonb 值转换器，见 <see cref="JsonbValueConverter.Create{TValue}"/>。</summary>

@@ -406,7 +406,7 @@ namespace EIMSNext.ApiService
         {
             return new DynamicFilter
             {
-                Field = Fields.BsonId,
+                Field = Fields.Id,
                 Op = FilterOp.Eq,
                 Value = "__no_permission__",
             };
