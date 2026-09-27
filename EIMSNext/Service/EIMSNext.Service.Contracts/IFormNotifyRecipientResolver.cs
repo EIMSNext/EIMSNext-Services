@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using EIMSNext.Async.Abstractions.Messaging;
 
@@ -8,5 +8,6 @@ namespace EIMSNext.Service.Contracts
     {
         Task<List<NotifyReceiver>> ResolveAsync(FormData data, FormDef formDef, string? notifiersJson, string? operatorEmpId);
         Task<List<NotifyReceiver>> ResolveCandidatesAsync(FormData data, FormDef formDef, IEnumerable<ApprovalCandidate> candidates, string? operatorEmpId);
+        Task<List<NotifyReceiver>> ResolveCandidatesAsync(IEnumerable<ApprovalCandidate> candidates, string? operatorEmpId);
     }
 }

@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using EIMSNext.ApiCore;
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
+using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.File;
 using EIMSNext.File.Host.Extensions;
@@ -8,6 +9,7 @@ using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
+using EIMSNext.File.Host;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigWebEnvironment();
@@ -43,7 +45,6 @@ builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSw
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
-builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 
 var app = builder.Build();
 
@@ -65,20 +66,19 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
+app.UseRouting();
+app.UseAuthentication();
+app.UseAuthorization();
+//app.UseMiddleware<FileAccessMiddleware>();
 app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>
     {
-        e.Context.Response.Headers.AccessControlAllowOrigin = e.Context.Request.Headers.Origin;
-        e.Context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-        e.Context.Response.Headers.AccessControlAllowHeaders = e.Context.Request.Headers.AccessControlRequestHeaders;
-        e.Context.Response.Headers.AccessControlAllowCredentials = "true";
+        e.Context.RequestServices.GetRequiredService<CorsPolicyHelper>().Apply(e.Context);
+        e.Context.Response.Headers.XContentTypeOptions = "nosniff";
     }
 });
 
-app.UseRouting();
-app.UseAuthentication();
-app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
 

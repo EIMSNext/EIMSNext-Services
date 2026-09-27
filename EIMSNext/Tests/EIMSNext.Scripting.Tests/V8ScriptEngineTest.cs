@@ -1,5 +1,7 @@
+using System;
 using System.Dynamic;
 using System.Collections.Generic;
+using System.Threading;
 
 namespace EIMSNext.Scripting.Tests
 {
@@ -171,6 +173,107 @@ namespace EIMSNext.Scripting.Tests
             var parameters = new Dictionary<string, object> { { "data", host } };
             var result = pool.Evaluate<int>("data.A + 1", parameters);
             Assert.AreEqual(6, result.Value);
+        }
+
+        [TestMethod]
+        public void TestNin_Behaves_As_NotIn()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption() { MinPoolSize = 1 });
+            // 在合集中 → false；不在 → true
+            Assert.AreEqual(false, pool.Evaluate("NIN([1,2,3], 2)", null).Value);
+            Assert.AreEqual(true, pool.Evaluate("NIN([1,2,3], 4)", null).Value);
+            // 与 IN 互为否定
+            Assert.AreEqual(true, pool.Evaluate("NIN([1,2,3], 4) === !IN([1,2,3], 4)", null).Value);
+        }
+
+        [TestMethod]
+        public void TestEvaluate_TimesOut_OnInfiniteLoop()
+        {
+            // DefaultEvaluationTimeout = 200ms 用来验证默认超时生效
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                DefaultEvaluationTimeout = TimeSpan.FromMilliseconds(200)
+            });
+
+            // IIFE 形式让死循环成为合法表达式;V8 引擎会包装成 `(() => { return (expr) })()`。
+            var result = pool.Evaluate("(() => { while(true){} })()", null);
+
+            Assert.IsFalse(result.Success);
+            Assert.IsTrue(result.Error?.Contains("timed out") == true,
+                $"expected 'timed out' in error, got: {result.Error}");
+        }
+
+        [TestMethod]
+        public void TestEvaluate_Honours_ExplicitCancellationToken()
+        {
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                // 显式 CT 模式下,默认超时被覆盖;这里把默认设很大,
+                // 验证显式 CT 能在 100ms 内打断死循环。
+                DefaultEvaluationTimeout = TimeSpan.FromSeconds(30)
+            });
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+            var result = pool.Evaluate("(() => { while(true){} })()", null, cts.Token);
+
+            Assert.IsFalse(result.Success);
+            // 显式 CT 触发时,IsCancellationRequested=true,Error 是 "cancelled" 而非 "timed out"
+            Assert.IsTrue(result.Error?.Contains("cancelled") == true,
+                $"expected 'cancelled' in error, got: {result.Error}");
+        }
+
+        [TestMethod]
+        public void TestEvaluate_DefaultTimeout_Zero_Disables_AutoCancel()
+        {
+            // DefaultEvaluationTimeout = Zero 时,只有显式 CT 才生效。
+            // 短任务不应被错误打断。
+            IScriptEngine pool = new V8ScriptEngine(new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                DefaultEvaluationTimeout = TimeSpan.Zero
+            });
+
+            var result = pool.Evaluate("1+1", null);
+            Assert.IsTrue(result.Success);
+            Assert.AreEqual(2, result.Value);
+        }
+
+        [TestMethod]
+        public void TestEngine_AppliesV8RuntimeConstraints_BuildsSuccessfully()
+        {
+            // Stage A: 验证 ScriptEngineOption 内存约束字段能正常构造引擎而不崩
+            // 不触发实际 OOM(V8 heap sampling 时序非确定性,留待 ops 监控)
+            // 通过合法表达式多次 evaluate 验证进程稳定 + 约束已应用
+            var option = new ScriptEngineOption
+            {
+                MinPoolSize = 1,
+                MaxOldSpaceSizeMB = 200,
+                MaxNewSpaceSizeMB = 32,
+                MaxRuntimeHeapSizeMB = 128,
+                MaxArrayBufferAllocation = 32L * 1024 * 1024,
+                ViolationPolicy = ScriptViolationPolicy.Exception
+            };
+
+            using var pool = new V8ScriptEngine(option);
+
+            // 1) 合法表达式能正常执行
+            var ok = pool.Evaluate("1 + 2 * 3", null);
+            Assert.IsTrue(ok.Success);
+            Assert.AreEqual(7, ok.Value);
+
+            // 2) formula.js 函数(ADD / IF / EQ)能正常调用
+            var add = pool.Evaluate("ADD(1, 2)", null);
+            Assert.IsTrue(add.Success);
+            Assert.AreEqual(3, add.Value);
+
+            // 3) 多次 evaluate 不触发 OOM(在约束内)
+            for (int i = 0; i < 10; i++)
+            {
+                var r = pool.Evaluate($"({i}) + 100", null);
+                Assert.IsTrue(r.Success);
+            }
         }
     }
 }

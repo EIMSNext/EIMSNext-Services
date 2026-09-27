@@ -1,5 +1,11 @@
-using EIMSNext.Core;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 
 using HKH.Mef2.Integration;
@@ -19,15 +25,15 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             var dataContext = GetDataContext(context);
 
-            using (var scope = FormDataRepository.NewTransactionScope())
+            await MongoTransactionScope.ExecuteWithRetryAsync(FormDataRepository.DbContext, async session =>
             {
-                UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approved, scope.SessionHandle);
+                UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approved, session);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(new DfRunParamter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
+                await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approved, "", dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                    .WithExecutionId($"{context.Workflow.Id}:end:{dataContext.Round}:approved"));
 
-                scope.CommitTransaction();
-            }
+            }).ConfigureAwait(false);
 
             return ExecutionResult.Next();
         }

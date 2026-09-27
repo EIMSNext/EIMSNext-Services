@@ -38,6 +38,15 @@ namespace EIMSNext.ApiClient.Contracts
             return HandleResponse<T>(response);
         }
 
+        protected virtual async Task<RestResponse<T>> GetAsyncAllowError<T>(string url, string? token = null)
+        {
+            var request = new RestRequest(url, Method.Get);
+            BuildRequest(request, null, token);
+
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response, throwOnError: false);
+        }
+
         protected virtual RestResponse<T> Post<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
         {
             var request = new RestRequest(url, Method.Post);
@@ -53,6 +62,15 @@ namespace EIMSNext.ApiClient.Contracts
 
             var response = await Client.ExecuteAsync(request);
             return HandleResponse<T>(response);
+        }
+
+        protected virtual async Task<RestResponse<T>> PostAsyncAllowError<T>(string url, object? data = null, string? token = null, WebContentType contentType = WebContentType.Json)
+        {
+            var request = new RestRequest(url, Method.Post);
+            BuildRequest(request, data, token, contentType);
+
+            var response = await Client.ExecuteAsync(request);
+            return HandleResponse<T>(response, throwOnError: false);
         }
 
         protected virtual async Task<RestResponse<T>> UploadFileAsync<T>(string url, byte[] content, string fileName, string? token = null, string fieldName = "files", string fileContentType = "application/octet-stream")
@@ -109,7 +127,12 @@ namespace EIMSNext.ApiClient.Contracts
 
         protected virtual RestResponse<T> HandleResponse<T>(RestResponse response)
         {
-            if (!response.IsSuccessful)
+            return HandleResponse<T>(response, throwOnError: true);
+        }
+
+        protected virtual RestResponse<T> HandleResponse<T>(RestResponse response, bool throwOnError)
+        {
+            if (!response.IsSuccessful && throwOnError)
             {
                 Logger.LogError("API返回错误。StatusCode={StatusCode}, Content={ResponseContent}", response.StatusCode, response.Content);
                 var errMsg = "";
@@ -144,7 +167,17 @@ namespace EIMSNext.ApiClient.Contracts
             }
 
             var tResp = RestResponse<T>.FromResponse(response);
-            tResp.Data = Client.Serializers.DeserializeContent<T>(response);
+            if (!string.IsNullOrWhiteSpace(response.Content))
+            {
+                try
+                {
+                    tResp.Data = Client.Serializers.DeserializeContent<T>(response);
+                }
+                catch when (!throwOnError)
+                {
+                    // 下游错误可能是纯文本，调用方仍可读取 Content。
+                }
+            }
             return tResp;
         }
     }

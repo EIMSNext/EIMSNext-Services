@@ -1,10 +1,14 @@
 using HKH.Mef2.Integration;
 
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 用户的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class UserApiService(IResolver resolver) : ApiServiceBase<User, User, IUserService>(resolver)
     {
     }

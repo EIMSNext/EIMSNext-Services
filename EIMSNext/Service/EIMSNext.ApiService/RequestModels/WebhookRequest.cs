@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -17,6 +17,11 @@ namespace EIMSNext.ApiService.RequestModels
         public string FormId { get; set; } = "";
 
         /// <summary>
+        /// 推送名称
+        /// </summary>
+        public string? Name { get; set; }
+
+        /// <summary>
         /// 推送地址
         /// </summary>
         public string Url { get; set; } = "";
@@ -24,6 +29,11 @@ namespace EIMSNext.ApiService.RequestModels
         /// Secret密钥
         /// </summary>
         public string Secret { get; set; } = "";
+
+        /// <summary>
+        /// 备注
+        /// </summary>
+        public string? Remark { get; set; }
 
         /// <summary>
         /// WebHook触发模式

@@ -2,8 +2,9 @@ using System.Text.Json;
 using System.Linq;
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Plugin.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Scripting;
 using MongoDB.Driver;
 
@@ -19,6 +20,10 @@ namespace EIMSNext.Component
             meta.Id = def.ExternalId;
             meta.Version = def.Version;
             var flowData = def.Content.DeserializeFromJson<FlowData>()!;
+            if (def.FlowType == FlowType.EventFlow)
+            {
+                ValidatePrintSources(flowData);
+            }
             meta.WorkflowSetting = new WorkflowSetting
             {
                 Description = flowData.WorkflowMeta?.Description,
@@ -32,6 +37,70 @@ namespace EIMSNext.Component
             return (meta, eventSetting);
         }
 
+        private static void ValidatePrintSources(FlowData flowData)
+        {
+            var nodes = EnumerateNodes(flowData).ToDictionary(x => x.Id, StringComparer.OrdinalIgnoreCase);
+            foreach (var printNode in nodes.Values.Where(x => x.NodeType == WfNodeType.Print))
+            {
+                var sourceId = printNode.Metadata.PrintMeta?.SourceNodeId;
+                if (string.IsNullOrWhiteSpace(sourceId)
+                    || !nodes.TryGetValue(sourceId, out var sourceNode))
+                {
+                    throw new BadRequestException($"Print node [{printNode.Id}] 的打印来源节点不存在");
+                }
+
+                if (sourceNode.NodeType is WfNodeType.Print or WfNodeType.Plugin
+                    || !string.Equals(GetFormId(sourceNode), printNode.Metadata.PrintMeta?.FormId, StringComparison.OrdinalIgnoreCase)
+                    || !IsPreviousNode(printNode, sourceNode, nodes))
+                {
+                    throw new BadRequestException($"Print node [{printNode.Id}] 的打印来源节点不合法");
+                }
+            }
+        }
+
+        private static IEnumerable<FlowNodeData> EnumerateNodes(FlowData flowData)
+        {
+            return Enumerate(flowData.StartNode)
+                .Concat(flowData.Nodes.SelectMany(Enumerate))
+                .Concat(Enumerate(flowData.EndNode));
+
+            static IEnumerable<FlowNodeData> Enumerate(FlowNodeData node)
+            {
+                yield return node;
+                if (node.ChildNodes == null) yield break;
+                foreach (var child in node.ChildNodes.SelectMany(Enumerate)) yield return child;
+            }
+        }
+
+        private static bool IsPreviousNode(FlowNodeData node, FlowNodeData source, IReadOnlyDictionary<string, FlowNodeData> nodes)
+        {
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var current = node;
+            while (!string.IsNullOrWhiteSpace(current.PrevId)
+                && visited.Add(current.Id)
+                && nodes.TryGetValue(current.PrevId, out var previous))
+            {
+                if (string.Equals(previous.Id, source.Id, StringComparison.OrdinalIgnoreCase)) return true;
+                current = previous;
+            }
+
+            return false;
+        }
+
+        private static string? GetFormId(FlowNodeData node)
+        {
+            return node.NodeType switch
+            {
+                WfNodeType.Start => node.Metadata.TriggerMeta?.FormId,
+                WfNodeType.Insert => node.Metadata.InsertMeta?.FormId,
+                WfNodeType.QueryOne => node.Metadata.QueryOneMeta?.FormId,
+                WfNodeType.QueryMany => node.Metadata.QueryManyMeta?.FormId,
+                WfNodeType.Update => node.Metadata.UpdateMeta?.FormId,
+                WfNodeType.Delete => node.Metadata.DeleteMeta?.FormId,
+                _ => null,
+            };
+        }
+
         private List<WfStep> ParseSteps(string corpId, EventSetting eventSetting, FlowType flowType, FlowData flowData)
         {
             var steps = new List<WfStep>() { };
@@ -41,7 +110,7 @@ namespace EIMSNext.Component
             flowData.Nodes.ForEach(node => { ParseFlowNode(corpId, steps, flowType, node, flowData.EndNode.Id, otherformIds); });
             ParseFlowNode(corpId, steps, flowType, flowData.EndNode, flowData.EndNode.Id, otherformIds);
 
-            if (flowType == FlowType.Dataflow)
+            if (flowType == FlowType.EventFlow)
             {
                 var triggerMeta = flowData.StartNode.Metadata.TriggerMeta!;
 
@@ -52,7 +121,7 @@ namespace EIMSNext.Component
                 eventSetting.NodeAction = triggerMeta.NodeAction;
                 eventSetting.SourceFormId = triggerMeta.FormId;
                 eventSetting.OtherFormIds = otherformIds;
-                eventSetting.CascadeMode = flowData.DfCascade;
+                eventSetting.CascadeMode = flowData.EfCascade;
                 if (flowData.EventIds?.Count > 0)
                 {
                     eventSetting.SpecifiedEvents = $",{string.Join(',', flowData.EventIds)},";
@@ -74,7 +143,7 @@ namespace EIMSNext.Component
         }
         private string GetStepType(FlowType flowType, WfNodeType nodeType)
         {
-            var prefix = flowType == FlowType.Dataflow ? "Df" : "Wf";
+            var prefix = flowType == FlowType.EventFlow ? "Ef" : "Wf";
             return $"{prefix}{nodeType}Node";
         }
 
@@ -94,9 +163,9 @@ namespace EIMSNext.Component
 
             step.StepType = GetStepType(flowType, flowNode.NodeType);
 
-            if (flowType == FlowType.Dataflow)
+            if (flowType == FlowType.EventFlow)
             {
-                step.DfNodeSetting = GetDfNodeSetting(corpId, flowNode, otherFormIds);
+                step.EfNodeSetting = GetEfNodeSetting(corpId, flowNode, otherFormIds);
             }
             else
             {
@@ -110,35 +179,51 @@ namespace EIMSNext.Component
             switch (flowNode.NodeType)
             {
                 case WfNodeType.Approve:
+                    var approveMeta = flowNode.Metadata.ApproveMeta;
+                    var approverType = approveMeta?.ApproverType ?? ApproverType.Normal;
                     wfNodeSetting.ApproveSetting = new ApproveSetting
                     {
-                        ApprovalMode = flowNode.Metadata.ApproveMeta?.ApproveMode ?? WfApprovalMode.None,
-                        Candidates = flowNode.Metadata.ApproveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>(),
-                        EnableCopyto = flowNode.Metadata.ApproveMeta?.EnableCopyto,
-                        CopytoCandidates = flowNode.Metadata.ApproveMeta?.CopytoCandidates,
-                        NodeActions = flowNode.Metadata.ApproveMeta?.NodeActions?.Select(x => new NodeActionConfig
+                        ApproverType = approverType,
+                        ApprovalMode = approveMeta?.ApproveMode ?? WfApprovalMode.None,
+                        Candidates = approverType == ApproverType.Normal ? approveMeta?.ApprovalCandidates ?? new List<ApprovalCandidate>() : new List<ApprovalCandidate>(),
+                        ByLevelApprovalSetting = approveMeta?.ByLevelApprovalSetting,
+                        EnableCopyto = approveMeta?.EnableCopyto,
+                        CopytoCandidates = approveMeta?.CopytoCandidates,
+                        NodeActions = approveMeta?.NodeActions?.Select(x => new NodeActionConfig
                         {
                             ActionType = Enum.TryParse<NodeActionType>(x.ActionType.ToString(), true, out var actionType) ? actionType : NodeActionType.Submit,
                             Enabled = x.Enabled ?? false,
                             Text = x.Text,
-                            Candidates = x.Candidates?.ToList()
-                        }).ToList(),
-                        NotifyChannels = flowNode.Metadata.ApproveMeta?.NotifyChannels ?? NotifyChannel.None,
-                        ExpireSetting = flowNode.Metadata.ApproveMeta?.ExpireSetting == null ? null : new ExpireSetting
-                        {
-                            ActionType = flowNode.Metadata.ApproveMeta.ExpireSetting.ActionType,
-                            TimeValue = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeValue,
-                            TimeUnit = flowNode.Metadata.ApproveMeta.ExpireSetting.TimeUnit,
-                            NotifySetting = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
+                            Candidates = x.Candidates?.ToList(),
+                            ReturnSetting = x.ReturnSetting == null ? null : new ReturnSetting
                             {
-                                Channels = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Channels,
-                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.NotifySetting.Candidates
+                                TargetMode = x.ReturnSetting.TargetMode,
+                                TargetNodeId = x.ReturnSetting.TargetNodeId,
                             },
-                            TransferSetting = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
+                        }).ToList(),
+                        NotifyChannels = approveMeta?.NotifyChannels ?? NotifyChannel.None,
+                        ExpireSetting = approveMeta?.ExpireSetting == null ? null : new ExpireSetting
+                        {
+                            ActionType = approveMeta.ExpireSetting.ActionType,
+                            TimeValue = approveMeta.ExpireSetting.TimeValue,
+                            TimeUnit = approveMeta.ExpireSetting.TimeUnit,
+                            NotifySetting = approveMeta.ExpireSetting.NotifySetting == null ? null : new NotifySetting
                             {
-                                Candidates = flowNode.Metadata.ApproveMeta.ExpireSetting.TransferSetting.Candidates
+                                Channels = approveMeta.ExpireSetting.NotifySetting.Channels,
+                                Candidates = approveMeta.ExpireSetting.NotifySetting.Candidates
+                            },
+                            TransferSetting = approveMeta.ExpireSetting.TransferSetting == null ? null : new TransferSetting
+                            {
+                                Candidates = approveMeta.ExpireSetting.TransferSetting.Candidates
+                            },
+                            ReturnSetting = approveMeta.ExpireSetting.ReturnSetting == null ? null : new ReturnSetting
+                            {
+                                TargetMode = approveMeta.ExpireSetting.ReturnSetting.TargetMode,
+                                TargetNodeId = approveMeta.ExpireSetting.ReturnSetting.TargetNodeId
                             }
-                        }
+                        },
+                        SubmitCondition = ParseSubmitCondition(approveMeta?.SubmitCondition),
+                        NoApproverSetting = ParseNoApproverSetting(approveMeta?.NoApproverSetting)
                     };
                     break;
                 case WfNodeType.CopyTo:
@@ -151,15 +236,15 @@ namespace EIMSNext.Component
 
             return wfNodeSetting;
         }
-        private DfNodeSetting GetDfNodeSetting(string corpId, FlowNodeData flowNode, List<string> otherFormIds)
+        private EfNodeSetting GetEfNodeSetting(string corpId, FlowNodeData flowNode, List<string> otherFormIds)
         {
-            var dfNodeSetting = new DfNodeSetting() { NodeType = flowNode.NodeType };
+            var efNodeSetting = new EfNodeSetting() { NodeType = flowNode.NodeType };
 
             switch (flowNode.NodeType)
             {
                 case WfNodeType.Start:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.TriggerMeta!.SingleResult;
-                    dfNodeSetting.TriggerSetting = new TriggerSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.TriggerMeta!.SingleResult;
+                    efNodeSetting.TriggerSetting = new TriggerSetting
                     {
                         EventType = flowNode.Metadata.TriggerMeta?.EventType,
                         ChangeFields = flowNode.Metadata.TriggerMeta?.ChangeFields,
@@ -167,21 +252,27 @@ namespace EIMSNext.Component
                         FormId = flowNode.Metadata.TriggerMeta?.FormId,
                         WfNodeId = flowNode.Metadata.TriggerMeta?.WfNodeId,
                         NodeAction = flowNode.Metadata.TriggerMeta?.NodeAction,
+                        TriggerKind = flowNode.Metadata.TriggerMeta?.TriggerKind ?? EventFlowTriggerKind.Form,
+                        TimeTrigger = flowNode.Metadata.TriggerMeta?.TimeSettings,
+                        HttpTrigger = flowNode.Metadata.TriggerMeta?.HttpSettings,
                     };
 
                     break;
                 case WfNodeType.Insert:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.InsertMeta!.SingleResult;
-                    dfNodeSetting.InsertSetting = new InsertSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.InsertMeta!.SingleResult;
+                    efNodeSetting.InsertSetting = new InsertSetting
                     {
                         FormId = flowNode.Metadata.InsertMeta!.FormId,
-                        FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.InsertMeta!.FormFieldList)
+                        FieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.InsertMeta!.FormFieldList)
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.InsertSetting.FormId);
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.InsertSetting.FieldSettings,
+                        $"Insert node [{flowNode.Id}]");
+                    otherFormIds.TryAdd(efNodeSetting.InsertSetting.FormId);
                     break;
                 case WfNodeType.QueryOne:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.QueryOneMeta!.SingleResult;
-                    dfNodeSetting.QueryOneSetting = new QueryOneSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.QueryOneMeta!.SingleResult;
+                    efNodeSetting.QueryOneSetting = new QueryOneSetting
                     {
                         FormId = flowNode.Metadata.QueryOneMeta!.FormId,
                         DynamicFindOptions = new DynamicFindOptions<FormData>
@@ -198,11 +289,11 @@ namespace EIMSNext.Component
                             Take = 1
                         }.SerializeToJson()
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.QueryOneSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.QueryOneSetting.FormId);
                     break;
                 case WfNodeType.QueryMany:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.QueryManyMeta!.SingleResult;
-                    dfNodeSetting.QueryManySetting = new QueryManySetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.QueryManyMeta!.SingleResult;
+                    efNodeSetting.QueryManySetting = new QueryManySetting
                     {
                         FormId = flowNode.Metadata.QueryManyMeta!.FormId,
                         DynamicFindOptions = new DynamicFindOptions<FormData>
@@ -219,11 +310,11 @@ namespace EIMSNext.Component
                             Take = flowNode.Metadata.QueryManyMeta.Take,
                         }.SerializeToJson()
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.QueryManySetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.QueryManySetting.FormId);
                     break;
                 case WfNodeType.Delete:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.DeleteMeta!.SingleResult;
-                    dfNodeSetting.DeleteSetting = new DeleteSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.DeleteMeta!.SingleResult;
+                    efNodeSetting.DeleteSetting = new DeleteSetting
                     {
                         DeleteMode = flowNode.Metadata.DeleteMeta!.DeleteMode,
                         NodeId = flowNode.Metadata.DeleteMeta.NodeId,
@@ -240,16 +331,16 @@ namespace EIMSNext.Component
                             }
                         }.SerializeToJson() : null
                     };
-                    otherFormIds.TryAdd(dfNodeSetting.DeleteSetting.FormId);
+                    otherFormIds.TryAdd(efNodeSetting.DeleteSetting.FormId);
                     break;
                 case WfNodeType.Update:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.UpdateMeta!.SingleResult;
-                    dfNodeSetting.UpdateSetting = new UpdateSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.UpdateMeta!.SingleResult;
+                    efNodeSetting.UpdateSetting = new UpdateSetting
                     {
                         UpdateMode = flowNode.Metadata.UpdateMeta!.UpdateMode,
                         NodeId = flowNode.Metadata.UpdateMeta.NodeId,
                         FormId = flowNode.Metadata.UpdateMeta!.FormId,
-                        FieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.FormFieldList),
+                        FieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.UpdateMeta.FormFieldList),
                         UpdateMatch = flowNode.Metadata.UpdateMeta!.SubCondition?.ToDataMatchSetting() ?? new DataMatchSetting(),
                         DynamicFindOptions = flowNode.Metadata.UpdateMeta.UpdateMode == UpdateMode.Form ? new DynamicFindOptions<FormData>
                         {
@@ -265,24 +356,49 @@ namespace EIMSNext.Component
                         InsertIfNoData = flowNode.Metadata.UpdateMeta.InsertIfNoData,
                     };
 
-                    if (dfNodeSetting.UpdateSetting.InsertIfNoData)
-                        dfNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.Dataflow, flowNode.Metadata.UpdateMeta.InsertFieldList);
+                    if (efNodeSetting.UpdateSetting.InsertIfNoData)
+                        efNodeSetting.UpdateSetting.InsertFieldSettings = ParseFormFieldList(FlowType.EventFlow, flowNode.Metadata.UpdateMeta.InsertFieldList);
 
-                    otherFormIds.TryAdd(dfNodeSetting.UpdateSetting.FormId);
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.UpdateSetting.FieldSettings,
+                        $"Update node [{flowNode.Id}]");
+                    EventFlowFieldMappingValidator.ValidateFormFieldSettings(
+                        efNodeSetting.UpdateSetting.InsertFieldSettings,
+                        $"Update node [{flowNode.Id}] insert-if-no-data");
+                    otherFormIds.TryAdd(efNodeSetting.UpdateSetting.FormId);
+                    break;
+                case WfNodeType.Print:
+                    var printMeta = flowNode.Metadata.PrintMeta;
+                    if (printMeta == null
+                        || string.IsNullOrWhiteSpace(printMeta.SourceNodeId)
+                        || string.IsNullOrWhiteSpace(printMeta.FormId)
+                        || string.IsNullOrWhiteSpace(printMeta.PrintDefId))
+                    {
+                        throw new ArgumentException($"Print node [{flowNode.Id}] is not configured");
+                    }
+
+                    efNodeSetting.SingleResult = true;
+                    efNodeSetting.PrintSetting = new PrintSetting
+                    {
+                        SourceNodeId = printMeta.SourceNodeId,
+                        FormId = printMeta.FormId,
+                        PrintDefId = printMeta.PrintDefId,
+                    };
+                    otherFormIds.TryAdd(efNodeSetting.PrintSetting.FormId);
                     break;
                 case WfNodeType.Plugin:
-                    dfNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
-                    dfNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
+                    efNodeSetting.SingleResult = flowNode.Metadata.PluginMeta!.SingleResult;
+                    efNodeSetting.PluginSetting = new Plugin.Contracts.PluginSetting
                     {
                         PluginId = flowNode.Metadata.PluginMeta.PluginId,
-                        PluginVersion = flowNode.Metadata.PluginMeta.PluginVersion,
                         FunctionId = flowNode.Metadata.PluginMeta.FunctionId,
-                        FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings)
+                        FieldSettings = ParsePluginFieldList(flowNode.Metadata.PluginMeta.FieldSettings),
+                        ResultFields = ParsePluginResultFieldList(flowNode.Metadata.PluginMeta.ResultFields)
                     };
                     break;
             }
 
-            return dfNodeSetting;
+            return efNodeSetting;
         }
         private void ParseBranchNode(string corpId, List<WfStep> steps, FlowType flowType, FlowNodeData flowNode, string endNodeId, List<string> otherFormIds)
         {
@@ -350,6 +466,90 @@ namespace EIMSNext.Component
             if (cond == null) return ScriptExpression.TRUE;
 
             return cond.ToScriptExpression();
+        }
+
+        private SubmitConditionSetting? ParseSubmitCondition(SubmitConditionMeta? condition)
+        {
+            if (condition?.Enabled != true)
+            {
+                return null;
+            }
+
+            var expression = ParseFormulaExpression(condition.FormulaValue);
+            return new SubmitConditionSetting
+            {
+                Enabled = true,
+                Expression = string.IsNullOrWhiteSpace(expression) ? ScriptExpression.TRUE : expression,
+                PromptText = condition.PromptText
+            };
+        }
+
+        private NoApproverSetting ParseNoApproverSetting(NoApproverMeta? setting)
+        {
+            return new NoApproverSetting
+            {
+                ActionType = setting?.ActionType ?? NoApproverActionType.StopAndReport,
+                Candidates = setting?.Candidates
+            };
+        }
+
+        private string ParseFormulaExpression(FormulaValue? formulaValue)
+        {
+            if (formulaValue == null)
+            {
+                return string.Empty;
+            }
+
+            var exp = formulaValue.Expression ?? string.Empty;
+            exp = SubstituteFormulaTokens(exp, formulaValue.Refs);
+            return exp;
+        }
+
+        /// <summary>
+        /// 把 <c>$F1</c>/<c>$F2</c>/… 占位符替换为 <c>data.{formId|nodeId}.field</c>。
+        /// <para>
+        /// 关键保护：
+        ///  1) 长度降序处理避免 <c>$F1</c> 先替换后吞掉 <c>$F10</c> 的前缀；
+        ///  2) 字面量保护：表达式体里形如 <c>"$F1"</c>/<c>'$F1'</c> 的字符串字面量先被
+        ///     控制字符占位符挪走，替换完再还原，避免误改用户字符串。
+        /// </para>
+        /// </summary>
+        private static string SubstituteFormulaTokens(string expression, List<FormulaRef> refs)
+        {
+            if (string.IsNullOrEmpty(expression) || refs == null || refs.Count == 0)
+            {
+                return expression;
+            }
+
+            // 1) 把字面量里的 $F\d+ 暂时挪走（用 ASCII 控制字符做占位符，源码中几乎不可能出现）
+            var literals = new List<string>();
+            var masked = System.Text.RegularExpressions.Regex.Replace(
+                expression,
+                @"\$F\d+",
+                match =>
+                {
+                    var idx = literals.Count;
+                    literals.Add(match.Value);
+                    return $"\u0001FMLIT{idx}\u0002";
+                });
+
+            // 2) 按 token 长度降序，避免 $F1 抢先覆盖 $F10
+            foreach (var formulaRef in refs.OrderByDescending(r => r.Key.Length))
+            {
+                if (string.IsNullOrEmpty(formulaRef.Key))
+                {
+                    continue;
+                }
+                masked = masked.Replace(formulaRef.Key, formulaRef.Field.ToFieldExp());
+            }
+
+            // 3) 还原字面量
+            for (var i = 0; i < literals.Count; i++)
+            {
+                masked = masked.Replace($"\u0001FMLIT{i}\u0002", literals[i]);
+            }
+
+            return masked;
         }
         #endregion
 
@@ -459,38 +659,64 @@ namespace EIMSNext.Component
             };
         }
 
-        private List<PluginFieldSetting> ParsePluginFieldList(PluginFieldList? fieldList)
+        private List<PluginFieldSetting> ParsePluginFieldList(List<PluginFieldItem>? fieldList, bool isSubFieldSetting = false)
         {
-            if (fieldList?.Items == null || fieldList.Items.Count == 0)
+            if (fieldList == null || fieldList.Count == 0)
             {
                 return new List<PluginFieldSetting>();
             }
 
-            return fieldList.Items.Select(item =>
+            return fieldList.Select(item =>
+                ParsePluginFieldItem(item, isSubFieldSetting)).ToList();
+        }
+
+        private PluginFieldSetting ParsePluginFieldItem(PluginFieldItem item, bool isSubFieldSetting)
+        {
+            var fieldSetting = new PluginFieldSetting
             {
-                var fieldSetting = new PluginFieldSetting
+                FieldKey = item.FieldKey,
+                FieldType = item.FieldType,
+                ValueType = Enum.TryParse<PluginValueType>(item.Value?.Type, true, out var valueType)
+                    ? valueType
+                    : PluginValueType.Empty,
+                Value = item.Value?.Value,
+                SubFieldSettings = ParsePluginFieldList(item.SubFieldSettings, isSubFieldSetting: true),
+            };
+
+            if (item.Value?.FieldValue != null)
+            {
+                fieldSetting.ValueField = new PluginFieldReference
+                {
+                    NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
+                    FormId = item.Value.FieldValue.FormId,
+                    Field = item.Value.FieldValue.Field,
+                    FieldType = item.Value.FieldValue.Type,
+                    IsSubField = item.Value.FieldValue.IsSubField || item.Value.FieldValue.Field.Contains('>'),
+                    SingleResultNode = item.Value.FieldValue.SingleResultNode,
+                };
+            }
+
+            EventFlowFieldMappingValidator.ValidatePluginFieldSetting(fieldSetting, isSubFieldSetting);
+            return fieldSetting;
+        }
+
+        private List<PluginResultFieldSetting> ParsePluginResultFieldList(List<PluginResultFieldItem>? fieldList)
+        {
+            if (fieldList == null || fieldList.Count == 0)
+            {
+                return new List<PluginResultFieldSetting>();
+            }
+
+            return fieldList
+                .Where(item => !string.IsNullOrWhiteSpace(item.FieldKey))
+                .Select(item => new PluginResultFieldSetting
                 {
                     FieldKey = item.FieldKey,
+                    FieldName = string.IsNullOrWhiteSpace(item.FieldName) ? item.FieldKey : item.FieldName,
                     FieldType = item.FieldType,
-                    ValueType = Enum.Parse<PluginValueType>(item.Value!.Type, true),
-                    Value = item.Value.Value,
-                };
-
-                if (item.Value.FieldValue != null)
-                {
-                    fieldSetting.ValueField = new PluginFieldReference
-                    {
-                        NodeId = item.Value.FieldValue.NodeId ?? string.Empty,
-                        FormId = item.Value.FieldValue.FormId,
-                        Field = item.Value.FieldValue.Field,
-                        FieldType = item.Value.FieldValue.Type,
-                        IsSubField = item.Value.FieldValue.IsSubField,
-                        SingleResultNode = item.Value.FieldValue.SingleResultNode,
-                    };
-                }
-
-                return fieldSetting;
-            }).ToList();
+                    SubFields = ParsePluginResultFieldList(item.SubFields),
+                })
+                .ToList();
         }
         #endregion
 
@@ -501,7 +727,7 @@ namespace EIMSNext.Component
             public List<FlowNodeData> Nodes { get; set; } = new List<FlowNodeData>();
             public FlowNodeData EndNode { get; set; } = new FlowNodeData();
             public WorkflowMeta? WorkflowMeta { get; set; }
-            public CascadeMode DfCascade { get; set; }
+            public CascadeMode EfCascade { get; set; }
             public List<string>? EventIds { get; set; }
         }
         private class WorkflowMeta
@@ -550,13 +776,30 @@ namespace EIMSNext.Component
         }
         private class ApproveMeta
         {
+            public ApproverType ApproverType { get; set; } = ApproverType.Normal;
             public WfApprovalMode ApproveMode { get; set; }
             public List<ApprovalCandidate> ApprovalCandidates { get; set; } = new List<ApprovalCandidate>();
+            public ByLevelApprovalSetting? ByLevelApprovalSetting { get; set; }
             public bool? EnableCopyto { get; set; }
             public List<ApprovalCandidate>? CopytoCandidates { get; set; }
             public List<NodeActionMeta>? NodeActions { get; set; }
             public NotifyChannel NotifyChannels { get; set; }
             public ExpireMeta? ExpireSetting { get; set; }
+            public SubmitConditionMeta? SubmitCondition { get; set; }
+            public NoApproverMeta? NoApproverSetting { get; set; }
+        }
+
+        private class SubmitConditionMeta
+        {
+            public bool? Enabled { get; set; }
+            public FormulaValue? FormulaValue { get; set; }
+            public string? PromptText { get; set; }
+        }
+
+        private class NoApproverMeta
+        {
+            public NoApproverActionType? ActionType { get; set; }
+            public List<ApprovalCandidate>? Candidates { get; set; }
         }
 
         private class NodeActionMeta
@@ -565,6 +808,7 @@ namespace EIMSNext.Component
             public bool? Enabled { get; set; }
             public string? Text { get; set; }
             public List<ApprovalCandidate>? Candidates { get; set; }
+            public ReturnMeta? ReturnSetting { get; set; }
         }
 
         private class ExpireMeta
@@ -574,6 +818,7 @@ namespace EIMSNext.Component
             public TimeUnit TimeUnit { get; set; } = TimeUnit.Minute;
             public NotifyMeta? NotifySetting { get; set; }
             public TransferMeta? TransferSetting { get; set; }
+            public ReturnMeta? ReturnSetting { get; set; }
         }
 
         private class NotifyMeta
@@ -585,6 +830,12 @@ namespace EIMSNext.Component
         private class TransferMeta
         {
             public List<ApprovalCandidate>? Candidates { get; set; }
+        }
+
+        private class ReturnMeta
+        {
+            public ReturnTargetMode TargetMode { get; set; } = ReturnTargetMode.Previous;
+            public string? TargetNodeId { get; set; }
         }
         private class CopytoMeta
         {
@@ -611,6 +862,9 @@ namespace EIMSNext.Component
             /// </summary>
             public List<string>? ChangeFields { get; set; }
             public bool SingleResult { get; set; }
+            public EventFlowTriggerKind TriggerKind { get; set; } = EventFlowTriggerKind.Form;
+            public EventFlowTimeTriggerSetting? TimeSettings { get; set; }
+            public EventFlowHttpTriggerSetting? HttpSettings { get; set; }
         }
 
         private class InsertMeta
@@ -683,20 +937,18 @@ namespace EIMSNext.Component
         }
         private class PrintMeta
         {
+            public string SourceNodeId { get; set; } = string.Empty;
+            public string FormId { get; set; } = string.Empty;
+            public string PrintDefId { get; set; } = string.Empty;
             public bool SingleResult { get; set; }
         }
         private class PluginMeta
         {
             public bool SingleResult { get; set; }
             public string PluginId { get; set; } = string.Empty;
-            public string? PluginVersion { get; set; }
             public string FunctionId { get; set; } = string.Empty;
-            public PluginFieldList FieldSettings { get; set; } = new PluginFieldList();
-        }
-
-        private class PluginFieldList
-        {
-            public List<PluginFieldItem> Items { get; set; } = new List<PluginFieldItem>();
+            public List<PluginFieldItem> FieldSettings { get; set; } = new List<PluginFieldItem>();
+            public List<PluginResultFieldItem> ResultFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
         private class PluginFieldItem
@@ -704,6 +956,15 @@ namespace EIMSNext.Component
             public string FieldKey { get; set; } = string.Empty;
             public string FieldType { get; set; } = string.Empty;
             public FormFieldValue? Value { get; set; }
+            public List<PluginFieldItem> SubFieldSettings { get; set; } = new List<PluginFieldItem>();
+        }
+
+        private class PluginResultFieldItem
+        {
+            public string FieldKey { get; set; } = string.Empty;
+            public string? FieldName { get; set; }
+            public string FieldType { get; set; } = string.Empty;
+            public List<PluginResultFieldItem> SubFields { get; set; } = new List<PluginResultFieldItem>();
         }
 
 

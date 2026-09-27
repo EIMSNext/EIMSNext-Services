@@ -1,9 +1,9 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
-using EIMSNext.CloudEvent;
-using EIMSNext.Core.Repositories;
-using EIMSNext.Service.Entities;
+using EIMSNext.Notification;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -67,7 +67,7 @@ namespace EIMSNext.Async.Tests
 
         private sealed class FakeEventHub : IEventHub
         {
-            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, object data) => Task.CompletedTask;
+            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data) => Task.CompletedTask;
         }
 
         private sealed class TestResolver(IServiceProvider serviceProvider) : IResolver

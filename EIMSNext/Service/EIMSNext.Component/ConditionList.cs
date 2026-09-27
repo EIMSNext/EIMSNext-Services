@@ -1,7 +1,8 @@
 using EIMSNext.Common;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Scripting;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Component
 {
@@ -54,7 +55,7 @@ namespace EIMSNext.Component
                         exp = "null";
                         break;
                     default:// FieldValueType.Custom:
-                        exp = value.Value;
+                        exp = DynamicValueNormalizer.Normalize(value.Value);
                         break;
                 }
             }
@@ -149,6 +150,7 @@ namespace EIMSNext.Component
                     {
                         //TODO: 值为字段时，需要更详细的处理
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             subExp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},x.{subField})}})";
                             break;
@@ -166,6 +168,7 @@ namespace EIMSNext.Component
                             subExp = $" {oper}(x.{subField}) ";
                             break;
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             subExp = $" {oper}({value},x.{subField}) ";
                             break;
@@ -189,6 +192,7 @@ namespace EIMSNext.Component
                     {
                         //TODO: 值为字段时，需要更详细的处理
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             exp = $"MATCH({valueArrField}, y=>{{return {oper}(y.{valueSubField},{field})}})";
                             break;
@@ -206,6 +210,7 @@ namespace EIMSNext.Component
                             exp = $" {oper}({field}) ";
                             break;
                         case FilterOp.In:
+                        case FilterOp.AllIn:
                         case FilterOp.Nin:
                             exp = $" {oper}({value},{field}) ";
                             break;
@@ -230,6 +235,12 @@ namespace EIMSNext.Component
                 case FilterOp.Gte:
                     oper = "GE";
                     break;
+                case FilterOp.AllIn:
+                    oper = "ALLIN";
+                    break;
+                case FilterOp.Between:
+                    oper = "BETWEEN";
+                    break;
             }
 
             return oper;
@@ -250,14 +261,16 @@ namespace EIMSNext.Component
             {
                 var fType = fieldType.ToLower();
                 var valStr = "";
+                var normalizedValue = DynamicValueNormalizer.Normalize(value.Value);
                 if (fType == FieldType.Number)
-                    valStr = $"{value?.Value ?? "0"}";
+                    valStr = $"{normalizedValue ?? "0"}";
                 else
-                    valStr = $"'{value?.Value}'";
+                    valStr = $"'{normalizedValue}'";
 
                 return valStr;
             }
         }
+
     }
 
     public class ConditionValue

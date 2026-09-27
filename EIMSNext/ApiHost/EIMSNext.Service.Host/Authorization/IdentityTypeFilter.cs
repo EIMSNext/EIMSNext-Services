@@ -1,4 +1,5 @@
 using EIMSNext.ApiService;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Controllers;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -11,7 +12,7 @@ namespace EIMSNext.Service.Host.Authorization
     public class IdentityTypeFilter : IAsyncAuthorizationFilter
     {
         private readonly IIdentityContext _identity;
-        private ILogger<IdentityTypeFilter> _logger;
+        private readonly ILogger<IdentityTypeFilter> _logger;
 
         /// <summary>
         /// 
@@ -30,6 +31,18 @@ namespace EIMSNext.Service.Host.Authorization
         /// <returns></returns>
         public Task OnAuthorizationAsync(AuthorizationFilterContext context)
         {
+            var actionDescriptor = context.ActionDescriptor as ControllerActionDescriptor;
+            if (AllowAnonymous(context, actionDescriptor))
+            {
+                return Task.CompletedTask;
+            }
+
+            var idAttr = ResolveIdentityType(context, actionDescriptor);
+            if (idAttr == null)
+            {
+                return Task.CompletedTask;
+            }
+
             if (_identity.IdentityType == IdentityType.None || _identity.IdentityType == IdentityType.Disabled)
             {
                 _logger.LogDebug("禁止访问 {Path}, 原因 {Reason}", context.HttpContext.Request.Path, "无身份用户或用户已被禁用");
@@ -37,32 +50,50 @@ namespace EIMSNext.Service.Host.Authorization
                 return Task.CompletedTask;
             }
 
-            var actionContext = (ControllerActionDescriptor)context.ActionDescriptor;
-            var idAttr = actionContext.FilterDescriptors.FirstOrDefault(f => f.Filter is IdentityTypeAttribute)?.Filter as IdentityTypeAttribute;
-
-            if (idAttr != null)
-            {                
-                //if (_identity.HasCorpAdminPermission()) //不具备超管级别权限
-                //{
-                    if (!idAttr.IdentityType.HasFlag(_identity.IdentityType))
-                    {
-                        _logger.LogDebug("禁止访问 {Path}, 原因 身份不允许 - IDT({AllowedIdentityType}), USR({CurrentIdentityType})", context.HttpContext.Request.Path, idAttr.IdentityType, _identity.IdentityType);
-                        //如果配置了明确身份限制并且不包含超管理员，则禁止访问
-                        context.Result = new ForbidResult();
-                    }
-                //}
-                //else
-                //{
-                //    if (!idAttr.IdentityType.HasFlag(_identity.IdentityType))
-                //    {
-                //        _logger.LogDebug($"禁止访问:{context.HttpContext.Request.Path}, 原因：身份不允许 - IDT（{idAttr.IdentityType}），USR（{_identity.IdentityType}）");
-                //        //如果当前用户没有身价，或者配置了身份限制并且不包含当前身份，则禁止访问
-                //        context.Result = new ForbidResult();
-                //    }
-                //}
+            if (!idAttr.IdentityType.HasFlag(_identity.IdentityType))
+            {
+                _logger.LogDebug("禁止访问 {Path}, 原因 身份不允许 - IDT({AllowedIdentityType}), USR({CurrentIdentityType})", context.HttpContext.Request.Path, idAttr.IdentityType, _identity.IdentityType);
+                context.Result = new ForbidResult();
             }
 
             return Task.CompletedTask;
+        }
+
+        private static IdentityTypeAttribute? ResolveIdentityType(AuthorizationFilterContext context, ControllerActionDescriptor? actionDescriptor)
+        {
+            var actionAttr = actionDescriptor?.MethodInfo
+                .GetCustomAttributes(inherit: true)
+                .OfType<IdentityTypeAttribute>()
+                .LastOrDefault();
+            if (actionAttr != null)
+            {
+                return actionAttr;
+            }
+
+            var controllerAttr = actionDescriptor?.ControllerTypeInfo
+                .GetCustomAttributes(inherit: true)
+                .OfType<IdentityTypeAttribute>()
+                .LastOrDefault();
+            if (controllerAttr != null)
+            {
+                return controllerAttr;
+            }
+
+            return context.ActionDescriptor.EndpointMetadata
+                .OfType<IdentityTypeAttribute>()
+                .LastOrDefault();
+        }
+
+        private static bool AllowAnonymous(AuthorizationFilterContext context, ControllerActionDescriptor? actionDescriptor)
+        {
+            return context.ActionDescriptor.EndpointMetadata.OfType<IAllowAnonymous>().Any()
+                || HasActionMetadata<IAllowAnonymous>(actionDescriptor);
+        }
+
+        private static bool HasActionMetadata<TMetadata>(ControllerActionDescriptor? actionDescriptor)
+        {
+            return actionDescriptor?.MethodInfo.GetCustomAttributes(inherit: true).OfType<TMetadata>().Any() == true
+                || actionDescriptor?.ControllerTypeInfo.GetCustomAttributes(inherit: true).OfType<TMetadata>().Any() == true;
         }
     }
 }

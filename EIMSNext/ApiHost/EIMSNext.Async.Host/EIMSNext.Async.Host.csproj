@@ -9,26 +9,29 @@
     <Version>1.1.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="Microsoft.Data.SqlClient" />
     <PackageReference Include="Quartz" />
     <PackageReference Include="Quartz.Extensions.DependencyInjection" />
     <PackageReference Include="Quartz.Extensions.Hosting" />
-    <PackageReference Include="Quartz.Serialization.Json" />
     <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" />
-    <PackageReference Include="Quartz.Serialization.SystemTextJson" />
+    <PackageReference Include="Quartz.Serialization.Json" />
+    <PackageReference Include="quartz-store-mongodb" />
     <PackageReference Include="Serilog.Extensions.Hosting" />
     <PackageReference Include="Serilog.Settings.Configuration" />
     <PackageReference Include="Serilog.Sinks.Console" />
     <PackageReference Include="Serilog.Sinks.File" />
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.Flow\EIMSNext.ApiClient.Flow.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Tasks\EIMSNext.Async.Tasks.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Quartz\EIMSNext.Async.Quartz.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.CloudEvent\EIMSNext.CloudEvent.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Contracts\EIMSNext.Plugin.Contracts.csproj" />
+    <ProjectReference Include="..\..\Service\EIMSNext.Notification\EIMSNext.Notification.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service.Persistence\EIMSNext.Service.Persistence.csproj" />
+    <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Service\EIMSNext.Flow.Service.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
   </ItemGroup>
 </Project>

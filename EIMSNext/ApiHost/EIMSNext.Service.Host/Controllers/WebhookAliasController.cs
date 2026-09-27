@@ -1,7 +1,7 @@
 using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Service.Host.Controllers

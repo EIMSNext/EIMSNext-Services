@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using System.Dynamic;
 
 namespace EIMSNext.Flow.Core

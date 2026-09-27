@@ -1,8 +1,15 @@
-﻿using EIMSNext.Cache;
-using EIMSNext.Core;
-using EIMSNext.Core.Serialization;
+using EIMSNext.ApiCore.RateLimiting;
+using EIMSNext.ApiCore.Idempotency;
+using EIMSNext.Cache;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Mongo.Serialization;
 using EIMSNext.Json.Serialization;
-using EIMSNext.MongoDb;
 using EIMSNext.Storage;
 using EIMSNext.Storage.Abstractions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -48,8 +55,11 @@ namespace EIMSNext.ApiCore
 
             EIMSNext.Common.Constants.BaseDirectory = AppDomain.CurrentDomain.BaseDirectory;
 
+            services.Configure<IdempotencyOptions>(configuration.GetSection("Idempotency"));
             services.Configure<MongoDbConfiguration>(configuration.GetSection("MongoDb"));
             services.Configure<StorageConfiguration>(configuration.GetSection("Storage"));
+            services.Configure<CorsOptions>(configuration.GetSection("Cors"));
+            services.AddSingleton<CorsPolicyHelper>();
 
             services.Configure<JsonOptions>(opt =>
             {
@@ -102,19 +112,37 @@ namespace EIMSNext.ApiCore
                     // User
                     //Password = "xxxxxx",
                     //AllowAdmin = true,
-                    DefaultDatabase = (configuration.GetSection("CacheServer:Database").Value ?? "1").SafeToInt(1),
+                    DefaultDatabase = (configuration.GetSection("CacheServer:Database").Value ?? "6").SafeToInt(6),
                     AbortOnConnectFail = false,//当为true时，当没有可用的服务器时则不会创建一个连接
                 };
                 options.ConfigurationOptions.EndPoints.Add(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
             });
 
-            //services.AddSingleton<ICacheClient, DistributedCacheClient>();
-            services.AddSingleton<ICacheClient, FakeCacheClient>();
+            services.AddSingleton<IConnectionMultiplexer>(sp =>
+            {
+                var config = ConfigurationOptions.Parse(configuration.GetSection("CacheServer:EndPoint").Value ?? "localhost:6379");
+                config.AbortOnConnectFail = false;
+                var database = (configuration.GetSection("CacheServer:Database").Value ?? "6").SafeToInt(6);
+                config.DefaultDatabase = database;
+                return ConnectionMultiplexer.Connect(config);
+            });
+
+            services.AddSingleton<ILogoutTokenStore, DistributedLogoutTokenStore>();
+
+            services.AddSingleton<ICacheClient, DistributedCacheClient>();
             services.AddScoped<IScopeCache, ScopeCache>();
+            services.AddScoped<PublicRateLimiter>();
+            services.AddScoped<VerificationCodeRateLimiter>();
         }
 
         public static void AddCustomAuthentication(this IServiceCollection services, IConfiguration configuration)
         {
+            var identityHostSection = configuration.GetSection("IdentityHost");
+            var authority = identityHostSection["Authority"];
+            var issuer = identityHostSection["Issuer"] ?? "https://identity.eimsnext.com/issuer";
+            var audience = identityHostSection["Audience"] ?? "eimsnext.api";
+            var requireHttps = identityHostSection.GetValue<bool?>("RequireHttpsMetadata") ?? false;
+
             services.AddAuthentication(o =>
             {
                 o.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -122,21 +150,23 @@ namespace EIMSNext.ApiCore
             }).AddJwtBearer(JwtBearerDefaults.AuthenticationScheme,
              opt =>
              {
-                 opt.Authority = configuration.GetSection("OAuth:Authority").Value;
+                 opt.Authority = authority;
                  opt.SaveToken = true;
-                 opt.RequireHttpsMetadata = false;
+                 opt.RequireHttpsMetadata = requireHttps;
+                 opt.Events = JwtBearerLogoutTokenEvents.Create();
 
                  opt.TokenValidationParameters = new TokenValidationParameters
                  {
                      ValidateIssuer = true,
-                     ValidIssuer = "https://auth.eimsnext.com",
+                     ValidIssuer = issuer,
                      ValidateAudience = true,
-                     ValidAudience = "eimsnext.api",
+                     ValidAudience = audience,
                      ValidateLifetime = true,
                      ValidateIssuerSigningKey = true
                  };
              });
         }
+
         public static void UseCustomMiddlewares(this IApplicationBuilder app)
         {
             app.UseMiddleware<ExceptionFilterMiddleware>();

@@ -1,5 +1,11 @@
-using EIMSNext.Core;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 
 using HKH.Mef2.Integration;
@@ -22,16 +28,16 @@ namespace EIMSNext.Flow.Core.Nodes
             var approveData = new WfApproveData(dataContext.CorpId!, dataContext.UserId ?? "", dataContext.WfStarter!.Id, dataContext.WfStarter.Value, dataContext.WfStarter.Label,
                 ApproveAction.Approve, string.Empty, string.Empty, context.Workflow.Id);
 
-            using (var scope = FormDataRepository.NewTransactionScope())
+            await MongoTransactionScope.ExecuteWithRetryAsync(FormDataRepository.DbContext, async session =>
             {
-                UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approving, scope.SessionHandle);
-                AddApprovalLog(context.Workflow, new Wf_Todo(), dataContext, Metadata!, approveData, scope.SessionHandle);
+                UpdateWorkflowStatus(dataContext.CorpId, dataContext.DataId, FlowStatus.Approving, session);
+                AddTaskLog(context.Workflow, new Wf_Task(), dataContext, Metadata!, approveData, session);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunDataflow(new DfRunParamter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.DfCascade, dataContext.EventIds));
+                await RunEventFlow(new EfRunParameter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                    .WithExecutionId($"{context.Workflow.Id}:start:{dataContext.Round}:submitted"));
 
-                scope.CommitTransaction();
-            }
+            }).ConfigureAwait(false);
 
             CreateExecLog(context.Workflow, dataContext, Metadata!, approveData);
 

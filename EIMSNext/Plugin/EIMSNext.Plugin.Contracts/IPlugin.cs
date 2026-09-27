@@ -23,15 +23,14 @@ namespace EIMSNext.Plugin.Contracts
         public virtual PluginExecResult Execute(PluginSetting pluginP, PluginExecArgs execArgs, PluginInvocationContext? context = null)
         {
             Context = context;
-            if (TryParse(pluginP.Settings, out var setting))
+            if (TryParse(pluginP.Settings, out var setting) && setting != null)
             {
-                //TODO: update default setting to json
-                Setting = setting.Deserialize<TSetting>(new JsonSerializerOptions { PropertyNameCaseInsensitive = true })!;
+                Setting = setting.DeserializeFromJson<TSetting>()!;
             }
 
             var result = new PluginExecResult();
 
-            var methodInfo = GetType().GetMethod(execArgs.FunName, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.IgnoreCase);
+            var methodInfo = PluginDescriptionBuilder.FindFunction(GetType(), execArgs.FunName);
 
             if (methodInfo == null)
             {
@@ -42,8 +41,6 @@ namespace EIMSNext.Plugin.Contracts
 
             if (!TryParse(execArgs.FunArgs, out var funArgs))
                 funArgs = new JsonObject();
-            //TODO: update default setting to json
-
             ParameterInfo[] parameters = methodInfo.GetParameters();
             if (parameters.Length != 1)
             {
@@ -64,7 +61,7 @@ namespace EIMSNext.Plugin.Contracts
             var call = Expression.Call(instanceParam, methodInfo, dataParam);
             var funDelegate = Expression.Lambda(delegateType, call, instanceParam, dataParam).Compile();
 
-            var data = funArgs!.Deserialize(parameterType, new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            var data = PluginValueBinder.Deserialize(funArgs!, parameterType);
             try
             {
                 if (methodInfo.ReturnType == typeof(void))
@@ -73,7 +70,8 @@ namespace EIMSNext.Plugin.Contracts
                 }
                 else
                 {
-                    result.Result = funDelegate.DynamicInvoke(this, data);
+                    var execResult = funDelegate.DynamicInvoke(this, data);
+                    result.Result = PluginDescriptionBuilder.ProjectResult(methodInfo, execResult);
                 }
             }
             catch (Exception ex)
@@ -97,7 +95,7 @@ namespace EIMSNext.Plugin.Contracts
 
         protected virtual PluginDesc BuildPluginDesc()
         {
-            return new PluginDesc() { Id = "", Name = "aa" };
+            return PluginDescriptionBuilder.Build(GetType());
         }
 
         protected bool TryParse(string? s, out JsonObject? result)

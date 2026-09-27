@@ -1,4 +1,5 @@
 using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.Flow.Service
@@ -8,7 +9,8 @@ namespace EIMSNext.Flow.Service
         public static void AddWorkflowServices(this IServiceCollection services)
         {
             services.AddScoped<IWorkflowLoader, WorkflowLoader>();
-            services.AddTransient<IDfDataProcessor, DfDataProcessor>();
+            services.AddTransient<IEfDataProcessor, EfDataProcessor>();
+            services.AddScoped<IEventFlowHookService, EventFlowHookService>();
         }
     }
 }

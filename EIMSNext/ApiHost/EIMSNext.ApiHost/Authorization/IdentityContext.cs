@@ -1,11 +1,19 @@
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
-using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.Http;
+
+using MongoDB.Driver;
 
 namespace EIMSNext.ApiHost.Authorization
 {
@@ -17,12 +25,14 @@ namespace EIMSNext.ApiHost.Authorization
         private bool _retrieved = false;
 
         private IdentityType _type = IdentityType.None;
+        private PublicScope _publicScope = PublicScope.None;
         private IResolver _resolver;
         private User? _user;
         private Employee? _employee;
+        private string _systemObjectName = string.Empty;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="resolver"></param>
         public IdentityContext(IResolver resolver)
@@ -30,10 +40,45 @@ namespace EIMSNext.ApiHost.Authorization
             _resolver = resolver;
             IHttpContextAccessor httpContextAccessor = resolver.Resolve<IHttpContextAccessor>();
             AccessToken = httpContextAccessor.HttpContext?.Request.Headers.Authorization.FirstOrDefault() ?? "";
-            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(AuthClaimTypes.Id);
+            var idClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.Id);
             var corpClaim = httpContextAccessor.HttpContext?.User.FindFirst("corp");
+            var identityTypeClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.IdentityType);
+            var nameClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.Name);
+            var dashboardIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.DashboardId);
+            var publicTargetIdClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.PublicTargetId);
+            var publicScopeClaim = httpContextAccessor.HttpContext?.User.FindFirst(IdentityClaimTypes.PublicScope);
             CurrentUserID = idClaim?.Value ?? string.Empty;
             CurrentCorpId = corpClaim?.Value ?? string.Empty;
+            CurrentDashboardId = publicTargetIdClaim?.Value ?? dashboardIdClaim?.Value ?? string.Empty;
+            _publicScope = ParsePublicScope(publicScopeClaim?.Value);
+            _systemObjectName = nameClaim?.Value ?? string.Empty;
+
+            if (string.Equals(identityTypeClaim?.Value, "public", StringComparison.OrdinalIgnoreCase) &&
+                !string.IsNullOrWhiteSpace(CurrentDashboardId))
+            {
+                _type = IdentityType.Public;
+                _user = new User { Id = "public", Name = "public" };
+                _employee = new Employee
+                {
+                    Id = "public",
+                    CorpId = CurrentCorpId,
+                    UserId = "public",
+                    UserName = "public",
+                    Code = "public",
+                    EmpName = "public",
+                    IsDummy = true,
+                    UserBound = true,
+                    Status = EmployeeStatus.Active,
+                };
+                _retrieved = true;
+            }
+
+            if (string.Equals(identityTypeClaim?.Value, IdentityType.System.ToString(), StringComparison.OrdinalIgnoreCase))
+            {
+                _type = IdentityType.System;
+                CurrentUserID = "system";
+                _retrieved = true;
+            }
 
             if (idClaim == null && corpClaim == null)
             {
@@ -41,11 +86,13 @@ namespace EIMSNext.ApiHost.Authorization
                 var clientId = client_idClaim?.Value ?? string.Empty;
                 if (!string.IsNullOrEmpty(clientId))
                 {
-                    var client = resolver.GetService<EIMSNext.Auth.Entities.Client>().Get(clientId);
+                    var client = resolver.GetService<EIMSNext.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
-                        CurrentCorpId = client.CorpId;
+                        CurrentCorpId = client.CorpId ?? string.Empty;
                         CurrentUserID = "system";
+                        _type = IdentityType.Client;
+                        _retrieved = true;
                     }
                 }
             }
@@ -55,8 +102,26 @@ namespace EIMSNext.ApiHost.Authorization
             serviceContext.CorpId = CurrentCorpId;
             serviceContext.User = CurrentUser;
             serviceContext.Employee = CurrentEmployee;
-            serviceContext.Operator = CurrentEmployee?.ToOperator() ?? Operator.Empty;
+            serviceContext.Operator = _type == IdentityType.System
+                ? new Operator("system", _systemObjectName, "System")
+                : CurrentEmployee?.ToOperator() ?? Operator.Empty;
             serviceContext.ClientIp = IpHelper.GetClientIp(httpContextAccessor);
+        }
+
+        private static PublicScope ParsePublicScope(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value)) return PublicScope.None;
+            return Enum.TryParse<PublicScope>(value.Trim(), ignoreCase: true, out var parsed)
+                && parsed is not PublicScope.None
+                && IsSingleScope(parsed)
+                ? parsed
+                : PublicScope.None;
+        }
+
+        private static bool IsSingleScope(PublicScope scope)
+        {
+            var value = (int)scope;
+            return value > 0 && (value & (value - 1)) == 0;
         }
 
         /// <summary>
@@ -78,7 +143,7 @@ namespace EIMSNext.ApiHost.Authorization
         }
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         public IEmployee? CurrentEmployee
         {
@@ -97,10 +162,25 @@ namespace EIMSNext.ApiHost.Authorization
                 _user = _resolver.GetRepository<User>().Get(CurrentUserID);
                 if (_user != null)
                 {
-                    _employee = _resolver.GetRepository<Employee>().Queryable.FirstOrDefault(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id);
+                    CurrentCorpId = ResolveCurrentCorpId(_user, CurrentCorpId);
+
+                    _employee = _resolver.GetRepository<Employee>().Find(x => x.CorpId == CurrentCorpId && x.UserId == _user.Id).FirstOrDefault();
                 }
                 _retrieved = true;
             }
+        }
+
+        internal static string ResolveCurrentCorpId(User user, string claimedCorpId)
+        {
+            var defaultCorpId = user.Crops.FirstOrDefault(x => x.IsDefault && !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId;
+            if (!string.IsNullOrWhiteSpace(defaultCorpId))
+            {
+                return defaultCorpId;
+            }
+
+            return !string.IsNullOrWhiteSpace(claimedCorpId)
+                ? claimedCorpId
+                : user.Crops.FirstOrDefault(x => !string.IsNullOrWhiteSpace(x.CorpId))?.CorpId ?? string.Empty;
         }
 
         /// <summary>
@@ -112,6 +192,13 @@ namespace EIMSNext.ApiHost.Authorization
             {
                 if (_type == IdentityType.None && CurrentUser != null && CurrentUser is User)
                 {
+                    var explicitIdentityType = ResolveExplicitIdentityType(_user!);
+                    if (explicitIdentityType.HasValue)
+                    {
+                        _type = explicitIdentityType.Value;
+                        return _type;
+                    }
+
                     var corp = ((User)CurrentUser).Crops.FirstOrDefault(x => x.CorpId == CurrentCorpId);
                     if (corp != null)
                     {
@@ -121,13 +208,31 @@ namespace EIMSNext.ApiHost.Authorization
                         }
                         else
                         {
-                            if (_user!.Disabled)
+                            if (_employee != null)
                             {
-                                _type = IdentityType.Disabled;
+                                var adminGroupTypes = _resolver.GetService<TenantAdminGroup>().All()
+                                    .Where(x =>
+                                        x.CorpId == CurrentCorpId &&
+                                        !x.DeleteFlag &&
+                                        x.EmployeeIds.Contains(_employee.Id))
+                                    .Select(x => x.Type)
+                                    .ToList();
+
+                                if (adminGroupTypes.Contains(TenantAdminGroupType.System))
+                                {
+                                    _type = IdentityType.CorpAdmin;
+                                }
+                                else if (adminGroupTypes.Contains(TenantAdminGroupType.Normal))
+                                {
+                                    _type = IdentityType.AppAdmin;
+                                }
+                                else
+                                {
+                                    _type = IdentityType.Employee;
+                                }
                             }
                             else
                             {
-                                //TODO:将来根据角色来指定身份
                                 _type = IdentityType.Employee;
                             }
 
@@ -143,10 +248,31 @@ namespace EIMSNext.ApiHost.Authorization
             }
         }
 
+        internal static IdentityType? ResolveExplicitIdentityType(User user)
+        {
+            if (user.Disabled)
+            {
+                return IdentityType.Disabled;
+            }
+            if (string.IsNullOrWhiteSpace(user.UserType))
+            {
+                return null;
+            }
+
+            return Enum.TryParse<IdentityType>(user.UserType.Trim(), true, out var explicitType)
+                ? explicitType
+                : IdentityType.None;
+        }
+
         /// <summary>
         /// 当前登录的企业ID
         /// </summary>
         public string CurrentCorpId { get; private set; }
+
+        /// <summary>
+        /// 当前公开访问仪表盘ID
+        /// </summary>
+        public string CurrentDashboardId { get; private set; } = string.Empty;
 
         /// <summary>
         /// 当前应用Id
@@ -166,5 +292,10 @@ namespace EIMSNext.ApiHost.Authorization
         /// 当前用户对资源的访问范围
         /// </summary>
         public AccessControlLevel AccessControlLevel { get; set; } = AccessControlLevel.NotSet;
+
+        /// <summary>
+        /// 公开访问 scope（仅 Public 身份有效）
+        /// </summary>
+        public PublicScope PublicScope => _publicScope;
     }
 }

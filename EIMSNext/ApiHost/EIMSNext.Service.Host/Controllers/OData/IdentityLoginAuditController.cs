@@ -1,0 +1,19 @@
+using Asp.Versioning;
+using EIMSNext.ApiService;
+using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Entities;
+using EIMSNext.Service.Host.OData;
+using HKH.Mef2.Integration;
+
+namespace EIMSNext.Service.Host.Controllers.OData
+{
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="resolver"></param>
+    [ApiVersion(1.0)]
+    public class IdentityLoginAuditController(IResolver resolver) : ReadOnlyODataController<IdentityLoginAuditApiService, IdentityLoginAudit, IdentityLoginAuditViewModel>(resolver)
+    {
+
+    }
+}

@@ -6,7 +6,7 @@ using System.Text.RegularExpressions;
 
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Component
 {

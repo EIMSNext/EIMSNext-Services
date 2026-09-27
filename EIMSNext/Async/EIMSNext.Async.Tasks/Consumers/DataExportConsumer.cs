@@ -2,13 +2,19 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.Export;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -47,6 +53,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
             catch (Exception ex)
             {
+                Logger.LogError(ex, "Data export task {ExportLogId} failed", exportLog.Id);
                 await exportLogService.MarkFailedAsync(exportLog.Id, ex.Message);
                 await PublishFailedMessageAsync(exportLog, ex.Message, resolver, ct);
             }
@@ -66,7 +73,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            await resolver.Resolve<IMessagePublisher>().PublishAsync(new SystemMessageTaskArgs
+            await resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new SystemMessageTaskArgs
             {
                 CorpId = exportLog.CorpId ?? string.Empty,
                 NotifyId = exportLog.Id,
@@ -76,6 +83,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ExpireTime = DateTime.UtcNow.AddDays(30).ToTimeStampMs(),
                 Category = MessageCategory.SystemNotify,
                 MessageType = MessageType.ExportNotify,
+                EventStamp = exportLog.CreateTime,
                 Receivers =
                 [
                     new NotifyReceiver
@@ -96,7 +104,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            await resolver.Resolve<IMessagePublisher>().PublishAsync(new SystemMessageTaskArgs
+            await resolver.Resolve<IOutboxPublisher>().EnqueueAsync(new SystemMessageTaskArgs
             {
                 CorpId = exportLog.CorpId ?? string.Empty,
                 NotifyId = exportLog.Id,
@@ -106,6 +114,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 ExpireTime = DateTime.UtcNow.AddDays(30).ToTimeStampMs(),
                 Category = MessageCategory.SystemNotify,
                 MessageType = MessageType.ExportNotify,
+                EventStamp = exportLog.CreateTime,
                 Receivers =
                 [
                     new NotifyReceiver
@@ -136,7 +145,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             return exportType switch
             {
-                ExportType.AuditLogin => "登录日志",
+                ExportType.IdentityLoginAudit => "登录日志",
                 ExportType.AuditLog => "操作日志",
                 ExportType.FormData => "表单数据",
                 _ => "导出",

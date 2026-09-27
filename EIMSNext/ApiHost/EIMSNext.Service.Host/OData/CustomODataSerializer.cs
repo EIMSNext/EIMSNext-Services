@@ -1,4 +1,5 @@
 using System.Diagnostics.Contracts;
+using System.Globalization;
 
 using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
@@ -105,11 +106,37 @@ namespace EIMSNext.Service.Host.OData
             if (item != null && readContext != null)
             {
                 var enumValue = item as ODataEnumValue;
-                if (enumValue != null && edmType.AsEnum().EnumDefinition().TryParseEnum(enumValue.Value, true, out long result))
-                    return Convert.ToInt32(result);
+                if (enumValue != null)
+                {
+                    // The client serializer emits enum values as numeric strings (for example, "1").
+                    // OData's name parser does not reliably convert that representation, so handle it
+                    // explicitly before falling back to named enum members.
+                    if (long.TryParse(enumValue.Value, NumberStyles.Integer, CultureInfo.InvariantCulture, out var numericValue))
+                    {
+                        return ConvertEnumValue(edmType, numericValue);
+                    }
+
+                    if (edmType.AsEnum().EnumDefinition().TryParseEnum(enumValue.Value, true, out long result))
+                    {
+                        return ConvertEnumValue(edmType, result);
+                    }
+                }
             }
 
             return base.ReadInline(item, edmType, readContext);
+        }
+
+        private static object ConvertEnumValue(IEdmTypeReference edmType, long value)
+        {
+            var fullName = edmType.AsEnum().EnumDefinition().FullName();
+            var clrType = AppDomain.CurrentDomain
+                .GetAssemblies()
+                .Select(assembly => assembly.GetType(fullName, throwOnError: false))
+                .FirstOrDefault(type => type?.IsEnum == true);
+
+            return clrType == null
+                ? Convert.ToInt32(value, CultureInfo.InvariantCulture)
+                : Enum.ToObject(clrType, value);
         }
     }
 }

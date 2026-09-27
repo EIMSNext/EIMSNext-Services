@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.ApiClient.Flow
+namespace EIMSNext.ApiClient.Flow
 {
     public interface IFlowClient
     {
@@ -13,13 +13,16 @@
         Task<WfResponse?> Withdraw(WithdrawRequest req, string accessToken);
         Task<WfResponse?> Urge(UrgeRequest req, string accessToken);
         Task<WfActionStatusResponse?> ActionStatus(ActionStatusRequest req, string accessToken);
+        Task<List<NodeActionResponse>?> NodeActions(ActionStatusRequest req, string accessToken);
         Task<List<ReturnTargetNode>?> ReturnNodes(ActionStatusRequest req, string accessToken);
         Task<WfResponse?> Status(StatusRequest req, string accessToken);
         Task<WfResponse?> Terminate(TerminateRequest req, string accessToken);
         Task<WfResponse?> ChangeApprover(ChangeApproverRequest req, string accessToken);
         Task<WfResponse?> DeleteDef(DeleteRequest req, string accessToken);
+        Task<WfResponse?> DeleteWorkflowInstances(DeleteWorkflowInstancesRequest req, string accessToken);
+        Task<WfResponse?> ExpireAction(ExpireActionRequest req, string accessToken);
 
-        Task<WfResponse?> RunDataflow(DfRunRequest req, string accessToken);
+        Task<WfResponse?> RunEventFlow(EfRunRequest req, string accessToken);
     }
 
     public class LoadDefRequest()
@@ -32,7 +35,7 @@
         public string WfDefinitionId { get; set; } = string.Empty;
         public int Version { get; set; }
         public string DataId { get; set; } = string.Empty;
-        public CascadeMode DfCascade { get; set; }
+        public CascadeMode EfCascade { get; set; }
         public string? EventIds { get; set; }
     }
     public class ApproveRequest
@@ -98,19 +101,38 @@
         public bool CanUrge { get; set; }
         public string? Error { get; set; }
     }
+    public class NodeActionResponse
+    {
+        public string ActionType { get; set; } = string.Empty;
+        public bool Enabled { get; set; }
+        public string? Text { get; set; }
+        public List<ApprovalCandidateResponse>? Candidates { get; set; }
+    }
+    public class ApprovalCandidateResponse
+    {
+        public string CandidateId { get; set; } = string.Empty;
+        public int CandidateType { get; set; }
+        public string? CandidateName { get; set; }
+        public bool CascadedDept { get; set; }
+    }
     public class ReturnTargetNode
     {
         public string NodeId { get; set; } = string.Empty;
         public string NodeName { get; set; } = string.Empty;
         public int Round { get; set; }
     }
-    public class DfRunRequest
+    public class EfRunRequest
     {
+        public string ExecutionId { get; set; } = string.Empty;
+        public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
-        public CascadeMode DfCascade { get; set; }
+        public string WfNodeId { get; set; } = string.Empty;
+        public string? NodeAction { get; set; }
+        public CascadeMode EfCascade { get; set; }
         public string? EventIds { get; set; }
+        public List<string>? ChangeFields { get; set; }
     }
     /// <summary>
     /// 事件来源类型枚举
@@ -128,14 +150,22 @@
         /// <summary>
         /// 按钮
         /// </summary>
-        Buttton
+        Button,
+        /// <summary>
+        /// 定时触发。
+        /// </summary>
+        Schedule,
+        /// <summary>
+        /// HTTP触发。
+        /// </summary>
+        Http
     }
     public enum EventType
     {
         None = 0,
-        Submit = 1,
-        Update = 2,
-        Delete = 4,
+        Submitted = 1,
+        Modified = 2,
+        Removed = 4,
         Approving = 8,
         Approved = 16,
         Rejected = 32,
@@ -155,9 +185,10 @@
     }
     public enum CascadeMode
     {
-        All,
-        Specified,
-        Never
+        NotSet = 0,
+        All = 1,
+        Specified = 2,
+        Never = 3
     }
     public enum WorkflowStatus
     {
@@ -189,10 +220,33 @@
         public string Comment { get; set; } = string.Empty;
     }
 
+    public class ExpireActionRequest
+    {
+        public string WfInstanceId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public WfExpireActionType ActionType { get; set; }
+    }
+
+    public enum WfExpireActionType
+    {
+        AutoNotify = 0,
+        AutoApprove = 1,
+        AutoTransfer = 2,
+        AutoReject = 3,
+        AutoReturn = 4
+    }
+
     public class DeleteRequest()
     {
         public string? AppId { get; set; }
         public IEnumerable<string>? FormIds { get; set; }
         public bool? DeleteDef { get; set; }
+    }
+
+    public class DeleteWorkflowInstancesRequest
+    {
+        public IEnumerable<string>? DataIds { get; set; }
+        public IEnumerable<string>? WfInstanceIds { get; set; }
     }
 }

@@ -1,80 +1,116 @@
 using Asp.Versioning;
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
 using EIMSNext.ApiService;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.Extensions;
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Plugin.Contracts;
+using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Service.Contracts;
+using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
-using EIMSNext.Service.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Controllers
 {
     /// <summary>
-    /// 
+    ///
     /// </summary>
-    /// <param name="resolver"></param> 
+    /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class SystemController(IResolver resolver, IPluginRuntimeManager pluginRuntimeManager) : MefControllerBase(resolver)
+    [IdentityType(IdentityTypeDefaults.BusinessUser)]
+    public class SystemController(IResolver resolver) : MefControllerBase(resolver)
     {
-        private IPluginRuntimeManager PluginRuntimeManager { get; } = pluginRuntimeManager;
+        private static readonly HashSet<string> AvatarFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".gif", ".jpeg", ".jpg", ".png", ".webp"
+        };
+
+        private IClientApiService ClientApiService => Resolver.Resolve<IClientApiService>();
+        private UserApiService UserApiService => Resolver.Resolve<UserApiService>();
+        private ICorpOnboardingService CorpOnboardingService => Resolver.Resolve<ICorpOnboardingService>();
+        private PluginStoreApiService PluginStoreApiService => Resolver.Resolve<PluginStoreApiService>();
+        private ECoinPriceApiService ECoinPriceApiService => Resolver.Resolve<ECoinPriceApiService>();
 
         /// <summary>
         /// 获取当前用户信息
         /// </summary>
         /// <returns></returns>
         [HttpGet("CurrentUser")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult CurrentUser()
         {
-            var user = IdentityContext.CurrentUser!;
+            var user = IdentityContext.CurrentUser;
             var emp = IdentityContext.CurrentEmployee as Employee;
+            var departmentIds = emp == null
+                ? new List<string>()
+                : Resolver.GetRepository<EmployeeDepartment>().Queryable
+                    .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == emp.Id)
+                    .OrderBy(x => x.SortValue)
+                    .Select(x => x.DepartmentId)
+                    .ToList();
 
             return ApiResult.Success(new
             {
-                userId = user.Id,
-                userName = user.Name,
-                phone = user.Phone,
-                email = user.Email,
+                userId = user?.Id ?? IdentityContext.CurrentUserID,
+                userName = user?.Name ?? User.Identity?.Name ?? IdentityContext.CurrentUserID,
+                phone = user?.Phone,
+                email = user?.Email,
+                avatar = (user as User)?.Avatar,
                 empId = emp?.Id,
                 empCode = emp?.Code,
                 empName = emp?.EmpName,
                 corpId = IdentityContext.CurrentCorpId,
-                deptId = emp?.DepartmentId,
+                departmentIds,
                 userType = IdentityContext.IdentityType,
-                roles = emp?.Roles.Select(x => x.RoleId)
+                employeeGroups = emp?.EmployeeGroups.Select(x => x.EmployeeGroupId)
             }).ToActionResult();
+        }
+
+        [HttpPost("UpdateAvatar")]
+        [IdentityType(IdentityTypeDefaults.BusinessUser)]
+        public async Task<IActionResult> UpdateAvatar([FromBody] UpdateAvatarRequest request)
+        {
+            if (IdentityContext.CurrentUser is not User user)
+            {
+                return Unauthorized();
+            }
+
+            var avatar = request.Avatar?.Trim().Replace('\\', '/');
+            var extension = Path.GetExtension(avatar ?? string.Empty).ToLowerInvariant();
+            var expectedAvatar = $"Avatar/{user.Id}{extension}";
+            if (!AvatarFileExtensions.Contains(extension)
+                || !string.Equals(avatar, expectedAvatar, StringComparison.Ordinal))
+            {
+                return BadRequest("头像路径无效");
+            }
+
+            user.Avatar = avatar;
+            await UserApiService.ReplaceAsync(user);
+            return ApiResult.Success(new { avatar }).ToActionResult();
+        }
+
+        [HttpGet("AdminPermissions")]
+        [IdentityType(IdentityTypeDefaults.AppAdmin)]
+        public IActionResult GetAdminPermissions()
+        {
+            return ApiResult.Success(Resolver.Resolve<TenantAccessEvaluator>().GetSnapshot()).ToActionResult();
         }
 
         [HttpGet("AppMenuPerms")]
         public IActionResult GetAppMenuPerms(string appId)
         {
-            if (IdentityType.App_Admins.HasFlag(IdentityContext.IdentityType))  //此种类型不应该请求进来
-            {
-                Ok(Array.Empty<object>());
-            }
-            else if (IdentityType.Employee_Admins.HasFlag(IdentityContext.IdentityType))
-            {
-                var emp = (IdentityContext.CurrentEmployee as Employee)!;
-
-                //TODO: 性能不一定好，先这样写
-                var empId = emp.Id;
-                var roleIds = emp.Roles.Select(x => x.RoleId).ToList();
-                var deptId = emp.DepartmentId;
-                var pDeptIds = Resolver.GetService<Department>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.HeriarchyId.Contains($"|{deptId}|")).Select(x => x.Id).ToList();
-                var formIds = Resolver.GetService<AuthGroup>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.AppId == appId && x.Members.Any(m => (m.Type == MemberType.Employee && m.Id == empId) || (m.Type == MemberType.Role && roleIds.Contains(m.Id)) || (m.Type == MemberType.Department && (m.CascadedDept && pDeptIds.Contains(m.Id) || deptId == m.Id)))).Select(x => x.FormId).Distinct().ToList();
-
-                //TODO:仪表盘还没有发布功能，返回所有
-                var dashIds = Resolver.GetService<DashboardDef>().Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.AppId == appId).Select(x => x.Id).Distinct().ToList(); ;
-
-                return Ok(formIds.Select(x => new { id = x, type = FormType.Form }).Concat(dashIds.Select(y => new { id = y, type = FormType.Dashboard })));
-            }
-
-            return Ok(Array.Empty<object>());
+            return Ok(Resolver.Resolve<TenantAccessEvaluator>().GetAppMenuPermissions(appId));
         }
 
         /// <summary>
@@ -85,12 +121,40 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("SwitchCorp")]
         public async Task<IActionResult> SwitchCorprate(SwitchCorprateRequest req)
         {
-            if (string.IsNullOrEmpty(req.CorpId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.CorpId)) return BadRequest("企业不能为空");
 
-            var user = IdentityContext.CurrentUser! as User;
-            user!.Crops.ForEach(x => x.IsDefault = (req.CorpId == x.CorpId));
-            await Resolver.GetApiService<User, User>().ReplaceAsync(user);
-            return ApiResult.Success(req.CorpId).ToActionResult();
+            if (IdentityContext.CurrentUser is not User user)
+                return Unauthorized();
+
+            var targetCorp = user.Crops?.FirstOrDefault(x =>
+                string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.Ordinal));
+            if (targetCorp == null)
+                return Forbid();
+
+            foreach (var corp in user.Crops ?? [])
+                corp.IsDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+
+            await UserApiService.ReplaceAsync(user);
+            return ApiResult.Success(targetCorp.CorpId).ToActionResult();
+        }
+
+        [HttpPost("JoinCorp")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
+        public async Task<IActionResult> JoinCorp([FromBody] ApplyJoinCorporateRequest request)
+        {
+            if (string.IsNullOrWhiteSpace(request.CorpId))
+            {
+                return BadRequest("请选择要加入的企业");
+            }
+
+            var user = IdentityContext.CurrentUser as User;
+            if (user == null)
+            {
+                return BadRequest("未登录用户");
+            }
+
+            await CorpOnboardingService.ApplyJoinCorporateAsync(request.CorpId, user);
+            return ApiResult.Success().ToActionResult();
         }
 
         /// <summary>
@@ -99,16 +163,17 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost("UpdateSecret")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
         public async Task<IActionResult> UpdateClientSecret(UpdateSecretRequest req)
         {
-            if (string.IsNullOrEmpty(req.ClientId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.ClientId)) return NotFound();
+            if (string.IsNullOrWhiteSpace(req.Secret)) return BadRequest();
 
-            var clientService = Resolver.GetApiService<Auth.Entities.Client, Auth.Entities.Client>();
-            var client = await clientService.GetAsync(req.ClientId);
+            var client = await ClientApiService.GetAsync(req.ClientId);
             if (client != null && client.CorpId == IdentityContext.CurrentCorpId)
             {
                 client.ClientSecrets = new List<ClientSecret> { new ClientSecret { Value = req.Secret.Sha256() } };
-                await clientService.ReplaceAsync(client);
+                await ClientApiService.ReplaceAsync(client);
                 return ApiResult.Success(req.ClientId).ToActionResult();
             }
 
@@ -116,15 +181,113 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpGet("Plugins")]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public IActionResult GetPlugins()
         {
-            return ApiResult.Success(PluginRuntimeManager.GetPlugins()).ToActionResult();
+            return ApiResult.Success(PluginStoreApiService.GetInstalledRuntimePlugins()).ToActionResult();
+        }
+
+        [HttpGet("EnabledPlugins")]
+        public IActionResult GetEnabledPlugins()
+        {
+            return ApiResult.Success(PluginStoreApiService.GetEnabledPlugins()).ToActionResult();
         }
 
         [HttpPost("ReloadPlugin")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
         public async Task<IActionResult> ReloadPlugin(CancellationToken cancellationToken)
         {
-            var result = await PluginRuntimeManager.ReloadAsync(cancellationToken);
+            var pluginRuntimeManager = Resolver.Resolve<IPluginRuntimeManager>();
+            var result = await pluginRuntimeManager.ReloadAsync(cancellationToken);
+            return ApiResult.Success(result).ToActionResult();
+        }
+
+        [HttpGet("PluginInstalls")]
+        [IdentityType(IdentityTypeDefaults.AppAdmin)]
+        public IActionResult GetPluginInstalls()
+        {
+            return ApiResult.Success(PluginStoreApiService.GetPluginInstalls()).ToActionResult();
+        }
+
+        [HttpPost("PluginInstalls/{id}/Enable")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
+        public async Task<IActionResult> EnablePluginInstall(string id)
+        {
+            var entity = await PluginStoreApiService.EnablePluginInstallAsync(id);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+            return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpPost("PluginInstalls/{id}/Disable")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
+        public async Task<IActionResult> DisablePluginInstall(string id)
+        {
+            var entity = await PluginStoreApiService.DisablePluginInstallAsync(id);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+            return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpDelete("PluginInstalls/{id}")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
+        public async Task<IActionResult> DeletePluginInstall(string id)
+        {
+            var entity = await PluginStoreApiService.DeletePluginInstallAsync(id);
+            if (entity == null)
+            {
+                return NotFound();
+            }
+            return ApiResult.Success(entity.Id).ToActionResult();
+        }
+
+        [HttpGet("pluginstore")]
+        public IActionResult GetPluginStore([FromQuery] PluginProfileQueryRequest request)
+        {
+            var (total, items) = PluginStoreApiService.GetPluginStore(request);
+            return ApiResult.Success(new { total, items }).ToActionResult();
+        }
+
+        [HttpGet("pluginstore/{id}")]
+        public IActionResult GetPluginStoreDetail(string id)
+        {
+            var detail = PluginStoreApiService.GetPluginStoreDetail(id);
+            if (detail == null)
+            {
+                return NotFound();
+            }
+            return ApiResult.Success(detail).ToActionResult();
+        }
+
+        [HttpPost("pluginstore/{id}/install")]
+        [IdentityType(IdentityTypeDefaults.CorpAdmin)]
+        public async Task<IActionResult> InstallPlugin(string id)
+        {
+            var result = await PluginStoreApiService.InstallPluginAsync(id);
+            if (result == null)
+            {
+                return Unauthorized();
+            }
+            return ApiResult.Success(new { pluginInstallId = result.PluginInstallId }).ToActionResult();
+        }
+
+        [HttpPost("pluginstore/publish")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> PublishPlugin([FromBody] PluginPublishRequest request)
+        {
+            var profile = await PluginStoreApiService.PublishAsync(request);
+            return ApiResult.Success(new { profile.Id, profile.PluginId, profile.Version }).ToActionResult();
+        }
+
+        [HttpPost("ecoinprice/batch")]
+        [IdentityType(IdentityTypeDefaults.PlatAdmin)]
+        public async Task<IActionResult> BatchUpsertECoinPrices([FromBody] List<ECoinPriceBatchItemRequest> requests)
+        {
+            var result = await ECoinPriceApiService.BatchUpsertAsync(requests);
             return ApiResult.Success(result).ToActionResult();
         }
     }

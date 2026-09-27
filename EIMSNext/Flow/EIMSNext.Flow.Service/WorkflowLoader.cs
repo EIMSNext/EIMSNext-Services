@@ -1,7 +1,8 @@
 using System.Dynamic;
 using System.Linq.Expressions;
+using EIMSNext.Flow.Core;
 using System.Reflection;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Core.Nodes;
 using EIMSNext.Service.Contracts;
@@ -52,16 +53,18 @@ namespace EIMSNext.Flow.Service
 
         public void LoadDefinition(Wf_Definition source)
         {
-            var def = Convert(source.Metadata);
+            var def = Convert(source.Metadata, source.FlowType);
             if (_registry.IsRegistered(def.Id, def.Version))
                 _registry.DeregisterWorkflow(def.Id, def.Version);
 
             _registry.RegisterWorkflow(def);
         }
 
-        private WorkflowDefinition Convert(WfMetadata metadata)
+        private WorkflowDefinition Convert(WfMetadata metadata, FlowType flowType)
         {
-            var dataType = typeof(ExpandoObject);
+            var dataType = flowType == FlowType.EventFlow
+                ? typeof(EfDataContext)
+                : typeof(ExpandoObject);
 
             var result = new WorkflowDefinition
             {
@@ -241,19 +244,38 @@ namespace EIMSNext.Flow.Service
         {
             foreach (var nextStep in source.SelectNextStep)
             {
-                Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(nextStep.Value, data, outcome);
-                step.Outcomes.Add(new ExpressionOutcome<ExpandoObject>(sourceExpr)
+                if (dataType == typeof(EfDataContext))
                 {
-                    ExternalNextStepId = $"{nextStep.Key}"
-                });
+                    Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(nextStep.Value, data, outcome);
+                    step.Outcomes.Add(new ExpressionOutcome<EfDataContext>(sourceExpr)
+                    {
+                        ExternalNextStepId = $"{nextStep.Key}"
+                    });
+                }
+                else
+                {
+                    Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(nextStep.Value, data, outcome);
+                    step.Outcomes.Add(new ExpressionOutcome<ExpandoObject>(sourceExpr)
+                    {
+                        ExternalNextStepId = $"{nextStep.Key}"
+                    });
+                }
             }
 
             if (!string.IsNullOrEmpty(source.NextStepId))
             {
                 if (step.Outcomes.Count > 0)
                 {
-                    Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
-                    step.Outcomes.Add(new ExpressionOutcome<ExpandoObject>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
+                    if (dataType == typeof(EfDataContext))
+                    {
+                        Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
+                        step.Outcomes.Add(new ExpressionOutcome<EfDataContext>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
+                    }
+                    else
+                    {
+                        Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
+                        step.Outcomes.Add(new ExpressionOutcome<ExpandoObject>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
+                    }
                 }
                 else
                     step.Outcomes.Add(new ValueOutcome() { ExternalNextStepId = $"{source.NextStepId}" });

@@ -1,20 +1,23 @@
-using System.Dynamic;
-using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Component;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.MongoDb;
-using EIMSNext.Scripting;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Flow.Persistence;
+using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using MongoDB.Bson;
 using MongoDB.Driver;
+using System.Text.Json;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -30,7 +33,7 @@ namespace EIMSNext.Async.Tasks.Consumers
             return args.MessageType switch
             {
                 MessageType.FormNotify => HandleFormNotifyAsync(args, ct, resolver),
-                MessageType.WfTodoNotify => HandleWfTodoNotifyAsync(args, ct, resolver),
+                MessageType.WfTaskNotify => HandleWfTaskNotifyAsync(args, ct, resolver),
                 MessageType.WfExpireNotify => HandleWfExpireNotifyAsync(args, ct, resolver),
                 MessageType.WfUrgeNotify => HandleWfUrgeNotifyAsync(args, ct, resolver),
                 _ => Task.CompletedTask
@@ -39,19 +42,42 @@ namespace EIMSNext.Async.Tasks.Consumers
 
         private static async Task HandleFormNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
         {
-            if (args.NewData == null || !args.FormTriggerMode.HasValue)
+            if (!args.FormTriggerMode.HasValue)
+            {
+                return;
+            }
+
+            if (args.TargetType == NotifyTargetType.Dashboard)
+            {
+                await HandleDashboardNotifyAsync(args, ct, resolver);
+                return;
+            }
+
+            if (args.NewData == null)
             {
                 return;
             }
 
             var notifyRepo = resolver.GetRepository<FormNotify>();
             var formDefRepo = resolver.GetRepository<FormDef>();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var formDataRepo = resolver.GetRepository<FormData>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
             var detailBuilder = resolver.Resolve<IFormNotifyDetailBuilder>();
             var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
             var templateResolver = resolver.Resolve<DataTitleResolver>();
 
-            var formDef = formDefRepo.Get(args.NewData.FormId);
+            var currentData = args.NewData;
+            if (args.FormTriggerMode == FormNotifyTriggerMode.TimeFieldScheduled && !string.IsNullOrWhiteSpace(args.DataId))
+            {
+                currentData = formDataRepo.Get(args.DataId);
+                if (currentData == null)
+                {
+                    return;
+                }
+                args.NewData = currentData;
+            }
+
+            var formDef = formDefRepo.Get(currentData.FormId);
             if (formDef == null)
             {
                 return;
@@ -59,52 +85,102 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             var notifies = notifyRepo.Find(x =>
                 x.CorpId == args.CorpId &&
-                x.AppId == args.NewData.AppId &&
-                x.FormId == args.NewData.FormId &&
+                x.AppId == currentData.AppId &&
+                x.FormId == currentData.FormId &&
+                x.TargetType == NotifyTargetType.Form &&
                 !x.Disabled &&
                 x.TriggerMode == args.FormTriggerMode.Value).ToList();
 
             foreach (var notify in notifies)
             {
-                if (!ShouldNotify(resolver, notify, args))
+                if (!FormNotifyRuntime.ShouldNotify(resolver, notify, args))
                 {
                     continue;
                 }
 
-                var receivers = await recipientResolver.ResolveAsync(args.NewData, formDef, notify.Notifiers, args.Operator?.Id);
+                var receivers = await recipientResolver.ResolveAsync(currentData, formDef, notify.Notifiers, args.Operator?.Id);
                 if (receivers.Count == 0)
                 {
                     continue;
                 }
 
                 var detail = args.FormTriggerMode == FormNotifyTriggerMode.DataAdded || args.OldData == null
-                    ? detailBuilder.BuildForAdd(args.NewData, formDef)
-                    : detailBuilder.BuildForChange(args.OldData, args.NewData, formDef);
+                    ? detailBuilder.BuildForAdd(currentData, formDef)
+                    : detailBuilder.BuildForChange(args.OldData, currentData, formDef);
 
-                var title = templateResolver.Resolve(notify.NotifyText, args.NewData, formDef);
-                var url = $"/data/{args.DataId}";
+                var title = templateResolver.Resolve(notify.NotifyText, currentData, formDef);
+                var url = args.FormTriggerMode == FormNotifyTriggerMode.CustomScheduled
+                    ? $"/app/{notify.AppId}/form/{notify.FormId}"
+                    : $"/app/{currentData.AppId}/form/{currentData.FormId}/data/{args.DataId}";
                 var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
                 var channels = (NotifyChannel)notify.Channels;
 
-                await PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct);
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
             }
         }
 
-        private static async Task HandleWfTodoNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
+        private static async Task HandleDashboardNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
+        {
+            if (string.IsNullOrWhiteSpace(args.AppId) || string.IsNullOrWhiteSpace(args.FormId))
+            {
+                return;
+            }
+
+            var notifyRepo = resolver.GetRepository<FormNotify>();
+            var dashboardRepo = resolver.GetRepository<DashboardDef>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
+            var recipientResolver = resolver.Resolve<IFormNotifyRecipientResolver>();
+
+            var dashboard = dashboardRepo.Get(args.FormId);
+            if (dashboard == null || dashboard.DeleteFlag || dashboard.CorpId != args.CorpId)
+            {
+                return;
+            }
+
+            var notifies = notifyRepo.Find(x =>
+                x.CorpId == args.CorpId &&
+                x.AppId == args.AppId &&
+                x.FormId == args.FormId &&
+                x.TargetType == NotifyTargetType.Dashboard &&
+                !x.Disabled &&
+                x.TriggerMode == FormNotifyTriggerMode.CustomScheduled).ToList();
+
+            foreach (var notify in notifies)
+            {
+                var candidates = (notify.Notifiers ?? "[]").DeserializeFromJson<List<ApprovalCandidate>>() ?? [];
+                var receivers = await recipientResolver.ResolveCandidatesAsync(candidates, args.Operator?.Id);
+                if (receivers.Count == 0)
+                {
+                    continue;
+                }
+
+                var title = string.IsNullOrWhiteSpace(notify.NotifyText)
+                    ? dashboard.Name
+                    : notify.NotifyText!;
+                var detail = dashboard.Name;
+                var url = $"/app/{notify.AppId}/dash/{notify.FormId}";
+                var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
+                var channels = (NotifyChannel)notify.Channels;
+
+                await FormNotifyRuntime.PublishToChannelsAsync(publisher, args.CorpId, notify.Id, title, detail, url, expireTime, MessageCategory.DataNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
+            }
+        }
+
+        private static async Task HandleWfTaskNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
         {
             if (string.IsNullOrWhiteSpace(args.WfInstanceId) || string.IsNullOrWhiteSpace(args.ApproveNodeId))
             {
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var step = GetWorkflowStep(resolver, sample.WfInstanceId, sample.ApproveNodeId);
             var channels = step?.WfNodeSetting?.ApproveSetting?.NotifyChannels ?? NotifyChannel.None;
             if (channels == NotifyChannel.None)
@@ -117,20 +193,20 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var receivers = await ResolveTodoReceiversAsync(resolver, todos.Select(x => x.EmployeeId));
+            var receivers = await ResolveTaskReceiversAsync(resolver, tasks.Select(x => x.EmployeeId));
             if (receivers.Count == 0)
             {
                 return;
             }
 
             var title = $"你有一条新的审批待办：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
-            var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:todo";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
+            var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:task";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
         private static async Task HandleWfExpireNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -140,14 +216,14 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId && x.ApproveNodeId == args.ApproveNodeId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var step = GetWorkflowStep(resolver, sample.WfInstanceId, sample.ApproveNodeId);
             var expireSetting = step?.WfNodeSetting?.ApproveSetting?.ExpireSetting;
             if (expireSetting?.ActionType != WfExpireActionType.AutoNotify)
@@ -178,13 +254,13 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             var title = $"审批待办已超时：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:expire";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, notifySetting.Channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
         private static async Task HandleWfUrgeNotifyAsync(NotifyDispatchTaskArgs args, CancellationToken ct, IResolver resolver)
@@ -194,14 +270,14 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return;
             }
 
-            var todoRepo = resolver.GetRepository<Wf_Todo>();
-            var todos = todoRepo.Find(x => x.WfInstanceId == args.WfInstanceId).ToList();
-            if (todos.Count == 0)
+            var taskRepo = resolver.GetRepository<Wf_Task>();
+            var tasks = taskRepo.Find(x => x.WfInstanceId == args.WfInstanceId).ToList();
+            if (tasks.Count == 0)
             {
                 return;
             }
 
-            var sample = todos[0];
+            var sample = tasks[0];
             var definition = GetWorkflowDefinition(resolver, sample.WfInstanceId);
             var channels = definition?.Metadata?.WorkflowSetting?.NotifyChannels ?? NotifyChannel.System;
             if (channels == NotifyChannel.None)
@@ -209,56 +285,23 @@ namespace EIMSNext.Async.Tasks.Consumers
                 channels = NotifyChannel.System;
             }
 
-            var receivers = await ResolveTodoReceiversAsync(resolver, todos.Select(x => x.EmployeeId));
+            var receivers = await ResolveTaskReceiversAsync(resolver, tasks.Select(x => x.EmployeeId));
             if (receivers.Count == 0)
             {
                 return;
             }
 
             var title = $"流程发起人催办：{sample.ApproveNodeName}";
-            var detail = BuildTodoDetail(sample);
-            var url = $"/workflow/todo/{sample.DataId}";
+            var detail = BuildTaskDetail(sample);
+            var url = $"/workflow/task/{sample.DataId}";
             var notifyId = $"{sample.WfInstanceId}:{sample.ApproveNodeId}:urge";
             var expireTime = DateTime.UtcNow.AddDays(7).ToTimeStampMs();
-            var publisher = resolver.Resolve<IMessagePublisher>();
+            var publisher = resolver.Resolve<IOutboxPublisher>();
 
-            await PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct);
+            await FormNotifyRuntime.PublishToChannelsAsync(publisher, sample.CorpId ?? string.Empty, notifyId, title, detail, url, expireTime, MessageCategory.FlowNotify, channels, receivers, args.MessageType, ct, args.EventStamp);
         }
 
-        private static async Task PublishToChannelsAsync(IMessagePublisher publisher, string corpId, string notifyId, string title, string detail, string url, long expireTime, MessageCategory category, NotifyChannel channels, List<NotifyReceiver> receivers, MessageType messageType, CancellationToken ct)
-        {
-            if (channels.HasFlag(NotifyChannel.System))
-            {
-                await publisher.PublishAsync(new SystemMessageTaskArgs
-                {
-                    CorpId = corpId,
-                    NotifyId = notifyId,
-                    Title = title,
-                    Detail = detail,
-                    Url = url,
-                    ExpireTime = expireTime,
-                    Category = category,
-                    Receivers = receivers,
-                    MessageType = messageType
-                }, ct);
-            }
-
-            if (channels.HasFlag(NotifyChannel.Email))
-            {
-                await publisher.PublishAsync(new EmailNotifyTaskArgs
-                {
-                    CorpId = corpId,
-                    NotifyId = notifyId,
-                    Title = title,
-                    Detail = detail,
-                    Url = url,
-                    Receivers = receivers,
-                    MessageType = messageType
-                }, ct);
-            }
-        }
-
-        private static async Task<List<NotifyReceiver>> ResolveTodoReceiversAsync(IResolver resolver, IEnumerable<string> empIds)
+        private static async Task<List<NotifyReceiver>> ResolveTaskReceiversAsync(IResolver resolver, IEnumerable<string> empIds)
         {
             var targetEmpIds = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
             if (targetEmpIds.Count == 0)
@@ -281,43 +324,38 @@ namespace EIMSNext.Async.Tasks.Consumers
         private static WfStep? GetWorkflowStep(IResolver resolver, string wfInstanceId, string approveNodeId)
         {
             var definition = GetWorkflowDefinition(resolver, wfInstanceId);
-
             return definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == approveNodeId);
         }
 
         private static Wf_Definition? GetWorkflowDefinition(IResolver resolver, string wfInstanceId)
         {
-            var raw = resolver.Resolve<IMongoDbContex>().Database.GetCollection<BsonDocument>("Wf_WorkflowInstance")
-                .Find(Builders<BsonDocument>.Filter.Eq("Id", wfInstanceId))
+            var workflowInstance = resolver.Resolve<IWfDbContext>().WorkflowInstances
+                .Find(x => x.Id == wfInstanceId)
                 .FirstOrDefault();
-            if (raw == null)
+            if (workflowInstance == null)
             {
                 return null;
             }
 
-            if (!raw.TryGetValue("WorkflowDefinitionId", out var workflowDefinitionIdValue) ||
-                !raw.TryGetValue("Version", out var versionValue))
+            if (string.IsNullOrWhiteSpace(workflowInstance.WorkflowDefinitionId))
             {
                 return null;
             }
-
-            var workflowDefinitionId = workflowDefinitionIdValue.AsString;
-            var version = versionValue.ToInt32();
 
             return resolver.GetRepository<Wf_Definition>()
-                .Find(x => x.ExternalId == workflowDefinitionId && x.Version == version)
+                .Find(x => x.ExternalId == workflowInstance.WorkflowDefinitionId && x.Version == workflowInstance.Version)
                 .FirstOrDefault();
         }
 
-        private static string BuildTodoDetail(Wf_Todo todo)
+        private static string BuildTaskDetail(Wf_Task task)
         {
             var lines = new List<string>();
-            if (!string.IsNullOrWhiteSpace(todo.Starter?.Label))
+            if (!string.IsNullOrWhiteSpace(task.Starter?.Label))
             {
-                lines.Add($"发起人: {todo.Starter.Label}");
+                lines.Add($"发起人: {task.Starter.Label}");
             }
 
-            foreach (var item in todo.DataBrief.Take(5))
+            foreach (var item in task.DataBrief.Take(5))
             {
                 if (item.Value == null || string.IsNullOrWhiteSpace(item.Value.ToString()))
                 {
@@ -328,64 +366,6 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
 
             return string.Join(Environment.NewLine, lines);
-        }
-
-        private static bool ShouldNotify(IResolver resolver, FormNotify notify, NotifyDispatchTaskArgs args)
-        {
-            if (args.NewData == null || !args.FormTriggerMode.HasValue)
-            {
-                return false;
-            }
-
-            if (args.FormTriggerMode == FormNotifyTriggerMode.DataChanged && args.OldData != null)
-            {
-                var changedFields = ExpandoComparer.Compare(args.OldData.Data, args.NewData.Data)
-                    .Select(x => x.FieldId)
-                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-                if (notify.ChangeFields?.Count > 0 && !notify.ChangeFields.Any(changedFields.Contains))
-                {
-                    return false;
-                }
-            }
-
-            if (notify.TriggerMode == FormNotifyTriggerMode.DataAdded || notify.TriggerMode == FormNotifyTriggerMode.DataChanged)
-            {
-                if (!string.IsNullOrEmpty(notify.DataExpressFilter))
-                {
-                    var pData = args.NewData.Data;
-                    pData.TryAdd("createBy", args.NewData.CreateBy);
-                    return resolver.Resolve<IScriptEngine>().Evaluate<bool>(notify.DataExpressFilter, new Dictionary<string, object>()
-                    {
-                        ["data"] = pData
-                    }).Value;
-                }
-
-                return true;
-            }
-
-            if (string.IsNullOrWhiteSpace(notify.DataDynamicFilter))
-            {
-                return true;
-            }
-
-            var filter = notify.DataDynamicFilter.DeserializeFromJson<DynamicFilter>();
-            if (filter == null)
-            {
-                return true;
-            }
-
-            var composed = new DynamicFilter
-            {
-                Rel = FilterRel.And,
-                Items =
-                [
-                    new DynamicFilter { Field = nameof(FormData.Id), Op = FilterOp.Eq, Value = args.DataId },
-                    filter
-                ]
-            };
-
-            return resolver.GetRepository<FormData>().Count(composed) > 0;
         }
     }
 }

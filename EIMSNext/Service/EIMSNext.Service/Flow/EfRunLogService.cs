@@ -1,0 +1,12 @@
+using EIMSNext.Core.Services;
+using EIMSNext.Service.Contracts;
+using EIMSNext.Entities;
+using HKH.Mef2.Integration;
+
+namespace EIMSNext.Service
+{
+    public class EfRunLogService(IResolver resolver) : MongoEntityServiceBase<Ef_RunLog>(resolver), IEfRunLogService
+    {
+        protected override bool LogAudit => false;
+    }
+}
