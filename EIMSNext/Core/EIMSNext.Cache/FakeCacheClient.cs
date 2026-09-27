@@ -91,6 +91,15 @@ namespace EIMSNext.Cache
             return Task.FromResult(Increment(key, delta, ttl, scope, scopeId));
         }
 
+        public async Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "")
+        {
+            var fullKey = GetKey(key, scope, scopeId);
+            if (_cache.TryGetValue(fullKey, out _)) return false;
+            _cache.Set(fullKey, value, new MemoryCacheEntryOptions { AbsoluteExpirationRelativeToNow = ttl });
+            await Task.CompletedTask;
+            return true;
+        }
+
         private static string GetKey(string key, CacheScope scope, string scopeId = "")
         {
             return string.IsNullOrEmpty(scopeId) ? $"{scope:G}".ToUpperInvariant() + $":{key}" : $"{scope:G}".ToUpperInvariant() + $":{scopeId}:{key}";

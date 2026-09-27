@@ -12,8 +12,8 @@ public sealed class SystemTokenProvider : ISystemTokenProvider
 
     public SystemTokenProvider(AppSetting appSetting)
     {
-        var tokenEndpoint = appSetting.OAuth.SystemTokenEndPoint
-            ?? throw new InvalidOperationException("Missing OAuth:BaseUrl or OAuth:Authority for system token provider");
+        var tokenEndpoint = appSetting.IdentityHost.SystemTokenEndPoint
+            ?? throw new InvalidOperationException("Missing IdentityHost:BaseUrl or IdentityHost:Authority for system token provider");
         _client = new RestClient(tokenEndpoint);
         _clientSecret = InternalClients.SystemClientSecret;
     }

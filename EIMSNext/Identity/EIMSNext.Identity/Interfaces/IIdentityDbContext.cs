@@ -7,6 +7,7 @@ namespace EIMSNext.Identity.Interfaces
     {
         IQueryable<Client> Clients { get; }
         IQueryable<User> Users { get; }
+        IQueryable<UserCorp> UserCorps { get; }
         IQueryable<IntegrationLoginSetting> IntegrationLoginSettings { get; }
         IQueryable<UserIntegrationBinding> UserIntegrationBindings { get; }
         IQueryable<EmployeeLookup> Employees { get; }

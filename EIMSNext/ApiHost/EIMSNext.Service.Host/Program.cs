@@ -1,5 +1,7 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
+
 using EIMSNext.ApiCore;
+using EIMSNext.ApiCore.Idempotency;
 using EIMSNext.Plugin.Runtime;
 using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
@@ -7,17 +9,18 @@ using EIMSNext.Entities;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
+using EIMSNext.Persistence.PostgreSql;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
@@ -25,12 +28,15 @@ using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
+
 using Serilog;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigWebEnvironment();
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 builder.Services.AddServiceComponents();
 
 builder.Host.UseAutofac<AutofacRegisterModule>();
@@ -115,6 +121,7 @@ app.UseODataQueryRequest();
 
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<IdempotencyMiddleware>();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
@@ -123,44 +130,44 @@ app.Run();
 
 async Task EnsureSeedData(IResolver resolver)
 {
+    var corpService = resolver.GetService<Corporate>();
+    if (corpService.All().Any())
+        return;
+
     var serviceContext = resolver.GetServiceContext();
     serviceContext.UserId = "admin";
     serviceContext.Operator = new Operator("", "admin", "Admin");
 
-    var corpService = resolver.GetService<Corporate>();
-    var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
-    if (!corpService!.All().Any())
+    var userRepo = resolver.GetRepository<User>();
+    var adminUser = userRepo.Queryable.FirstOrDefault(x => x.Id == "admin");
+    if (adminUser == null && !userRepo.Queryable.Any())
     {
-        var userRepo = resolver.GetRepository<User>();
-        var adminUser = userRepo.Queryable.FirstOrDefault(x => x.Id == "admin");
-        if (adminUser == null && !userRepo.Queryable.Any())
+        adminUser = new User
         {
-            adminUser = new User
-            {
-                Id = "admin",
-                Name = "Admin",
-                Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
-                Email = "admin@eimsnext.com",
-                Phone = "12345678901",
-                CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
-            };
-            await userRepo.InsertAsync(adminUser);
-        }
-
-        if (adminUser == null)
-        {
-            throw new InvalidOperationException("初始化企业需要 admin 用户，请先初始化 Auth 数据。");
-        }
-
-        serviceContext.User = adminUser;
-        await corpService.AddAsync(new Corporate
-        {
-            Code = "2008080800008",
-            Name = "EIMS Team",
-            Description = "EIMS Team",
-        });
+            Id = "admin",
+            Name = "Admin",
+            Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
+            Email = "admin@eimsnext.com",
+            Phone = "12345678901",
+            CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        };
+        await userRepo.InsertAsync(adminUser);
     }
 
+    if (adminUser == null)
+    {
+        throw new InvalidOperationException("初始化企业需要 admin 用户，请先初始化 Auth 数据。");
+    }
+
+    serviceContext.User = adminUser;
+    await corpService.AddAsync(new Corporate
+    {
+        Code = "2008080800008",
+        Name = "EIMS Team",
+        Description = "EIMS Team",
+    });
+
+    var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
     if (!pluginProfileRepo.Queryable.Any(x => x.PluginId == "sampleplugin" && !x.DeleteFlag))
     {
         var profile = new PluginProfile
@@ -196,3 +203,4 @@ async Task EnsureSeedData(IResolver resolver)
         });
     }
 }
+

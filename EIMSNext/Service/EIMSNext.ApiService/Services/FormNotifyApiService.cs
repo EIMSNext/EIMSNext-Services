@@ -3,25 +3,37 @@ using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 表单通知的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class FormNotifyApiService(IResolver resolver) : ApiServiceBase<FormNotify, FormNotifyViewModel, IFormNotifyService>(resolver)
 	{
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(FormNotify entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(FormNotify entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(FormNotify entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var items = CoreService.All()

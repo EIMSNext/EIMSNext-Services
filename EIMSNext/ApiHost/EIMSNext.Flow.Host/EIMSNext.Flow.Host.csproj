@@ -5,7 +5,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.1.0.0</Version>
+    <Version>2.0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Asp.Versioning.OData.ApiExplorer" />
@@ -26,9 +26,10 @@
     <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Service\EIMSNext.Flow.Service.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService\EIMSNext.ApiService.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\EIMSNext.ApiHost\EIMSNext.ApiHost.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Mef\EIMSNext.Mef.csproj" />
   </ItemGroup>
 </Project>
+

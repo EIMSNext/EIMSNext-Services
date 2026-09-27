@@ -1,5 +1,6 @@
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -9,7 +10,8 @@ namespace EIMSNext.Identity.Services;
 public sealed class IdentityLoginAuditWriterService : BackgroundService
 {
     private readonly IdentityLoginAuditQueue _queue;
-    private readonly IIdentityDbContext _dbContext;
+    private readonly IServiceScopeFactory? _scopeFactory;
+    private readonly IIdentityDbContext? _testDbContext;
     private readonly ILogger<IdentityLoginAuditWriterService> _logger;
     private readonly int _batchSize;
     private readonly TimeSpan _flushInterval;
@@ -18,12 +20,27 @@ public sealed class IdentityLoginAuditWriterService : BackgroundService
 
     public IdentityLoginAuditWriterService(
         IdentityLoginAuditQueue queue,
+        IServiceScopeFactory scopeFactory,
+        IOptions<IdentityLoginAuditQueueOptions> options,
+        ILogger<IdentityLoginAuditWriterService> logger)
+    {
+        _queue = queue;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
+        _batchSize = Math.Max(1, options.Value.BatchSize);
+        _flushInterval = TimeSpan.FromMilliseconds(Math.Max(10, options.Value.FlushIntervalMs));
+        _shutdownDrainTimeout = TimeSpan.FromSeconds(Math.Max(1, options.Value.ShutdownDrainSeconds));
+    }
+
+    // Kept for focused unit tests that use an in-memory IIdentityDbContext double.
+    public IdentityLoginAuditWriterService(
+        IdentityLoginAuditQueue queue,
         IIdentityDbContext dbContext,
         IOptions<IdentityLoginAuditQueueOptions> options,
         ILogger<IdentityLoginAuditWriterService> logger)
     {
         _queue = queue;
-        _dbContext = dbContext;
+        _testDbContext = dbContext;
         _logger = logger;
         _batchSize = Math.Max(1, options.Value.BatchSize);
         _flushInterval = TimeSpan.FromMilliseconds(Math.Max(10, options.Value.FlushIntervalMs));
@@ -126,7 +143,16 @@ public sealed class IdentityLoginAuditWriterService : BackgroundService
         {
             try
             {
-                await _dbContext.AddIdentityLoginAudits(batch, cancellationToken);
+                if (_testDbContext is not null)
+                {
+                    await _testDbContext.AddIdentityLoginAudits(batch, cancellationToken);
+                }
+                else
+                {
+                    await using var scope = _scopeFactory!.CreateAsyncScope();
+                    var dbContext = scope.ServiceProvider.GetRequiredService<IIdentityDbContext>();
+                    await dbContext.AddIdentityLoginAudits(batch, cancellationToken);
+                }
                 _queue.MarkPersisted(batch.Count);
                 _inFlightBatch = null;
                 return;

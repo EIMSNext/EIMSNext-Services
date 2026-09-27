@@ -27,3 +27,4 @@ namespace EIMSNext.Identity.Host
         public bool AllowMissingOriginInDevelopment { get; set; }
     }
 }
+

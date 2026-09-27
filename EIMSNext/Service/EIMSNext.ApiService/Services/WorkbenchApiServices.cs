@@ -1,24 +1,28 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 工作台目录查询服务。
+    /// </summary>
     public class WorkbenchQueryApiService(IResolver resolver) : ApiServiceBase(resolver)
     {
+        /// <summary>
+        /// 获取当前用户可访问的工作台目录。
+        /// </summary>
+        /// <returns>工作台目录应用列表。</returns>
         public List<WorkbenchCatalogAppViewModel> GetCatalog()
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -73,6 +77,11 @@ namespace EIMSNext.ApiService
             }).ToList();
         }
 
+        /// <summary>
+        /// 获取指定图表项。
+        /// </summary>
+        /// <param name="dashboardItemId">仪表盘项 ID。</param>
+        /// <returns>仪表盘项，无权限或不存在时返回 null。</returns>
         public DashboardItemDef? GetChartItem(string dashboardItemId)
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -108,7 +117,7 @@ namespace EIMSNext.ApiService
                         {
                             Id = menu.MenuId,
                             Title = menu.Title,
-                            TargetType = "group",
+                            TargetType = null,
                             Icon = menu.Icon,
                             IconColor = menu.IconColor,
                             Children = children
@@ -142,8 +151,15 @@ namespace EIMSNext.ApiService
         }
     }
 
+    /// <summary>
+    /// 工作台配置服务。
+    /// </summary>
     public class WorkbenchConfigApiService(IResolver resolver) : ApiServiceBase<WorkbenchConfig, WorkbenchConfigViewModel, IWorkbenchConfigService>(resolver)
     {
+        /// <summary>
+        /// 获取按权限过滤后的工作台配置视图查询。
+        /// </summary>
+        /// <returns>视图模型的可查询对象。</returns>
         protected override IQueryable<WorkbenchConfigViewModel> FilterByPermission()
         {
             var employeeId = CurrentEmployeeId;
@@ -152,6 +168,10 @@ namespace EIMSNext.ApiService
                 .Select(TVConvertor);
         }
 
+        /// <summary>
+        /// 新增工作台配置。
+        /// </summary>
+        /// <param name="entity">工作台配置实体。</param>
         protected override Task AddAsyncCore(WorkbenchConfig entity)
         {
             entity.EmployeeId = CurrentEmployeeId;
@@ -167,14 +187,24 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchConfig entity)
+        /// <summary>
+        /// 替换工作台配置。
+        /// </summary>
+        /// <param name="entity">工作台配置实体。</param>
+        /// <returns>替换结果。</returns>
+        protected override Task<int> ReplaceAsyncCore(WorkbenchConfig entity)
         {
             EnsureOwner(entity.EmployeeId);
             entity.EmployeeId = CurrentEmployeeId;
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除工作台配置。
+        /// </summary>
+        /// <param name="ids">工作台配置 ID 集合。</param>
+        /// <returns>删除结果。</returns>
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
@@ -205,8 +235,15 @@ namespace EIMSNext.ApiService
         private string CurrentEmployeeId => IdentityContext.CurrentEmployee?.Id ?? IdentityContext.CurrentUserID;
     }
 
+    /// <summary>
+    /// 工作台收藏服务。
+    /// </summary>
     public class WorkbenchFavoriteApiService(IResolver resolver) : ApiServiceBase<WorkbenchFavorite, WorkbenchFavoriteViewModel, IWorkbenchFavoriteService>(resolver)
     {
+        /// <summary>
+        /// 获取按权限过滤后的工作台收藏视图查询。
+        /// </summary>
+        /// <returns>视图模型的可查询对象。</returns>
         protected override IQueryable<WorkbenchFavoriteViewModel> FilterByPermission()
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -226,6 +263,10 @@ namespace EIMSNext.ApiService
                 .Select(TVConvertor);
         }
 
+        /// <summary>
+        /// 新增工作台收藏。
+        /// </summary>
+        /// <param name="entity">工作台收藏实体。</param>
         protected override Task AddAsyncCore(WorkbenchFavorite entity)
         {
             entity.EmployeeId = CurrentEmployeeId;
@@ -258,7 +299,12 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchFavorite entity)
+        /// <summary>
+        /// 替换工作台收藏。
+        /// </summary>
+        /// <param name="entity">工作台收藏实体。</param>
+        /// <returns>替换结果。</returns>
+        protected override Task<int> ReplaceAsyncCore(WorkbenchFavorite entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -272,13 +318,18 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除工作台收藏。
+        /// </summary>
+        /// <param name="ids">工作台收藏 ID 集合。</param>
+        /// <returns>删除结果。</returns>
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -318,10 +369,15 @@ namespace EIMSNext.ApiService
         private string CurrentEmployeeId => IdentityContext.CurrentEmployee?.Id ?? IdentityContext.CurrentUserID;
     }
 
+    /// <summary>
+    /// 工作台最近访问服务。
+    /// </summary>
     public class WorkbenchRecentVisitApiService(IResolver resolver) : ApiServiceBase<WorkbenchRecentVisit, WorkbenchRecentVisitViewModel, IWorkbenchRecentVisitService>(resolver)
     {
-        private const int MaxRecentVisitCount = 10;
-
+        /// <summary>
+        /// 获取按权限过滤后的工作台最近访问视图查询。
+        /// </summary>
+        /// <returns>视图模型的可查询对象。</returns>
         protected override IQueryable<WorkbenchRecentVisitViewModel> FilterByPermission()
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -339,6 +395,10 @@ namespace EIMSNext.ApiService
                 .Select(TVConvertor);
         }
 
+        /// <summary>
+        /// 新增工作台最近访问记录。
+        /// </summary>
+        /// <param name="entity">工作台最近访问实体。</param>
         protected override async Task AddAsyncCore(WorkbenchRecentVisit entity)
         {
             entity.EmployeeId = CurrentEmployeeId;
@@ -363,10 +423,14 @@ namespace EIMSNext.ApiService
             entity.VisitCount = 1;
             entity.LastVisitTime = Now();
             await base.AddAsyncCore(entity);
-            await PruneRecentVisitsAsync(entity.EmployeeId);
         }
 
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchRecentVisit entity)
+        /// <summary>
+        /// 替换工作台最近访问记录。
+        /// </summary>
+        /// <param name="entity">工作台最近访问实体。</param>
+        /// <returns>替换结果。</returns>
+        protected override async Task<int> ReplaceAsyncCore(WorkbenchRecentVisit entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -377,20 +441,27 @@ namespace EIMSNext.ApiService
 
             ApplyTarget(entity, target);
             entity.EmployeeId = CurrentEmployeeId;
-            entity.VisitCount = Math.Max(0, entity.VisitCount) + 1;
-            entity.LastVisitTime = Now();
-            var result = await base.ReplaceAsyncCore(entity);
-            await PruneRecentVisitsAsync(entity.EmployeeId);
+            var result = await CoreService.TouchRecentVisitAsync(entity);
+            if (result == 0)
+            {
+                throw new BadRequestException("最近使用记录不存在");
+            }
+
             return result;
         }
 
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除工作台最近访问记录。
+        /// </summary>
+        /// <param name="ids">最近访问记录 ID 集合。</param>
+        /// <returns>删除结果。</returns>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
-            return base.DeleteAsyncCore(ids);
+            return await base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -405,7 +476,7 @@ namespace EIMSNext.ApiService
             entity.IconColor = target.IconColor;
         }
 
-        private static bool IsRecentTargetType(string targetType)
+        private static bool IsRecentTargetType(WorkbenchTargetType targetType)
         {
             return targetType == WorkbenchTargetType.Form ||
                    targetType == WorkbenchTargetType.Dashboard;
@@ -433,48 +504,36 @@ namespace EIMSNext.ApiService
             }
         }
 
-        private async Task PruneRecentVisitsAsync(string employeeId)
-        {
-            var records = CoreService.All()
-                .Where(x =>
-                    x.CorpId == IdentityContext.CurrentCorpId &&
-                    x.EmployeeId == employeeId &&
-                    !x.DeleteFlag)
-                .OrderByDescending(x => x.LastVisitTime)
-                .ThenByDescending(x => x.CreateTime)
-                .ToList();
-
-            var seenTargets = new HashSet<string>();
-            var keptCount = 0;
-            var idsToDelete = new List<string>();
-            foreach (var record in records)
-            {
-                var targetKey = $"{record.TargetType}:{record.TargetId}";
-                if (!seenTargets.Add(targetKey) || keptCount >= MaxRecentVisitCount)
-                {
-                    idsToDelete.Add(record.Id);
-                    continue;
-                }
-
-                keptCount++;
-            }
-
-            if (idsToDelete.Count > 0)
-            {
-                await CoreService.DeleteAsync(idsToDelete);
-            }
-        }
-
         private string CurrentEmployeeId => IdentityContext.CurrentEmployee?.Id ?? IdentityContext.CurrentUserID;
 
         private static long Now() => DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
     }
 
-    public record WorkbenchTargetInfo(string TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
+    /// <summary>
+    /// 工作台目标信息。
+    /// </summary>
+    /// <param name="TargetType">目标类型。</param>
+    /// <param name="TargetId">目标 ID。</param>
+    /// <param name="AppId">应用 ID。</param>
+    /// <param name="Title">标题。</param>
+    /// <param name="Icon">图标。</param>
+    /// <param name="IconColor">图标颜色。</param>
+    public record WorkbenchTargetInfo(WorkbenchTargetType TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
 
+    /// <summary>
+    /// 工作台目标解析器。
+    /// </summary>
     public static class WorkbenchTargetResolver
     {
-        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, string targetType, string targetId)
+        /// <summary>
+        /// 解析工作台目标信息。
+        /// </summary>
+        /// <param name="resolver">依赖解析器。</param>
+        /// <param name="identityContext">身份上下文。</param>
+        /// <param name="targetType">目标类型。</param>
+        /// <param name="targetId">目标 ID。</param>
+        /// <returns>工作台目标信息，无权限或不存在时返回 null。</returns>
+        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, WorkbenchTargetType targetType, string targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId))
             {
@@ -539,6 +598,13 @@ namespace EIMSNext.ApiService
             return null;
         }
 
+        /// <summary>
+        /// 获取当前身份可访问的表单 ID 列表。
+        /// </summary>
+        /// <param name="resolver">依赖解析器。</param>
+        /// <param name="identityContext">身份上下文。</param>
+        /// <param name="appId">应用 ID。</param>
+        /// <returns>可访问的表单 ID 列表。</returns>
         public static List<string> GetAccessibleFormIds(IResolver resolver, IIdentityContext identityContext, string? appId)
         {
             var corpId = identityContext.CurrentCorpId;
@@ -576,11 +642,24 @@ namespace EIMSNext.ApiService
             return [];
         }
 
+        /// <summary>
+        /// 获取当前身份可访问的仪表盘 ID 列表。
+        /// </summary>
+        /// <param name="resolver">依赖解析器。</param>
+        /// <param name="identityContext">身份上下文。</param>
+        /// <param name="appId">应用 ID。</param>
+        /// <returns>可访问的仪表盘 ID 列表。</returns>
         public static List<string> GetAccessibleDashboardIds(IResolver resolver, IIdentityContext identityContext, string? appId)
         {
             return resolver.Resolve<TenantAccessEvaluator>().GetUsageDashboardIdsForCurrentEmployee(appId);
         }
 
+        /// <summary>
+        /// 获取当前身份可访问的应用 ID 集合。
+        /// </summary>
+        /// <param name="resolver">依赖解析器。</param>
+        /// <param name="identityContext">身份上下文。</param>
+        /// <returns>可访问的应用 ID 集合。</returns>
         public static HashSet<string> GetAccessibleAppIds(IResolver resolver, IIdentityContext identityContext)
         {
             var corpId = identityContext.CurrentCorpId;

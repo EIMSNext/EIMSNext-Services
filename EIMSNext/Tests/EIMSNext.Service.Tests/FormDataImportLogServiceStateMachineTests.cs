@@ -1,43 +1,35 @@
+﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
+using System.Reflection;
+
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
+using EIMSNext.TestSupport;
+
 using HKH.Mef2.Integration;
+
+using Microsoft.EntityFrameworkCore.Query;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Bson.Serialization.Conventions;
-using MongoDB.Driver;
-using MongoDB.Driver.Search;
 
 namespace EIMSNext.Service.Tests
 {
+    /// <summary>
+    /// <see cref="FormDataImportLogService"/> 状态机测试。
+    /// </summary>
     [TestClass]
     public class FormDataImportLogServiceStateMachineTests
     {
         private const string LogId = "log-1";
-
-        [ClassInitialize]
-        public static void Init(TestContext context)
-        {
-            // 注册 BsonClassMap，确保 Render 序列化器能正确解析 FormDataImportLog
-            BsonClassMap.TryRegisterClassMap<FormDataImportLog>(cm =>
-            {
-                cm.AutoMap();
-            });
-        }
 
         [TestMethod]
         public async Task TryMarkProcessingAsync_RequiresPendingStatusAndRetryCount()
@@ -48,25 +40,28 @@ namespace EIMSNext.Service.Tests
             var acquired = await service.TryMarkProcessingAsync(LogId, retryCount: 2);
 
             Assert.IsTrue(acquired);
-            var filter = Render(repo.LastFilter!);
-            var update = Render(repo.LastUpdate!);
-            var idValue = filter.TryGetValue("Id", out var explicitId) ? explicitId : filter["_id"];
-            Assert.AreEqual(LogId, idValue.AsString);
-            var filterJson = filter.ToJson();
-            StringAssert.Contains(filterJson, "RetryCount");
-            StringAssert.Contains(filterJson, "Status");
-            Assert.IsFalse(filterJson.Contains("$or"));
-            Assert.IsFalse(filterJson.Contains("ProcessingExpireTime"));
-            Assert.AreEqual((int)FormDataImportStatus.Processing, update["$set"]["Status"].ToInt32());
-            Assert.AreEqual(0L, update["$set"]["TotalCount"].ToInt64());
-            Assert.IsTrue(update["$set"].AsBsonDocument.Contains("ProcessingExpireTime"));
-            Assert.IsFalse(repo.LastUpsert);
+
+            // 过滤谓词：Id == id && RetryCount == retryCount && Status == Pending
+            var predicate = repo.LastPredicate!;
+            var rendered = predicate.ToString();
+            StringAssert.Contains(rendered, "Id");
+            StringAssert.Contains(rendered, "RetryCount");
+            StringAssert.Contains(rendered, "Status");
+            Assert.IsFalse(rendered.Contains("OrElse"), "谓词应为 AND 组合，不应出现 OR。");
+            Assert.IsFalse(rendered.Contains("ProcessingExpireTime"), "首次抢占不应带租约过期条件。");
+
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.Processing, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.TotalCount)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.ProcessingExpireTime)));
+
+            Assert.AreEqual(1, repo.AffectedRows);
         }
 
         [TestMethod]
         public async Task TryMarkProcessingAsync_ReturnsFalseWhenStateNotAcquired()
         {
-            var repo = new RecordingRepository<FormDataImportLog> { ModifiedCount = 0 };
+            var repo = new RecordingRepository<FormDataImportLog> { AffectedRows = 0 };
             var service = NewService(repo);
 
             var acquired = await service.TryMarkProcessingAsync(LogId, retryCount: 2);
@@ -82,18 +77,17 @@ namespace EIMSNext.Service.Tests
 
             await service.MarkProcessingAsync(LogId, totalCount: 100);
 
-            var doc = Render(repo.LastUpdate!);
-            var set = doc["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Processing, set["Status"].ToInt32());
-            Assert.AreEqual(100L, set["TotalCount"].ToInt64());
-            Assert.AreEqual(0L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(0L, set["AddCount"].ToInt64());
-            Assert.AreEqual(0L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(0L, set["FailedCount"].ToInt64());
-            Assert.IsTrue(set.Contains("StartTime"));
-            Assert.IsTrue(set["FinishTime"].IsBsonNull);
-            Assert.IsTrue(set.Contains("ProcessingExpireTime"));
-            Assert.IsTrue(set["ErrorMessage"].IsBsonNull);
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.Processing, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(100L, setters[nameof(FormDataImportLog.TotalCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.ProcessedCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.AddCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.UpdateCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.FailedCount)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.StartTime)));
+            Assert.IsNull(setters[nameof(FormDataImportLog.FinishTime)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.ProcessingExpireTime)));
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorMessage)]);
         }
 
         [TestMethod]
@@ -104,14 +98,14 @@ namespace EIMSNext.Service.Tests
 
             await service.UpdateProgressAsync(LogId, processedCount: 20, addCount: 15, updateCount: 5, failedCount: 0);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual(20L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(15L, set["AddCount"].ToInt64());
-            Assert.AreEqual(5L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(0L, set["FailedCount"].ToInt64());
-            Assert.IsTrue(set.Contains("ProcessingExpireTime"));
-            Assert.IsFalse(set.Contains("status"));
-            Assert.IsFalse(set.Contains("totalCount"));
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(20L, setters[nameof(FormDataImportLog.ProcessedCount)]);
+            Assert.AreEqual(15L, setters[nameof(FormDataImportLog.AddCount)]);
+            Assert.AreEqual(5L, setters[nameof(FormDataImportLog.UpdateCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.FailedCount)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.ProcessingExpireTime)));
+            Assert.IsFalse(setters.ContainsKey(nameof(FormDataImportLog.Status)));
+            Assert.IsFalse(setters.ContainsKey(nameof(FormDataImportLog.TotalCount)));
         }
 
         [TestMethod]
@@ -122,18 +116,18 @@ namespace EIMSNext.Service.Tests
 
             await service.MarkSucceededAsync(LogId, totalCount: 50, addCount: 30, updateCount: 20);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Succeeded, set["Status"].ToInt32());
-            Assert.AreEqual(50L, set["TotalCount"].ToInt64());
-            Assert.AreEqual(50L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(30L, set["AddCount"].ToInt64());
-            Assert.AreEqual(20L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(0L, set["FailedCount"].ToInt64());
-            Assert.IsTrue(set["EditableErrorRowsJson"].IsBsonNull);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(0, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsTrue(set["ErrorMessage"].IsBsonNull);
-            Assert.IsTrue(set.Contains("FinishTime"));
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.Succeeded, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(50L, setters[nameof(FormDataImportLog.TotalCount)]);
+            Assert.AreEqual(50L, setters[nameof(FormDataImportLog.ProcessedCount)]);
+            Assert.AreEqual(30L, setters[nameof(FormDataImportLog.AddCount)]);
+            Assert.AreEqual(20L, setters[nameof(FormDataImportLog.UpdateCount)]);
+            Assert.AreEqual(0L, setters[nameof(FormDataImportLog.FailedCount)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsObjectKey)]);
+            Assert.AreEqual(0, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorMessage)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.FinishTime)));
         }
 
         [TestMethod]
@@ -148,19 +142,19 @@ namespace EIMSNext.Service.Tests
                 errorReportFileName: "r.xlsx", errorReportObjectKey: "k", errorReportDownloadUrl: "https://x",
                 editableErrorRowsJson: "[]", editableErrorRowsObjectKey: null, editableErrorRowCount: 5);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.CompletedWithErrors, set["Status"].ToInt32());
-            Assert.AreEqual(100L, set["TotalCount"].ToInt64());
-            Assert.AreEqual(100L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(80L, set["AddCount"].ToInt64());
-            Assert.AreEqual(10L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(10L, set["FailedCount"].ToInt64());
-            Assert.AreEqual("r.xlsx", set["ErrorReportFileName"].AsString);
-            Assert.AreEqual("k", set["ErrorReportObjectKey"].AsString);
-            Assert.AreEqual("https://x", set["ErrorReportDownloadUrl"].AsString);
-            Assert.AreEqual("[]", set["EditableErrorRowsJson"].AsString);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(5, set["EditableErrorRowCount"].ToInt32());
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.CompletedWithErrors, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(100L, setters[nameof(FormDataImportLog.TotalCount)]);
+            Assert.AreEqual(100L, setters[nameof(FormDataImportLog.ProcessedCount)]);
+            Assert.AreEqual(80L, setters[nameof(FormDataImportLog.AddCount)]);
+            Assert.AreEqual(10L, setters[nameof(FormDataImportLog.UpdateCount)]);
+            Assert.AreEqual(10L, setters[nameof(FormDataImportLog.FailedCount)]);
+            Assert.AreEqual("r.xlsx", setters[nameof(FormDataImportLog.ErrorReportFileName)]);
+            Assert.AreEqual("k", setters[nameof(FormDataImportLog.ErrorReportObjectKey)]);
+            Assert.AreEqual("https://x", setters[nameof(FormDataImportLog.ErrorReportDownloadUrl)]);
+            Assert.AreEqual("[]", setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsObjectKey)]);
+            Assert.AreEqual(5, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
         }
 
         [TestMethod]
@@ -172,16 +166,16 @@ namespace EIMSNext.Service.Tests
             await service.MarkFailedAsync(LogId, "boom",
                 errorReportFileName: "f.xlsx", errorReportObjectKey: "fk", errorReportDownloadUrl: "https://f");
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Failed, set["Status"].ToInt32());
-            Assert.AreEqual("boom", set["ErrorMessage"].AsString);
-            Assert.AreEqual("f.xlsx", set["ErrorReportFileName"].AsString);
-            Assert.AreEqual("fk", set["ErrorReportObjectKey"].AsString);
-            Assert.AreEqual("https://f", set["ErrorReportDownloadUrl"].AsString);
-            Assert.IsTrue(set["EditableErrorRowsJson"].IsBsonNull);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(0, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsTrue(set.Contains("FinishTime"));
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.Failed, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual("boom", setters[nameof(FormDataImportLog.ErrorMessage)]);
+            Assert.AreEqual("f.xlsx", setters[nameof(FormDataImportLog.ErrorReportFileName)]);
+            Assert.AreEqual("fk", setters[nameof(FormDataImportLog.ErrorReportObjectKey)]);
+            Assert.AreEqual("https://f", setters[nameof(FormDataImportLog.ErrorReportDownloadUrl)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsObjectKey)]);
+            Assert.AreEqual(0, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.FinishTime)));
         }
 
         [TestMethod]
@@ -192,21 +186,21 @@ namespace EIMSNext.Service.Tests
 
             await service.MarkCorrectionResultAsync(LogId, totalCount: 5, addCount: 2, updateCount: 1, failedCount: 2, editableErrorRowsJson: "[1,2]", editableErrorRowsObjectKey: null, editableErrorRowCount: 2);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.CompletedWithErrors, set["Status"].ToInt32());
-            Assert.AreEqual(5L, set["TotalCount"].ToInt64());
-            Assert.AreEqual(5L, set["ProcessedCount"].ToInt64());
-            Assert.AreEqual(2L, set["AddCount"].ToInt64());
-            Assert.AreEqual(1L, set["UpdateCount"].ToInt64());
-            Assert.AreEqual(2L, set["FailedCount"].ToInt64());
-            Assert.AreEqual("[1,2]", set["EditableErrorRowsJson"].AsString);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(2, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsTrue(set["ErrorReportFileName"].IsBsonNull);
-            Assert.IsTrue(set["ErrorReportObjectKey"].IsBsonNull);
-            Assert.IsTrue(set["ErrorReportDownloadUrl"].IsBsonNull);
-            Assert.IsTrue(set["ErrorMessage"].IsBsonNull);
-            Assert.IsTrue(set.Contains("FinishTime"));
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.CompletedWithErrors, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(5L, setters[nameof(FormDataImportLog.TotalCount)]);
+            Assert.AreEqual(5L, setters[nameof(FormDataImportLog.ProcessedCount)]);
+            Assert.AreEqual(2L, setters[nameof(FormDataImportLog.AddCount)]);
+            Assert.AreEqual(1L, setters[nameof(FormDataImportLog.UpdateCount)]);
+            Assert.AreEqual(2L, setters[nameof(FormDataImportLog.FailedCount)]);
+            Assert.AreEqual("[1,2]", setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsObjectKey)]);
+            Assert.AreEqual(2, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorReportFileName)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorReportObjectKey)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorReportDownloadUrl)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorMessage)]);
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.FinishTime)));
         }
 
         [TestMethod]
@@ -217,11 +211,11 @@ namespace EIMSNext.Service.Tests
 
             await service.MarkCorrectionResultAsync(LogId, totalCount: 3, addCount: 1, updateCount: 2, failedCount: 0, editableErrorRowsJson: null, editableErrorRowsObjectKey: null, editableErrorRowCount: 0);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual((int)FormDataImportStatus.Succeeded, set["Status"].ToInt32());
-            Assert.AreEqual(0, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsTrue(set["EditableErrorRowsJson"].IsBsonNull);
-            Assert.IsTrue(set["ErrorReportDownloadUrl"].IsBsonNull);
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(FormDataImportStatus.Succeeded, setters[nameof(FormDataImportLog.Status)]);
+            Assert.AreEqual(0, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.ErrorReportDownloadUrl)]);
         }
 
         [TestMethod]
@@ -232,11 +226,11 @@ namespace EIMSNext.Service.Tests
 
             await service.UpdateEditableErrorsAsync(LogId, "[1]", null, 3);
 
-            var set = Render(repo.LastUpdate!)["$set"].AsBsonDocument;
-            Assert.AreEqual("[1]", set["EditableErrorRowsJson"].AsString);
-            Assert.IsTrue(set["EditableErrorRowsObjectKey"].IsBsonNull);
-            Assert.AreEqual(3, set["EditableErrorRowCount"].ToInt32());
-            Assert.IsFalse(set.Contains("status"));
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual("[1]", setters[nameof(FormDataImportLog.EditableErrorRowsJson)]);
+            Assert.IsNull(setters[nameof(FormDataImportLog.EditableErrorRowsObjectKey)]);
+            Assert.AreEqual(3, setters[nameof(FormDataImportLog.EditableErrorRowCount)]);
+            Assert.IsFalse(setters.ContainsKey(nameof(FormDataImportLog.Status)));
         }
 
         [TestMethod]
@@ -247,30 +241,130 @@ namespace EIMSNext.Service.Tests
 
             await service.IncrementRetryAsync(LogId);
 
-            var doc = Render(repo.LastUpdate!);
-            Assert.IsFalse(doc.Contains("$set"));
-            var inc = doc["$inc"].AsBsonDocument;
-            Assert.AreEqual(1, inc.GetValue("RetryCount", -1).ToInt32(), $"got: {doc.ToJson()}");
+            var setters = ReadSetters(repo.LastSetters!, () => new FormDataImportLog());
+            Assert.AreEqual(1, setters.Count, "自增重试次数只应产生一个 SetProperty。");
+            Assert.IsTrue(setters.ContainsKey(nameof(FormDataImportLog.RetryCount)));
+
+            // 记录下来的原始值是一个 Lambda（而非常量 1），据此确认语义确实是「读旧值 +1」。
+            Assert.IsTrue(repo.LastRawIncrement, $"期望自增表达式，实际为: {repo.LastSetters}");
+        }
+
+        /// <summary>
+        /// 从 <see cref="UpdateSettersBuilder{T}"/> 里剥出「属性名 → 值」映射。
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// EF Core 10 的 setter 回调是委托（<c>Action&lt;UpdateSettersBuilder&lt;T&gt;&gt;</c>），
+        /// 委托本身没有表达式树可解析；因此这里把委托<b>重放</b>到一个新建的
+        /// <see cref="UpdateSettersBuilder{T}"/> 上，再取回 EF 组装好的表达式。
+        /// </para>
+        /// <para>
+        /// 该表达式的形状是 <see cref="NewArrayExpression"/>：
+        /// <c>new ITuple[] { new Tuple&lt;Delegate, object&gt;(属性 lambda, 值表达式), … }</c>。
+        /// 逐个 <see cref="NewExpression"/> 取第 0 个实参作属性、第 1 个实参作值即可，
+        /// 无需再展开 <c>SetProperty</c> 的调用链。
+        /// </para>
+        /// <para>
+        /// 值表达式有两种形态：
+        /// <list type="bullet">
+        /// <item><description><c>SetProperty(property, value)</c>：常量表达式。</description></item>
+        /// <item><description><c>SetProperty(property, valueExpression)</c>：<c>Func&lt;T, TValue&gt;</c>
+        /// lambda（自增等场景），此处把它编译出来，对传入的空白实体求值即可。</description></item>
+        /// </list>
+        /// </para>
+        /// </remarks>
+        private static Dictionary<string, object?> ReadSetters(
+            Action<UpdateSettersBuilder<FormDataImportLog>> setters,
+            Func<FormDataImportLog> newEntity)
+        {
+            var result = new Dictionary<string, object?>(StringComparer.Ordinal);
+            foreach (var setter in BuildSetters(setters).Expressions)
+            {
+                var tuple = (NewExpression)setter;
+                if (UnwrapMember(tuple.Arguments[0]) is not { } member)
+                {
+                    continue;
+                }
+
+                result[member] = Evaluate(tuple.Arguments[1], newEntity);
+            }
+
+            return result;
+        }
+
+        /// <summary>
+        /// 把上层记录的 setter <b>委托</b>重放一遍，换回 EF Core 组装好的 setter 数组表达式。
+        /// </summary>
+        /// <remarks>
+        /// EF Core 10 的 <c>UpdateSettersBuilder&lt;T&gt;</c> 是一个可公开构造的记录型 builder
+        /// （标记为 internal API）：把委托喂给它，它会记下每次 <c>SetProperty</c>，
+        /// 再由 <c>BuildSettersExpression()</c> 还原成表达式树。
+        /// 生产代码里的 <c>ExecuteUpdate</c> 走的也是同一条路径。
+        /// </remarks>
+        private static NewArrayExpression BuildSetters<T>(Action<UpdateSettersBuilder<T>> setters)
+        {
+            var builder = new UpdateSettersBuilder<T>();
+            setters(builder);
+            return builder.BuildSettersExpression();
+        }
+
+        private static bool ContainsIncrement<T>(Action<UpdateSettersBuilder<T>> setters)
+            => HasAdd(BuildSetters(setters));
+
+        private static bool HasAdd(Expression expression) => expression switch
+        {
+            BinaryExpression { NodeType: ExpressionType.Add or ExpressionType.AddChecked } => true,
+            UnaryExpression unary => HasAdd(unary.Operand),
+            LambdaExpression lambda => HasAdd(lambda.Body),
+            MethodCallExpression call => (call.Object is not null && HasAdd(call.Object)) || call.Arguments.Any(HasAdd),
+            NewArrayExpression array => array.Expressions.Any(HasAdd),
+            NewExpression @new => @new.Arguments.Any(HasAdd),
+            _ => false,
+        };
+
+        private static string? UnwrapMember(Expression expression)
+        {
+            // setter 数组元素的第 0 个实参是 Lambda: x => x.Property
+            if (expression is UnaryExpression unary)
+            {
+                return UnwrapMember(unary.Operand);
+            }
+
+            if (expression is LambdaExpression lambda)
+            {
+                return UnwrapMember(lambda.Body);
+            }
+
+            return (expression as MemberExpression)?.Member.Name;
+        }
+
+        private static object? Evaluate(Expression expression, Func<FormDataImportLog> newEntity)
+        {
+            if (expression is UnaryExpression unary)
+            {
+                return Evaluate(unary.Operand, newEntity);
+            }
+
+            if (expression is LambdaExpression lambda)
+            {
+                // x => x.RetryCount + 1 —— 对空白实体求值等价于「旧值 0 + 1」。
+                var compiled = lambda.Compile();
+                return compiled.DynamicInvoke(newEntity());
+            }
+
+            if (expression is ConstantExpression constant)
+            {
+                return constant.Value;
+            }
+
+            // 闭包字段（如本地变量）访问：编译后取值。
+            return Expression.Lambda(expression).Compile().DynamicInvoke();
         }
 
         private static IFormDataImportLogService NewService(IRepository<FormDataImportLog> repo)
         {
             var resolver = new TestResolver(repo);
             return new FormDataImportLogService(resolver);
-        }
-
-        private static BsonDocument Render(UpdateDefinition<FormDataImportLog> update)
-        {
-            var registry = BsonSerializer.SerializerRegistry;
-            var serializer = registry.GetSerializer<FormDataImportLog>();
-            return update.Render(new RenderArgs<FormDataImportLog>(serializer, registry)).ToBsonDocument();
-        }
-
-        private static BsonDocument Render(FilterDefinition<FormDataImportLog> filter)
-        {
-            var registry = BsonSerializer.SerializerRegistry;
-            var serializer = registry.GetSerializer<FormDataImportLog>();
-            return filter.Render(new RenderArgs<FormDataImportLog>(serializer, registry)).ToBsonDocument();
         }
 
         private sealed class TestResolver : IResolver
@@ -334,127 +428,43 @@ namespace EIMSNext.Service.Tests
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
             public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
         }
 
-        private sealed class StubRepository<T> : IRepository<T> where T : class, IMongoEntity
+        /// <summary>
+        /// 记录型仓储，捕获 EF Core 更新调用的谓词与 setter 表达式树。
+        /// </summary>
+        private sealed class RecordingRepository<T> : StubRepository<T> where T : class, IEntityKey
         {
-            public IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public IQueryable<T> Queryable => throw new NotSupportedException();
-            public FilterDefinitionBuilder<T> FilterBuilder => throw new NotSupportedException();
-            public SortDefinitionBuilder<T> SortBuilder => throw new NotSupportedException();
-            public SearchDefinitionBuilder<T> SearchBuilder => throw new NotSupportedException();
-            public ProjectionDefinitionBuilder<T> ProjectionBuilder => throw new NotSupportedException();
-            public UpdateDefinitionBuilder<T> UpdateBuilder => Builders<T>.Update;
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public T? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<T> EnsureId(IEnumerable<T> entities) => entities;
-            public T EnsureId(T entity) => entity;
-            public string NewId() => ObjectId.GenerateNewId().ToString();
-        }
-
-        private sealed class RecordingRepository<T> : IRepository<T> where T : class, IMongoEntity
-        {
-            public FilterDefinition<T>? LastFilter { get; private set; }
-            public UpdateDefinition<T>? LastUpdate { get; private set; }
+            public Expression<Func<T, bool>>? LastPredicate { get; private set; }
+            public Action<UpdateSettersBuilder<T>>? LastSetters { get; private set; }
             public string? LastUpdateId { get; private set; }
-            public bool LastUpsert { get; private set; }
-            public long ModifiedCount { get; set; } = 1;
+            public int AffectedRows { get; set; } = 1;
 
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
+            /// <summary>供 <c>IncrementRetryAsync</c> 之类的自增断言使用。</summary>
+            public bool LastRawIncrement { get; private set; }
+
+            public override Task<int> UpdateAsync(
+                string id,
+                Action<UpdateSettersBuilder<T>> setters,
+                CancellationToken cancellationToken = default)
             {
-                LastUpdate = update;
+                LastSetters = setters;
                 LastUpdateId = id;
-                LastUpsert = upsert;
-                return Task.FromResult<UpdateResult>(new UpdateResult.Acknowledged(1, ModifiedCount, new BsonDocument()));
+                LastRawIncrement = ContainsIncrement(setters);
+                return Task.FromResult(AffectedRows);
             }
 
-            public IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public IQueryable<T> Queryable => throw new NotSupportedException();
-            public FilterDefinitionBuilder<T> FilterBuilder => Builders<T>.Filter;
-            public SortDefinitionBuilder<T> SortBuilder => throw new NotSupportedException();
-            public SearchDefinitionBuilder<T> SearchBuilder => throw new NotSupportedException();
-            public ProjectionDefinitionBuilder<T> ProjectionBuilder => throw new NotSupportedException();
-            public UpdateDefinitionBuilder<T> UpdateBuilder => Builders<T>.Update;
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public T? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null)
+            public override Task<int> UpdateManyAsync(
+                Expression<Func<T, bool>> predicate,
+                Action<UpdateSettersBuilder<T>> setters,
+                CancellationToken cancellationToken = default)
             {
-                LastFilter = filter;
-                LastUpdate = update;
-                LastUpsert = upsert;
-                return new UpdateResult.Acknowledged(1, ModifiedCount, new BsonDocument());
+                LastPredicate = predicate;
+                LastSetters = setters;
+                LastRawIncrement = ContainsIncrement(setters);
+                return Task.FromResult(AffectedRows);
             }
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<T> EnsureId(IEnumerable<T> entities) => entities;
-            public T EnsureId(T entity) => entity;
-            public string NewId() => ObjectId.GenerateNewId().ToString();
         }
     }
 }

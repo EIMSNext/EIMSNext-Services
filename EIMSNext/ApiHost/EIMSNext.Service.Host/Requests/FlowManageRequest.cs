@@ -7,3 +7,4 @@ namespace EIMSNext.Service.Host.Requests
         public int PageSize { get; set; } = 20;
     }
 }
+

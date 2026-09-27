@@ -128,8 +128,7 @@ namespace EIMSNext.Identity.Services
                 Platform = PlatformType.Public,
                 Password = BCrypt.HashPassword(Guid.NewGuid().ToString("N")),
                 Email = string.Empty,
-                Phone = string.Empty,
-                Crops = new List<UserCorp>()
+                Phone = string.Empty
             };
 
             await _dbContext.AddUser(user);

@@ -1,11 +1,12 @@
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
     /// <summary>
     /// 本地用户与第三方身份绑定关系。
     /// </summary>
-    public class UserIntegrationBinding : MongoEntityBase
+    public class UserIntegrationBinding : KeyedEntityBase
     {
         /// <summary>
         /// 本地用户标识。

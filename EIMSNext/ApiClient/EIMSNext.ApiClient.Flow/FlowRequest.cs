@@ -123,6 +123,7 @@ namespace EIMSNext.ApiClient.Flow
     }
     public class EfRunRequest
     {
+        public string ExecutionId { get; set; } = string.Empty;
         public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
@@ -141,23 +142,23 @@ namespace EIMSNext.ApiClient.Flow
         /// <summary>
         /// 无
         /// </summary>
-        None,
+        None = 0,
         /// <summary>
         /// 表单
         /// </summary>
-        Form,
+        Form = 1,
         /// <summary>
         /// 按钮
         /// </summary>
-        Button,
+        Button = 2,
         /// <summary>
         /// 定时触发。
         /// </summary>
-        Schedule,
+        Schedule = 3,
         /// <summary>
         /// HTTP触发。
         /// </summary>
-        Http
+        Http = 4,
     }
     public enum EventType
     {
@@ -171,16 +172,16 @@ namespace EIMSNext.ApiClient.Flow
     }
     public enum ApproveAction
     {
-        None,
-        Approve,
-        Reject,
-        Return,
-        AddSignPre,
-        AddSignAfter,
-        AutoApprove,
-        CopyTo,
-        Withdraw,
-        Transfer
+        None = 0,
+        Approve = 1,
+        Reject = 2,
+        Return = 3,
+        AddSignPre = 4,
+        AddSignAfter = 5,
+        AutoApprove = 6,
+        CopyTo = 7,
+        Withdraw = 8,
+        Transfer = 9,
     }
     public enum CascadeMode
     {

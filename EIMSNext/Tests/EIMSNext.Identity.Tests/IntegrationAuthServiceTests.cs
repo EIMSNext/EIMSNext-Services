@@ -126,6 +126,8 @@ namespace EIMSNext.Identity.Tests
 
             public IQueryable<UserIntegrationBinding> UserIntegrationBindings => _bindings.AsQueryable();
 
+            public IQueryable<UserCorp> UserCorps => Array.Empty<UserCorp>().AsQueryable();
+
             public IQueryable<EmployeeLookup> Employees => throw new NotImplementedException();
 
             public IQueryable<PublicAccessSetting> PublicSettings => throw new NotImplementedException();

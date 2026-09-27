@@ -1,4 +1,4 @@
-using System.Composition.Hosting;
+﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
 using EIMSNext.ApiService;
 using EIMSNext.Async.Abstractions.Messaging;
@@ -6,16 +6,15 @@ using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
+using EIMSNext.TestSupport;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
-using MongoDB.Driver;
 
 namespace EIMSNext.Service.Tests;
 
@@ -161,40 +160,17 @@ public class CorporateApiServiceNotificationTests
         public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
         public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
         public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+        public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
     }
 
-    private class RecordingEntityService<T>(T? item = null) : IService<T> where T : class, IMongoEntity
+    /// <summary>
+    /// 只读的内存实体服务。
+    /// </summary>
+    private class RecordingEntityService<T>(T? item = null) : StubEntityService<T>
+        where T : class, EIMSNext.Core.Abstractions.IEntityKey
     {
-        private readonly T? _item = item;
-        public IMongoCollection<T> Collection => throw new NotSupportedException();
-        public T? Get(string id) => _item?.Id == id ? _item : null;
-        public IQueryable<T> All() => _item == null ? Enumerable.Empty<T>().AsQueryable() : new[] { _item }.AsQueryable();
-        public IQueryable<T> Query(Expression<Func<T, bool>> where) => All().Where(where);
-        public IFindFluent<T, T> Find(DynamicFindOptions<T> options) => throw new NotSupportedException();
-        public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-        public long Count(DynamicFilter filter) => throw new NotSupportedException();
-        public long Count(Expression<Func<T, bool>> filter) => All().LongCount(filter);
-        public bool Exists(Expression<Func<T, bool>> where) => All().Any(where);
-        public bool Exists(DynamicFilter where) => throw new NotSupportedException();
-        public void Add(T entity) { }
-        public void Add(IEnumerable<T> entities) { }
-        public ReplaceOneResult Replace(T entity) => throw new NotSupportedException();
-        public object Delete(string id) => throw new NotSupportedException();
-        public object Delete(IEnumerable<string> ids) => throw new NotSupportedException();
-        public object Delete(DynamicFilter filter) => throw new NotSupportedException();
-        public Task<T?> GetAsync(string id) => Task.FromResult(Get(id));
-        public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options) => throw new NotSupportedException();
-        public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-        public Task<long> CountAsync(DynamicFilter filter) => throw new NotSupportedException();
-        public Task<long> CountAsync(Expression<Func<T, bool>> filter) => Task.FromResult(Count(filter));
-        public Task<bool> ExistsAsync(Expression<Func<T, bool>> where) => Task.FromResult(Exists(where));
-        public Task<bool> ExistsAsync(DynamicFilter where) => throw new NotSupportedException();
-        public Task AddAsync(T entity) => Task.CompletedTask;
-        public Task AddAsync(IEnumerable<T> entities) => Task.CompletedTask;
-        public Task<ReplaceOneResult> ReplaceAsync(T entity) => throw new NotSupportedException();
-        public Task<object> DeleteAsync(string id) => throw new NotSupportedException();
-        public Task<object> DeleteAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-        public Task<object> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
+        public override Task<T?> GetAsync(string id)
+            => Task.FromResult(item?.Id == id ? item : null);
     }
 
     private sealed class RecordingCorporateService : RecordingEntityService<Corporate>, ICorporateService

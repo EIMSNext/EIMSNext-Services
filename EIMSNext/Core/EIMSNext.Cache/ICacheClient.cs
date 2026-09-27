@@ -24,6 +24,7 @@ namespace EIMSNext.Cache
 
         long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
         Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
+        Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "");
     }
     public enum CacheScope
     {

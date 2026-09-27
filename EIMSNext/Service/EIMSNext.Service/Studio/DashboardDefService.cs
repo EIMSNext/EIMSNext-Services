@@ -1,15 +1,15 @@
+﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Query;
 
 namespace EIMSNext.Service
 {
@@ -17,66 +17,67 @@ namespace EIMSNext.Service
 	{
         private static readonly HashSet<int> ValidRefreshIntervals = [1, 3, 5, 10, 15, 30, 60, 180];
 
-        protected override Task BeforeAdd(IEnumerable<DashboardDef> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<DashboardDef> entities)
         {
             foreach (var entity in entities)
             {
                 PrepareEntity(entity);
             }
 
-            return base.BeforeAdd(entities, session);
+            return base.BeforeAdd(entities);
         }
 
-        protected override Task BeforeReplace(DashboardDef entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(DashboardDef entity)
         {
             PrepareEntity(entity);
-            return base.BeforeReplace(entity, session);
+            return base.BeforeReplace(entity);
         }
 
-        protected override async Task AfterAdd(IEnumerable<DashboardDef> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<DashboardDef> entities)
         {
-            await base.AfterAdd(entities, session);
+            await base.AfterAdd(entities);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entities.First().AppId, session)!;
+            var app = appRepo.Get(entities.First().AppId)!;
             var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
             {
                 maxIndex = maxIndex + 100;
                 app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = FormType.Dashboard, Title = e.Name, SortIndex = maxIndex });
             });
-            appRepo.Replace(app, session);
+            appRepo.Replace(app);
 
             return;
         }
 
-        protected override async Task AfterReplace(DashboardDef entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(DashboardDef entity)
         {
-            await base.AfterReplace(entity, session);
+            await base.AfterReplace(entity);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entity.AppId, session)!;
+            var app = appRepo.Get(entity.AppId)!;
 
             var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
             if (menu != null)
             {
                 menu.Title = entity.Name;
-                appRepo.Replace(app, session);
+                appRepo.Replace(app);
             }
         }
 
-        protected override async Task AfterUpdate(FilterDefinition<DashboardDef> filter, UpdateDefinition<DashboardDef> update, bool upsert, IClientSessionHandle? session)
+        protected override async Task AfterUpdate(
+            Expression<Func<DashboardDef, bool>> filter,
+            Action<UpdateSettersBuilder<DashboardDef>> setters)
         {
-            await base.AfterUpdate(filter, update, upsert, session);
+            await base.AfterUpdate(filter, setters);
             var updated = Context.ScopeCache.GetAll<DashboardDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
-                updated = await Collection.Find(filter).ToListAsync();
+                updated = FindCore(filter).ToList();
             }
 
             if (updated.Any())
             {
                 var appRepo = Resolver.GetRepository<AppDef>();
-                var dashboardRepo = Resolver.GetRepository<DashboardDef>();
-                var app = appRepo.Get(updated.First().AppId, session)!;
+                var app = appRepo.Get(updated.First().AppId)!;
 
                 updated.ForEach(e =>
                 {
@@ -84,14 +85,19 @@ namespace EIMSNext.Service
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
-                appRepo.Replace(app, session);
+                appRepo.Replace(app);
             }
         }
 
-        protected override async Task AfterDelete(FilterDefinition<DashboardDef> filter, IClientSessionHandle? session)
+        protected override async Task AfterDelete(Expression<Func<DashboardDef, bool>> filter)
         {
-            await base.AfterDelete(filter, session);
-            var deletedDashboards = Repository.Find(new MongoFindOptions<DashboardDef> { Filter = filter }, session).ToList();
+            await base.AfterDelete(filter);
+            // 同 FormDefService.AfterDelete：软删除已经生效，必须忽略全局 `!DeleteFlag` 过滤，
+            // 否则读不到刚删掉的仪表盘，子项逻辑删除与 App 菜单清理都会失效。
+            var deletedDashboards = Repository.Queryable
+                .IgnoreQueryFilters()
+                .Where(filter)
+                .ToList();
             if (deletedDashboards.Count == 0)
             {
                 return;
@@ -100,17 +106,14 @@ namespace EIMSNext.Service
             var dashboardIds = deletedDashboards.Select(x => x.Id).ToList();
             var dashboardItemRepo = Resolver.GetRepository<DashboardItemDef>();
             await dashboardItemRepo.UpdateManyAsync(
-                dashboardItemRepo.FilterBuilder.And(
-                    dashboardItemRepo.FilterBuilder.Eq(x => x.DeleteFlag, false),
-                    dashboardItemRepo.FilterBuilder.In(x => x.DashboardId, dashboardIds)),
-                dashboardItemRepo.UpdateBuilder.Set(x => x.DeleteFlag, true),
-                session: session);
+                x => !x.DeleteFlag && dashboardIds.Contains(x.DashboardId),
+                setters => setters.SetProperty(x => x.DeleteFlag, true));
 
             var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();
             foreach (var appId in appIds)
             {
-                var app = appRepo.Get(appId, session);
+                var app = appRepo.Get(appId);
                 if (app == null) continue;
 
                 var removedCount = 0;
@@ -125,7 +128,7 @@ namespace EIMSNext.Service
                 if (removedCount > 0)
                 {
                     AppMenuHelper.Normalize(app.AppMenus);
-                    appRepo.Replace(app, session);
+                    appRepo.Replace(app);
                 }
             }
         }

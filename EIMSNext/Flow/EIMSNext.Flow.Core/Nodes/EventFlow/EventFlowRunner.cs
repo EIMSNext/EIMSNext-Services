@@ -1,11 +1,10 @@
-
+﻿
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
@@ -13,11 +12,12 @@ using EIMSNext.Scripting;
 
 using HKH.Mef2.Integration;
 
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
-using MongoDB.Driver;
-
 using WorkflowCore.Interface;
+using EIMSNext.Core.Extensions;
+using EIMSNext.Component;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -35,6 +35,7 @@ namespace EIMSNext.Flow.Core.Nodes
         protected ISyncWorkflowRunner SyncWfRunner => _resolver.Resolve<ISyncWorkflowRunner>();
         protected IScriptEngine ScriptEngine { get; private set; }
         protected ILogger<EventFlowRunner> Logger { get; private set; }
+        private IRepository<WorkflowTransitionExecution> TransitionRepository => _resolver.Resolve<IRepository<WorkflowTransitionExecution>>();
 
 
         public bool IsMeet(Wf_Definition eventFlow, FormData data)
@@ -55,18 +56,67 @@ namespace EIMSNext.Flow.Core.Nodes
         public async Task<EfExecResult> RunAsync(EfRunParameter paramter)
         {
             var execResult = new EfExecResult();
+            if (string.IsNullOrWhiteSpace(paramter.ExecutionId))
+            {
+                paramter.WithExecutionId(TsidIdGenerator.NewId());
+            }
             if (paramter.Cascade == CascadeMode.Never || (paramter.Cascade == CascadeMode.Specified && string.IsNullOrEmpty(paramter.EventIds)))
             {
                 return execResult;
             }
 
+            var transitionMode = paramter.WorkflowTransition
+                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
+            var inTransaction = TransactionScope.IsInTransactionFor(TransitionRepository.DbContext);
+            if (transitionMode)
+            {
+                var executionId = paramter.ExecutionId;
+                var transition = TransitionRepository.Find(x => x.ExecutionId == executionId).FirstOrDefault();
+                if (transition?.Status == WorkflowTransitionStatus.Completed)
+                {
+                    return execResult;
+                }
+
+                var now = DateTime.UtcNow.ToTimeStampMs();
+                if (transition is null)
+                {
+                    // PostgreSQL 下没有等价的 upsert 语义（部分列 SetOnInsert、部分列 Set），
+                    // 因此改用「先查后插/改」——外层已在事务内（由 SubmitAsync 打开），
+                    // 并发竞态由 ExecutionId 上的唯一约束在提交时兜底。
+                    var created = new WorkflowTransitionExecution
+                    {
+                        Id = TransitionRepository.NewId(),
+                        ExecutionId = executionId,
+                        WorkflowInstanceId = paramter.WorkflowInstanceId,
+                        CorpId = paramter.Data.CorpId ?? string.Empty,
+                        WfNodeId = paramter.WfNodeId,
+                        NodeAction = paramter.NodeAction ?? string.Empty,
+                        CreateTime = now,
+                        UpdateTime = now,
+                        Status = WorkflowTransitionStatus.Running,
+                    };
+                    await TransitionRepository.InsertAsync(created);
+                }
+                else
+                {
+                    await TransitionRepository.UpdateManyAsync(
+                        x => x.ExecutionId == executionId,
+                        setters => setters
+                            .SetProperty(x => x.Status, WorkflowTransitionStatus.Running)
+                            .SetProperty(x => x.UpdateTime, now));
+                }
+            }
+
             var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
-            var candidates = repository.Find(x => x.CorpId == paramter.Data.CorpId
+            var corpId = paramter.Data.CorpId;
+            var eventSource = paramter.EventSource;
+            var candidates = repository.Find(x => x.CorpId == corpId
                 && x.FlowType == FlowType.EventFlow
                 && !x.DeleteFlag
                 && !x.Disabled
                 && x.EventSetting != null
-                && x.EventSource == paramter.EventSource).ToList();
+                && x.EventSource == eventSource).ToList();
 
             if (!string.IsNullOrEmpty(paramter.EventFlowId))
             {
@@ -83,6 +133,41 @@ namespace EIMSNext.Flow.Core.Nodes
                     execResult.Error = string.IsNullOrEmpty(execResult.Error)
                         ? result.Error
                         : $"{execResult.Error}; {result.Error}";
+                }
+            }
+
+            if (transitionMode)
+            {
+                var executionId = paramter.ExecutionId;
+                if (string.IsNullOrEmpty(execResult.Error))
+                {
+                    // 状态推进语义保持不变：
+                    //   Running → EventFlowsCompleted（事务内可见，供同事务内的后续节点读取）
+                    //            → Completed（提交后异步落库，避免事务外的读看到「已完成」而跳过真正未完成的工作）
+                    await TransitionRepository.UpdateManyAsync(
+                        x => x.ExecutionId == executionId,
+                        setters => setters
+                            .SetProperty(x => x.Status, WorkflowTransitionStatus.EventFlowsCompleted)
+                            .SetProperty(x => x.Error, string.Empty)
+                            .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
+
+                    await TransactionScope.RegisterAfterCommitAsync(TransitionRepository.DbContext, async () =>
+                    {
+                        await TransitionRepository.UpdateManyAsync(
+                            x => x.ExecutionId == executionId,
+                            setters => setters
+                                .SetProperty(x => x.Status, WorkflowTransitionStatus.Completed)
+                                .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
+                    });
+                }
+                else
+                {
+                    await TransitionRepository.UpdateManyAsync(
+                        x => x.ExecutionId == executionId,
+                        setters => setters
+                            .SetProperty(x => x.Status, WorkflowTransitionStatus.Failed)
+                            .SetProperty(x => x.Error, execResult.Error ?? string.Empty)
+                            .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
                 }
             }
 
@@ -212,6 +297,15 @@ namespace EIMSNext.Flow.Core.Nodes
                 AppId = paramter.Data.AppId,
                 EventFlowId = eventFlow.Id,
                 RunLogId = runLog?.Id ?? string.Empty,
+                ExecutionId = string.IsNullOrWhiteSpace(paramter.ExecutionId)
+                    ? runLog?.Id ?? TsidIdGenerator.NewId()
+                    : paramter.ExecutionId,
+                WorkflowInstanceId = paramter.WorkflowInstanceId,
+                WorkflowTransition = paramter.WorkflowTransition
+                    && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                    && !string.IsNullOrWhiteSpace(paramter.NodeAction),
+                WfNodeId = paramter.WfNodeId,
+                NodeAction = paramter.NodeAction ?? string.Empty,
                 FormId = paramter.Data.FormId,
                 DataId = paramter.Data.Id,
                 TriggerData = paramter.Data,

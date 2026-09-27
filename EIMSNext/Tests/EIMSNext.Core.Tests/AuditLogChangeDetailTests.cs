@@ -1,24 +1,20 @@
-using System.Composition.Hosting;
+﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
 using System.Reflection;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
+using EIMSNext.TestSupport;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using MongoDB.Driver.Search;
 
 namespace EIMSNext.Core.Tests
 {
@@ -104,8 +100,11 @@ namespace EIMSNext.Core.Tests
 
         private static string InvokeGetChangeDetail(TestEntityService<TestAuditEntity> service, TestAuditEntity oldT, TestAuditEntity newT)
         {
-            // GetChangeDetail 是 ServiceCore<T> 上的私有方法，使用 closed generic 类型的 MethodInfo
-            var method = typeof(ServiceCore<TestAuditEntity>).GetMethod("GetChangeDetail", BindingFlags.NonPublic | BindingFlags.Instance)
+            // GetChangeDetail 是 ServiceCore<T> 上的私有方法，使用 closed generic 类型的 MethodInfo。
+            // 注意：该方法为 static（内部已不依赖任何实例状态），
+            // 因此这里同时带上 Instance 与 Static 标志，两种形态都能取到。
+            var method = typeof(ServiceCore<TestAuditEntity>).GetMethod(
+                    "GetChangeDetail", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
                 ?? throw new InvalidOperationException("GetChangeDetail not found on ServiceCore<TestAuditEntity>");
             return (string)method.Invoke(service, [oldT, newT])!;
         }
@@ -138,7 +137,7 @@ namespace EIMSNext.Core.Tests
             public string? D { get; set; }
         }
 
-        private sealed class TestEntityService<T> : MongoEntityServiceBase<T> where T : class, IMongoEntity
+        private sealed class TestEntityService<T> : EntityServiceBaseCore<T> where T : class, IEntityKey
         {
             public TestEntityService(IResolver resolver) : base(resolver) { }
         }
@@ -192,58 +191,10 @@ namespace EIMSNext.Core.Tests
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
             public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
         }
 
         // 最小桩：仅让 ServiceCore 构造成功；任何实际方法被调用都抛异常（GetChangeDetail 不触发）。
-        private sealed class StubRepository<T> : IRepository<T> where T : class, IMongoEntity
-        {
-            public IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public IQueryable<T> Queryable => throw new NotSupportedException();
-            public FilterDefinitionBuilder<T> FilterBuilder => throw new NotSupportedException();
-            public SortDefinitionBuilder<T> SortBuilder => throw new NotSupportedException();
-            public SearchDefinitionBuilder<T> SearchBuilder => throw new NotSupportedException();
-            public ProjectionDefinitionBuilder<T> ProjectionBuilder => throw new NotSupportedException();
-            public UpdateDefinitionBuilder<T> UpdateBuilder => throw new NotSupportedException();
-            public MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(MongoFindOptions<T> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public T? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<T> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult Update(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<T> filter, UpdateDefinition<T> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(T entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<T> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<T> EnsureId(IEnumerable<T> entities) => throw new NotSupportedException();
-            public T EnsureId(T entity) => throw new NotSupportedException();
-            public string NewId() => throw new NotSupportedException();
-        }
+        // 复用共享的 StubRepository<T>（见 StubRepository.cs）。
     }
 }

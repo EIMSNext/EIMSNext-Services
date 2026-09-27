@@ -1,6 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using System.Text.Json.Serialization;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -53,14 +52,16 @@ namespace EIMSNext.Entities
         public bool UserBound { get; set; }
 
         /// <summary>
-        /// 所属员工组
+        /// 所属部门（关系表导航）。用于按部门 OData 过滤。
+        /// 由 EF 约定依据 <see cref="EmployeeDepartment.EmployeeId"/> 形成外键。
         /// </summary>
-        public List<EmployeeGroupRef> EmployeeGroups { get; set; } = new List<EmployeeGroupRef>();
+        public List<EmployeeDepartment> Departments { get; set; } = new List<EmployeeDepartment>();
 
         /// <summary>
-        /// 所属部门（嵌入式，用于OData查询优化）
+        /// 所属员工组（关系表导航）。用于按员工组 OData 过滤。
+        /// 由 EF 约定依据 <see cref="EmployeeGroupMember.EmployeeId"/> 形成外键。
         /// </summary>
-        public List<EmpDept> Depts { get; set; } = new List<EmpDept>();
+        public List<EmployeeGroupMember> Groups { get; set; } = new List<EmployeeGroupMember>();
 
         /// <summary>
         /// 转换为操作员对象
@@ -79,41 +80,6 @@ namespace EIMSNext.Entities
         /// 是否为匿名用户
         /// </summary>
         public bool IsAnonymous => IsDummy && Id.Equals("public");
-    }
-
-    /// <summary>
-    /// 员工组关联
-    /// </summary>
-    public class EmployeeGroupRef
-    {
-        /// <summary>
-        /// 员工组 ID
-        /// </summary>
-        public string EmployeeGroupId { get; set; } = "";
-        /// <summary>
-        /// 员工组名称
-        /// </summary>
-        public string EmployeeGroupName { get; set; } = "";
-    }
-
-    /// <summary>
-    /// 员工部门关联（嵌入式，用于OData查询优化）
-    /// </summary>
-    public class EmpDept
-    {
-        /// <summary>
-        /// 部门ID
-        /// </summary>
-        public string DeptId { get; set; } = "";
-        /// <summary>
-        /// 部门层级路径，格式：|parentId|grandparentId|...
-        /// </summary>
-        [JsonIgnore]
-        public string HeriarchyId { get; set; } = "";
-        /// <summary>
-        /// 部门名称
-        /// </summary>
-        public string DeptName { get; set; } = "";
     }
 
     /// <summary>

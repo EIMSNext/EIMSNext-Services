@@ -45,6 +45,7 @@ public sealed class SingleSignOnServiceTests
 
         public IQueryable<Client> Clients => Array.Empty<Client>().AsQueryable();
         public IQueryable<User> Users => Array.Empty<User>().AsQueryable();
+        public IQueryable<UserCorp> UserCorps => Array.Empty<UserCorp>().AsQueryable();
         public IQueryable<EmployeeLookup> Employees => Array.Empty<EmployeeLookup>().AsQueryable();
         public IQueryable<EIMSNext.Identity.Models.PublicAccessSetting> PublicSettings => Array.Empty<EIMSNext.Identity.Models.PublicAccessSetting>().AsQueryable();
         public IQueryable<CorporateSettingReadModel> CorporateSettings => _settings.AsQueryable();

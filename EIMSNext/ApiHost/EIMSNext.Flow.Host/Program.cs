@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiCore;
 using EIMSNext.Plugin.Runtime;
 using EIMSNext.Mef;
@@ -10,7 +10,7 @@ using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
-using EIMSNext.Core.Mongo;
+using EIMSNext.Persistence.PostgreSql;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -21,6 +21,8 @@ using WorkflowCore.Interface;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigWebEnvironment();
+builder.Services.AddWorkflowPersistence(builder.Configuration);
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 builder.Services.AddServiceComponents();
 
 // Add services to the container.
@@ -36,7 +38,7 @@ builder.Services.AddControllers();
 
 builder.Services.AddWorkflow(opt =>
 {
-    opt.UseMongoDB(services => services.GetRequiredService<IWfDbContext>());
+    opt.UsePostgreSql<WfDbContext>();
 });
 
 builder.Services.AddStepBodys();
@@ -101,5 +103,6 @@ host.Start();
 //});
 
 app.Run();
+
 
 

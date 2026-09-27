@@ -1,8 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -103,10 +100,7 @@ namespace EIMSNext.Entities
 
         /// <summary>
         /// 发布状态。
-        /// <para>BSON 仍以字符串形式持久化（<c>BsonRepresentation(BsonType.String)</c>），
-        /// 兼容历史数据 <c>"Published"</c>，无需数据迁移。</para>
         /// </summary>
-        [BsonRepresentation(BsonType.String)]
         public AppProfileStatus Status { get; set; } = AppProfileStatus.Draft;
 
         /// <summary>

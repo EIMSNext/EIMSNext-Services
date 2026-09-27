@@ -1,23 +1,27 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 租户管理员组的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, TenantAdminGroupViewModel, ITenantAdminGroupService>(resolver)
     {
+        /// <summary>
+        /// 移动节点。
+        /// </summary>
         public async Task<TenantAdminGroup?> Move(MoveTenantAdminGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有移动管理组的权限");
@@ -93,6 +97,9 @@ namespace EIMSNext.ApiService
             return moving;
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override async Task AddAsyncCore(TenantAdminGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建管理组的权限");
@@ -114,7 +121,10 @@ namespace EIMSNext.ApiService
             await base.AddAsyncCore(entity);
         }
 
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(TenantAdminGroup entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> ReplaceAsyncCore(TenantAdminGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改管理组的权限");
 
@@ -142,7 +152,10 @@ namespace EIMSNext.ApiService
             return await base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除管理组的权限");
 
@@ -341,9 +354,12 @@ namespace EIMSNext.ApiService
             }
 
             var userIds = employees.Select(x => x.UserId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            var ownerUserIds = Resolver.GetService<User>().All()
-                .Where(x => userIds.Contains(x.Id) && x.Crops.Any(c => c.CorpId == IdentityContext.CurrentCorpId && c.IsCorpOwner))
-                .Select(x => x.Id)
+            var ownerUserIds = Resolver.GetRepository<UserCorp>().Queryable
+                .Where(x =>
+                    userIds.Contains(x.UserId) &&
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    x.IsCorpOwner)
+                .Select(x => x.UserId)
                 .ToHashSet();
 
             if (employees.Any(x => ownerUserIds.Contains(x.UserId)))
@@ -403,7 +419,7 @@ namespace EIMSNext.ApiService
             EnsureIdsExist<EmployeeGroup>(entity.ContactEmployeeGroupIds, "通讯录员工组");
         }
 
-        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Mongo.Entities.CorpEntityBase
+        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : CorpEntityBase
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             if (idList.Count == 0)

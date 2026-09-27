@@ -96,3 +96,4 @@ namespace EIMSNext.Service.Host.Requests
         public string Comment { get; set; } = string.Empty;
     }
 }
+

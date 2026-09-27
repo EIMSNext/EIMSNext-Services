@@ -7,7 +7,7 @@ using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Persistence.Mongo;
+using EIMSNext.Persistence.PostgreSql;
 
 namespace EIMSNext.Flow.Host.Extensions
 {
@@ -22,11 +22,12 @@ namespace EIMSNext.Flow.Host.Extensions
         {
             base.Load(builder);
 
-            builder.RegisterType<WfDbContext>().As<IWfDbContext>().AsImplementedInterfaces().SingleInstance();
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
 
-            builder.RegisterType<EIMSDbContext>().AsImplementedInterfaces().SingleInstance();
+            // 数据库上下文由 AutofacRegisterModuleBase 统一注册的 PostgreSqlDbContext 提供
+            // （与 File.Host 保持一致），无需在此重复注册。
             builder.RegisterOutboxPublisher();
         }
     }
 }
+

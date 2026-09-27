@@ -5,12 +5,24 @@ using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 公开表单系统字段辅助类。
+    /// </summary>
     public static class PublicFormSystemFieldHelper
     {
+        /// <summary>公开来源标识。</summary>
         public const string Source = "public";
+
+        /// <summary>微信 OpenId 字段。</summary>
         public const string WxOpenId = "wxopenid";
+
+        /// <summary>微信昵称字段。</summary>
         public const string WxNickname = "wxnickname";
+
+        /// <summary>微信头像字段。</summary>
         public const string WxAvator = "wxavator";
+
+        /// <summary>扩展字段。</summary>
         public const string Ext = "ext";
 
         private static readonly IReadOnlyDictionary<string, PublicSystemFieldSpec> Specs =
@@ -22,6 +34,11 @@ namespace EIMSNext.ApiService
                 [Ext] = new(Ext, "扩展字段", FieldType.Input),
             };
 
+        /// <summary>
+        /// 确保表单定义包含公开链接所需的系统字段。
+        /// </summary>
+        /// <param name="formDef">表单定义。</param>
+        /// <param name="setting">公开设置。</param>
         public static void EnsureRequiredFields(FormDef formDef, PublicSetting setting)
         {
             if (setting.TargetType != PublicTargetType.Form)
@@ -48,6 +65,11 @@ namespace EIMSNext.ApiService
             EnsureFields(formDef, required);
         }
 
+        /// <summary>
+        /// 确保表单定义保留已有的公开系统字段。
+        /// </summary>
+        /// <param name="formDef">表单定义。</param>
+        /// <param name="oldContent">旧的表单内容。</param>
         public static void EnsureExistingPublicFields(FormDef formDef, FormContent? oldContent)
         {
             var oldLayout = ParseLayout(oldContent?.Layout);
@@ -64,6 +86,11 @@ namespace EIMSNext.ApiService
             EnsureFields(formDef, existingPublicFields);
         }
 
+        /// <summary>
+        /// 判断指定字段是否为公开系统字段。
+        /// </summary>
+        /// <param name="field">字段路径。</param>
+        /// <returns>是公开系统字段时为 true。</returns>
         public static bool IsPublicSystemField(string? field)
         {
             return !string.IsNullOrWhiteSpace(field) && Specs.ContainsKey(field);

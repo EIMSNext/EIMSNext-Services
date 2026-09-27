@@ -1,8 +1,8 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using EIMSNext.Async.Abstractions.Messaging;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Persistence.Mongo.Outbox;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Persistence.PostgreSql.Outbox;
 
 using Microsoft.Extensions.Logging;
 

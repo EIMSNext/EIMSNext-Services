@@ -1,30 +1,46 @@
-using EIMSNext.ApiCore;
-using EIMSNext.Identity.DbMaintenance;
-using EIMSNext.Core.Mongo;
+using EIMSNext.Common;
+using EIMSNext.Tool.DbMaintenance;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-
-var builder = Host.CreateApplicationBuilder(args);
-builder.Configuration
-    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
-    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false)
-    .AddEnvironmentVariables();
-
-var mongoSection = builder.Configuration.GetSection("MongoDb");
-var connectionString = mongoSection["ConnectionString"];
-var database = mongoSection["Database"];
-if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(database))
+var dryRun = args.Contains("--dry-run", StringComparer.Ordinal);
+var verifyOnly = args.Contains("--verify", StringComparer.Ordinal);
+var acceptChecksumChange = args.Contains("--accept-checksum-change", StringComparer.Ordinal);
+var targetVersion = ReadOption(args, "--target-version");
+var configurationArgs = args.Where(x =>
+    x is not "--dry-run"
+      and not "--verify"
+      and not "--accept-checksum-change"
+      and not "--target-version").ToArray();
+var builder = Host.CreateApplicationBuilder(new HostApplicationBuilderSettings
 {
-    throw new InvalidOperationException("缺少 MongoDb 配置，请在 appsettings.json、环境变量或命令行中提供 MongoDb:ConnectionString 和 MongoDb:Database。");
+    Args = configurationArgs,
+    ContentRootPath = AppContext.BaseDirectory
+});
+builder.Services.AddPostgreSqlConfiguration(builder.Configuration);
+builder.Services.AddSingleton<PostgreSqlMaintenanceRunner>();
+using var host = builder.Build();
+try
+{
+    await host.Services.GetRequiredService<PostgreSqlMaintenanceRunner>()
+        .ApplyAsync(dryRun, verifyOnly, targetVersion, acceptChecksumChange);
+    return 0;
+}
+catch (Exception exception)
+{
+    Console.Error.WriteLine($"Database maintenance failed: {exception.Message}");
+    return 1;
 }
 
-builder.Services.AddBasicServices(builder.Configuration);
-builder.Services.AddSingleton<EIMSDbContext>();
-builder.Services.AddSingleton<DbIndexManager>();
-
-using var host = builder.Build();
-var indexManager = host.Services.GetRequiredService<DbIndexManager>();
-indexManager.CreateIndexes();
-
-Console.WriteLine($"Mongo indexes created for database '{database}'.");
+/// <summary>
+/// 读取形如 <c>--name value</c> 的选项值。缺少取值时直接抛错，
+/// 避免把下一条参数误当成值后静默执行到错误版本。
+/// </summary>
+static string? ReadOption(string[] arguments, string name)
+{
+    var index = Array.FindIndex(arguments, x => string.Equals(x, name, StringComparison.Ordinal));
+    if (index < 0) return null;
+    if (index + 1 >= arguments.Length || arguments[index + 1].StartsWith("--", StringComparison.Ordinal))
+        throw new ArgumentException($"{name} requires a value, e.g. {name} 001_CreateTables");
+    return arguments[index + 1];
+}

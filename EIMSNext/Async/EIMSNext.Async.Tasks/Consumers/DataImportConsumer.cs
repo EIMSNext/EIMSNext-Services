@@ -8,11 +8,9 @@ using EIMSNext.Async.Tasks.System;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -20,9 +18,9 @@ using EIMSNext.Storage.Abstractions;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
 using NPOI.SS.UserModel;
 using NPOI.XSSF.UserModel;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -423,7 +421,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return errors;
             }
 
-            private List<FormDataImportCellError> ValidateImportData(ExpandoObject data)
+            private List<FormDataImportCellError> ValidateImportData(Dictionary<string, object?> data)
             {
                 if (!_importLog.TriggerValidation)
                 {
@@ -593,7 +591,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                         {
                             RecordIndex = records.Count + 1,
                             StartRowNumber = rowIndex + 1,
-                            Data = new ExpandoObject(),
+                            Data = new Dictionary<string, object?>(),
                         };
                         records.Add(current);
                     }
@@ -702,10 +700,10 @@ namespace EIMSNext.Async.Tasks.Consumers
                 }
             }
 
-            private ExpandoObject NormalizeEditableData(ExpandoObject source, out List<FormDataImportCellError> errors)
+            private Dictionary<string, object?> NormalizeEditableData(Dictionary<string, object?> source, out List<FormDataImportCellError> errors)
             {
                 errors = [];
-                var result = new ExpandoObject();
+                var result = new Dictionary<string, object?>();
                 var resultDict = (IDictionary<string, object?>)result;
                 var childRowsByParent = new Dictionary<string, List<Dictionary<string, object?>>>(StringComparer.OrdinalIgnoreCase);
 
@@ -837,7 +835,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 }
             }
 
-            private static object? GetValue(ExpandoObject data, string? field)
+            private static object? GetValue(Dictionary<string, object?> data, string? field)
             {
                 if (string.IsNullOrWhiteSpace(field) || field.Contains('>'))
                 {
@@ -847,10 +845,9 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return GetTopLevelValue(data, field);
             }
 
-            private static object? GetTopLevelValue(ExpandoObject data, string field)
+            private static object? GetTopLevelValue(Dictionary<string, object?> data, string field)
             {
-                var dict = (IDictionary<string, object?>)data;
-                return GetDictionaryValue(dict, field);
+                return GetDictionaryValue(data, field);
             }
 
             private static object? GetDictionaryValue(IDictionary<string, object?> data, string field)
@@ -858,7 +855,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 return data.TryGetValue(field, out var value) ? ImportCellConverters.UnwrapJsonValue(value) : null;
             }
 
-            private static List<IDictionary<string, object?>> GetChildRows(ExpandoObject data, string parentField)
+            private static List<IDictionary<string, object?>> GetChildRows(Dictionary<string, object?> data, string parentField)
             {
                 var raw = GetTopLevelValue(data, parentField);
                 raw = ImportCellConverters.UnwrapJsonValue(raw);
@@ -869,58 +866,28 @@ namespace EIMSNext.Async.Tasks.Consumers
 
                 return rows
                     .Cast<object?>()
-                    .Select(AsDictionary)
+                    .Select(x => x.AsDictionary())
                     .Where(x => x != null)
                     .Cast<IDictionary<string, object?>>()
                     .ToList();
             }
 
-            private static IDictionary<string, object?>? AsDictionary(object? value)
+            private static Dictionary<string, object?> CloneData(Dictionary<string, object?> source)
             {
-                value = ImportCellConverters.UnwrapJsonValue(value);
-                if (value is ExpandoObject expando)
+                var clone = new Dictionary<string, object?>();
+                foreach (var (key, value) in source)
                 {
-                    return (IDictionary<string, object?>)expando;
-                }
-                if (value is IDictionary<string, object?> typed)
-                {
-                    return typed;
-                }
-                if (value is IDictionary dictionary)
-                {
-                    var result = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
-                    foreach (DictionaryEntry entry in dictionary)
-                    {
-                        if (entry.Key is string key)
-                        {
-                            result[key] = ImportCellConverters.UnwrapJsonValue(entry.Value);
-                        }
-                    }
-
-                    return result;
-                }
-
-                return null;
-            }
-
-            private static ExpandoObject CloneData(ExpandoObject source)
-            {
-                var clone = new ExpandoObject();
-                var cloneDict = (IDictionary<string, object?>)clone;
-                foreach (var (key, value) in (IDictionary<string, object?>)source)
-                {
-                    cloneDict[key] = ImportCellConverters.UnwrapJsonValue(value);
+                    clone[key] = ImportCellConverters.UnwrapJsonValue(value);
                 }
 
                 return clone;
             }
 
-            private static void MergeData(ExpandoObject target, ExpandoObject source)
+            private static void MergeData(Dictionary<string, object?> target, Dictionary<string, object?> source)
             {
-                var targetDict = (IDictionary<string, object?>)target;
-                foreach (var (key, value) in (IDictionary<string, object?>)source)
+                foreach (var (key, value) in source)
                 {
-                    targetDict[key] = value;
+                    target[key] = value;
                 }
             }
 
@@ -1059,7 +1026,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             public string? MatchValue { get; set; }
 
-            public ExpandoObject Data { get; set; } = new();
+            public Dictionary<string, object?> Data { get; set; } = new();
 
             public List<FormDataImportCellError> Errors { get; set; } = [];
 

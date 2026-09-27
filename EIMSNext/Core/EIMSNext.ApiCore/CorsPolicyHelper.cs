@@ -7,7 +7,7 @@ namespace EIMSNext.ApiCore
     public class CorsPolicyHelper
     {
         public const string AllowedMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-        public const string AllowedHeaders = "Authorization,Content-Type,Accept,Origin,X-Requested-With";
+        public const string AllowedHeaders = "Authorization,Content-Type,Accept,Origin,X-Requested-With,Idempotency-Key";
         private readonly CorsOptions _options;
 
         public CorsPolicyHelper(IOptions<CorsOptions> options)

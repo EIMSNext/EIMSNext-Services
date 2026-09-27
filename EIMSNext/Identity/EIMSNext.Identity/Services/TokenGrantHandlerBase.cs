@@ -25,10 +25,11 @@ namespace EIMSNext.Identity.Services
 
         protected static List<Claim> CreateUserClaims(string subject, User user, DateTimeOffset authenticationTime)
         {
-            var corp = user.Crops.FirstOrDefault(x => x.IsDefault);
+            // 企业归属来自关系表 "UserCorp"（由宿主查询后填充到 User.UserCorps）。
+            var corp = user.UserCorps.FirstOrDefault(x => x.IsDefault);
             if (corp == null || string.IsNullOrEmpty(corp.CorpId))
             {
-                corp = user.Crops.FirstOrDefault(x => x.IsCorpOwner);
+                corp = user.UserCorps.FirstOrDefault(x => x.IsCorpOwner);
             }
 
             return new List<Claim>

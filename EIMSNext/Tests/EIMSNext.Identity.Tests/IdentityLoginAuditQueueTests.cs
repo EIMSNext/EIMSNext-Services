@@ -167,6 +167,7 @@ public class IdentityLoginAuditQueueTests
 
         public IQueryable<Client> Clients => Array.Empty<Client>().AsQueryable();
         public IQueryable<User> Users => Array.Empty<User>().AsQueryable();
+        public IQueryable<UserCorp> UserCorps => Array.Empty<UserCorp>().AsQueryable();
         public IQueryable<EmployeeLookup> Employees => Array.Empty<EmployeeLookup>().AsQueryable();
         public IQueryable<PublicAccessSetting> PublicSettings => Array.Empty<PublicAccessSetting>().AsQueryable();
         public IQueryable<CorporateSettingReadModel> CorporateSettings => Array.Empty<CorporateSettingReadModel>().AsQueryable();

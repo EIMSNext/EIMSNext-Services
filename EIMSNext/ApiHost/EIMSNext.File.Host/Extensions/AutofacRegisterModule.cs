@@ -18,8 +18,9 @@ namespace EIMSNext.File.Host.Extensions
         {
             base.Load(builder);
 
-            builder.RegisterType<UploadDbContext>().AsImplementedInterfaces().SingleInstance();
+            // File.Host 的仓储由 PostgreSqlDbContext 统一提供，无需单独注册上下文。
             builder.RegisterType<ServiceContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
+        }
     }
 }
-}
+

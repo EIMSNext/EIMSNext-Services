@@ -1,11 +1,12 @@
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
     /// <summary>
     /// 第三方集成登录配置。
     /// </summary>
-    public class IntegrationLoginSetting : MongoEntityBase
+    public class IntegrationLoginSetting : KeyedEntityBase
     {
         /// <summary>
         /// 集成类型。

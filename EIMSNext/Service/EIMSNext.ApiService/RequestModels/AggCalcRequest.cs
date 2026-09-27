@@ -1,6 +1,5 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 
 namespace EIMSNext.ApiService.RequestModels
 {

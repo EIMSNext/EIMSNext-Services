@@ -3,18 +3,17 @@ using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Async.Abstractions.Messaging;
 
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Service
 {
@@ -95,12 +94,14 @@ namespace EIMSNext.Service
                 }
             }
 
-            var filters = new List<FilterDefinition<Employee>>();
-            if (empIds.Count > 0)
+            if (empIds.Count == 0 && deptIds.Count == 0 && employeeGroupIds.Count == 0)
             {
-                filters.Add(Builders<Employee>.Filter.In(x => x.Id, empIds));
+                return [];
             }
 
+            // 员工候选与部门候选最终都是「Id 命中」，可合并为同一个集合。
+            // 注意快路径走 SQL IN（数据库端大小写敏感），内存路径也必须大小写敏感，否则两条路径行为不一致。
+            var empIdFilter = empIds.ToHashSet();
             if (deptIds.Count > 0)
             {
                 var departmentEmployeeIds = EmployeeDepartmentRepository.Queryable
@@ -108,44 +109,63 @@ namespace EIMSNext.Service
                     .Select(x => x.EmployeeId)
                     .Distinct()
                     .ToList();
-                filters.Add(Builders<Employee>.Filter.In(x => x.Id, departmentEmployeeIds));
-            }
-
-            if (employeeGroupIds.Count > 0)
-            {
-                filters.Add(Builders<Employee>.Filter.ElemMatch(x => x.EmployeeGroups, r => employeeGroupIds.Contains(r.EmployeeGroupId)));
-            }
-
-            if (filters.Count == 0)
-            {
-                return [];
-            }
-
-            var filter = Builders<Employee>.Filter.And(
-                Builders<Employee>.Filter.Eq(x => x.IsDummy, false),
-                Builders<Employee>.Filter.Eq(x => x.Status, 0),
-                Builders<Employee>.Filter.Or(filters));
-
-            await EmployeeRepository.Find(new MongoFindOptions<Employee> { Filter = filter }).ForEachAsync(x =>
-            {
-                //TODO: 暂时不排除当前操作人，方便测试
-                //if (x.Id.Equals(operatorEmpId, StringComparison.OrdinalIgnoreCase))
-                //{
-                //    return;
-                //}
-
-                if (!receivers.ContainsKey(x.Id))
+                foreach (var employeeId in departmentEmployeeIds)
                 {
-                    receivers[x.Id] = new NotifyReceiver
-                    {
-                        EmpId = x.Id,
-                        EmpName = x.EmpName,
-                        Email = x.WorkEmail
-                    };
+                    empIdFilter.Add(employeeId);
                 }
-            });
+            }
+
+            if (employeeGroupIds.Count == 0)
+            {
+                // 只有员工/部门候选，全部可下推到数据库。
+                var matched = EmployeeRepository.Queryable
+                    .Where(x => !x.IsDummy && x.Status == 0 && empIdFilter.Contains(x.Id))
+                    .ToList();
+                foreach (var employee in matched)
+                {
+                    AddReceiver(receivers, employee);
+                }
+
+                return receivers.Values.Take(200).ToList();
+            }
+
+            // 员工组候选由关系表 EmployeeGroupMember 承载，先在服务端求出属于任一目标员工组的员工。注意三类候选之间是「或」关系：
+            // 不能只对已按 empIdFilter 过滤过的结果再筛员工组。
+            var groupIdList = employeeGroupIds.ToList();
+            var groupEmployeeIds = EmployeeRepository.Queryable
+                .SelectMany(x => x.Groups)
+                .Where(x => groupIdList.Contains(x.EmployeeGroupId))
+                .Select(x => x.EmployeeId)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var employee in EmployeeRepository.Queryable.Where(x => !x.IsDummy && x.Status == 0).ToList())
+            {
+                if (empIdFilter.Contains(employee.Id) || groupEmployeeIds.Contains(employee.Id))
+                {
+                    AddReceiver(receivers, employee);
+                }
+            }
 
             return receivers.Values.Take(200).ToList();
+        }
+
+        private static void AddReceiver(IDictionary<string, NotifyReceiver> receivers, Employee employee)
+        {
+            //TODO: 暂时不排除当前操作人，方便测试
+            //if (employee.Id.Equals(operatorEmpId, StringComparison.OrdinalIgnoreCase))
+            //{
+            //    return;
+            //}
+
+            if (!receivers.ContainsKey(employee.Id))
+            {
+                receivers[employee.Id] = new NotifyReceiver
+                {
+                    EmpId = employee.Id,
+                    EmpName = employee.EmpName,
+                    Email = employee.WorkEmail
+                };
+            }
         }
 
         private void ExpandFormFieldCandidate(FormData data, FormDef formDef, ApprovalCandidate notifier, ISet<string> deptIds, ISet<string> empIds)
@@ -190,15 +210,14 @@ namespace EIMSNext.Service
                 return [];
             }
 
-            var query = DepartmentRepository.Queryable
-                .Where(x => !x.DeleteFlag && x.Id == departmentId);
-            if (cascaded)
-            {
-                query = DepartmentRepository.Queryable
-                    .Where(x => !x.DeleteFlag && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")));
-            }
-
-            return query.Select(x => x.Id).Distinct().ToList();
+            // 直接用关系表上的层级路径快照匹配，省去先查 Department 表展开子部门、
+            // 再按 DepartmentIds 查关系表的两次往返（快照由 DepartmentService 在层级变动时同步）。
+            return EmployeeDepartmentRepository.Queryable
+                .Where(x => x.DepartmentId == departmentId
+                    || (cascaded && x.HeriarchyId.Contains($"|{departmentId}|")))
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
         }
 
         private static List<string> ExtractCandidateValues(object rawValue)
@@ -206,7 +225,7 @@ namespace EIMSNext.Service
             var result = new List<string>();
             foreach (var item in EnumerateItemsOrSingle(rawValue))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 if (dict != null && dict.TryGetValue(Fields.Id, out var valueObj))
                 {
                     var value = valueObj?.ToString();
@@ -256,32 +275,6 @@ namespace EIMSNext.Service
             }
 
             yield return value;
-        }
-
-        private static IDictionary<string, object?>? AsDictionary(object? value)
-        {
-            if (value is ExpandoObject expandoObject)
-            {
-                return (IDictionary<string, object?>)expandoObject;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return dict;
-            }
-
-            if (value is IDictionary<string, object> objectDict)
-            {
-                return objectDict.ToDictionary(x => x.Key, x => (object?)x.Value);
-            }
-
-            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
-            {
-                var expando = jsonElement.ToString().DeserializeFromJson<ExpandoObject>();
-                return expando == null ? null : (IDictionary<string, object?>)expando;
-            }
-
-            return null;
         }
     }
 }

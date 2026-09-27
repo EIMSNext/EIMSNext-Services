@@ -1,13 +1,11 @@
-using EIMSNext.Plugin.Runtime;
+﻿using EIMSNext.Plugin.Runtime;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Service.Contracts;
@@ -24,6 +22,9 @@ namespace EIMSNext.ApiService
     {
         private const string PublishedStatus = "Published";
 
+        /// <summary>
+        /// 执行 PluginStoreApiService 操作。
+        /// </summary>
         public PluginStoreApiService(IResolver resolver) : base(resolver)
         {
         }
@@ -32,6 +33,9 @@ namespace EIMSNext.ApiService
         private IPluginInstallService PluginInstallService => Resolver.GetService<IPluginInstallService, PluginInstall>();
         private IPluginProfileService PluginProfileService => Resolver.GetService<IPluginProfileService, PluginProfile>();
 
+        /// <summary>
+        /// 获取已启用的插件。
+        /// </summary>
         public IEnumerable<PluginRuntimeInfo> GetEnabledPlugins()
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -56,6 +60,9 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 获取插件安装记录。
+        /// </summary>
         public IEnumerable<PluginInstall> GetPluginInstalls()
         {
             var corpId = IdentityContext.CurrentCorpId;
@@ -64,6 +71,9 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 启用插件安装。
+        /// </summary>
         public async Task<PluginInstall?> EnablePluginInstallAsync(string id)
         {
             var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
@@ -86,6 +96,9 @@ namespace EIMSNext.ApiService
             return entity;
         }
 
+        /// <summary>
+        /// 禁用插件安装。
+        /// </summary>
         public async Task<PluginInstall?> DisablePluginInstallAsync(string id)
         {
             var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
@@ -101,6 +114,9 @@ namespace EIMSNext.ApiService
             return entity;
         }
 
+        /// <summary>
+        /// 删除PluginInstall。
+        /// </summary>
         public async Task<PluginInstall?> DeletePluginInstallAsync(string id)
         {
             var entity = PluginInstallService.Query(x => x.Id == id && x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
@@ -121,6 +137,9 @@ namespace EIMSNext.ApiService
             return entity;
         }
 
+        /// <summary>
+        /// 获取插件商店。
+        /// </summary>
         public (long total, IReadOnlyList<object> items) GetPluginStore(PluginProfileQueryRequest request)
         {
             var query = PluginProfileService.Query(x => !x.DeleteFlag && x.Status == PublishedStatus);
@@ -191,6 +210,9 @@ namespace EIMSNext.ApiService
             return (total, items);
         }
 
+        /// <summary>
+        /// 获取PluginStoreDetail。
+        /// </summary>
         public object? GetPluginStoreDetail(string id)
         {
             var profile = PluginProfileService.Get(id);
@@ -246,6 +268,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 安装插件。
+        /// </summary>
         public async Task<PluginInstallResult?> InstallPluginAsync(string id)
         {
             if (string.IsNullOrWhiteSpace(IdentityContext.CurrentUserID) || string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId))
@@ -290,8 +315,14 @@ namespace EIMSNext.ApiService
             return new PluginInstallResult { PluginInstallId = entity.Id };
         }
 
+        /// <summary>
+        /// 获取已安装的运行时插件。
+        /// </summary>
         public IEnumerable<PluginRuntimeInfo> GetInstalledRuntimePlugins() => PluginRuntimeManager.GetPlugins();
 
+        /// <summary>
+        /// 发布插件。
+        /// </summary>
         public async Task<PluginProfile> PublishAsync(PluginPublishRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.PluginId))
@@ -371,8 +402,14 @@ namespace EIMSNext.ApiService
                 && (install.ExpireAt == null || install.ExpireAt > now);
         }
 
+        /// <summary>
+        /// 插件安装结果类型定义。
+        /// </summary>
         public class PluginInstallResult
         {
+            /// <summary>
+            /// 获取或设置PluginInstallId。
+            /// </summary>
             public string PluginInstallId { get; set; } = string.Empty;
         }
     }

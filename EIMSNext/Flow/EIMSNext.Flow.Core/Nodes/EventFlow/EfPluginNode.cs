@@ -1,10 +1,10 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Text.Json;
 using System.Collections;
 
 using EIMSNext.Plugin.Runtime;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Plugin.Contracts;
 using EIMSNext.Entities;
 
@@ -12,6 +12,7 @@ using HKH.Mef2.Integration;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -23,12 +24,18 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
+            // 而 WorkflowCore 的 Run 契约是同步的，因此在此处统一同步等待。
+            return RunAsync(context).GetAwaiter().GetResult();
+        }
+
+        private async Task<ExecutionResult> RunAsync(IStepExecutionContext context)
+        {
             var dataContext = GetDataContext(context);
             var startTime = DateTime.UtcNow.ToTimeStampMs();
             var setting = Metadata?.EfNodeSetting?.PluginSetting;
             if (setting == null || string.IsNullOrWhiteSpace(setting.PluginId) || string.IsNullOrWhiteSpace(setting.FunctionId))
             {
-                CreateFailureExecLog(context.Workflow, dataContext, Metadata!, "插件节点未配置", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, "插件节点未配置", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
                 return ExecutionResult.Next();
             }
 
@@ -36,7 +43,7 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 if (!IsPluginEnabled(dataContext.CorpId, setting.PluginId))
                 {
-                    CreateFailureExecLog(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
                     return ExecutionResult.Next();
                 }
 
@@ -55,30 +62,28 @@ namespace EIMSNext.Flow.Core.Nodes
                     }
                 };
 
-                var result = runtimeManager.ExecuteAsync(
+                var result = await runtimeManager.ExecuteAsync(
                         setting.PluginId,
                         setting,
                         new PluginExecArgs { FunName = setting.FunctionId, FunArgs = payload.SerializeToJson() },
                         invocationContext,
-                        context.CancellationToken)
-                    .GetAwaiter()
-                    .GetResult();
+                        context.CancellationToken);
 
                 if (result.Code != 0)
                 {
-                    CreateFailureExecLog(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
                 }
                 else
                 {
                     SavePluginNodeResult(dataContext, result.Result, setting);
-                    CreateExecLog(context.Workflow, dataContext, Metadata!, startTime: startTime, endTime: DateTime.UtcNow.ToTimeStampMs(), summary: "执行成功");
+                    await CreateExecLogAsync(context.Workflow, dataContext, Metadata!, startTime: startTime, endTime: DateTime.UtcNow.ToTimeStampMs(), summary: "执行成功");
                 }
             }
             catch (Exception ex)
             {
                 var failure = ClassifyFailure(Metadata!, ex, pluginFailure: true);
                 dataContext.ErrMsg = failure.Reason;
-                CreateExecLog(
+                await CreateExecLogAsync(
                     context.Workflow,
                     dataContext,
                     Metadata!,
@@ -307,7 +312,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         private void SavePluginNodeResult(EfDataContext dataContext, object? pluginResult, Plugin.Contracts.PluginSetting setting)
         {
-            var payload = new ExpandoObject();
+            var payload = new Dictionary<string, object?>();
             payload.AddOrUpdate("result", ToScriptValue(pluginResult));
 
             var resultMap = ToDictionary(pluginResult);
@@ -385,7 +390,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (value is IDictionary<string, object?> dictionary)
             {
-                var expando = new ExpandoObject();
+                var expando = new Dictionary<string, object?>();
                 foreach (var item in dictionary)
                 {
                     expando.AddOrUpdate(item.Key, ToScriptValue(item.Value));
@@ -396,7 +401,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (value is IDictionary legacyDictionary)
             {
-                var expando = new ExpandoObject();
+                var expando = new Dictionary<string, object?>();
                 foreach (DictionaryEntry item in legacyDictionary)
                 {
                     var key = item.Key?.ToString();
@@ -451,9 +456,9 @@ namespace EIMSNext.Flow.Core.Nodes
             };
         }
 
-        private static ExpandoObject ConvertJsonObject(JsonElement element)
+        private static Dictionary<string, object?> ConvertJsonObject(JsonElement element)
         {
-            var result = new ExpandoObject();
+            var result = new Dictionary<string, object?>();
             foreach (var property in element.EnumerateObject())
             {
                 result.AddOrUpdate(property.Name, ConvertJsonElement(property.Value));

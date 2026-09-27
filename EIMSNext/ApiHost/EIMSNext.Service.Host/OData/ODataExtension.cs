@@ -1,7 +1,5 @@
 using HKH.Common;
 using Microsoft.AspNetCore.OData.Formatter;
-using Microsoft.AspNetCore.OData.Query;
-using Microsoft.AspNetCore.OData.Query.Validator;
 
 namespace EIMSNext.Service.Host.OData
 {
@@ -10,9 +8,6 @@ namespace EIMSNext.Service.Host.OData
     /// </summary>
     public static class ODataExtension
     {
-        private static ODataValidationSettings validationSettings = new ODataValidationSettings() { MaxExpansionDepth = 3, MaxNodeCount = 200 };
-        private static ODataQuerySettings querySettings = new ODataQuerySettings();
-
         /// <summary>
         /// 
         /// </summary>
@@ -65,3 +60,4 @@ namespace EIMSNext.Service.Host.OData
         }
     }
 }
+

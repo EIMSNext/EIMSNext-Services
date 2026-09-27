@@ -1,13 +1,11 @@
-using EIMSNext.Async.RabbitMQ.Messaging;
+﻿using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using Microsoft.Extensions.DependencyInjection;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 
@@ -15,8 +13,6 @@ using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Logging;
 
-using MongoDB.Driver;
-using MongoDB.Driver.Linq;
 
 namespace EIMSNext.Async.Tasks.Consumers
 {
@@ -88,12 +84,30 @@ namespace EIMSNext.Async.Tasks.Consumers
             }
             catch (TaskRequeueException)
             {
+                await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                 throw;
             }
             catch (Exception ex)
             {
+                await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                 Logger.LogWarning(ex, "Email external effect failed; message will be requeued. key={Key}, target={Target}", baseKey, target);
                 throw new TaskRequeueException("Email external effect failed.", TimeSpan.FromSeconds(30));
+            }
+        }
+
+        private async Task ReleaseLeaseAsync(
+            IMessageProcessingRepository processingRepository,
+            string eventKey,
+            string target,
+            string leaseToken)
+        {
+            try
+            {
+                await processingRepository.ReleaseAsync(eventKey, target, leaseToken, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to release email processing lease. key={Key}, target={Target}", eventKey, target);
             }
         }
 

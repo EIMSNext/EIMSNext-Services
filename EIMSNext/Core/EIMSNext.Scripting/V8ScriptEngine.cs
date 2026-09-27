@@ -1,5 +1,6 @@
 
 using System.Collections.Concurrent;
+using System.Dynamic;
 using System.Reflection;
 using System.Text.Json;
 
@@ -203,10 +204,11 @@ namespace EIMSNext.Scripting
                 {
                     foreach (var param in parameters)
                     {
-                        if (param.Key == "data")
-                            engine.Engine.AddHostObject(param.Key, param.Value);
-                        else
-                            engine.Engine.Script[param.Key] = param.Value;
+                        // 必须按「原生 JS 值」注入：ClearScript 会把 Dictionary/List 包成宿主对象，
+                        // 其属性是 CLR 成员（Add/Clear/Item…），条件表达式 `data.f_x.field` 会取到
+                        // undefined。这里递归转成 ExpandoObject / List，ClearScript 才能生成真正的
+                        // JS 对象与数组（filter.js/formula.js 中的 GT/MATCH 等均为纯 JS 实现，直接可用）。
+                        engine.Engine.Script[param.Key] = ToScriptValue(param.Value);
                     }
                 }
 
@@ -248,6 +250,42 @@ namespace EIMSNext.Scripting
 
             return result;
         }
+
+        /// <summary>
+        /// 把参数值递归转成 ClearScript 会映射为原生 JS 对象/数组的形态
+        /// （<see cref="ExpandoObject"/> / <see cref="List{T}"/>）。
+        /// 直接用 Dictionary/List 会被包成宿主对象，只能用 CLR 成员名访问，
+        /// 脚本里的 <c>data.f_x.field</c>、<c>subform[0].field</c> 会全部取到 undefined。
+        /// 其余类型（委托、基元、字符串等）原样返回，保持宿主函数语义。
+        /// </summary>
+        private static object? ToScriptValue(object? value)
+        {
+            switch (value)
+            {
+                case null:
+                    return null;
+                case IDictionary<string, object?> dict:
+                    return ToExpando(dict);
+                case string:
+                case byte[]:
+                    return value;
+                case System.Collections.IEnumerable items:
+                    var list = new List<object?>();
+                    foreach (var item in items) list.Add(ToScriptValue(item));
+                    return list;
+                default:
+                    return value;
+            }
+
+            static ExpandoObject ToExpando(IEnumerable<KeyValuePair<string, object?>> source)
+            {
+                var expando = new ExpandoObject();
+                var target = (IDictionary<string, object?>)expando;
+                foreach (var pair in source) target[pair.Key] = ToScriptValue(pair.Value);
+                return expando;
+            }
+        }
+
         public EvaluationResult<T> Evaluate<T>(string script, IDictionary<string, object>? parameters = null, CancellationToken ct = default)
         {
             var result = new EvaluationResult<T>();

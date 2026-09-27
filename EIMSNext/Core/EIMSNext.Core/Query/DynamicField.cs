@@ -3,26 +3,16 @@ using EIMSNext.Common;
 namespace EIMSNext.Core.Query
 {
     /// <summary>
-    /// 动态查询投影字段。
+    /// 动态字段路径工具。
     /// </summary>
-    public class DynamicField
+    public static class DynamicField
     {
-        public DynamicField() { }
-        public DynamicField(string field, bool visible = true)
-        {
-            Field = field;
-            Visible = visible;
-        }
-
-        /// <summary>字段路径。</summary>
-        public string Field { get; set; } = "";
-        /// <summary>是否返回该字段。</summary>
-        public bool Visible { get; set; } = true;
-
-        public static DynamicField Create(string field, bool visible = true)
-        {
-            return new DynamicField(field, visible);
-        }
+        /// <summary>
+        /// 根据字段类型格式化筛选用的字段路径。
+        /// </summary>
+        /// <param name="field">字段路径。</param>
+        /// <param name="fieldType">字段类型。</param>
+        /// <returns>格式化后的字段路径。</returns>
         public static string FormatFieldForFilter(string field, string? fieldType)
         {
             var finalField = field;
@@ -59,5 +49,4 @@ namespace EIMSNext.Core.Query
             return finalField;
         }
     }
-    public class DynamicFieldList : List<DynamicField> { }
 }

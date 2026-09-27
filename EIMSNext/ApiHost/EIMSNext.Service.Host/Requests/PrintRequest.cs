@@ -13,3 +13,4 @@ namespace EIMSNext.Service.Host.Requests
         public PrintDefType PrintType { get; set; } = PrintDefType.Pdf;
     }
 }
+

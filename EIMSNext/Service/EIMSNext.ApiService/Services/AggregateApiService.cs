@@ -1,22 +1,28 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
+using EIMSNext.Persistence.PostgreSql;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using System.Data.Common;
+using System.Text;
 using System.Text.Json;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 聚合的 API 服务。
+    /// </summary>
+    /// <remarks>
+        /// 由 PostgreSQL 命令执行器在 <c>"FormData"</c> 表上执行（jsonb 字段用 <c>-&gt;&gt;</c> 取值）。
+    /// </remarks>
     public class AggregateApiService : ApiServiceBase, IAggregateApiService
     {
         private static readonly HashSet<string> SupportedAggregateFunctions = new(StringComparer.OrdinalIgnoreCase)
@@ -24,57 +30,149 @@ namespace EIMSNext.ApiService
             "count", "sum", "avg", "max", "min",
         };
 
+        /// <summary>
+        /// 初始化AggregateApiService的新实例。
+        /// </summary>
+        /// <param name="resolver">服务解析器。</param>
         public AggregateApiService(IResolver resolver) : base(resolver)
         {
-            AggregateService = resolver.Resolve<AggregateService>();
         }
-
-        private AggregateService AggregateService { get; set; }
 
         private const int MaxDashboardTake = 1000;
 
-        public async Task<IAsyncCursor<BsonDocument>?> Calucate(DashboardAggregateRequest request)
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
+        public async Task<List<Dictionary<string, object?>>?> Calucate(DashboardAggregateRequest request)
         {
             var build = BuildDashboardRequest(request, null, false);
-            return build == null ? null : await Execute(build);
+            return build == null || build.Authorization.CorpId == null
+                ? null
+                : await ExecuteAsync(AggregateSqlBuilder.BuildRows(build.Request), build.Authorization.CorpId, build.Request.DataSource.Id);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(DashboardAggregateRequest request)
         {
             var build = BuildDashboardRequest(request, null, false);
-            return build == null ? 0 : await ExecuteCount(build);
+            return build == null ? 0 : await ExecuteCountAsync(build);
         }
 
-        public async Task<IAsyncCursor<BsonDocument>?> Preview(DashboardAggregatePreviewRequest request)
+        /// <summary>
+        /// 预览聚合结果。
+        /// </summary>
+        public async Task<List<Dictionary<string, object?>>?> Preview(DashboardAggregatePreviewRequest request)
         {
             var build = BuildDashboardRequest(request, request.Details, true);
-            return build == null ? null : await Execute(build);
+            return build == null || build.Authorization.CorpId == null
+                ? null
+                : await ExecuteAsync(AggregateSqlBuilder.BuildRows(build.Request), build.Authorization.CorpId, build.Request.DataSource.Id);
         }
 
+        /// <summary>
+        /// 预览聚合结果数量。
+        /// </summary>
         public async Task<long> PreviewCount(DashboardAggregatePreviewRequest request)
         {
             var build = BuildDashboardRequest(request, request.Details, true);
-            return build == null ? 0 : await ExecuteCount(build);
+            return build == null ? 0 : await ExecuteCountAsync(build);
         }
 
-        private async Task<IAsyncCursor<BsonDocument>?> Execute(DashboardAggregateBuild build)
+        /// <summary>
+        /// 在 "FormData" 表上执行聚合 SQL。
+        /// </summary>
+        private async Task<List<Dictionary<string, object?>>> ExecuteAsync(
+            AggregateSqlBuilder.SqlStatement statement,
+            string corpId,
+            string? formId = null)
         {
-            var collection = AggregateService.GetCollection("FormData");
-            var filter = WrapFilter(build.Request.Filter, build.Request.DataSource.Id, build.Authorization.CorpId)
-                .And(build.Authorization.DataFilter)!;
-            build.Request.Filter = filter;
-            var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(
-                PipelineBuilder.BuildPipeline(collection, build.Request, ServiceContext));
-            return await collection.AggregateAsync(pipeline);
+            var rows = new List<Dictionary<string, object?>>();
+            await using var command = CreateCommand(statement.Sql, corpId, statement.Parameters);
+            await using var reader = await command.ExecuteReaderAsync().ConfigureAwait(false);
+            while (await reader.ReadAsync().ConfigureAwait(false))
+            {
+                var row = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    var value = reader.IsDBNull(i) ? null : reader.GetValue(i);
+                    row[reader.GetName(i)] = value is DBNull ? null : value;
+                }
+
+                NormalizeAggregateRow(row, formId);
+
+                rows.Add(row);
+            }
+
+            return rows;
         }
 
-        private async Task<long> ExecuteCount(DashboardAggregateBuild build)
+        private async Task<long> ExecuteCountAsync(DashboardAggregateBuild build)
         {
-            var collection = AggregateService.GetCollection("FormData");
-            var filter = WrapFilter(build.Request.Filter, build.Request.DataSource.Id, build.Authorization.CorpId)
-                .And(build.Authorization.DataFilter)!;
-            var count = await collection.CountDocumentsAsync(filter.ToFilterDefinition<BsonDocument>());
+            var sql = AggregateSqlBuilder.BuildCount(build.Request, null);
+            await using var command = CreateCommand(sql.Sql, build.Authorization.CorpId ?? string.Empty, sql.Parameters);
+            var result = await command.ExecuteScalarAsync().ConfigureAwait(false);
+            var count = result is null or DBNull ? 0L : Convert.ToInt64(result);
             return build.CountLimit.HasValue ? Math.Min(count, build.CountLimit.Value) : count;
+        }
+
+        private void NormalizeAggregateRow(Dictionary<string, object?> row, string? formId)
+        {
+            if (row.TryGetValue("data", out var rawData))
+            {
+                var data = rawData switch
+                {
+                    string json when !string.IsNullOrWhiteSpace(json) => DynamicJsonbReader.Parse(json),
+                    JsonDocument document => DynamicJsonbReader.Parse(document.RootElement.GetRawText()),
+                    JsonElement element when element.ValueKind == JsonValueKind.Object => DynamicJsonbReader.Parse(element.GetRawText()),
+                    _ => null,
+                };
+                if (data is not null) row["data"] = data;
+            }
+
+            NormalizeJsonObject(row, "createBy");
+            NormalizeJsonObject(row, "updateBy");
+
+            if (formId is null || !row.ContainsKey("dataTitle") || row["dataTitle"] is not null ||
+                row["data"] is not Dictionary<string, object?> dataValues)
+            {
+                return;
+            }
+
+            var formDef = Resolver.Resolve<EIMSNext.Service.Contracts.IFormDefService>().Get(formId);
+            if (formDef is null) return;
+
+            var formData = new FormData
+            {
+                Id = row.TryGetValue("id", out var id) ? id?.ToString() ?? string.Empty : string.Empty,
+                AppId = row.TryGetValue("appId", out var appId) ? appId?.ToString() ?? string.Empty : string.Empty,
+                FormId = formId,
+                Data = dataValues,
+            };
+            row["dataTitle"] = Resolver.Resolve<DataTitleResolver>().ResolveDataTitle(formData, formDef);
+        }
+
+        private static void NormalizeJsonObject(Dictionary<string, object?> row, string name)
+        {
+            if (!row.TryGetValue(name, out var raw) || raw is not string json || string.IsNullOrWhiteSpace(json)) return;
+            try
+            {
+                row[name] = JsonSerializer.Deserialize<Operator>(json);
+            }
+            catch (JsonException)
+            {
+                row[name] = null;
+            }
+        }
+
+        /// <summary>
+        /// 创建绑定到当前 DbContext 连接的 PostgreSQL 命令。
+        /// </summary>
+        private DbCommand CreateCommand(string sql, string corpId, IReadOnlyList<object?>? parameters = null)
+        {
+            var dbContext = Resolver.GetRepository<FormData>().DbContext;
+            return PostgreSqlCommandBuilder.Create(dbContext, sql, corpId ?? string.Empty, parameters);
         }
 
         private DashboardAggregateBuild? BuildDashboardRequest(
@@ -97,11 +195,15 @@ namespace EIMSNext.ApiService
                 var authorization = AuthorizeDashboardItem(item, dataSource.Id, isPreview);
                 if (!authorization.Allowed) return null;
 
+                var aggregateFilter = MergeFilters(ReadConfiguredFilter(root), request.Filter);
+                aggregateFilter = WrapFilter(aggregateFilter, dataSource.Id, authorization.CorpId);
+                aggregateFilter = aggregateFilter.And(authorization.DataFilter);
+
                 var aggregateRequest = new AggCalcRequest
                 {
                     ItemId = item.Id,
                     DataSource = dataSource,
-                    Filter = MergeFilters(ReadConfiguredFilter(root), request.Filter),
+                    Filter = aggregateFilter,
                     Sort = request.Sort,
                     Skip = Math.Max(request.Skip ?? 0, 0),
                 };
@@ -142,19 +244,10 @@ namespace EIMSNext.ApiService
                 }
                 else return null;
 
-                // Only the component definition is subject to field visibility. Runtime filters and sorts
-                // intentionally remain dynamic; data permission and Mongo operator value protections still apply.
                 var scope = authorization.FormFieldPermissions;
                 if (scope != null)
                 {
-                    var configuredFields = new AggCalcRequest
-                    {
-                        DataSource = aggregateRequest.DataSource,
-                        Dimensions = aggregateRequest.Dimensions,
-                        Metrics = aggregateRequest.Metrics,
-                        DisplayFields = aggregateRequest.DisplayFields,
-                    };
-                    if (!AreRequestedFieldsVisible(configuredFields, scope)) return null;
+                    if (!AreRequestedFieldsVisible(aggregateRequest, scope)) return null;
                 }
                 return new DashboardAggregateBuild(aggregateRequest, authorization, countLimit);
             }
@@ -272,43 +365,57 @@ namespace EIMSNext.ApiService
 
         private static int ClampTake(int take, int? configuredLimit) => Math.Clamp(take <= 0 ? 20 : take, 1, Math.Min(configuredLimit ?? MaxDashboardTake, MaxDashboardTake));
 
-        public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request)
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
+        public async Task<List<Dictionary<string, object?>>?> Calucate(AggCalcRequest request)
         {
             return await Calucate(request, ServiceContext.CorpId);
         }
 
-        public async Task<IAsyncCursor<BsonDocument>?> Calucate(AggCalcRequest request, string corpId)
+        /// <summary>
+        /// 计算聚合结果。
+        /// </summary>
+        public async Task<List<Dictionary<string, object?>>?> Calucate(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return null;
             var authorization = Authorize(request, corpId);
             if (!authorization.Allowed) return null;
 
-            var collection = AggregateService.GetCollection("FormData");
             var filter = WrapFilter(request.Filter, request.DataSource.Id, authorization.CorpId);
             filter = filter.And(authorization.DataFilter)!;
             request.Filter = filter;
+            if (authorization.CorpId == null) return null;
 
-            var pipeline = PipelineDefinition<BsonDocument, BsonDocument>.Create(
-                PipelineBuilder.BuildPipeline(collection, request, ServiceContext));
-            return await collection.AggregateAsync(pipeline);
+            var sql = AggregateSqlBuilder.BuildRows(request);
+            return await ExecuteAsync(sql, authorization.CorpId, request.DataSource.Id);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(AggCalcRequest request)
         {
             return await Count(request, ServiceContext.CorpId);
         }
 
+        /// <summary>
+        /// 统计数量。
+        /// </summary>
         public async Task<long> Count(AggCalcRequest request, string corpId)
         {
             if (request.DataSource?.Type != AgDataSourceType.Form) return 0;
             var authorization = Authorize(request, corpId);
             if (!authorization.Allowed) return 0;
 
-            var collection = AggregateService.GetCollection("FormData");
             var filter = WrapFilter(request.Filter, request.DataSource.Id, authorization.CorpId);
             filter = filter.And(authorization.DataFilter)!;
-            var filterDef = filter.ToFilterDefinition<BsonDocument>();
-            return await collection.CountDocumentsAsync(filterDef);
+            request.Filter = filter;
+
+            var sql = AggregateSqlBuilder.BuildCount(request, null);
+            await using var command = CreateCommand(sql.Sql, authorization.CorpId ?? string.Empty, sql.Parameters);
+            var result = await command.ExecuteScalarAsync().ConfigureAwait(false);
+            return result is null or DBNull ? 0 : Convert.ToInt64(result);
         }
 
         private AggregateAuthorization Authorize(AggCalcRequest request, string corpId)
@@ -726,154 +833,505 @@ namespace EIMSNext.ApiService
         }
     }
 
-    static class PipelineBuilder
+
+    /// <summary>
+    /// 把聚合请求编译为 PostgreSQL 语句。
+    /// </summary>
+    /// <remarks>
+    /// <c>$match</c> → <c>where</c>、<c>$group</c> → <c>group by</c>、
+    /// <c>$project</c> → <c>select</c> 列表、<c>$sort</c> → <c>order by</c>、
+    /// <c>$skip/$limit</c> → <c>offset/fetch</c>。
+    /// 表单业务字段存放在 jsonb 列 <c>"Data"</c>，用 <c>-&gt;&gt;</c> 取文本。
+    /// </remarks>
+    internal static class AggregateSqlBuilder
     {
-        public static BsonDocument[] BuildPipeline(IMongoCollection<BsonDocument> collection, AggCalcRequest request, IServiceContext context)
+        /// <summary>
+        /// 聚合 SQL 与其位置参数。
+        /// </summary>
+        /// <param name="Sql">SQL 文本，企业条件使用 <c>@corpId</c> 占位。</param>
+        /// <param name="Parameters">按 <c>@p0</c>、<c>@p1</c>… 顺序绑定的位置参数。</param>
+        internal readonly record struct SqlStatement(string Sql, IReadOnlyList<object?> Parameters);
+
+        /// <summary>
+        /// 生成明细行查询（含聚合度量时为 group by 结果集，否则为投影明细）。
+        /// </summary>
+        public static SqlStatement BuildRows(AggCalcRequest request)
         {
-            var pipelineStages = new List<BsonDocument>();
+            var parameters = new List<object?>();
+            var where = BuildWhere(request.Filter, parameters);
 
-            if (request.Filter != null)
-            {
-                var filterDef = request.Filter.ToFilterDefinition<BsonDocument>();
-                var matchStage = new BsonDocument("$match", filterDef.Render(new RenderArgs<BsonDocument>(collection.DocumentSerializer, BsonSerializer.SerializerRegistry)));
-                pipelineStages.Add(matchStage);
-            }
+            var metricSql = BuildMetricSelects(request.Metrics, parameters);
+            var dimensionSql = BuildDimensionSelects(request.Dimensions);
 
-            if (request.Metrics?.Count > 0)
+            var sql = new StringBuilder();
+            if (metricSql.Count > 0 && request.Metrics is { Count: > 0 })
             {
-                pipelineStages.Add(BuildGroupStage(request.Dimensions, request.Metrics));
-                if (request.Dimensions?.Count > 0)
+                var groupKeys = (request.Dimensions ?? [])
+                    .Where(d => !string.IsNullOrEmpty(d.Id))
+                    .Select(d => FieldExpression(d.Id))
+                    .ToList();
+                if (groupKeys.Count > 0)
                 {
-                    pipelineStages.Add(BuildProjectStage(request.Dimensions!, request.Metrics!));
-                }
-            }
-
-            if (request.Sort?.Count > 0)
-            {
-                pipelineStages.Add(BuildSortStage(request.Sort!));
-            }
-
-            if (request.Skip.HasValue && request.Skip.Value > 0)
-            {
-                pipelineStages.Add(new BsonDocument("$skip", request.Skip.Value));
-            }
-
-            if (request.Take.HasValue && request.Take.Value > 0)
-            {
-                pipelineStages.Add(new BsonDocument("$limit", request.Take.Value));
-            }
-
-            // 公开模式：按 displayFields 投影
-            if (request.DisplayFields?.Count > 0)
-            {
-                pipelineStages.Add(BuildDisplayFieldProjectStage(request.DisplayFields));
-            }
-
-            return pipelineStages.ToArray();
-        }
-
-        private static BsonDocument BuildGroupStage(List<Dimension>? dimensions, List<Metric> metrics)
-        {
-            var groupDoc = new BsonDocument();
-
-            if (dimensions != null && dimensions.Any())
-            {
-                var idDoc = new BsonDocument();
-                foreach (var dimension in dimensions)
-                {
-                    if (!string.IsNullOrEmpty(dimension.Id))
+                    // 有维度：按维度分组输出维度列 + 度量列。
+                    sql.Append("select ").Append(string.Join(", ", dimensionSql));
+                    foreach (var metric in metricSql)
                     {
-                        var finalId = GetFinalId(dimension.Id);
-                        idDoc[dimension.Id] = $"${finalId}";
+                        sql.Append(", ").Append(metric);
                     }
-                }
-                groupDoc["_id"] = idDoc;
-            }
-            else
-            {
-                groupDoc["_id"] = BsonNull.Value;
-            }
 
-            foreach (var metric in metrics)
-            {
-                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
-                    continue;
-
-                if (metric.AggFun.Equals("count", StringComparison.OrdinalIgnoreCase))
-                {
-                    groupDoc[$"{metric.Id}_count"] = new BsonDocument("$sum", 1);
+                    sql.Append(" from \"FormData\" where ").Append(where);
+                    sql.Append(" group by ").Append(string.Join(", ", groupKeys));
                 }
                 else
                 {
-                    var finalId = GetFinalId(metric.Id);
-                    groupDoc[$"{metric.Id}_{metric.AggFun}"] =
-                        new BsonDocument($"${metric.AggFun}", $"${finalId}");
+                    // 无维度：整表聚合成一行。
+                    sql.Append("select ").Append(string.Join(", ", metricSql));
+                    sql.Append(" from \"FormData\" where ").Append(where);
                 }
             }
-
-            return new BsonDocument("$group", groupDoc);
-        }
-
-        private static BsonDocument BuildProjectStage(List<Dimension> dimensions, List<Metric> metrics)
-        {
-            var projectDoc = new BsonDocument();
-
-            foreach (var dimension in dimensions)
+            else
             {
-                if (!string.IsNullOrEmpty(dimension.Id))
-                {
-                    projectDoc[dimension.Id] = $"$_id.{dimension.Id}";
-                }
+                // 明细表：投影基础字段与被指定的展示字段。
+                sql.Append("select ");
+                // 返回原有 FormData 契约：动态字段保留在 data 对象中，
+                // 避免把字段名改成 data_xxx 后破坏前端和公开查询调用方。
+                sql.Append("\"Id\" as \"id\", \"AppId\" as \"appId\", \"FormId\" as \"formId\", ");
+                sql.Append("null::text as \"dataTitle\", \"Data\" as \"data\", ");
+                sql.Append("\"CreateBy\" as \"createBy\", \"CreateTime\" as \"createTime\", ");
+                sql.Append("\"UpdateBy\" as \"updateBy\", \"UpdateTime\" as \"updateTime\", ");
+                sql.Append("\"FlowStatus\" as \"flowStatus\"");
+
+                sql.Append(" from \"FormData\" where ").Append(where);
             }
 
-            foreach (var metric in metrics)
-            {
-                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun))
-                    continue;
-
-                projectDoc[$"{metric.Id}_{metric.AggFun}"] = $"${metric.Id}_{metric.AggFun}";
-            }
-
-            projectDoc["_id"] = 0;
-            return new BsonDocument("$project", projectDoc);
+            AppendOrderBy(sql, request.Sort, parameters, request);
+            AppendPaging(sql, request.Skip, request.Take);
+            return new SqlStatement(sql.ToString(), parameters);
         }
 
-        private static BsonDocument BuildDisplayFieldProjectStage(List<string> displayFields)
+        /// <summary>
+        /// 生成计数语句。
+        /// </summary>
+        public static SqlStatement BuildCount(AggCalcRequest request, DynamicFilter? extraFilter)
         {
-            var projectDoc = new BsonDocument
+            var parameters = new List<object?>();
+            var filter = request.Filter.And(extraFilter);
+            var where = BuildWhere(filter, parameters);
+            return new SqlStatement($"select count(*) from \"FormData\" where {where}", parameters);
+        }
+
+        /// <summary>
+        /// 生成 where 子句。企业隔离与软删除条件始终注入。
+        /// </summary>
+        /// <returns>where 子句正文（不含关键字）。</returns>
+        private static string BuildWhere(DynamicFilter? filter, List<object?> parameters)
+        {
+            filter = DynamicFilterRules.Normalize(filter);
+            DynamicFilterValidator.Validate(filter);
+            var clauses = new List<string>
             {
-                ["_id"] = 0,
-                [Fields.Id] = 1,
-                [Fields.AppId] = 1,
-                [Fields.FormId] = 1,
-                [Fields.DataTitle] = 1,
-                [Fields.CreateTime] = 1,
+                // corpId 由调用方通过 @corpId 绑定，作为企业维度的显式过滤条件。
+                "\"CorpId\" = @corpId",
+                "not \"DeleteFlag\"",
             };
 
-            foreach (var field in displayFields)
+            var business = BuildFilterBody(filter, parameters);
+            if (!string.IsNullOrEmpty(business))
             {
-                if (string.IsNullOrWhiteSpace(field)) continue;
-                var root = field.Split('.', 2)[0];
-                projectDoc[$"{Fields.Data}.{root}"] = 1;
+                clauses.Add(business);
             }
 
-            return new BsonDocument("$project", projectDoc);
+            return string.Join(" and ", clauses);
         }
 
-        private static BsonDocument BuildSortStage(List<SortItem> sort)
+        /// <summary>
+        /// 递归把动态过滤条件编译为 SQL 谓词。
+        /// </summary>
+        /// <returns>SQL 谓词；无法编译时退化为 true。</returns>
+        private static string BuildFilterBody(DynamicFilter? filter, List<object?> parameters)
         {
-            var sortDoc = new BsonDocument();
+            if (filter == null || filter.IsEmpty && !filter.IsGroup)
+            {
+                return string.Empty;
+            }
+
+            if (filter.IsGroup)
+            {
+                var children = (filter.Items ?? [])
+                    .Select(item => BuildFilterBody(item, parameters))
+                    .Where(x => !string.IsNullOrEmpty(x))
+                    .ToList();
+                if (children.Count == 0)
+                {
+                    return string.Empty;
+                }
+
+                var joined = string.Join(filter.Rel switch
+                {
+                    FilterRel.Or => " or ",
+                    _ => " and ",
+                }, children);
+                return string.Equals(filter.Rel, FilterRel.Not, StringComparison.OrdinalIgnoreCase)
+                    ? $"not ({joined})"
+                    : $"({joined})";
+            }
+
+            if (string.IsNullOrWhiteSpace(filter.Field))
+            {
+                return string.Empty;
+            }
+
+            var column = FieldExpression(filter.Field);
+            var op = filter.Op!;
+            var values = NormalizeValues(filter.Value);
+
+            string Add(object? value)
+            {
+                parameters.Add(value);
+                return $"@p{parameters.Count - 1}";
+            }
+
+            if (filter.Value is null)
+            {
+                return op switch
+                {
+                    FilterOp.Eq => $"{column} is null",
+                    FilterOp.Ne or FilterOp.Nin => $"{column} is not null",
+                    FilterOp.Empty => $"{column} is null",
+                    FilterOp.NotEmpty or FilterOp.Exists => $"{column} is not null",
+                    _ => throw new BadRequestException($"运算符 {op} 不接受空过滤值"),
+                };
+            }
+
+            switch (op)
+            {
+                case FilterOp.Eq:
+                    if (values.Count == 1 && IsDynamicField(filter.Field))
+                    {
+                        var jsonPath = $"{BuildJsonPath(filter.Field)} ? (@ == {JsonSerializer.Serialize(values[0])})";
+                        return $"\"Data\" @? {Add(jsonPath)}::jsonpath";
+                    }
+                    return values.Count == 1
+                        ? $"{column} = {Add(ToSqlText(values[0]))}"
+                        : $"{column} = any({Add(values.Select(ToSqlText).ToList())})";
+                case FilterOp.Ne:
+                    return values.Count == 1
+                        ? $"({column} is null or {column} <> {Add(ToSqlText(values[0]))})"
+                        : $"({column} is null or {column} <> all({Add(values.Select(ToSqlText).ToList())}))";
+                case FilterOp.Gt:
+                case FilterOp.Gte:
+                case FilterOp.Lt:
+                case FilterOp.Lte:
+                {
+                    if (values.Count == 0) return "false";
+                    var symbol = op switch
+                    {
+                        FilterOp.Gt => ">",
+                        FilterOp.Gte => ">=",
+                        FilterOp.Lt => "<",
+                        _ => "<=",
+                    };
+                    return $"{NumericExpression(filter.Field)} {symbol} {Add(values[0])}::numeric";
+                }
+                case FilterOp.Between:
+                {
+                    if (values.Count < 2) return "false";
+                    return $"{NumericExpression(filter.Field)} between {Add(values[0])}::numeric and {Add(values[1])}::numeric";
+                }
+                case FilterOp.In:
+                    if (IsDynamicField(filter.Field))
+                        return BuildJsonPathMatch(filter.Field, values, Add, negate: false);
+                    return values.Count == 0
+                        ? "false"
+                        : $"{column} = any({Add(values.Select(ToSqlText).ToList())})";
+                case FilterOp.AllIn:
+                    return values.Count == 0
+                        ? "false"
+                        : string.Join(" and ", values.Select(value => $"exists (select 1 from jsonb_array_elements_text({JsonArrayExpression(filter.Field)}) as elem where elem = {Add(ToSqlText(value))})"));
+                case FilterOp.Nin:
+                    if (IsDynamicField(filter.Field))
+                        return BuildJsonPathMatch(filter.Field, values, Add, negate: true);
+                    return values.Count == 0
+                        ? "true"
+                        : $"({column} is null or {column} <> all({Add(values.Select(ToSqlText).ToList())}))";
+                case FilterOp.Empty:
+                    return $"({column} is null or {column} = '')";
+                case FilterOp.NotEmpty:
+                    return $"({column} is not null and {column} <> '')";
+                case FilterOp.Exists:
+                    return $"{column} is not null";
+                case FilterOp.Text:
+                    return values.Count == 0 ? "false" : $"{column} ilike {Add($"%{values[0]}%")}";
+                default:
+                    throw new BadRequestException($"不支持的过滤运算符: {op}");
+            }
+        }
+
+        private static List<string> BuildMetricSelects(List<Metric>? metrics, List<object?> parameters)
+        {
+            var selects = new List<string>();
+            foreach (var metric in metrics ?? [])
+            {
+                if (string.IsNullOrEmpty(metric.Id) || string.IsNullOrEmpty(metric.AggFun)) continue;
+                var alias = $"{SanitizeAlias(metric.Id)}_{metric.AggFun.ToLowerInvariant()}";
+                var expression = metric.AggFun.ToLowerInvariant() switch
+                {
+                    "count" => "count(*)",
+                    "sum" => $"sum({NumericExpression(metric.Id)})",
+                    "avg" => $"avg({NumericExpression(metric.Id)})",
+                    "max" => $"max({NumericExpression(metric.Id)})",
+                    "min" => $"min({NumericExpression(metric.Id)})",
+                    _ => null,
+                };
+                if (expression == null) continue;
+                selects.Add($"{expression} as \"{alias}\"");
+            }
+
+            _ = parameters;
+            return selects;
+        }
+
+        private static List<string> BuildDimensionSelects(List<Dimension>? dimensions)
+        {
+            return (dimensions ?? [])
+                .Where(d => !string.IsNullOrEmpty(d.Id))
+                .Select(d => $"{FieldExpression(d.Id)} as \"{SanitizeAlias(d.Id)}\"")
+                .ToList();
+        }
+
+        private static void AppendOrderBy(StringBuilder sql, List<SortItem>? sort, List<object?> parameters, AggCalcRequest request)
+        {
+            if (sort is not { Count: > 0 })
+            {
+                return;
+            }
+
+            var parts = new List<string>();
             foreach (var rule in sort)
             {
                 if (string.IsNullOrEmpty(rule.Id)) continue;
-                sortDoc[rule.Id] = (int)rule.Dir;
+                var direction = rule.Dir < 0 ? "desc" : "asc";
+                var metricAlias = (request.Metrics ?? [])
+                    .Where(metric => !string.IsNullOrWhiteSpace(metric.Id) && !string.IsNullOrWhiteSpace(metric.AggFun))
+                    .Select(metric => $"{SanitizeAlias(metric.Id)}_{metric.AggFun.ToLowerInvariant()}")
+                    .FirstOrDefault(alias => string.Equals(alias, rule.Id, StringComparison.OrdinalIgnoreCase));
+                var dimensionAlias = (request.Dimensions ?? [])
+                    .Where(dimension => !string.IsNullOrWhiteSpace(dimension.Id))
+                    .Select(dimension => SanitizeAlias(dimension.Id))
+                    .FirstOrDefault(alias => string.Equals(alias, SanitizeAlias(rule.Id), StringComparison.OrdinalIgnoreCase));
+                var orderExpression = metricAlias is not null
+                    ? $"\"{metricAlias}\""
+                    : dimensionAlias is not null
+                        ? $"\"{dimensionAlias}\""
+                        : FieldExpression(rule.Id);
+                parts.Add($"{orderExpression} {direction} nulls last");
             }
-            return new BsonDocument("$sort", sortDoc);
+
+            if (parts.Count > 0)
+            {
+                sql.Append(" order by ").Append(string.Join(", ", parts));
+            }
+
+            _ = parameters;
         }
 
-        private static string GetFinalId(string field)
+        private static void AppendPaging(StringBuilder sql, int? skip, int? take)
         {
-            return Fields.IsSystemField(field) ? field : $"data.{field}";
+            if (take is > 0)
+            {
+                if (skip is > 0)
+                {
+                    sql.Append(" offset ").Append(skip.Value);
+                }
+
+                sql.Append(" limit ").Append(take.Value);
+            }
         }
+
+        /// <summary>
+        /// 把业务字段路径编译为 SQL 表达式。
+        /// 系统字段直取同名列；业务字段走 jsonb <c>"Data"</c>。
+        /// </summary>
+        /// <param name="field">字段路径，形如 <c>createTime</c> 或 <c>data.name</c>。</param>
+        private static string FieldExpression(string field)
+        {
+            var normalized = NormalizePath(field);
+            if (TryGetSystemColumn(normalized, out var systemColumn))
+            {
+                return $"\"{systemColumn}\"";
+            }
+
+            foreach (var systemRoot in new[] { Fields.CreateBy, Fields.UpdateBy })
+            {
+                var prefix = $"{systemRoot}.";
+                if (normalized.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    var nested = normalized[prefix.Length..].Split('.', StringSplitOptions.RemoveEmptyEntries);
+                    var systemExpression = $"\"{(systemRoot.Equals(Fields.CreateBy, StringComparison.OrdinalIgnoreCase) ? "CreateBy" : "UpdateBy")}\"";
+                    foreach (var segment in nested)
+                        systemExpression += $" ->> '{EscapeLiteral(segment)}'";
+                    return systemExpression;
+                }
+            }
+
+            if (string.Equals(normalized, Fields.DataTitle, StringComparison.OrdinalIgnoreCase))
+                return "null::text";
+
+            if (normalized.Contains('>'))
+            {
+                var path = BuildJsonPath(normalized);
+                return $"jsonb_path_query_first(\"Data\", '{EscapeLiteral(path)}') #>> '{{}}'";
+            }
+
+            var segments = normalized.Split('.', StringSplitOptions.RemoveEmptyEntries);
+            var expression = "\"Data\"";
+            for (var i = 0; i < segments.Length; i++)
+            {
+                var isLast = i == segments.Length - 1;
+                expression += isLast
+                    ? $" ->> '{EscapeLiteral(segments[i])}'"
+                    : $" -> '{EscapeLiteral(segments[i])}'";
+            }
+
+            return expression;
+        }
+
+        private static string JsonColumn(string field)
+        {
+            var segments = NormalizePath(field).Split('.', StringSplitOptions.RemoveEmptyEntries);
+            if (NormalizePath(field).Contains('>'))
+            {
+                return $"jsonb_path_query_array(\"Data\", '{EscapeLiteral(BuildJsonPath(NormalizePath(field)))}')";
+            }
+
+            var expression = "\"Data\"";
+            foreach (var segment in segments)
+            {
+                expression += $" -> '{EscapeLiteral(segment)}'";
+            }
+
+            return expression;
+        }
+
+        private static string NumericExpression(string field)
+        {
+            var expression = field.StartsWith("elem_", StringComparison.Ordinal)
+                ? field
+                : FieldExpression(field);
+            return $"case when {expression} ~ '^-?[0-9]+([.][0-9]+)?$' then {expression}::numeric end";
+        }
+
+        private static string JsonArrayExpression(string field)
+        {
+            var json = JsonColumn(field);
+            return $"case when jsonb_typeof({json}) = 'array' then {json} else '[]'::jsonb end";
+        }
+
+        private static string BuildJsonPathMatch(
+            string field,
+            IReadOnlyCollection<object?> values,
+            Func<object?, string> add,
+            bool negate)
+        {
+            if (values.Count == 0) return negate ? "true" : "false";
+            var predicate = string.Join(" || ", values.Select(value => $"@ == {JsonSerializer.Serialize(value)}"));
+            var exists = $"\"Data\" @? {add($"{BuildJsonPath(field)} ? ({predicate})")}::jsonpath";
+            return negate ? $"not ({exists})" : exists;
+        }
+
+        private static string NormalizePath(string field)
+        {
+            var normalized = field.Trim();
+            return normalized.StartsWith($"{Fields.Data}.", StringComparison.OrdinalIgnoreCase)
+                ? normalized[$"{Fields.Data}.".Length..]
+                : normalized;
+        }
+
+        private static bool TryGetSystemColumn(string field, out string column)
+        {
+            column = field.ToLowerInvariant() switch
+            {
+                Fields.Id => "Id",
+                Fields.BsonId => "Id",
+                Fields.AppId => "AppId",
+                Fields.FormId => "FormId",
+                Fields.CorpId => "CorpId",
+                Fields.CreateBy => "CreateBy",
+                Fields.CreateTime => "CreateTime",
+                Fields.UpdateBy => "UpdateBy",
+                Fields.UpdateTime => "UpdateTime",
+                Fields.DeleteFlag => "DeleteFlag",
+                Fields.FlowStatus => "FlowStatus",
+                _ => string.Empty,
+            };
+            return column.Length > 0;
+        }
+
+        private static bool IsDynamicField(string field)
+        {
+            var normalized = NormalizePath(field);
+            return !TryGetSystemColumn(normalized, out _) &&
+                !normalized.StartsWith($"{Fields.CreateBy}.", StringComparison.OrdinalIgnoreCase) &&
+                !normalized.StartsWith($"{Fields.UpdateBy}.", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(normalized, Fields.DataTitle, StringComparison.OrdinalIgnoreCase);
+        }
+
+        private static string BuildJsonPath(string field)
+        {
+            var builder = new StringBuilder("$");
+            var levels = NormalizePath(field).Split('>', StringSplitOptions.RemoveEmptyEntries);
+            for (var levelIndex = 0; levelIndex < levels.Length; levelIndex++)
+            {
+                if (levelIndex > 0) builder.Append("[*]");
+                foreach (var segment in levels[levelIndex].Split('.', StringSplitOptions.RemoveEmptyEntries))
+                {
+                    builder.Append(".\"")
+                        .Append(segment.Replace("\\", "\\\\").Replace("\"", "\\\""))
+                        .Append('"');
+                }
+            }
+            return builder.ToString();
+        }
+
+        private static List<object?> NormalizeValues(object? value)
+        {
+            return value switch
+            {
+                null => [],
+                string text => [text],
+                System.Text.Json.JsonElement json => JsonElementToValues(json),
+                System.Collections.IEnumerable sequence => sequence.Cast<object?>().ToList(),
+                _ => [value],
+            };
+        }
+
+        private static List<object?> JsonElementToValues(JsonElement element)
+        {
+            if (element.ValueKind == JsonValueKind.Array)
+            {
+                return element.EnumerateArray().Select(item => (object?)item.ToString()).ToList();
+            }
+
+            return [element.ToString()];
+        }
+
+        private static object? ToSqlText(object? value)
+        {
+            return value switch
+            {
+                null => null,
+                bool flag => flag ? "true" : "false",
+                DateTime dateTime => dateTime.ToUniversalTime().ToString("O"),
+                _ => value.ToString(),
+            };
+        }
+
+        private static string SanitizeAlias(string field)
+        {
+            var normalized = NormalizePath(field);
+            return normalized.Replace(".", "_").Replace(">", "_").Replace(" ", "_");
+        }
+
+        private static string EscapeLiteral(string value) => value.Replace("'", "''");
     }
 }

@@ -18,6 +18,9 @@ namespace EIMSNext.Async.Abstractions.Messaging
         /// </summary>
         public string EventFlowId { get; set; } = string.Empty;
 
+        /// <summary>本次定时触发的稳定执行 ID；消息重投必须沿用该值。</summary>
+        public string ExecutionId { get; set; } = string.Empty;
+
         /// <summary>
         /// 应用ID。
         /// </summary>

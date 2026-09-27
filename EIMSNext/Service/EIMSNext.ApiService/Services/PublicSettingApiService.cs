@@ -4,12 +4,18 @@ using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Component;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 公开设置的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class PublicSettingApiService(IResolver resolver) : ApiServiceBase<PublicSetting, PublicSettingViewModel, IPublicSettingService>(resolver)
 	{
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(PublicSetting entity)
         {
             Normalize(entity);
@@ -18,7 +24,10 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(PublicSetting entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(PublicSetting entity)
         {
             Normalize(entity);
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
@@ -26,7 +35,10 @@ namespace EIMSNext.ApiService
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var settings = CoreService.All()

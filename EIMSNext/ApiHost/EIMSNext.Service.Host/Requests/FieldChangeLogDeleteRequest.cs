@@ -7,3 +7,4 @@ namespace EIMSNext.Service.Host.Requests
         public bool ClearAll { get; set; }
     }
 }
+

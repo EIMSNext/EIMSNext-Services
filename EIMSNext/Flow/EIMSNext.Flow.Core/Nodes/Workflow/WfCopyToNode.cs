@@ -1,5 +1,4 @@
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -18,7 +17,7 @@ namespace EIMSNext.Flow.Core.Nodes
             var empIds = await PopulateEmpIds(dataContext, Metadata!.WfNodeSetting?.CopyToSetting?.Candidates);
 
             if (empIds.Any())
-                await AddCCLogs(context.Workflow, dataContext, Metadata!, empIds, null);
+                await AddCCLogs(context.Workflow, dataContext, Metadata!, empIds);
 
             return ExecutionResult.Next();
         }

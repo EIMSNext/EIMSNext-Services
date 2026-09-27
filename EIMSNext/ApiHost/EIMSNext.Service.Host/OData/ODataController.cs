@@ -1,4 +1,4 @@
-using EIMSNext.ApiHost.Extensions;
+﻿using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.Extensions;
 using EIMSNext.Cache;
@@ -17,9 +17,9 @@ using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Results;
 using Microsoft.AspNetCore.OData.Routing.Controllers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.OData.UriParser;
 
-using MongoDB.AspNetCore.OData;
 
 using System.Buffers;
 using System.IO.Pipelines;
@@ -38,7 +38,7 @@ namespace EIMSNext.Service.Host.OData
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public abstract class ReadOnlyODataController<S, T, V> : ODataController
         where S : class, IApiService<T, V>
-        where T : class, IMongoEntity
+        where T : class, IEntityKey
         where V : class, T, new()
     {
         protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
@@ -100,7 +100,8 @@ namespace EIMSNext.Service.Host.OData
         /// <returns></returns>
         [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [MongoEnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize)]
+        // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
+        [EnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize, MaxExpansionDepth = 1, MaxNodeCount = 200)]
         public virtual IActionResult Get(ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
@@ -156,7 +157,8 @@ namespace EIMSNext.Service.Host.OData
         /// <returns></returns>
         [HttpGet]
         [Permission(Operation = Operation.Read)]
-        [MongoEnableQuery]
+        // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
+        [EnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
         public virtual SingleResult Get([FromODataUri] string key, ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
@@ -248,7 +250,7 @@ namespace EIMSNext.Service.Host.OData
         where S : class, IApiService<T, V>
         where T : class, IEntity
         where V : class, T, new()
-        where R : class, IMongoEntity
+        where R : class, IEntityKey
     {
         /// <summary>
         /// 
@@ -449,7 +451,16 @@ namespace EIMSNext.Service.Host.OData
             {
                 if (batch?.Keys?.Count > 0)
                 {
-                    await ApiService.DeleteAsync(batch.Keys);
+                    // 仅删除落在当前租户数据权限范围内的主键，越权主键会被过滤掉
+                    var ownedKeys = await ApiService.All()
+                        .Where(v => batch.Keys.Contains(v.Id))
+                        .Select(v => v.Id)
+                        .ToListAsync<string>();
+                    if (ownedKeys.Count == 0)
+                    {
+                        return NotFound();
+                    }
+                    await ApiService.DeleteAsync(ownedKeys);
                 }
                 else
                 {
@@ -458,6 +469,12 @@ namespace EIMSNext.Service.Host.OData
             }
             else
             {
+                // 单条删除同样需校验归属，不存在或越权均视为 NotFound
+                T? entity = await ApiService.GetAsync(key);
+                if (entity == null)
+                {
+                    return NotFound();
+                }
                 await ApiService.DeleteAsync(key);
             }
             return NoContent();
@@ -556,3 +573,4 @@ namespace EIMSNext.Service.Host.OData
     //    protected bool RequestExtend => (Request.Query["extend"].FirstOrDefault() ?? "0") == "1";
     //}
 }
+

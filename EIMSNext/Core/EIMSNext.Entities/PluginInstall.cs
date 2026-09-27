@@ -1,5 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -21,8 +21,8 @@ namespace EIMSNext.Entities
         /// <summary>插件图标 URL（冗余字段）。</summary>
         public string Icon { get; set; } = string.Empty;
 
-        /// <summary>安装状态，对应 <see cref="PluginInstallStatus"/> 常量之一。</summary>
-        public string Status { get; set; } = string.Empty;
+        /// <summary>安装状态。</summary>
+        public PluginInstallStatus Status { get; set; } = PluginInstallStatus.Installed;
 
         /// <summary>运行时是否启用；与 <see cref="Status"/> 联合控制实际生效。</summary>
         public bool Enabled { get; set; }
@@ -56,14 +56,14 @@ namespace EIMSNext.Entities
     }
 
     /// <summary>
-    /// 插件安装状态常量。
+    /// 插件安装状态。
     /// </summary>
-    public static class PluginInstallStatus
+    public enum PluginInstallStatus
     {
         /// <summary>已安装（运行时是否生效还要看 <see cref="PluginInstall.Enabled"/>）。</summary>
-        public const string Installed = "Installed";
+        Installed = 0,
 
         /// <summary>已卸载（保留安装记录，但不参与运行时）。</summary>
-        public const string Uninstalled = "Uninstalled";
+        Uninstalled = 1,
     }
 }

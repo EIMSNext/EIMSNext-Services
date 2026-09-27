@@ -10,9 +10,11 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using EIMSNext.File.Host;
+using EIMSNext.Persistence.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigWebEnvironment();
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 
 // Add services to the container.
 builder.Host.UseAutofac<AutofacRegisterModule>();
@@ -45,7 +47,6 @@ builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSw
 builder.Services.AddSwaggerGen();
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
-builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 
 var app = builder.Build();
 
@@ -70,7 +71,7 @@ app.UseSerilogRequestLogging();
 app.UseRouting();
 app.UseAuthentication();
 app.UseAuthorization();
-app.UseMiddleware<FileAccessMiddleware>();
+//app.UseMiddleware<FileAccessMiddleware>();
 app.UseStaticFiles(new StaticFileOptions()
 {
     OnPrepareResponse = (e) =>
@@ -84,5 +85,6 @@ app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();
+
 
 

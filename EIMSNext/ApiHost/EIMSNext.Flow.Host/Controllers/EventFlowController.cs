@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
@@ -18,7 +16,6 @@ using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Mvc;
 
-using MongoDB.Driver;
 
 using WorkflowCore.Interface;
 
@@ -62,6 +59,12 @@ namespace EIMSNext.Flow.Host.Controllers
             if (request.EfCascade == CascadeMode.Never)
                 return ApiResult.Success(new { Id = "", Error = "" }).ToActionResult();
 
+            if (request.EventType.HasFlag(EventType.Approving)
+                || !string.IsNullOrWhiteSpace(request.NodeAction))
+            {
+                return BadRequest("外部 EventFlow 不允许触发工作流节点流转");
+            }
+
             FormData? formData = null;
             Wf_Definition? eventFlow = null;
 
@@ -99,7 +102,7 @@ namespace EIMSNext.Flow.Host.Controllers
                     CorpId = eventFlow.CorpId,
                     AppId = eventFlow.AppId,
                     FormId = eventFlow.SourceId ?? string.Empty,
-                    Data = new System.Dynamic.ExpandoObject()
+                    Data = new Dictionary<string, object?>()
                 };
             }
             else
@@ -117,8 +120,10 @@ namespace EIMSNext.Flow.Host.Controllers
                     ResolveStarter(request),
                     request.EfCascade,
                     request.EventIds)
+                .WithExecutionId(request.ExecutionId)
                 .WithEventFlowId(request.EventFlowId)
-                .WithNodeAction(request.NodeAction)
+                .WithNodeAction(null)
+                .WithWorkflowTransition(false)
                 .WithChangeFields(request.ChangeFields);
 
             var efExecResult = await _eventFlowRunner.RunAsync(runParamter);
@@ -203,6 +208,7 @@ namespace EIMSNext.Flow.Host.Controllers
     }
     public class EfRunRequest
     {
+        public string ExecutionId { get; set; } = string.Empty;
         public string EventFlowId { get; set; } = string.Empty;
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
@@ -214,3 +220,4 @@ namespace EIMSNext.Flow.Host.Controllers
         public List<string>? ChangeFields { get; set; }
     }
 }
+

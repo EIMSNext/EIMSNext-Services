@@ -1,11 +1,9 @@
-using EIMSNext.Async.Abstractions.Messaging;
+﻿using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Entities;
@@ -14,7 +12,6 @@ using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Logging;
 
-using MongoDB.Driver;
 
 using Quartz;
 
@@ -55,14 +52,14 @@ namespace EIMSNext.Async.Quartz.Jobs
                     if (definition == null || definition.Disabled
                         || definition.EventSource != EventSourceType.Schedule)
                     {
-                        await scheduleRepo.DeleteAsync(item.Id);
+                        await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                         continue;
                     }
 
                     var currentVersion = (definition.UpdateTime ?? 0) > 0 ? definition.UpdateTime!.Value : definition.CreateTime;
                     if (currentVersion != item.ScheduleVersion)
                     {
-                        await scheduleRepo.DeleteAsync(item.Id);
+                        await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                         continue;
                     }
 
@@ -71,7 +68,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                         var data = formDataRepo.Get(item.DataId);
                         if (data == null)
                         {
-                            await scheduleRepo.DeleteAsync(item.Id);
+                            await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                             continue;
                         }
                     }
@@ -83,6 +80,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                     {
                         CorpId = definition.CorpId??string.Empty,
                         EventFlowId = definition.Id,
+                        ExecutionId = $"schedule:{item.Id}:{item.TriggerTime}",
                         AppId = definition.AppId,
                         FormId = item.FormId,
                         DataId = item.DataId,
@@ -107,7 +105,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             var timeTrigger = triggerSetting?.TimeTrigger;
             if (timeTrigger == null)
             {
-                await scheduleRepo.DeleteAsync(item.Id);
+                await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                 return;
             }
 
@@ -119,7 +117,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             }
             else
             {
-                await scheduleRepo.DeleteAsync(item.Id);
+                await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
             }
         }
     }

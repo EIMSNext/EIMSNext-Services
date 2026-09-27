@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.1.0.0</Version>
+    <Version>2.0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Asp.Versioning.OData.ApiExplorer" />
@@ -16,6 +16,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.ApiService.Contracts\EIMSNext.ApiService.Contracts.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.RabbitMQ\EIMSNext.Async.RabbitMQ.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
@@ -26,3 +27,4 @@
     </AssemblyAttribute>
   </ItemGroup>
 </Project>
+

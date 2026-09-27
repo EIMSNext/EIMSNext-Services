@@ -13,5 +13,6 @@ namespace EIMSNext.Service.Contracts
 
     public interface IWorkbenchRecentVisitService : IService<WorkbenchRecentVisit>
     {
+        Task<int> TouchRecentVisitAsync(WorkbenchRecentVisit entity);
     }
 }

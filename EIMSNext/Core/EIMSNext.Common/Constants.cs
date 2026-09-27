@@ -1,20 +1,78 @@
 namespace EIMSNext.Common
 {
+    /// <summary>
+    /// 定义系统级公共常量。
+    /// </summary>
     public static class Constants
     {
+        /// <summary>
+        /// 默认金额格式。
+        /// </summary>
         public const string Defaut_MoneyFormat = "0.00";
+
+        /// <summary>
+        /// 默认日期格式。
+        /// </summary>
         public const string Defaut_DateFormat = "yyyy-MM-dd";
+
+        /// <summary>
+        /// 默认日期时间格式。
+        /// </summary>
         public const string Defaut_DateTimeFormat = "yyyy-MM-dd HH:mm:ss";
+
+        /// <summary>
+        /// 默认每页大小。
+        /// </summary>
         public const int DefaultPageSize = 20;
+
+        /// <summary>
+        /// 最大每页大小。
+        /// </summary>
         public const int MaxPageSize = 5000;
+
+        /// <summary>
+        /// 令牌默认有效期（秒）。
+        /// </summary>
         public const int DefaultTokenLifetime = 28800;
+
+        /// <summary>
+        /// 只读权限标识。
+        /// </summary>
         public const string Read = "read";
+
+        /// <summary>
+        /// 读写权限标识。
+        /// </summary>
         public const string ReadWrite = "readwrite";
+
+        /// <summary>
+        /// 用户权限缓存键前缀。
+        /// </summary>
         public const string PermissionCacheKey = "userp_";
+
+        /// <summary>
+        /// 系统保留的口令（永不使用）。
+        /// </summary>
         public const string NoPassword = "(!@#^&*$%) [,./';:>?<]";
+
+        /// <summary>
+        /// 获取或设置应用程序基目录。
+        /// </summary>
         public static string BaseDirectory = "";
+
+        /// <summary>
+        /// 获取或设置应用程序内容根路径。
+        /// </summary>
         public static string ContentRootPath = "";
+
+        /// <summary>
+        /// 获取或设置应用程序 Web 根路径。
+        /// </summary>
         public static string WebRootPath = "";
+
+        /// <summary>
+        /// 二维码存储路径。
+        /// </summary>
         public const string QRCodePath = "qrcode";
 
         /// <summary>
@@ -23,7 +81,14 @@ namespace EIMSNext.Common
         /// </summary>
         public static readonly Operation Operation_All = Operation.Read | Operation.Add | Operation.Edit | Operation.Delete | Operation.Import;
 
+        /// <summary>
+        /// 系统用户标识。
+        /// </summary>
         public const string System = "system";
+
+        /// <summary>
+        /// 主键字段名。
+        /// </summary>
         public const string Id = "Id";
 
         /// <summary>

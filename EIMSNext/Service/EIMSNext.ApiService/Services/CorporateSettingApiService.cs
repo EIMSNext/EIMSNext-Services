@@ -3,13 +3,19 @@ using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService;
 
+/// <summary>
+/// 企业设置的 API 服务。
+/// </summary>
+/// <param name="resolver">服务解析器。</param>
 public sealed class CorporateSettingApiService(IResolver resolver)
     : ApiServiceBase<CorporateSetting, CorporateSettingViewModel, ICorporateSettingService>(resolver)
 {
+    /// <summary>
+    /// 新增实体核心逻辑。
+    /// </summary>
     protected override async Task AddAsyncCore(CorporateSetting entity)
     {
         entity.CorpId = IdentityContext.CurrentCorpId;
@@ -21,7 +27,10 @@ public sealed class CorporateSettingApiService(IResolver resolver)
         await base.AddAsyncCore(entity);
     }
 
-    protected override async Task<ReplaceOneResult> ReplaceAsyncCore(CorporateSetting entity)
+    /// <summary>
+    /// 更新实体核心逻辑。
+    /// </summary>
+    protected override async Task<int> ReplaceAsyncCore(CorporateSetting entity)
     {
         var existing = await CoreService.GetAsync(entity.Id);
         if (existing == null || existing.DeleteFlag || existing.CorpId != IdentityContext.CurrentCorpId)
@@ -36,7 +45,10 @@ public sealed class CorporateSettingApiService(IResolver resolver)
         return await base.ReplaceAsyncCore(entity);
     }
 
-    protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+    /// <summary>
+    /// 删除实体核心逻辑。
+    /// </summary>
+    protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
     {
         var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
         var existing = CoreService.All()

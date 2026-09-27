@@ -31,7 +31,7 @@ namespace EIMSNext.Identity.Tests
         {
             var user = new User
             {
-                Crops = new List<UserCorp>
+                UserCorps = new List<UserCorp>
                 {
                     new() { CorpId = "old-corp" },
                     new() { CorpId = "new-corp", IsDefault = true }
@@ -44,7 +44,7 @@ namespace EIMSNext.Identity.Tests
         [TestMethod]
         public void ResolveCurrentCorpId_UsesTokenClaimWhenNoDefaultIsPersisted()
         {
-            var user = new User { Crops = new List<UserCorp> { new() { CorpId = "corp-a" } } };
+            var user = new User { UserCorps = new List<UserCorp> { new() { CorpId = "corp-a" } } };
 
             Assert.AreEqual("corp-b", IdentityContext.ResolveCurrentCorpId(user, "corp-b"));
         }

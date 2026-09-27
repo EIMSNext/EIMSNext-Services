@@ -7,3 +7,4 @@ namespace EIMSNext.Service.Host.Extensions
         public override string Title => "EIMSNext Service API";
     }
 }
+

@@ -1,6 +1,7 @@
 using System.Dynamic;
 
 using EIMSNext.Entities;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core
 {
@@ -20,18 +21,18 @@ namespace EIMSNext.Flow.Core
             ExecLogId = execLogId;
         }
 
-        public static WfApproveData FromExpando(ExpandoObject expando)
+        public static WfApproveData FromData(IDictionary<string, object?> data)
         {
             var ctx = new WfApproveData();
-            ctx.CorpId = expando.GetValue(WfConsts.WorkerCorpId, string.Empty);
-            ctx.UserId = expando.GetValue(WfConsts.WorkerUserId, string.Empty);
-            ctx.WorkerId = expando.GetValue(WfConsts.WorkerId, string.Empty);
-            ctx.WorkerCode = expando.GetValue(WfConsts.WorkerCode, string.Empty);
-            ctx.WorkerName = expando.GetValue(WfConsts.WorkerName, string.Empty);
-            ctx.Action = expando.GetValue(WfConsts.ApproveAction, ApproveAction.None);
-            ctx.Comment = expando.GetValue(WfConsts.ApproveComment, string.Empty);
-            ctx.Signature = expando.GetValue(WfConsts.ApproveSignature, string.Empty);
-            ctx.ExecLogId = expando.GetValue(WfConsts.ApproveLogId, string.Empty);
+            ctx.CorpId = data.GetValue(WfConsts.WorkerCorpId, string.Empty);
+            ctx.UserId = data.GetValue(WfConsts.WorkerUserId, string.Empty);
+            ctx.WorkerId = data.GetValue(WfConsts.WorkerId, string.Empty);
+            ctx.WorkerCode = data.GetValue(WfConsts.WorkerCode, string.Empty);
+            ctx.WorkerName = data.GetValue(WfConsts.WorkerName, string.Empty);
+            ctx.Action = data.GetValue(WfConsts.ApproveAction, ApproveAction.None);
+            ctx.Comment = data.GetValue(WfConsts.ApproveComment, string.Empty);
+            ctx.Signature = data.GetValue(WfConsts.ApproveSignature, string.Empty);
+            ctx.ExecLogId = data.GetValue(WfConsts.ApproveLogId, string.Empty);
 
             return ctx;
         }
@@ -46,6 +47,8 @@ namespace EIMSNext.Flow.Core
         public string Signature { get; private set; } = string.Empty;
         public string ExecLogId { get; private set; } = string.Empty;
 
+        // 写入口保持 ExpandoObject：经 SubmitActivitySuccess 进入 WorkflowCore 的
+        // ExecutionPointer.EventData（ActivityResult.Data），由持久化层 $type 契约还原。
         public ExpandoObject ToExpando()
         {
             var approveData = new ExpandoObject();

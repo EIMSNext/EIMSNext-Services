@@ -1,20 +1,25 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 公开表单链接访问守卫。
+    /// </summary>
     public sealed class PublicFormLinkGuard(IResolver resolver) : ApiServiceBase(resolver)
     {
         private const string WxOpenIdFieldPath = "data.wxopenid";
         private const string CreateByIpFieldPath = "createBy.id";
         private static readonly TimeSpan OneSubmitWindow = TimeSpan.FromDays(1);
 
+        /// <summary>
+        /// 校验是否可提交表单。
+        /// </summary>
         public void EnsureCanSubmit(PublicFormLinkSetting setting, FormData draft, string? wxOpenId, string ip, string? corpId, string? formId)
         {
             if (!setting.Enabled)
@@ -35,14 +40,18 @@ namespace EIMSNext.ApiService
             var (field, value) = ResolveDedupKey(setting, wxOpenId, ip, corpId, formId);
             var filter = BuildDupFilter(corpId, formId, field, value);
 
-            var collection = Resolver.Resolve<IFormDataService>().Collection;
-            var count = collection.CountDocuments(filter.ToFilterDefinition<FormData>(), new CountOptions { Limit = 1 });
-            if (count > 0)
+            var hasSubmitted = Resolver.Resolve<IFormDataService>()
+                .Find(filter)
+                .Any();
+            if (hasSubmitted)
             {
                 throw new PublicOneSubmitDuplicateException();
             }
         }
 
+        /// <summary>
+        /// 构建公开读取的过滤条件。
+        /// </summary>
         public DynamicFilter? BuildReadFilter(PublicFormLinkSetting setting, string? wxOpenId, string ip)
         {
             if (!setting.ViewOwnData && !setting.EditOwnData)
@@ -88,8 +97,14 @@ namespace EIMSNext.ApiService
         }
     }
 
+    /// <summary>
+    /// 公开表单重复提交异常。
+    /// </summary>
     public sealed class PublicOneSubmitDuplicateException : Exception
     {
+        /// <summary>
+        /// 初始化公开表单重复提交异常的新实例。
+        /// </summary>
         public PublicOneSubmitDuplicateException() : base("已提交过该表单") { }
     }
 }

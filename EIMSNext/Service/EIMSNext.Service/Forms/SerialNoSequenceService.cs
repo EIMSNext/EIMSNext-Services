@@ -1,11 +1,14 @@
-using HKH.Mef2.Integration;
+﻿using HKH.Mef2.Integration;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
+using EIMSNext.Persistence.PostgreSql;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using Npgsql;
 
 namespace EIMSNext.Service
 {
@@ -40,43 +43,35 @@ namespace EIMSNext.Service
 
         private int NextCorporateSerialNo(DateTime utcToday)
         {
-            var filter = Builders<SerialNoSequence>.Filter.Eq(x => x.SerialNoType, SerialNoType.Corporate);
-            var resetFilter = Builders<SerialNoSequence>.Filter.And(
-                filter,
-                Builders<SerialNoSequence>.Filter.Ne(x => x.CurrDate, utcToday));
-            var resetUpdate = Builders<SerialNoSequence>.Update
-                .Set(x => x.CurrDate, utcToday)
-                .Set(x => x.CurrId, 1);
+            // 当日首先生成时把计数器重置为 1，否则自增。
+            // 同一语句内完成「不存在则插入、存在则按条件重置或自增」，天然原子。
+            const string sql = """
+                insert into "SerialNoSequence" as s
+                    ("Id", "SerialNoType", "CorpId", "AppId", "FormId", "Key", "CurrDate", "CurrId",
+                     "CreateTime", "UpdateTime", "DeleteFlag")
+                values (@id, @serialNoType, @corpId, @appId, @formId, @key, @currDate, 1,
+                        @now, @now, false)
+                on conflict ("SerialNoType", "CorpId", "AppId", "FormId", "Key") do update
+                    set "CurrId" = case when s."CurrDate" is distinct from excluded."CurrDate" then 1
+                                        else s."CurrId" + 1 end,
+                        "CurrDate" = excluded."CurrDate",
+                        "UpdateTime" = excluded."UpdateTime"
+                returning "CurrId"
+                """;
 
-            if (FindOneAndUpdate(resetFilter, resetUpdate, false, null) != null)
+            var id = Repository.NewId();
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            return ExecuteScalarInt(sql, cmd =>
             {
-                return 1;
-            }
-
-            var update = Builders<SerialNoSequence>.Update
-                .SetOnInsert(x => x.Id, Repository.NewId())
-                .SetOnInsert(x => x.SerialNoType, SerialNoType.Corporate)
-                .SetOnInsert(x => x.CurrDate, utcToday)
-                .Inc(x => x.CurrId, 1);
-
-            for (var attempt = 0; attempt < 5; attempt++)
-            {
-                try
-                {
-                    var current = FindOneAndUpdate(filter, update, true, null);
-                    if (current != null) return current.CurrId ?? 1;
-                }
-                catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
-                {
-                    // Another request created the singleton; retry the atomic increment.
-                }
-                catch (MongoException ex) when (IsWriteConflict(ex) && attempt < 4)
-                {
-                    Thread.Sleep(10 * (attempt + 1));
-                }
-            }
-
-            throw new InvalidOperationException("企业编号生成冲突，请重试");
+                cmd.Parameters.AddWithValue("id", id);
+                cmd.Parameters.AddWithValue("serialNoType", (int)SerialNoType.Corporate);
+                cmd.Parameters.AddWithValue("corpId", string.Empty);
+                cmd.Parameters.AddWithValue("appId", string.Empty);
+                cmd.Parameters.AddWithValue("formId", string.Empty);
+                cmd.Parameters.AddWithValue("key", string.Empty);
+                cmd.Parameters.AddWithValue("currDate", utcToday);
+                cmd.Parameters.AddWithValue("now", now);
+            });
         }
 
         private static DateTime UtcDay()
@@ -90,67 +85,45 @@ namespace EIMSNext.Service
         /// </summary>
         private int NextFormSerialNoInternal(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle)
         {
-            var now = DateTime.UtcNow;
-            var anchor = GetCycleAnchor(now, cycle);
-            var filter = Builders<SerialNoSequence>.Filter.And(
-                Builders<SerialNoSequence>.Filter.Eq(x => x.SerialNoType, SerialNoType.Form),
-                Builders<SerialNoSequence>.Filter.Eq(x => x.CorpId, corpId),
-                Builders<SerialNoSequence>.Filter.Eq(x => x.AppId, appId),
-                Builders<SerialNoSequence>.Filter.Eq(x => x.FormId, formId),
-                Builders<SerialNoSequence>.Filter.Eq(x => x.Key, key));
-            // 序列计数是独立的原子计数器。不要加入提交事务，否则并发提交同一表单
-            // 会在同一序列文档上产生 Mongo WriteConflict；业务事务回滚时允许出现号段间隙。
-            IClientSessionHandle? session = null;
+            var anchor = GetCycleAnchor(DateTime.UtcNow, cycle);
 
-            if (cycle != SerialNoResetCycle.Never)
-            {
-                var resetFilter = Builders<SerialNoSequence>.Filter.And(
-                    filter,
-                    Builders<SerialNoSequence>.Filter.Ne(x => x.CurrDate, anchor));
-                var resetUpdate = Builders<SerialNoSequence>.Update
-                    .Set(x => x.CurrDate, anchor)
-                    .Set(x => x.CurrId, 1);
-                var resetResult = FindOneAndUpdate(resetFilter, resetUpdate, false, session);
+            // 序列计数使用当前 PostgreSQL DbContext 的连接和事务，
+            // 由 PostgreSqlCommandBuilder 绑定 CurrentTransaction，保证命令不会脱离业务事务。
+            const string sql = """
+                insert into "SerialNoSequence" as s
+                    ("Id", "SerialNoType", "CorpId", "AppId", "FormId", "Key", "CurrDate", "CurrId",
+                     "CreateTime", "UpdateTime", "DeleteFlag")
+                values (@id, @serialNoType, @corpId, @appId, @formId, @key, @currDate, 1,
+                        @now, @now, false)
+                on conflict ("SerialNoType", "CorpId", "AppId", "FormId", "Key") do update
+                    set "CurrId" = case when s."CurrDate" is distinct from excluded."CurrDate" then 1
+                                        else s."CurrId" + 1 end,
+                        "CurrDate" = excluded."CurrDate",
+                        "UpdateTime" = excluded."UpdateTime"
+                returning "CurrId"
+                """;
 
-                if (resetResult != null)
-                {
-                    return resetResult.CurrId ?? 1;
-                }
-            }
-
-            var update = Builders<SerialNoSequence>.Update
-                .SetOnInsert(x => x.Id, Repository.NewId())
-                .SetOnInsert(x => x.SerialNoType, SerialNoType.Form)
-                .SetOnInsert(x => x.CorpId, corpId)
-                .SetOnInsert(x => x.AppId, appId)
-                .SetOnInsert(x => x.FormId, formId)
-                .SetOnInsert(x => x.Key, key)
-                .SetOnInsert(x => x.CurrDate, anchor)
-                .Inc(x => x.CurrId, 1);
+            var id = Repository.NewId();
+            var now = DateTime.UtcNow.ToTimeStampMs();
             for (var attempt = 0; attempt < 5; attempt++)
             {
                 try
                 {
-                    var currentSerialNo = FindOneAndUpdate(filter, update, true, session);
-                    if (currentSerialNo != null)
+                    return ExecuteScalarInt(sql, cmd =>
                     {
-                        return currentSerialNo.CurrId ?? 1;
-                    }
+                        cmd.Parameters.AddWithValue("id", id);
+                        cmd.Parameters.AddWithValue("serialNoType", (int)SerialNoType.Form);
+                        cmd.Parameters.AddWithValue("corpId", corpId ?? string.Empty);
+                        cmd.Parameters.AddWithValue("appId", appId ?? string.Empty);
+                        cmd.Parameters.AddWithValue("formId", formId ?? string.Empty);
+                        cmd.Parameters.AddWithValue("key", key ?? string.Empty);
+                        cmd.Parameters.AddWithValue("currDate", anchor);
+                        cmd.Parameters.AddWithValue("now", now);
+                    });
                 }
-                catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+                catch (PostgresException ex) when (IsRetryable(ex) && attempt < 4)
                 {
-                    var currentSerialNo = FindOneAndUpdate(
-                        filter,
-                        Builders<SerialNoSequence>.Update.Inc(x => x.CurrId, 1),
-                        false,
-                        session);
-                    if (currentSerialNo != null)
-                    {
-                        return currentSerialNo.CurrId ?? 1;
-                    }
-                }
-                catch (MongoException ex) when (IsWriteConflict(ex) && attempt < 4)
-                {
+                    // 40001 序列化失败 / 40P01 死锁：短暂退避后重试。
                     Thread.Sleep(10 * (attempt + 1));
                 }
             }
@@ -158,29 +131,20 @@ namespace EIMSNext.Service
             throw new InvalidOperationException("流水号生成冲突，请重试");
         }
 
-        private static bool IsWriteConflict(MongoException exception)
+        /// <summary>
+        /// 在当前 DbContext 连接上执行返回单个整数的计数语句。
+        /// </summary>
+        private int ExecuteScalarInt(string sql, Action<NpgsqlCommand> bind)
         {
-            return exception.Message.Contains("WriteConflict", StringComparison.OrdinalIgnoreCase)
-                || exception.Message.Contains("Please retry your operation", StringComparison.OrdinalIgnoreCase)
-                || exception is MongoCommandException command && command.Code == 112
-                || exception is MongoWriteException write && write.WriteError?.Code == 112;
+            using var command = PostgreSqlCommandBuilder.Create(Repository.DbContext, sql);
+            bind(command);
+            var result = command.ExecuteScalar();
+            return result is null or DBNull ? 0 : Convert.ToInt32(result);
         }
 
-        private SerialNoSequence? FindOneAndUpdate(
-            FilterDefinition<SerialNoSequence> filter,
-            UpdateDefinition<SerialNoSequence> update,
-            bool isUpsert,
-            IClientSessionHandle? session)
+        private static bool IsRetryable(PostgresException exception)
         {
-            var options = new FindOneAndUpdateOptions<SerialNoSequence>
-            {
-                IsUpsert = isUpsert,
-                ReturnDocument = ReturnDocument.After
-            };
-
-            return session == null
-                ? Repository.Collection.FindOneAndUpdate(filter, update, options)
-                : Repository.Collection.FindOneAndUpdate(session, filter, update, options);
+            return exception.SqlState is "40001" or "40P01";
         }
 
         /// <summary>

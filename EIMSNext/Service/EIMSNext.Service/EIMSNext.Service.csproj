@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.1.0.0</Version>
+    <Version>2.0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" />
@@ -13,6 +13,7 @@
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.PostgreSql\EIMSNext.Persistence.PostgreSql.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Storage\EIMSNext.Storage.csproj" />
     <ProjectReference Include="..\EIMSNext.Component\EIMSNext.Component.csproj" />
@@ -22,3 +23,4 @@
     <InternalsVisibleTo Include="EIMSNext.Service.Tests" />
   </ItemGroup>
 </Project>
+

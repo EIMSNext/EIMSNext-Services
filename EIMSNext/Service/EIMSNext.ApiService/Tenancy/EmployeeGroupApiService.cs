@@ -1,23 +1,27 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 员工组的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class EmployeeGroupApiService(IResolver resolver) : ApiServiceBase<EmployeeGroup, EmployeeGroupViewModel, IEmployeeGroupService>(resolver)
     {
+        /// <summary>
+        /// 新增EmployeesToEmployeeGroup。
+        /// </summary>
         public async Task AddEmployeesToEmployeeGroup(AddEmployeesToEmployeeGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployeeGroupMembers(request.EmployeeGroupId!, request.EmpIds ?? []);
@@ -29,6 +33,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 移除EmployeesFromEmployeeGroup。
+        /// </summary>
         public async Task RemoveEmployeesFromEmployeeGroup(RemoveEmployeesFromEmployeeGroupRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageEmployeeGroupMembers(request.EmployeeGroupId!, request.EmpIds ?? []);
@@ -36,6 +43,9 @@ namespace EIMSNext.ApiService
             await empService.RemoveFromEmployeeGroupAsync(request.EmployeeGroupId!, request.EmpIds!);
         }
 
+        /// <summary>
+        /// 移动节点。
+        /// </summary>
         public async Task<bool> Move(MoveEmployeeGroupTreeNodeRequest request)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组结构的权限");
@@ -134,6 +144,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(EmployeeGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有创建员工组的权限");
@@ -141,21 +154,28 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroup entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(EmployeeGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组的权限");
             EnsureEmployeeGroupCategoryBelongsToCurrentCorp(entity.EmployeeGroupCategoryId);
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组的权限");
 
             var employeeGroupIds = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            var referenced = Resolver.GetRepository<Employee>().Queryable
+            // 引用检查看关系表 EmployeeGroupMember。
+            var referenced = Resolver.GetRepository<EmployeeGroupMember>().Queryable
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
-                .Any(x => x.EmployeeGroups.Any(r => employeeGroupIds.Contains(r.EmployeeGroupId)));
+                .Any(x => employeeGroupIds.Contains(x.EmployeeGroupId));
             if (referenced)
             {
                 throw new BadRequestException("该员工组有员工使用，不能删除");

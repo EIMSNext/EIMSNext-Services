@@ -1,9 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using HKH.Mef2.Integration;
 using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.ApiService.ViewModels;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -14,13 +14,19 @@ namespace EIMSNext.ApiService
     public class ClientGrantApiService(IResolver resolver)
         : ApiServiceBase<ClientGrant, ClientGrantViewModel, IClientGrantService>(resolver), IClientGrantApiService
     {
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(ClientGrant entity)
         {
             ValidateGrant(entity);
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(ClientGrant entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(ClientGrant entity)
         {
             ValidateGrant(entity);
             return base.ReplaceAsyncCore(entity);

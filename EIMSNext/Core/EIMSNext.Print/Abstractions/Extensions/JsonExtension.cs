@@ -17,16 +17,16 @@ namespace EIMSNext.Print.Extensions
         {
             var result = new List<JsonObject>();
             var options = new JsonSerializerOptions();
-            options.Converters.Add(new ExpandoObjectJsonConverter());
+            options.Converters.Add(new DictionaryJsonConverter());
 
             foreach (var obj in datas)
             {
-                var expandoObj = obj.SerializeToJson(options).DeserializeFromJson<ExpandoObject>(options)!;
-                var lowerExpandoObj = ConvertKeysToLowerCase(expandoObj);
+                var dict = obj.SerializeToJson(options).DeserializeFromJson<Dictionary<string, object?>>(options)!;
+                var lowerDict = ConvertKeysToLowerCase(dict);
 
-                var str = JsonSerializer.Serialize(lowerExpandoObj, options);
-                Logger.Information("格式化后表单数据。Data={Data}", lowerExpandoObj);
+                Logger.Information("格式化后表单数据。Data={Data}", lowerDict);
 
+                var str = JsonSerializer.Serialize(lowerDict, options);
                 var jObj = JsonSerializer.Deserialize<JsonNode>(str);
                 if (jObj != null)
                     result.Add(jObj.AsObject());
@@ -35,43 +35,42 @@ namespace EIMSNext.Print.Extensions
             return result;
         }
 
-        private static ExpandoObject ConvertKeysToLowerCase(ExpandoObject expando)
+        private static Dictionary<string, object?> ConvertKeysToLowerCase(Dictionary<string, object?> dict)
         {
-            var result = new ExpandoObject();
-            var resultDict = (IDictionary<string, object?>)result;
+            var result = new Dictionary<string, object?>();
 
-            foreach (var kvp in expando)
+            foreach (var kvp in dict)
             {
                 var lowerKey = kvp.Key.ToLower();
                 var value = kvp.Value;
 
-                if (value is ExpandoObject childExpando)
+                if (value is Dictionary<string, object?> childDict)
                 {
-                    resultDict[lowerKey] = ConvertKeysToLowerCase(childExpando);
+                    result[lowerKey] = ConvertKeysToLowerCase(childDict);
                 }
                 else if (value is string)
                 {
-                    resultDict[lowerKey] = value;
+                    result[lowerKey] = value;
                 }
                 else if (value is IEnumerable list)
                 {
-                    var newList = new List<object>();
+                    var newList = new List<object?>();
                     foreach (var item in list)
                     {
-                        if (item is ExpandoObject itemExpando)
+                        if (item is Dictionary<string, object?> itemDict)
                         {
-                            newList.Add(ConvertKeysToLowerCase(itemExpando));
+                            newList.Add(ConvertKeysToLowerCase(itemDict));
                         }
                         else
                         {
                             newList.Add(item);
                         }
                     }
-                    resultDict[lowerKey] = newList;
-                }               
+                    result[lowerKey] = newList;
+                }
                 else
                 {
-                    resultDict[lowerKey] = value;
+                    result[lowerKey] = value;
                 }
             }
 

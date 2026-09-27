@@ -1,3 +1,4 @@
+﻿using System.Linq.Expressions;
 using System.Dynamic;
 using System.Globalization;
 using System.Text;
@@ -7,21 +8,18 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common;
 using EIMSNext.Cache;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
+using Microsoft.EntityFrameworkCore;
 using HKH.Common;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Driver;
 
 namespace EIMSNext.Service
 {
@@ -37,7 +35,7 @@ namespace EIMSNext.Service
             _attachmentReferenceService = new AttachmentReferenceService(resolver);
         }
 
-        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, FilterDefinition<FormData>? filter, UpdateDefinition<FormData>? update)
+        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, string? dataFilter = null, string? update = null)
         {
             var logList = new List<AuditLog>();
             var now = DateTime.UtcNow.ToTimeStampMs();
@@ -51,8 +49,8 @@ namespace EIMSNext.Service
                 {
                     Action = DbAction.Update,
                     EntityType = nameof(FormData),
-                    Detail = $"批量更新数据(无旧对象):{filter?.ToString()}",
-                    DataFilter = filter?.ToString(),
+                    Detail = $"批量更新数据(无旧对象):{dataFilter}",
+                    DataFilter = dataFilter,
                     CreateBy = op,
                     UpdateBy = op,
                     CreateTime = now,
@@ -135,13 +133,13 @@ namespace EIMSNext.Service
             };
         }
 
-        protected override Task BeforeAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        protected override Task BeforeAdd(IEnumerable<FormData> entities)
         {
             var formDef = GetFromStore<FormDef>(entities.First().FormId)!;
             EnsureAddScope(entities, formDef);
             foreach (var entity in entities)
             {
-                _attachmentReferenceService.Apply(entity, null, session);
+                _attachmentReferenceService.Apply(entity, null);
             }
             if (Context.Action == DataAction.Submit)
             {
@@ -153,7 +151,7 @@ namespace EIMSNext.Service
                 //非流程单据直接生效
                 entities.ForEach(entity => { entity.FlowStatus = FlowStatus.Approved; });
             }
-            return base.BeforeAdd(entities, session);
+            return base.BeforeAdd(entities);
         }
 
         private void EnsureAddScope(IEnumerable<FormData> entities, FormDef formDef)
@@ -184,31 +182,31 @@ namespace EIMSNext.Service
 
         public override async Task AddAsync(IEnumerable<FormData> entities)
         {
+            var action = Context.Action;
             await base.AddAsync(entities);
-            await SubmitAsync(entities, null, EIMSNext.Entities.CascadeMode.NotSet, null);
+            // Nested persistence/hooks can share the request context. Restore the original
+            // action before deciding whether the submitted data must start a workflow.
+            Context.Action = action;
+            await SubmitAsync(entities, EIMSNext.Entities.CascadeMode.NotSet, null);
         }
 
-        public void Add(IEnumerable<FormData> entities, IClientSessionHandle? session)
-        {
-            AddCore(entities, session);
-        }
-
-        protected override async Task AfterAdd(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        protected override async Task AfterAdd(IEnumerable<FormData> entities)
         {
             var outboxPublisher = Resolver.Resolve<IOutboxPublisher>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var entity = entities.First();
-            var webhookEventId = Guid.NewGuid().ToString("N");
+            var webhookEventId = TsidIdGenerator.NewId();
             var webhookPayload = (entity).SerializeToJson();
-            MongoTransactionScope.RegisterAfterCommit(() => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId));
+            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId));
 
             await EnqueueFormNotify(messagePublisher, entity, null, FormNotifyTriggerMode.DataAdded);
-            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
-            await base.AfterAdd(entities, session);
+            await RebuildTimeFieldNotifySchedulesAsync(entity);
+            await base.AfterAdd(entities);
         }
 
-        public override async Task<ReplaceOneResult> ReplaceAsync(FormData entity)
+        public override async Task<int> ReplaceAsync(FormData entity)
         {
+            var action = Context.Action;
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
             if (old == null && ShouldTriggerFormDataChangeEventFlow())
             {
@@ -228,7 +226,8 @@ namespace EIMSNext.Service
                     .ToList();
 
             var result = await base.ReplaceAsync(entity);
-            await SubmitAsync([entity], null, EIMSNext.Entities.CascadeMode.NotSet, null);
+            Context.Action = action;
+            await SubmitAsync([entity], EIMSNext.Entities.CascadeMode.NotSet, null);
 
             if (ShouldTriggerFormDataChangeEventFlow() && changeFields.Count > 0)
             {
@@ -238,21 +237,11 @@ namespace EIMSNext.Service
             return result;
         }
 
-        public ReplaceOneResult Replace(FormData entity, IClientSessionHandle? session)
+        protected override int DeleteCore(Expression<Func<FormData, bool>> filter)
         {
-            return ReplaceCore(entity, session);
-        }
+            BeforeDelete(filter).Wait();
 
-        public object Delete(IEnumerable<string> ids, IClientSessionHandle? session)
-        {
-            return DeleteCore(FilterBuilder.In(x => x.Id, ids), session);
-        }
-
-        protected override object DeleteCore(FilterDefinition<FormData> filter, IClientSessionHandle? session)
-        {
-            BeforeDelete(filter, session).Wait();
-
-            var targets = FindDeleteTargets(filter, session);
+            var targets = FindDeleteTargets(filter);
             EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
@@ -266,31 +255,31 @@ namespace EIMSNext.Service
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)));
 
-            var logicDeleted = DeleteFormDataByIds(logicIds, physical: false, session);
+            var logicDeleted = DeleteFormDataByIds(logicIds, physical: false);
             if (logicIds.Count > 0)
             {
-                CreateAuditLog(DbAction.Delete, null, null, FilterBuilder.In(x => x.Id, logicIds), null, session);
+                CreateAuditLog(DbAction.Delete, null, null, $"Id in [{string.Join(',', logicIds)}]");
             }
 
-            DeleteStronglyRelatedData(physicalIds, session);
-            var physicalDeleted = DeleteFormDataByIds(physicalIds, physical: true, session);
+            DeleteStronglyRelatedData(physicalIds);
+            var physicalDeleted = DeleteFormDataByIds(physicalIds, physical: true);
             if (physicalIds.Count > 0)
             {
                 DeleteWorkflowInstancesByDataIdsAsync(physicalIds).GetAwaiter().GetResult();
-                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)));
             }
-            AfterDelete(filter, session).Wait();
+            AfterDelete(filter).Wait();
 
-            return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+            return (int)(logicDeleted + physicalDeleted);
         }
 
-        protected override async Task<object> DeleteCoreAsync(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        protected override async Task<int> DeleteCoreAsync(Expression<Func<FormData, bool>> filter)
         {
-            await BeforeDelete(filter, session);
+            await BeforeDelete(filter);
 
-            var targets = await FindDeleteTargetsAsync(filter, session);
+            var targets = await FindDeleteTargetsAsync(filter);
             EnsureCanDeleteTargets(targets);
             var physicalIds = targets
                 .Where(x => x.FlowStatus == FlowStatus.Draft && !x.DeleteFlag)
@@ -304,24 +293,24 @@ namespace EIMSNext.Service
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
-            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+            _attachmentReferenceService.Release(targets.Where(x => physicalIdSet.Contains(x.Id)));
 
-            var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false, session);
+            var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false);
             if (logicIds.Count > 0)
             {
-                CreateAuditLog(DbAction.Delete, null, null, FilterBuilder.In(x => x.Id, logicIds), null, session);
+                CreateAuditLog(DbAction.Delete, null, null, $"Id in [{string.Join(',', logicIds)}]");
             }
 
-            await DeleteStronglyRelatedDataAsync(physicalIds, session);
-            var physicalDeleted = await DeleteFormDataByIdsAsync(physicalIds, physical: true, session);
+            await DeleteStronglyRelatedDataAsync(physicalIds);
+            var physicalDeleted = await DeleteFormDataByIdsAsync(physicalIds, physical: true);
             if (physicalIds.Count > 0)
             {
                 await DeleteWorkflowInstancesByDataIdsAsync(physicalIds);
-                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)), session);
+                CreatePhysicalDeleteAuditLog(targets.Where(x => physicalIdSet.Contains(x.Id)));
             }
-            await AfterDelete(filter, session);
+            await AfterDelete(filter);
 
-            return new { LogicDeleted = logicDeleted, PhysicalDeleted = physicalDeleted };
+            return (int)(logicDeleted + physicalDeleted);
         }
 
         private static void EnsureCanDeleteTargets(IEnumerable<FormData> targets)
@@ -332,12 +321,12 @@ namespace EIMSNext.Service
             }
         }
 
-        public override Task<object> DeleteAsync(string id)
+        public override Task<int> DeleteAsync(string id)
         {
             return DeleteAsync([id]);
         }
 
-        public override async Task<object> DeleteAsync(IEnumerable<string> ids)
+        public override async Task<int> DeleteAsync(IEnumerable<string> ids)
         {
             var idList = ids
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -365,13 +354,12 @@ namespace EIMSNext.Service
                 .ToList();
             if (idList.Count == 0) return;
 
-            using var scope = NewTransactionScope();
-            var filter = FilterBuilder.And(
-                FilterBuilder.In(x => x.Id, idList),
-                FilterBuilder.Eq(x => x.DeleteFlag, true));
-            var update = UpdateBuilder.Set(x => x.DeleteFlag, false);
-            await PatchManyCoreAsync(filter, update, false, scope.SessionHandle);
-            scope.CommitTransaction();
+            await ExecuteWithTransactionRetryAsync(async () =>
+            {
+                await PatchManyCoreAsync(
+                    x => idList.Contains(x.Id) && x.DeleteFlag,
+                    setters => setters.SetProperty(x => x.DeleteFlag, false)).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
         public async Task PurgeAsync(IEnumerable<string> ids)
@@ -382,15 +370,16 @@ namespace EIMSNext.Service
                 .ToList();
             if (idList.Count == 0) return;
 
-            using var scope = NewTransactionScope();
-            await PurgeCoreAsync(idList, scope.SessionHandle);
-            scope.CommitTransaction();
+            await ExecuteWithTransactionRetryAsync(async () =>
+            {
+                await PurgeCoreAsync(idList).ConfigureAwait(false);
+            }).ConfigureAwait(false);
         }
 
-        public override async Task<object> DeleteAsync(DynamicFilter filter)
+        public override async Task<int> DeleteAsync(DynamicFilter filter)
         {
             var deleting = ShouldTriggerFormDataChangeEventFlow()
-                ? Repository.Collection.Find(filter.ToFilterDefinition<FormData>()).ToList()
+                ? Repository.FindList(filter)
                 : [];
 
             var result = await base.DeleteAsync(filter);
@@ -403,14 +392,17 @@ namespace EIMSNext.Service
             return result;
         }
 
-        protected virtual async Task PurgeCoreAsync(IReadOnlyCollection<string> ids, IClientSessionHandle? session)
+        protected virtual async Task PurgeCoreAsync(IReadOnlyCollection<string> ids)
         {
             if (ids.Count == 0) return;
 
-            var filter = FilterBuilder.And(
-                FilterBuilder.In(x => x.Id, ids),
-                FilterBuilder.Eq(x => x.DeleteFlag, true));
-            var targets = await FindDeleteTargetsAsync(filter, session);
+            // 物理清理必须能看见已逻辑删除的行，因此显式忽略软删除全局过滤。
+            var idList = ids.ToList();
+            var targets = await Repository.Queryable
+                .IgnoreQueryFilters()
+                .Where(x => idList.Contains(x.Id) && x.DeleteFlag)
+                .ToListAsync()
+                .ConfigureAwait(false);
             var dataIds = targets
                 .Select(x => x.Id)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -418,28 +410,24 @@ namespace EIMSNext.Service
                 .ToList();
             if (dataIds.Count == 0) return;
 
-            _attachmentReferenceService.Release(targets, session);
+            _attachmentReferenceService.Release(targets);
 
-            await DeleteStronglyRelatedDataAsync(dataIds, session);
-            await DeleteFormDataByIdsAsync(dataIds, physical: true, session);
+            await DeleteStronglyRelatedDataAsync(dataIds);
+            await DeleteFormDataByIdsAsync(dataIds, physical: true);
             await DeleteWorkflowInstancesByDataIdsAsync(dataIds);
         }
 
-        protected virtual IReadOnlyList<FormData> FindDeleteTargets(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        protected virtual IReadOnlyList<FormData> FindDeleteTargets(Expression<Func<FormData, bool>> filter)
         {
-            return session == null
-                ? Repository.Collection.Find(filter).ToList()
-                : Repository.Collection.Find(session, filter).ToList();
+            return Repository.FindAsync(filter).GetAwaiter().GetResult();
         }
 
-        protected virtual async Task<IReadOnlyList<FormData>> FindDeleteTargetsAsync(FilterDefinition<FormData> filter, IClientSessionHandle? session)
+        protected virtual Task<IReadOnlyList<FormData>> FindDeleteTargetsAsync(Expression<Func<FormData, bool>> filter)
         {
-            return session == null
-                ? await Repository.Collection.Find(filter).ToListAsync()
-                : await Repository.Collection.Find(session, filter).ToListAsync();
+            return Repository.FindAsync(filter).ContinueWith(t => (IReadOnlyList<FormData>)t.Result);
         }
 
-        private void CreatePhysicalDeleteAuditLog(IEnumerable<FormData> entities, IClientSessionHandle? session)
+        private void CreatePhysicalDeleteAuditLog(IEnumerable<FormData> entities)
         {
             if (!LogAudit) return;
 
@@ -465,35 +453,25 @@ namespace EIMSNext.Service
                 CorpId = string.IsNullOrWhiteSpace(x.CorpId) ? corpId : x.CorpId,
             }).ToList();
 
-            Resolver.GetRepository<AuditLog>().Insert(logs, session);
+            Resolver.GetRepository<AuditLog>().InsertAsync(logs).GetAwaiter().GetResult();
         }
 
-        protected virtual long DeleteFormDataByIds(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+        protected virtual long DeleteFormDataByIds(IReadOnlyCollection<string> ids, bool physical)
         {
             if (ids.Count == 0) return 0;
 
-            if (physical)
-            {
-                return Repository.Delete(ids, session).DeletedCount;
-            }
-
-            var filter = FilterBuilder.In(x => x.Id, ids);
-            var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
-            return Repository.UpdateMany(filter, update, session: session).ModifiedCount;
+            return physical
+                ? Repository.DeleteManyAsync(x => ids.Contains(x.Id)).GetAwaiter().GetResult()
+                : Repository.SoftDeleteManyAsync(ids).GetAwaiter().GetResult();
         }
 
-        protected virtual async Task<long> DeleteFormDataByIdsAsync(IReadOnlyCollection<string> ids, bool physical, IClientSessionHandle? session)
+        protected virtual async Task<long> DeleteFormDataByIdsAsync(IReadOnlyCollection<string> ids, bool physical)
         {
             if (ids.Count == 0) return 0;
 
-            if (physical)
-            {
-                return (await Repository.DeleteAsync(ids, session)).DeletedCount;
-            }
-
-            var filter = FilterBuilder.In(x => x.Id, ids);
-            var update = UpdateBuilder.Set(Fields.DeleteFlag, true);
-            return (await Repository.UpdateManyAsync(filter, update, session: session)).ModifiedCount;
+            return physical
+                ? await Repository.DeleteManyAsync(x => ids.Contains(x.Id)).ConfigureAwait(false)
+                : await Repository.SoftDeleteManyAsync(ids).ConfigureAwait(false);
         }
 
         protected virtual Task<WfResponse?> DeleteWorkflowInstancesByDataIdsAsync(IReadOnlyCollection<string> dataIds)
@@ -503,60 +481,57 @@ namespace EIMSNext.Service
                 : _flowClient.DeleteWorkflowInstances(new DeleteWorkflowInstancesRequest { DataIds = dataIds }, Context.AccessToken);
         }
 
-        protected virtual void DeleteStronglyRelatedData(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+        protected virtual void DeleteStronglyRelatedData(IReadOnlyCollection<string> dataIds)
         {
             if (dataIds.Count == 0) return;
 
-            var taskRepo = Resolver.GetRepository<Wf_Task>();
-            taskRepo.Delete(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
-
-            var eventFlowScheduleRepo = Resolver.GetRepository<EventFlowScheduleItem>();
-            eventFlowScheduleRepo.Delete(eventFlowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
-
-            var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
-            notifyScheduleRepo.Delete(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            Resolver.GetRepository<Wf_Task>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).GetAwaiter().GetResult();
+            Resolver.GetRepository<EventFlowScheduleItem>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).GetAwaiter().GetResult();
+            Resolver.GetRepository<FormNotifyScheduleItem>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).GetAwaiter().GetResult();
         }
 
-        protected virtual async Task DeleteStronglyRelatedDataAsync(IReadOnlyCollection<string> dataIds, IClientSessionHandle? session)
+        protected virtual async Task DeleteStronglyRelatedDataAsync(IReadOnlyCollection<string> dataIds)
         {
             if (dataIds.Count == 0) return;
 
-            var taskRepo = Resolver.GetRepository<Wf_Task>();
-            await taskRepo.DeleteAsync(taskRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
-
-            var eventFlowScheduleRepo = Resolver.GetRepository<EventFlowScheduleItem>();
-            await eventFlowScheduleRepo.DeleteAsync(eventFlowScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
-
-            var notifyScheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
-            await notifyScheduleRepo.DeleteAsync(notifyScheduleRepo.FilterBuilder.In(x => x.DataId, dataIds), session);
+            await Resolver.GetRepository<Wf_Task>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).ConfigureAwait(false);
+            await Resolver.GetRepository<EventFlowScheduleItem>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).ConfigureAwait(false);
+            await Resolver.GetRepository<FormNotifyScheduleItem>()
+                .DeleteManyAsync(x => dataIds.Contains(x.DataId)).ConfigureAwait(false);
         }
 
-        protected override async Task AfterReplace(FormData entity, IClientSessionHandle? session)
+        protected override async Task AfterReplace(FormData entity)
         {
             var outboxPublisher = Resolver.Resolve<IOutboxPublisher>();
             var messagePublisher = Resolver.Resolve<IMessagePublisher>();
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old);
-            var oriValue = new ExpandoObject();
+            var oriValue = new Dictionary<string, object?>();
             IList<ExpandoChangeLog> changeLogs = [];
             if (old != null)
             {
                 changeLogs = ExpandoComparer.Compare(old.Data, entity.Data);
                 changeLogs.ForEach(x => oriValue.TryAdd(x.FieldId, x.OriValue));
-                CreateFormDataChangeLog(entity, changeLogs, session);
+                CreateFormDataChangeLog(entity, changeLogs);
             }
 
-            var formExp = entity.SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
+            var formExp = entity.SerializeToJson().DeserializeFromJson<Dictionary<string, object?>>()
+                ?? new Dictionary<string, object?>();
             formExp.TryAdd("oridata", oriValue);
-            var webhookEventId = Guid.NewGuid().ToString("N");
-            MongoTransactionScope.RegisterAfterCommit(() => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId));
+            var webhookEventId = TsidIdGenerator.NewId();
+            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId));
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);
-            await RebuildTimeFieldNotifySchedulesAsync(entity, session);
+            await RebuildTimeFieldNotifySchedulesAsync(entity);
 
-            await base.AfterReplace(entity, session);
+            await base.AfterReplace(entity);
         }
 
-        private void CreateFormDataChangeLog(FormData entity, IList<ExpandoChangeLog> changeLogs, IClientSessionHandle? session)
+        private void CreateFormDataChangeLog(FormData entity, IList<ExpandoChangeLog> changeLogs)
         {
             if (changeLogs.Count == 0) return;
 
@@ -579,22 +554,22 @@ namespace EIMSNext.Service
                 CreateTime = now,
                 UpdateBy = Context.Operator,
                 UpdateTime = now
-            }, session);
+            });
         }
 
-        protected override Task BeforeReplace(FormData entity, IClientSessionHandle? session)
+        protected override Task BeforeReplace(FormData entity)
         {
             var old = ScopeCache.Get<FormData>(entity.Id, DataVersion.Old) ?? GetFromStore<FormData>(entity.Id, DataVersion.Old);
             var formDef = GetFromStore<FormDef>(entity.FormId)!;
             EnsureCanEdit(entity, formDef);
-            _attachmentReferenceService.Apply(entity, old, session);
+            _attachmentReferenceService.Apply(entity, old);
             if (Context.Action == DataAction.Submit)
             {
                 ValidateRequiredFields(entity, formDef);
                 ResolveSerialNumbers(entity, formDef, old);
             }
 
-            return base.BeforeReplace(entity, session);
+            return base.BeforeReplace(entity);
         }
 
         protected static void EnsureCanEdit(FormData entity, FormDef formDef)
@@ -610,7 +585,7 @@ namespace EIMSNext.Service
             }
         }
 
-        public async Task SubmitAsync(IEnumerable<FormData> entities, IClientSessionHandle? session, EIMSNext.Entities.CascadeMode cascade, string? eventIds)
+        public async Task SubmitAsync(IEnumerable<FormData> entities, EIMSNext.Entities.CascadeMode cascade, string? eventIds)
         {
             var entity = entities.First();
 
@@ -620,14 +595,39 @@ namespace EIMSNext.Service
 
                 if (formDef.UsingWorkflow)
                 {
-                    var wfDef = Resolver.GetRepository<Wf_Definition>().Find(x => x.ExternalId == entity.FormId).FirstOrDefault();
-                    if (wfDef != null)
+                    var wfDef = FindCurrentWorkflowDefinition(entity.FormId);
+                    if (wfDef == null)
                     {
-                        var wfResp = await _flowClient.Start(new StartRequest { WfDefinitionId = entity.FormId, DataId = entity.Id }, Context.AccessToken);
-                        if (wfResp != null && !string.IsNullOrEmpty(wfResp.Error))
+                        // A workflow form without an enabled workflow behaves like a normal form.
+                        entity.FlowStatus = FlowStatus.Approved;
+                        await Resolver.GetRepository<FormData>().UpdateAsync(
+                            entity.Id,
+                            setters => setters.SetProperty(x => x.FlowStatus, FlowStatus.Approved));
+                        return;
+                    }
+
+                    WfResponse? wfResp;
+                    try
+                    {
+                        wfResp = await _flowClient.Start(new StartRequest
                         {
-                            throw new UnLogException(wfResp.Error);
-                        }
+                            WfDefinitionId = wfDef.ExternalId,
+                            Version = wfDef.Version,
+                            DataId = entity.Id,
+                        }, Context.AccessToken);
+                    }
+                    catch (Exception ex)
+                    {
+                        throw new UnLogException($"流程服务调用失败: {ex.Message}", ex);
+                    }
+
+                    if (wfResp == null)
+                    {
+                        throw new UnLogException("流程服务未返回启动结果");
+                    }
+                    if (!string.IsNullOrEmpty(wfResp.Error))
+                    {
+                        throw new UnLogException($"流程启动失败: {wfResp.Error}");
                     }
                 }
                 else
@@ -635,6 +635,17 @@ namespace EIMSNext.Service
                     await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
                 }
             }
+        }
+
+        private Wf_Definition? FindCurrentWorkflowDefinition(string formId)
+        {
+            return Resolver.GetRepository<Wf_Definition>()
+                .Find(x => x.ExternalId == formId
+                    && x.FlowType == FlowType.Workflow
+                    && x.IsCurrent
+                    && !x.Disabled
+                    && !x.DeleteFlag)
+                .FirstOrDefault();
         }
 
         private bool ShouldTriggerFormDataChangeEventFlow()
@@ -656,6 +667,7 @@ namespace EIMSNext.Service
 
             var efResp = await _flowClient.RunEventFlow(new EfRunRequest
             {
+                ExecutionId = $"form:{entity.Id}:{eventType}:{entity.UpdateTime ?? entity.CreateTime}:{eventIds ?? string.Empty}",
                 DataId = entity.Id,
                 EventSource = ApiClient.Flow.EventSourceType.Form,
                 EventType = eventType,
@@ -681,7 +693,7 @@ namespace EIMSNext.Service
         private void ResolveSerialNumbers(FormData entity, FormDef formDef, FormData? oldEntity)
         {
             if (formDef?.Content == null) return;
-            entity.Data ??= new ExpandoObject();
+            entity.Data ??= new Dictionary<string, object?>();
             var layout = formDef.Content.Layout;
             if (string.IsNullOrWhiteSpace(layout)) return;
 
@@ -920,12 +932,12 @@ namespace EIMSNext.Service
             return new FilterOptionResult { Items = items };
         }
 
-        private static List<FilterOptionItem> ProcessDistinctValues(List<BsonValue> values, string? keyword, int limit)
+        private static List<FilterOptionItem> ProcessDistinctValues(IReadOnlyList<object?> values, string? keyword, int limit)
         {
             var items = new List<FilterOptionItem>();
             foreach (var value in values)
             {
-                if (value == null || value.IsBsonNull) continue;
+                if (value is null) continue;
 
                 foreach (var option in ExpandOptionValues(value))
                 {
@@ -945,48 +957,95 @@ namespace EIMSNext.Service
             return items;
         }
 
-        private static IEnumerable<FilterOptionItem> ExpandOptionValues(BsonValue value)
+        /// <summary>
+        /// 展开选项值。PostgreSQL 下 <c>Data</c> 是 jsonb，读回来是
+        /// <c>JsonElement</c> / <c>ExpandoObject</c> / 标量三类，这里统一处理。
+        /// </summary>
+        private static IEnumerable<FilterOptionItem> ExpandOptionValues(object? value)
         {
-            if (value.IsBsonArray)
+            // 直接落到方法末尾 value.ToString() 会抛 NRE。
+            if (value is null) yield break;
+
+            switch (value)
             {
-                foreach (var item in value.AsBsonArray)
+                case JsonElement json when json.ValueKind == JsonValueKind.Array:
+                    foreach (var item in json.EnumerateArray())
+                    {
+                        foreach (var option in ExpandOptionValues(item))
+                            yield return option;
+                    }
+
+                    yield break;
+
+                case JsonElement json when json.ValueKind == JsonValueKind.Object:
                 {
-                    foreach (var option in ExpandOptionValues(item))
-                        yield return option;
+                    var id = ReadJsonText(json, "id") ?? json.ToString();
+                    var label = ReadJsonText(json, "label")
+                        ?? ReadJsonText(json, "name")
+                        ?? id;
+
+                    yield return new FilterOptionItem
+                    {
+                        Id = id!,
+                        Label = label!,
+                        Value = json,
+                    };
+                    yield break;
                 }
-                yield break;
-            }
 
-            if (value.IsBsonDocument)
-            {
-                var doc = value.AsBsonDocument;
-                var id = doc.TryGetValue("id", out var idValue) ? idValue.ToString() : value.ToString();
-                var label = doc.TryGetValue("label", out var labelValue)
-                    ? labelValue.ToString()
-                    : doc.TryGetValue("name", out var nameValue)
-                        ? nameValue.ToString()
-                        : id;
-
-                yield return new FilterOptionItem
+                case JsonElement json:
                 {
-                    Id = id!,
-                    Label = label!,
-                    Value = BsonTypeMapper.MapToDotNetValue(value)
-                };
-                yield break;
+                    var text = json.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                        ? string.Empty
+                        : json.ToString();
+                    if (!string.IsNullOrWhiteSpace(text))
+                    {
+                        yield return new FilterOptionItem { Id = text, Label = text, Value = json };
+                    }
+
+                    yield break;
+                }
+
+                case IDictionary<string, object?> dictionary:
+                {
+                    var id = ReadDictionaryText(dictionary, "id") ?? dictionary.ToString();
+                    var label = ReadDictionaryText(dictionary, "label")
+                        ?? ReadDictionaryText(dictionary, "name")
+                        ?? id;
+
+                    yield return new FilterOptionItem { Id = id!, Label = label!, Value = dictionary };
+                    yield break;
+                }
+
+                case IEnumerable<object?> sequence when value is not string:
+                    foreach (var item in sequence)
+                    {
+                        foreach (var option in ExpandOptionValues(item))
+                            yield return option;
+                    }
+
+                    yield break;
             }
 
-            var scalar = BsonTypeMapper.MapToDotNetValue(value);
-            var text = scalar?.ToString() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(text))
+            var scalarText = value.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(scalarText))
             {
-                yield return new FilterOptionItem
-                {
-                    Id = text,
-                    Label = text,
-                    Value = scalar
-                };
+                yield return new FilterOptionItem { Id = scalarText, Label = scalarText, Value = value };
             }
+        }
+
+        private static string? ReadJsonText(JsonElement element, string propertyName)
+        {
+            if (!element.TryGetProperty(propertyName, out var property)) return null;
+            return property.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined
+                ? null
+                : property.ToString();
+        }
+
+        private static string? ReadDictionaryText(IDictionary<string, object?> dictionary, string key)
+        {
+            if (!dictionary.TryGetValue(key, out var value) || value is null) return null;
+            return value.ToString();
         }
 
         private Task EnqueueFormNotify(IMessagePublisher publisher, FormData newData, FormData? oldData, FormNotifyTriggerMode triggerMode)
@@ -1021,7 +1080,7 @@ namespace EIMSNext.Service
             });
         }
 
-        private async Task RebuildTimeFieldNotifySchedulesAsync(FormData entity, IClientSessionHandle? session)
+        private async Task RebuildTimeFieldNotifySchedulesAsync(FormData entity)
         {
             var notifyRepo = Resolver.GetRepository<FormNotify>();
             var scheduleRepo = Resolver.GetRepository<FormNotifyScheduleItem>();
@@ -1041,9 +1100,7 @@ namespace EIMSNext.Service
 
             foreach (var notify in notifies)
             {
-                await scheduleRepo.DeleteAsync(scheduleRepo.FilterBuilder.And(
-                    scheduleRepo.FilterBuilder.Eq(x => x.NotifyId, notify.Id),
-                    scheduleRepo.FilterBuilder.Eq(x => x.DataId, entity.Id)), session);
+                await scheduleRepo.DeleteManyAsync(x => x.NotifyId == notify.Id && x.DataId == entity.Id);
 
                 if (string.IsNullOrWhiteSpace(notify.TimeField))
                 {
@@ -1091,7 +1148,7 @@ namespace EIMSNext.Service
                     TriggerTime = nextTriggerTime.Value,
                     AnchorTime = adjustedAnchor,
                     TimeField = notify.TimeField
-                }, session);
+                });
             }
         }
     }

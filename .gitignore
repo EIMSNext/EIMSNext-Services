@@ -9,3 +9,5 @@ EIMSNext/ApiHost/EIMSNext.File.Host/wwwroot/Upload/*/
 *.log
 EIMSNext/.reasonix
 EIMSNext/reasonix.toml
+EIMSNext/tmp
+EIMSNext/.workbuddy

@@ -1,17 +1,15 @@
-using EIMSNext.Common.Extensions;
+﻿using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
 using System.Dynamic;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -50,10 +48,18 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected WfDataContext GetDataContext(IStepExecutionContext context)
         {
-            return WfDataContext.FromExpando((ExpandoObject)context.Workflow.Data);
+            return WfDataContext.FromData((IDictionary<string, object?>)context.Workflow.Data);
         }
 
-        protected void AddTaskLog(WorkflowInstance wfInst, Wf_Task task, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
+        /// <summary>
+        /// 写入审批日志。
+        /// </summary>
+        /// <remarks>
+        /// 挂到调用方的事务上。PostgreSQL 下事务绑在 <see cref="DbContext"/> 的当前连接上，
+        /// 仓储写方法会自行判断 <see cref="TransactionScope.IsInTransaction"/> 决定是
+        /// 加入外层事务还是开一个短事务，因此 session 参数被整体移除。
+        /// </remarks>
+        protected async Task AddTaskLog(WorkflowInstance wfInst, Wf_Task task, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData)
         {
             var log = new Wf_TaskLog()
             {
@@ -75,10 +81,10 @@ namespace EIMSNext.Flow.Core.Nodes
                 Round = dataContext.Round
             };
 
-            TaskLogRepository.Insert(log, session);
+            await TaskLogRepository.InsertAsync(log);
         }
 
-        protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
+        protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds)
         {
             var targetEmpIds = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             if (targetEmpIds.Count == 0)
@@ -100,30 +106,33 @@ namespace EIMSNext.Flow.Core.Nodes
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
             var logs = new List<Wf_TaskLog>();
-            await EmployeeRepository.Find(x => targetEmpIds.Contains(x.Id))
-             .ForEachAsync(emp => logs.Add(new Wf_TaskLog()
-             {
-                 CorpId = dataContext.CorpId,
-                 AppId = dataContext.AppId,
-                 FormId = dataContext.FormId,
-                 FormName = GetFormDef(dataContext.FormId).Name,
-                 DataId = dataContext.DataId,
-                 DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
-                 Approver = new Operator(emp.Id, emp.Code, emp.EmpName),
-                 NodeId = wfStep.Id,
-                 NodeName = wfStep.Name,
-                  NodeType = wfStep.NodeType,
-                  ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
-                  Result = ApproveAction.CopyTo,
-                  WfVersion = wfInst.Version,
-                  Round = dataContext.Round
-              }));
+            var employees = await EmployeeRepository.Find(x => targetEmpIds.Contains(x.Id)).ToListAsync();
+            foreach (var emp in employees)
+            {
+                logs.Add(new Wf_TaskLog()
+                {
+                    CorpId = dataContext.CorpId,
+                    AppId = dataContext.AppId,
+                    FormId = dataContext.FormId,
+                    FormName = GetFormDef(dataContext.FormId).Name,
+                    DataId = dataContext.DataId,
+                    DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
+                    Approver = new Operator(emp.Id, emp.Code, emp.EmpName),
+                    NodeId = wfStep.Id,
+                    NodeName = wfStep.Name,
+                    NodeType = wfStep.NodeType,
+                    ApprovalTime = DateTime.UtcNow.ToTimeStampMs(),
+                    Result = ApproveAction.CopyTo,
+                    WfVersion = wfInst.Version,
+                    Round = dataContext.Round
+                });
+            }
 
             logs = logs.Where(x => x.Approver != null && !existedEmpIds.Contains(x.Approver.Id)).ToList();
 
             if (logs.Any())
             {
-                TaskLogRepository.Insert(logs, session);
+                await TaskLogRepository.InsertAsync(logs);
             }
         }
 
@@ -135,7 +144,7 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.WaitForActivity(context.ExecutionPointer.EventKey, context.Workflow.Data, DateTime.Now);
         }
 
-        protected async Task<List<Wf_Task>> CreateTasks(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
+        protected async Task<List<Wf_Task>> CreateTasks(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep)
         {
             var approveSetting = wfStep.WfNodeSetting?.ApproveSetting;
             var empIds = (await PopulateEmpIds(dataContext, approveSetting?.Candidates)).ToList();
@@ -171,7 +180,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if ((tasks.Any()))
             {
-                TaskRepository.Insert(tasks, session);
+                await TaskRepository.InsertAsync(tasks);
             }
 
             return tasks;
@@ -203,23 +212,66 @@ namespace EIMSNext.Flow.Core.Nodes
             return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 
-        public DeleteResult DeleteTasks(string corpId, string dataId, string nodeId, IClientSessionHandle? session)
+        /// <summary>
+        /// 删除指定节点下某人/某数据的所有待办任务。
+        /// </summary>
+        public async Task<int> DeleteTasks(string corpId, string dataId, string nodeId)
         {
-            var filter = new DynamicFilter()
-            {
-                Items = new List<DynamicFilter> {
-                new DynamicFilter() { Field = "CorpId", Op = FilterOp.Eq, Value = corpId },
-                new DynamicFilter() { Field = "DataId", Op = FilterOp.Eq, Value = dataId },
-                new DynamicFilter() { Field = "ApproveNodeId", Op = FilterOp.Eq, Value = nodeId }
-            }
-            };
-
-            return TaskRepository.Delete(filter, session);
+            return await TaskRepository.DeleteManyAsync(x =>
+                x.CorpId == corpId && x.DataId == dataId && x.ApproveNodeId == nodeId);
         }
 
-        public UpdateResult UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
+        /// <summary>
+        /// 抢占并删除一条待办任务（原子「领取」语义）。
+        /// </summary>
+        /// <returns>被抢到的任务；不存在时为 null。</returns>
+        /// <remarks>
+        /// <para>
+        /// PostgreSQL 下 EF Core 没有等价的 <c>DELETE ... RETURNING *</c> 高层 API
+        ///（<c>ExecuteDelete</c> 只返回行数），因此采用「先取行 → 按主键条件删除 → 只在
+        /// 删除成功时返回该行」：
+        /// </para>
+        /// <code language="csharp">
+        /// var task = await TaskRepository.Find(predicate).FirstOrDefaultAsync();
+        /// if (task is null) return null;
+        /// var affected = await TaskRepository.DeleteManyAsync(x =&gt; x.Id == task.Id);
+        /// return affected == 1 ? task : null;
+        /// </code>
+        /// <para>
+        /// <b>并发安全性说明：</b>两个并发请求都可能读到同一行，但 <c>delete where "Id" = @id</c>
+        /// 只有一个能返回 1，另一个返回 0 从而返回 null，最终语义与 <c>FindOneAndDelete</c> 一致。
+        /// 前提是调用方处于事务内（由 <c>SubmitAsync</c> 打开），否则两次读之间可能被第三方改写。
+        /// 若后续要彻底消除窗口，可改为一条 <c>DELETE ... WHERE "Id" = (SELECT ... FOR UPDATE SKIP LOCKED)
+        /// RETURNING *</c> 的原生 SQL，当前实现已满足业务要求。
+        /// </para>
+        /// </remarks>
+        protected async Task<Wf_Task?> ClaimTask(string workflowInstanceId, string dataId, string nodeId, string employeeId)
         {
-            return FormDataRepository.Update(dataId, Builders<FormData>.Update.Set(x => x.FlowStatus, flowStatus), session: session);
+            var task = await TaskRepository
+                .Find(x => x.WfInstanceId == workflowInstanceId
+                           && x.DataId == dataId
+                           && x.ApproveNodeId == nodeId
+                           && x.EmployeeId == employeeId)
+                .FirstOrDefaultAsync();
+
+            if (task is null)
+            {
+                return null;
+            }
+
+            var taskId = task.Id;
+            var affected = await TaskRepository.DeleteManyAsync(x => x.Id == taskId);
+            return affected == 1 ? task : null;
+        }
+
+        /// <summary>
+        /// 更新表单数据的流程状态。
+        /// </summary>
+        public async Task<int> UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus)
+        {
+            return await FormDataRepository.UpdateAsync(
+                dataId,
+                setters => setters.SetProperty(x => x.FlowStatus, flowStatus));
         }
 
         protected Wf_Definition? GetWorkflowDefinition(WorkflowInstance wfInst)
@@ -245,13 +297,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)
             {
+                // OrderByDescending(...).FirstOrDefault()，两者都翻译为 ORDER BY ... LIMIT 1。
                 var lastApproval = TaskLogRepository
                     .Find(x => x.DataId == dataContext.DataId
                         && x.Result != ApproveAction.CopyTo
                         && x.Result != ApproveAction.Transfer
                         && x.Result != ApproveAction.AutoTransfer
                         && x.Result != ApproveAction.ChangeApprover)
-                    .SortByDescending(x => x.ApprovalTime)
+                    .OrderByDescending(x => x.ApprovalTime)
                     .FirstOrDefault();
                 return lastApproval?.Approver?.Id == dataContext.WfStarter?.Id;
             }
@@ -310,7 +363,19 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task RunEventFlow(EfRunParameter paramter)
         {
-            var efExecResult = await EventFlowRunner.RunAsync(paramter);
+            var isWorkflowTransition = paramter.WorkflowTransition
+                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
+            EfExecResult efExecResult;
+            if (isWorkflowTransition)
+            {
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
+            else
+            {
+                using var suppression = TransactionScope.SuppressAmbient();
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
             if (!efExecResult.Success)
             {
                 throw new UnLogException(efExecResult.Error);

@@ -3,25 +3,37 @@ using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 表单数据权限组的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class FormDataPermissionGroupApiService(IResolver resolver) : ApiServiceBase<FormDataPermissionGroup, FormDataPermissionGroupViewModel, IFormDataPermissionGroupService>(resolver)
 	{
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(FormDataPermissionGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageFormDataPermissionGroup(entity);
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(FormDataPermissionGroup entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(FormDataPermissionGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageFormDataPermissionGroup(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var permissionGroups = CoreService.All()

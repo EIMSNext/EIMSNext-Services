@@ -1,21 +1,25 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 跨应用绑定的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class CrossBindingApiService(IResolver resolver) : ApiServiceBase<CrossBinding, CrossBindingViewModel, ICrossBindingService>(resolver)
     {
+        /// <summary>
+        /// 按当前身份权限过滤查询。
+        /// </summary>
         protected override IQueryable<CrossBindingViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
@@ -34,6 +38,9 @@ namespace EIMSNext.ApiService
             return query.Where(x => false);
         }
 
+        /// <summary>
+        /// 新增实体核心逻辑。
+        /// </summary>
         protected override Task AddAsyncCore(CrossBinding entity)
         {
             ValidateBindingTarget(entity.TargetAppId, entity.SourceAppId, entity.SourceFormId);
@@ -41,14 +48,20 @@ namespace EIMSNext.ApiService
             return base.AddAsyncCore(entity);
         }
 
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(CrossBinding entity)
+        /// <summary>
+        /// 更新实体核心逻辑。
+        /// </summary>
+        protected override Task<int> ReplaceAsyncCore(CrossBinding entity)
         {
             ValidateBindingTarget(entity.TargetAppId, entity.SourceAppId, entity.SourceFormId);
             EnsureNotDuplicated(entity);
             return base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var bindings = CoreService.All()

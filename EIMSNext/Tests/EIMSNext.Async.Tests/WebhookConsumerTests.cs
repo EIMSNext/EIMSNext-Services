@@ -2,18 +2,13 @@ using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
 using EIMSNext.Notification;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Entities;
+using EIMSNext.TestSupport;
 
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.DependencyInjection;
-
-using MongoDB.Bson;
-using MongoDB.Driver;
 
 using RabbitMQ.Client;
 
@@ -131,6 +126,7 @@ namespace EIMSNext.Async.Tests
             await Assert.ThrowsExactlyAsync<EIMSNext.Async.RabbitMQ.Messaging.TaskRequeueException>(
                 () => consumer.ExecuteInScopeAsync(message, CancellationToken.None));
             Assert.AreEqual(0, processingRepository.CompletedTargets.Count);
+            CollectionAssert.AreEqual(new[] { "wh-1" }, processingRepository.ReleasedTargets);
         }
 
         private sealed class RecordingEventHub : IEventHub
@@ -144,111 +140,25 @@ namespace EIMSNext.Async.Tests
             }
         }
 
-        private sealed class FakeWebhookRepository(List<Webhook> webhooks) : IRepository<Webhook>
+        /// <summary>
+        /// 内存版 Webhook 仓储。
+        /// </summary>
+        private sealed class FakeWebhookRepository(List<Webhook> webhooks)
+            : StubRepository<Webhook>
         {
-            public EIMSNext.Core.Mongo.IMongoDbContex DbContext => throw new NotSupportedException();
-            public MongoDB.Driver.IMongoCollection<Webhook> Collection => throw new NotSupportedException();
-            public IQueryable<Webhook> Queryable => webhooks.AsQueryable();
-            public MongoDB.Driver.FilterDefinitionBuilder<Webhook> FilterBuilder => Builders<Webhook>.Filter;
-            public MongoDB.Driver.SortDefinitionBuilder<Webhook> SortBuilder => Builders<Webhook>.Sort;
-            public MongoDB.Driver.Search.SearchDefinitionBuilder<Webhook> SearchBuilder => Builders<Webhook>.Search;
-            public MongoDB.Driver.ProjectionDefinitionBuilder<Webhook> ProjectionBuilder => Builders<Webhook>.Projection;
-            public MongoDB.Driver.UpdateDefinitionBuilder<Webhook> UpdateBuilder => Builders<Webhook>.Update;
-            public EIMSNext.Core.Mongo.MongoTransactionScope NewTransactionScope(MongoDB.Driver.TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(EIMSNext.Core.Query.DynamicFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(EIMSNext.Core.Mongo.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.IFindFluent<Webhook, Webhook> Find(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(EIMSNext.Core.Query.DynamicFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(EIMSNext.Core.Mongo.Query.MongoFindOptions<Webhook> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.IAsyncCursor<Webhook>> FindAsync(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Webhook? Get(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<Webhook?> GetAsync(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(System.Linq.Expressions.Expression<Func<Webhook, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.IClientSessionHandle? session = null, MongoDB.Driver.CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(Webhook entity, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<Webhook> entities, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(Webhook entity, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<Webhook> entities, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.UpdateResult Update(string id, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.UpdateResult> UpdateAsync(string id, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.UpdateResult UpdateMany(DynamicFilter filter, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.UpdateResult> UpdateManyAsync(DynamicFilter filter, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.UpdateResult UpdateMany(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.UpdateResult> UpdateManyAsync(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.UpdateDefinition<Webhook> update, bool upsert = true, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.ReplaceOneResult Replace(Webhook entity, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.ReplaceOneResult> ReplaceAsync(Webhook entity, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.DeleteResult Delete(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.DeleteResult Delete(IEnumerable<string> ids, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.DeleteResult Delete(DynamicFilter filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.DeleteResult Delete(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.DeleteResult> DeleteAsync(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.DeleteResult> DeleteAsync(IEnumerable<string> ids, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.DeleteResult> DeleteAsync(DynamicFilter filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.DeleteResult> DeleteAsync(MongoDB.Driver.FilterDefinition<Webhook> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<Webhook> EnsureId(IEnumerable<Webhook> entities) => throw new NotSupportedException();
-            public Webhook EnsureId(Webhook entity) => throw new NotSupportedException();
-            public string NewId() => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public override IQueryable<Webhook> Queryable => webhooks.AsQueryable();
         }
 
-        private sealed class FakeWebhookAliasRepository(List<WebhookAlias> aliases) : IRepository<WebhookAlias>
+        private sealed class FakeWebhookAliasRepository(List<WebhookAlias> aliases)
+            : StubRepository<WebhookAlias>
         {
-            public EIMSNext.Core.Mongo.IMongoDbContex DbContext => throw new NotSupportedException();
-            public IMongoCollection<WebhookAlias> Collection => throw new NotSupportedException();
-            public IQueryable<WebhookAlias> Queryable => aliases.AsQueryable();
-            public FilterDefinitionBuilder<WebhookAlias> FilterBuilder => Builders<WebhookAlias>.Filter;
-            public SortDefinitionBuilder<WebhookAlias> SortBuilder => Builders<WebhookAlias>.Sort;
-            public MongoDB.Driver.Search.SearchDefinitionBuilder<WebhookAlias> SearchBuilder => Builders<WebhookAlias>.Search;
-            public ProjectionDefinitionBuilder<WebhookAlias> ProjectionBuilder => Builders<WebhookAlias>.Projection;
-            public UpdateDefinitionBuilder<WebhookAlias> UpdateBuilder => Builders<WebhookAlias>.Update;
-            public EIMSNext.Core.Mongo.MongoTransactionScope NewTransactionScope(TransactionOptions? transOptions = null) => throw new NotSupportedException();
-            public IFindFluent<WebhookAlias, WebhookAlias> Find(EIMSNext.Core.Query.DynamicFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<WebhookAlias, WebhookAlias> Find(EIMSNext.Core.Mongo.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IFindFluent<WebhookAlias, WebhookAlias> Find(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<WebhookAlias>> FindAsync(EIMSNext.Core.Query.DynamicFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<WebhookAlias>> FindAsync(EIMSNext.Core.Mongo.Query.MongoFindOptions<WebhookAlias> options, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<IAsyncCursor<WebhookAlias>> FindAsync(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public WebhookAlias? Get(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<WebhookAlias?> GetAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public long Count(FilterDefinition<WebhookAlias> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(System.Linq.Expressions.Expression<Func<WebhookAlias, bool>> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public Task<long> CountAsync(FilterDefinition<WebhookAlias> filter, IClientSessionHandle? session = null, CountOptions? options = null) => throw new NotSupportedException();
-            public void Insert(WebhookAlias entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public void Insert(IEnumerable<WebhookAlias> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(WebhookAlias entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task InsertAsync(IEnumerable<WebhookAlias> entities, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult Update(string id, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateAsync(string id, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(DynamicFilter filter, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(DynamicFilter filter, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public UpdateResult UpdateMany(FilterDefinition<WebhookAlias> filter, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<UpdateResult> UpdateManyAsync(FilterDefinition<WebhookAlias> filter, UpdateDefinition<WebhookAlias> update, bool upsert = true, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(WebhookAlias entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(WebhookAlias entity, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public DeleteResult Delete(FilterDefinition<WebhookAlias> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(string id, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(IEnumerable<string> ids, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(DynamicFilter filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<DeleteResult> DeleteAsync(FilterDefinition<WebhookAlias> filter, IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public IEnumerable<WebhookAlias> EnsureId(IEnumerable<WebhookAlias> entities) => throw new NotSupportedException();
-            public WebhookAlias EnsureId(WebhookAlias entity) => throw new NotSupportedException();
-            public string NewId() => throw new NotSupportedException();
-            public Task<List<BsonValue>> DistinctFieldValuesAsync(DynamicFilter filter, string field, IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public override IQueryable<WebhookAlias> Queryable => aliases.AsQueryable();
         }
 
         private sealed class FakeMessageProcessingRepository : IMessageProcessingRepository
         {
             public List<string> CompletedTargets { get; } = [];
+            public List<string> ReleasedTargets { get; } = [];
 
             public Task<string?> TryAcquireAsync(string eventKey, string target, DateTime leaseUntil, CancellationToken cancellationToken = default)
             {
@@ -258,6 +168,12 @@ namespace EIMSNext.Async.Tests
             public Task<bool> MarkCompletedAsync(string eventKey, string target, string leaseToken, long processedTime, CancellationToken cancellationToken = default)
             {
                 CompletedTargets.Add(target);
+                return Task.FromResult(true);
+            }
+
+            public Task<bool> ReleaseAsync(string eventKey, string target, string leaseToken, CancellationToken cancellationToken = default)
+            {
+                ReleasedTargets.Add(target);
                 return Task.FromResult(true);
             }
         }

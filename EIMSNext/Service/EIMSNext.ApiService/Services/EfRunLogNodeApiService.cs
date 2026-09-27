@@ -1,21 +1,22 @@
-using HKH.Mef2.Integration;
+﻿using HKH.Mef2.Integration;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 运行日志节点的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class EfRunLogNodeApiService(IResolver resolver) : ApiServiceBase<Ef_RunLogNode, EfRunLogNodeViewModel, IEfRunLogNodeService>(resolver)
 	{
         // 不再预过滤 AppId/RunLogId：

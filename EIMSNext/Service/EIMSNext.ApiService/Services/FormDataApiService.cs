@@ -9,23 +9,22 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Storage.Abstractions;
 using HKH.Common;
 using HKH.Mef2.Integration;
-using MongoDB.Bson;
-using MongoDB.Driver;
 using NPOI.SS.UserModel;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 表单数据的 API 服务。
+    /// </summary>
     public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
     {
         private const int ImportMaxColumns = 500;
@@ -34,6 +33,10 @@ namespace EIMSNext.ApiService
         private IFormDataChangeLogService _formDataChangeLogService;
         private TenantAccessEvaluator _permissionEvaluator;
         private FormDataReadScopeResolver _readScopeResolver;
+        /// <summary>
+        /// 初始化FormDataApiService的新实例。
+        /// </summary>
+        /// <param name="resolver">服务解析器。</param>
         public FormDataApiService(IResolver resolver) : base(resolver)
         {
             _formDefService = resolver.Resolve<IFormDefService>();
@@ -42,22 +45,34 @@ namespace EIMSNext.ApiService
             _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         }
 
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public override Task AddAsync(FormData entity)
         {
             throw new UnLogException("Please use AddAsync(FormData,DataAction) instead");
         }
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public Task AddAsync(FormData entity, DataAction action)
         {
             ServiceContext.Action = action;
             return base.AddAsync(entity);
         }
 
+        /// <summary>
+        /// 更新实体。
+        /// </summary>
         public Task ReplaceAsync(FormData entity, DataAction action)
         {
             ServiceContext.Action = action;
             return base.ReplaceAsync(entity);
         }
 
+        /// <summary>
+        /// 执行 ExportAsync 操作。
+        /// </summary>
         public async Task<ExportResponse> ExportAsync(FormDataExportRequest request)
         {
             ValidateExportRequest(request);
@@ -120,6 +135,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 预览Import。
+        /// </summary>
         public FormDataImportPreviewResponse PreviewImport(string formId, Stream source, string fileName, long fileSize)
         {
             ValidateImportFile(fileName, fileSize);
@@ -165,6 +183,9 @@ namespace EIMSNext.ApiService
             return response;
         }
 
+        /// <summary>
+        /// 执行 StartImportAsync 操作。
+        /// </summary>
         public async Task<FormDataImportStartResponse> StartImportAsync(FormDataImportStartRequest request, Stream source, string fileName, long fileSize)
         {
             ValidateImportRequest(request, fileName, fileSize);
@@ -175,7 +196,8 @@ namespace EIMSNext.ApiService
             ValidateImportMappings(request, fieldSnapshot);
             var importLogService = Resolver.Resolve<IFormDataImportLogService>();
             var storage = Resolver.Resolve<IStorageProvider>();
-            var importLogId = ObjectId.GenerateNewId().ToString();
+            // 与 RepositoryBase.NewId 保持一致的 TSID 主键。
+            var importLogId = TsidIdGenerator.NewId();
             var normalizedFileName = NormalizeFileName(fileName);
             var objectKey = $"Import\\{IdentityContext.CurrentCorpId}\\{DateTime.UtcNow:yyyyMMdd}\\{importLogId}_{normalizedFileName}";
             if (!storage.Upload(source, objectKey))
@@ -227,6 +249,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 获取ImportStatus。
+        /// </summary>
         public FormDataImportStatusResponse GetImportStatus(string id)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -249,6 +274,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 获取EditableImportErrors。
+        /// </summary>
         public FormDataImportEditableErrorsResponse GetEditableImportErrors(string id)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -259,6 +287,9 @@ namespace EIMSNext.ApiService
             };
         }
 
+        /// <summary>
+        /// 执行 RetryImportAsync 操作。
+        /// </summary>
         public async Task<FormDataImportRetryResponse> RetryImportAsync(string id, FormDataImportRetryRequest request)
         {
             var importLog = GetAccessibleImportLog(id);
@@ -383,6 +414,9 @@ namespace EIMSNext.ApiService
             }
         }
 
+        /// <summary>
+        /// 获取FilterOptions。
+        /// </summary>
         public async Task<FormDataFilterOptionsResponse> GetFilterOptionsAsync(FormDataFilterOptionsRequest request)
         {
             var filter = BuildBaseFilter(request);
@@ -416,6 +450,9 @@ namespace EIMSNext.ApiService
             return new FormDataFilterOptionsResponse { Items = result.Items };
         }
 
+        /// <summary>
+        /// 获取ChangeLogs。
+        /// </summary>
         public List<FormDataChangeLog> GetChangeLogs(string dataId, int skip, int top)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return [];
@@ -431,6 +468,9 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
+        /// <summary>
+        /// 统计ChangeLogs。
+        /// </summary>
         public long CountChangeLogs(string dataId)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return 0;
@@ -867,14 +907,14 @@ namespace EIMSNext.ApiService
             return map;
         }
 
-        private static ExpandoObject NormalizeImportCorrectionData(
-            ExpandoObject source,
+        private static Dictionary<string, object?> NormalizeImportCorrectionData(
+            Dictionary<string, object?> source,
             string? mappingJson,
             IReadOnlyDictionary<string, FieldDef> fieldMap,
             out List<FormDataImportCellError> errors)
         {
             errors = [];
-            var result = new ExpandoObject();
+            var result = new Dictionary<string, object?>();
             var resultDict = (IDictionary<string, object?>)result;
             var sourceDict = (IDictionary<string, object?>)source;
             var mappings = string.IsNullOrWhiteSpace(mappingJson)
@@ -978,7 +1018,7 @@ namespace EIMSNext.ApiService
 
         private static List<FormDataImportCellError> ValidateCorrectionRecordShape(
             FormDataImportLog importLog,
-            ExpandoObject data,
+            Dictionary<string, object?> data,
             IReadOnlyDictionary<string, FieldDef> fieldMap)
         {
             var errors = new List<FormDataImportCellError>();
@@ -1003,7 +1043,7 @@ namespace EIMSNext.ApiService
 
         private static List<FormDataImportCellError> ValidateCorrectionData(
             FormDataImportLog importLog,
-            ExpandoObject data,
+            Dictionary<string, object?> data,
             IReadOnlyDictionary<string, FieldDef> fieldMap)
         {
             if (!importLog.TriggerValidation)
@@ -1064,7 +1104,7 @@ namespace EIMSNext.ApiService
             return errors;
         }
 
-        private FormData? ResolveCorrectionTarget(FormDataImportLog importLog, string? dataId, ExpandoObject data, DynamicFilter? dataScopeFilter)
+        private FormData? ResolveCorrectionTarget(FormDataImportLog importLog, string? dataId, Dictionary<string, object?> data, DynamicFilter? dataScopeFilter)
         {
             if (!string.IsNullOrWhiteSpace(dataId))
             {
@@ -1286,7 +1326,7 @@ namespace EIMSNext.ApiService
             return text;
         }
 
-        private static object? GetImportValue(ExpandoObject data, string? field)
+        private static object? GetImportValue(Dictionary<string, object?> data, string? field)
         {
             if (string.IsNullOrWhiteSpace(field) || field.Contains('>'))
             {
@@ -1296,9 +1336,9 @@ namespace EIMSNext.ApiService
             return GetImportTopLevelValue(data, field);
         }
 
-        private static object? GetImportTopLevelValue(ExpandoObject data, string field)
+        private static object? GetImportTopLevelValue(Dictionary<string, object?> data, string field)
         {
-            return GetDictionaryValue((IDictionary<string, object?>)data, field);
+            return GetDictionaryValue(data, field);
         }
 
         private static object? GetDictionaryValue(IDictionary<string, object?> data, string field)
@@ -1306,7 +1346,7 @@ namespace EIMSNext.ApiService
             return data.TryGetValue(field, out var value) ? UnwrapImportJsonValue(value) : null;
         }
 
-        private static List<IDictionary<string, object?>> GetImportChildRows(ExpandoObject data, string parentField)
+        private static List<IDictionary<string, object?>> GetImportChildRows(Dictionary<string, object?> data, string parentField)
         {
             var raw = GetImportTopLevelValue(data, parentField);
             raw = UnwrapImportJsonValue(raw);
@@ -1326,10 +1366,6 @@ namespace EIMSNext.ApiService
         private static IDictionary<string, object?>? AsImportDictionary(object? value)
         {
             value = UnwrapImportJsonValue(value);
-            if (value is ExpandoObject expando)
-            {
-                return (IDictionary<string, object?>)expando;
-            }
             if (value is IDictionary<string, object?> typed)
             {
                 return typed;
@@ -1351,24 +1387,22 @@ namespace EIMSNext.ApiService
             return null;
         }
 
-        private static ExpandoObject CloneImportData(ExpandoObject source)
+        private static Dictionary<string, object?> CloneImportData(Dictionary<string, object?> source)
         {
-            var clone = new ExpandoObject();
-            var cloneDict = (IDictionary<string, object?>)clone;
-            foreach (var (key, value) in (IDictionary<string, object?>)source)
+            var clone = new Dictionary<string, object?>();
+            foreach (var (key, value) in source)
             {
-                cloneDict[key] = UnwrapImportJsonValue(value);
+                clone[key] = UnwrapImportJsonValue(value);
             }
 
             return clone;
         }
 
-        private static void MergeImportData(ExpandoObject target, ExpandoObject source)
+        private static void MergeImportData(Dictionary<string, object?> target, Dictionary<string, object?> source)
         {
-            var targetDict = (IDictionary<string, object?>)target;
-            foreach (var (key, value) in (IDictionary<string, object?>)source)
+            foreach (var (key, value) in source)
             {
-                targetDict[key] = value;
+                target[key] = value;
             }
         }
 
@@ -1423,7 +1457,7 @@ namespace EIMSNext.ApiService
                 JsonValueKind.True => true,
                 JsonValueKind.False => false,
                 JsonValueKind.Array => element.EnumerateArray().Select(item => UnwrapImportJsonValue(item)).ToList(),
-                JsonValueKind.Object => element.Deserialize<ExpandoObject>(),
+                JsonValueKind.Object => element.Deserialize<Dictionary<string, object?>>(),
                 _ => element.ToString(),
             };
         }

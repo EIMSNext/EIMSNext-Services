@@ -72,7 +72,7 @@ namespace EIMSNext.Async.Tests
                 {
                     RecordIndex = 1,
                     StartRowNumber = 2,
-                    Data = NewExpando(new Dictionary<string, object?> { ["name"] = "Alice" }),
+                    Data = NewData(new Dictionary<string, object?> { ["name"] = "Alice" }),
                     Errors = new List<FormDataImportCellError>
                     {
                         new() { FieldTitle = "姓名", Message = "必填字段不能为空" }
@@ -83,7 +83,7 @@ namespace EIMSNext.Async.Tests
                     RecordIndex = 2,
                     StartRowNumber = 3,
                     EndRowNumber = 5,
-                    Data = NewExpando(new Dictionary<string, object?> { ["name"] = "Bob" }),
+                    Data = NewData(new Dictionary<string, object?> { ["name"] = "Bob" }),
                     Errors = new List<FormDataImportCellError>
                     {
                         new() { FieldTitle = "年龄", Message = "数字格式无效" }
@@ -149,13 +149,7 @@ namespace EIMSNext.Async.Tests
 
         // ===== helpers =====
 
-        private static ExpandoObject NewExpando(IDictionary<string, object?> dict)
-        {
-            var exp = new ExpandoObject();
-            var d = (IDictionary<string, object?>)exp;
-            foreach (var kv in dict) d[kv.Key] = kv.Value;
-            return exp;
-        }
+        private static Dictionary<string, object?> NewData(IDictionary<string, object?> dict) => new(dict);
 
         private static string GetCellText(ICell? cell)
         {

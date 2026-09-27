@@ -9,7 +9,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
-using MongoDB.Driver;
 
 namespace EIMSNext.Service.Host.Controllers
 {
@@ -37,13 +36,12 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 request.Filter.ClearValueExpressions();
             }
-            var cursor = await ApiService.Calucate(request);
-            if ((cursor == null))
+            var data = await ApiService.Calucate(request);
+            if (data == null)
             {
                 return ApiResult.Fail(-1, "没有数据").ToActionResult();
             }
 
-            var data = await cursor.ToListAsync();
             return ApiResult.Success(data).ToActionResult();
         }
 
@@ -71,9 +69,9 @@ namespace EIMSNext.Service.Host.Controllers
             if (request == null || string.IsNullOrWhiteSpace(request.ItemId) || string.IsNullOrWhiteSpace(request.Details))
                 return BadRequest();
 
-            var cursor = await ApiService.Preview(request);
-            if (cursor == null) return ApiResult.Fail(-1, "没有数据").ToActionResult();
-            return ApiResult.Success(await cursor.ToListAsync()).ToActionResult();
+            var data = await ApiService.Preview(request);
+            if (data == null) return ApiResult.Fail(-1, "没有数据").ToActionResult();
+            return ApiResult.Success(data).ToActionResult();
         }
 
         [Permission(Operation = Operation.Read)]
@@ -86,3 +84,4 @@ namespace EIMSNext.Service.Host.Controllers
         }
     }
 }
+

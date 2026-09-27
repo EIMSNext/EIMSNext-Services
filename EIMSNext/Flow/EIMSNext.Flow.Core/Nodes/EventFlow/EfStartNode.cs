@@ -15,7 +15,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLog(context, dataContext =>
+            return ExecuteWithLogAsync(context, dataContext =>
             {
                 if (!string.IsNullOrEmpty(dataContext.DataId) && !dataContext.NodeDatas.ContainsKey(Metadata!.Id))
                 {
@@ -38,8 +38,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     });
                 }
 
-                return ExecutionResult.Next();
-            });
+                return Task.FromResult(ExecutionResult.Next());
+            }).GetAwaiter().GetResult();
         }
     }
 }

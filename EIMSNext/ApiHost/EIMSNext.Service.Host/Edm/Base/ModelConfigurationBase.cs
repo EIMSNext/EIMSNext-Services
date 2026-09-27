@@ -1,9 +1,9 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using Asp.Versioning.OData;
 
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 
 using Microsoft.OData.ModelBuilder;
 
@@ -108,3 +108,4 @@ namespace EIMSNext.Service.Host.Edm
         }
     }
 }
+

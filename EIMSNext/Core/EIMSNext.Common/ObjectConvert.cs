@@ -4,18 +4,44 @@ using System.Reflection;
 
 namespace EIMSNext.Common
 {
+    /// <summary>
+    /// 提供基于表达式树编译的对象转换、拷贝与投影扩展方法。
+    /// </summary>
     public static class ObjectConvert
     {
+        /// <summary>
+        /// 将源对象转换为目标类型的对象。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="T">目标类型。</typeparam>
+        /// <param name="s">源对象。</param>
+        /// <returns>转换后的目标对象。</returns>
         public static T CastTo<S, T>(this S s)
         {
             return CastExp<S, T>().Compile().Invoke(s);
         }
 
+        /// <summary>
+        /// 将源对象的同名属性值拷贝到目标对象。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="T">目标类型。</typeparam>
+        /// <param name="s">源对象。</param>
+        /// <param name="t">目标对象。</param>
         public static void CopyTo<S, T>(this S s, T t)
         {
             CopyToExp<S, T>().Invoke(s, t);
         }
 
+        /// <summary>
+        /// 将源对象按指定选择器投影，并替换指定属性值。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="P">属性类型。</typeparam>
+        /// <param name="s">源对象。</param>
+        /// <param name="keySelector">指定要替换的属性。</param>
+        /// <param name="val">新的属性值。</param>
+        /// <returns>投影后的源对象副本。</returns>
         public static S Proj<S, P>(this S s, Expression<Func<S, P>> keySelector, P val)
         {
             return ProjExp<S, P>(keySelector).Compile().Invoke(s, val);
@@ -25,6 +51,12 @@ namespace EIMSNext.Common
 
         private static ConcurrentDictionary <TypePair, Expression> CastCache = new ConcurrentDictionary<TypePair, Expression>();
 
+        /// <summary>
+        /// 构建并缓存从 <typeparamref name="S"/> 到 <typeparamref name="T"/> 的类型转换表达式。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="T">目标类型。</typeparam>
+        /// <returns>类型转换表达式。</returns>
         public static Expression<Func<S, T>> CastExp<S, T>()
         {
             Type source = typeof(S);
@@ -83,6 +115,13 @@ namespace EIMSNext.Common
 
         private static ConcurrentDictionary<TypePropPair, Expression> ProjCache = new ConcurrentDictionary<TypePropPair, Expression>();
 
+        /// <summary>
+        /// 构建并缓存投影表达式，用于将源对象中指定属性替换为新的值。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="P">属性类型。</typeparam>
+        /// <param name="keySelector">指定要替换的属性。</param>
+        /// <returns>投影表达式。</returns>
         public static Expression<Func<S, P, S>> ProjExp<S, P>(Expression<Func<S, P>> keySelector)
         {
             Type source = typeof(S);
@@ -144,6 +183,15 @@ namespace EIMSNext.Common
             public string ProjectPropName { get; set; }
         }
 
+        /// <summary>
+        /// 构建并缓存投影表达式，用于将源对象中的属性替换为投影对象中的对应属性值。
+        /// </summary>
+        /// <typeparam name="S">源类型。</typeparam>
+        /// <typeparam name="P">投影类型。</typeparam>
+        /// <typeparam name="TProp">属性类型。</typeparam>
+        /// <param name="srcKeySelector">指定源对象中要替换的属性。</param>
+        /// <param name="projKeySelector">指定投影对象中要取值的属性。</param>
+        /// <returns>投影表达式。</returns>
         public static Expression<Func<S, P, S>> ProjExp<S, P, TProp>(Expression<Func<S, TProp>> srcKeySelector, Expression<Func<P, TProp>> projKeySelector)
         {
             Type source = typeof(S);

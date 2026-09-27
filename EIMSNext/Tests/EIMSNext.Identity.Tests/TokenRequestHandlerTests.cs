@@ -24,7 +24,7 @@ namespace EIMSNext.Identity.Tests
                 Email = "admin@eimsnext.com",
                 Phone = "12345678901",
                 Password = "hashed",
-                Crops = [new UserCorp { CorpId = "corp-001", IsDefault = true }]
+                UserCorps = [new UserCorp { CorpId = "corp-001", IsDefault = true }]
             };
 
             var client = new Client
@@ -74,7 +74,7 @@ namespace EIMSNext.Identity.Tests
                 Name = "Admin",
                 Email = "admin@eimsnext.com",
                 Password = "hashed",
-                Crops = [new UserCorp { CorpId = "corp-001", IsDefault = true }]
+                UserCorps = [new UserCorp { CorpId = "corp-001", IsDefault = true }]
             };
 
             var client = new Client

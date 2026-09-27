@@ -1,5 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -72,15 +72,15 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表格。
         /// </summary>
-        Table,
+        Table = 0,
         /// <summary>
         /// 看板。
         /// </summary>
-        Kanban,
+        Kanban = 1,
         /// <summary>
         /// 画廊。
         /// </summary>
-        Gallery,
+        Gallery = 2,
     }
 
     /// <summary>
@@ -91,10 +91,10 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表格。
         /// </summary>
-        Table,
+        Table = 0,
         /// <summary>
         /// 卡片。
         /// </summary>
-        Card,
+        Card = 1,
     }
 }

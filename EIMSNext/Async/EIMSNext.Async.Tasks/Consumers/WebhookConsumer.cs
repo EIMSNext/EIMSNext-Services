@@ -1,15 +1,13 @@
-using System.Text.Json.Nodes;
+﻿using System.Text.Json.Nodes;
 
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Notification;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 
@@ -75,13 +73,31 @@ namespace EIMSNext.Async.Tasks.Consumers
                 }
                 catch (TaskRequeueException)
                 {
+                    await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                     throw;
                 }
                 catch (Exception ex)
                 {
+                    await ReleaseLeaseAsync(processingRepository, baseKey, target, leaseToken);
                     Logger.LogWarning(ex, "Webhook external effect failed; message will be requeued. key={Key}, target={Target}", baseKey, target);
                     throw new TaskRequeueException("Webhook external effect failed.", TimeSpan.FromSeconds(30));
                 }
+            }
+        }
+
+        private async Task ReleaseLeaseAsync(
+            IMessageProcessingRepository processingRepository,
+            string eventKey,
+            string target,
+            string leaseToken)
+        {
+            try
+            {
+                await processingRepository.ReleaseAsync(eventKey, target, leaseToken, CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to release webhook processing lease. key={Key}, target={Target}", eventKey, target);
             }
         }
 

@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
@@ -9,11 +9,9 @@ using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -23,8 +21,7 @@ using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Deltas;
-using MongoDB.Bson;
-using MongoDB.Driver;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 
@@ -38,7 +35,7 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
     {
-        private const int MongoMaxDocumentBytes = 16 * 1024 * 1024;
+        private const int MaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly TenantAccessEvaluator _permissionEvaluator = resolver.Resolve<TenantAccessEvaluator>();
@@ -51,7 +48,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// 获取当前用户在指定表单中实际所属的权限组。
         /// </summary>
         [Permission(Operation = Operation.Read)]
-        [HttpGet("permissiongroups")]
+        [HttpGet("permission-group")]
         public ActionResult GetAssignedFormDataPermissionGroups([FromQuery] string formId)
         {
             if (string.IsNullOrWhiteSpace(formId))
@@ -80,7 +77,6 @@ namespace EIMSNext.Service.Host.Controllers
             return Ok(groups);
         }
 
-
         /// <summary>
         /// 动态查询总数
         /// </summary>
@@ -89,8 +85,8 @@ namespace EIMSNext.Service.Host.Controllers
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
-        [HttpPost("dynamic/$count")]
-        public ActionResult GetDynamicCount([FromBody] DynamicFindOptions<FormData> options)
+        [HttpPost("$count")]
+        public ActionResult GetCount([FromBody] DynamicFindOptions<FormData> options)
         {
             var filtered = FilterResult(new DynamicFindOptions<FormData>
             {
@@ -101,36 +97,6 @@ namespace EIMSNext.Service.Host.Controllers
                 IncludeDeleted = options.IncludeDeleted,
             });
             return Ok(ApiService.Count(filtered.Filter ?? DynamicFilter.Empty));
-        }
-        /// <summary>
-        /// 动态查询数据
-        /// </summary>
-        /// <param name="options"></param>
-        /// <returns></returns>
-        [Permission(Operation = Operation.Read)]
-        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
-        [HttpPost("dynamic/$query")]
-        public ActionResult GetDynamicData([FromBody] DynamicFindOptions<FormData> options)
-        {
-            var filtered = FilterResult(options);
-            var result = ApiService.Find(filtered).ToList();
-            return Ok(new { value = result.Select(item => ToViewModel(item)) });
-        }
-
-        /// <summary>
-        /// 动态查询总数
-        /// </summary>
-        /// <param name="filter"></param>
-        /// <returns></returns>
-        [Permission(Operation = Operation.Read)]
-        [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
-        [PublicScope(PublicScope.QueryLink | PublicScope.FormLink)]
-        [HttpPost("$count")]
-        public ActionResult GetCount([FromBody] DynamicFilter filter)
-        {
-            var options = FilterResult(new DynamicFindOptions<FormData> { Filter = filter });
-            return Ok(ApiService.Count(options.Filter ?? DynamicFilter.Empty));
         }
 
         /// <summary>
@@ -144,16 +110,7 @@ namespace EIMSNext.Service.Host.Controllers
         [HttpPost("$query")]
         public ActionResult GetData([FromBody] DynamicFindOptions<FormData> options)
         {
-            if (options.Select == null || options.Select.Count == 0)
-            {
-                //不指定列时，不返回历史日志字段
-                options.Select = new DynamicFieldList()
-                {
-                    DynamicField.Create("updateLog",false),
-                    DynamicField.Create("changeLog",false)
-                };
-            }
-            var filtered = FilterResult(options);
+             var filtered = FilterResult(options);
             var result = ApiService.Find(filtered).ToList();
             return Ok(new { value = result.Select(item => ToViewModel(item)) });
         }
@@ -328,7 +285,6 @@ namespace EIMSNext.Service.Host.Controllers
                     ? CreateNoMatchFilter()
                     : validator.ApplyFormDataScope(formId!, query.Filter);
                 query.Scope = null;
-                ApplyPublicProjection(validator, formId, query);
                 query.Take = Math.Clamp(query.GetEffectiveTake(), 1, 200);
                 query.Skip = Math.Max(0, query.Skip);
                 return query;
@@ -490,7 +446,6 @@ namespace EIMSNext.Service.Host.Controllers
             var options = new DynamicFindOptions<FormData>
             {
                 Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
-                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
                 Take = 1,
                 Scope = string.IsNullOrWhiteSpace(permissionGroupId) ? null : new DataScope { PermissionGroupId = permissionGroupId }
             };
@@ -510,7 +465,6 @@ namespace EIMSNext.Service.Host.Controllers
             var data = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
             {
                 Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
-                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true), DynamicField.Create("formId", true) },
                 Take = 1,
             })).FirstOrDefault();
             if (data == null)
@@ -573,13 +527,12 @@ namespace EIMSNext.Service.Host.Controllers
         /// 单条查询
         /// </summary>
         /// <param name="key"></param>
-        /// <param name="select"></param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DataLink)]
         [HttpGet("{key}")]
-        public ActionResult Get([FromRoute] string key, [FromQuery] string? select)
+        public ActionResult Get([FromRoute] string key)
         {
             FormData? publicData = null;
             if (IdentityContext.IdentityType == IdentityType.Public)
@@ -597,25 +550,14 @@ namespace EIMSNext.Service.Host.Controllers
                 }
             }
 
-            var fields = new DynamicFieldList();
-            if (!string.IsNullOrEmpty(select))
-            {
-                foreach (var field in select.Split(',', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    fields.Add(new DynamicField { Field = field, Visible = true });
-                }
-            }
-
             var queryOptions = new DynamicFindOptions<FormData>()
             {
-                Select = fields,
                 Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
             };
             if (IdentityContext.IdentityType != IdentityType.Public)
             {
                 var accessProbe = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
                 {
-                    Select = new DynamicFieldList { DynamicField.Create(Fields.FormId, true) },
                     Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
                     Take = 1,
                 })).FirstOrDefault();
@@ -633,7 +575,6 @@ namespace EIMSNext.Service.Host.Controllers
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 queryOptions.Scope = new DataScope { FormId = publicData!.FormId };
-                queryOptions.Select = BuildPublicSelectList(ResolvePublicSingleViewFields(publicData.FormId));
             }
 
             var options = FilterResult(queryOptions);
@@ -701,7 +642,7 @@ namespace EIMSNext.Service.Host.Controllers
             //默认草稿
             entity.FlowStatus = FlowStatus.Draft;
 
-            if (!IsMongoDocumentSizeAllowed(entity))
+            if (!IsFormDataSizeAllowed(entity))
             {
                 return BadRequest("表单数据不能超过 16MB");
             }
@@ -798,7 +739,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest("请求修改对象的Key不一致");
             }
 
-            if (!IsMongoDocumentSizeAllowed(entity))
+            if (!IsFormDataSizeAllowed(entity))
             {
                 return BadRequest("表单数据不能超过 16MB");
             }
@@ -849,7 +790,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             model.CopyTo(entity);
 
-            if (!IsMongoDocumentSizeAllowed(entity))
+            if (!IsFormDataSizeAllowed(entity))
             {
                 return BadRequest("表单数据不能超过 16MB");
             }
@@ -877,9 +818,13 @@ namespace EIMSNext.Service.Host.Controllers
             return true;
         }
 
-        private static bool IsMongoDocumentSizeAllowed(FormData entity)
+        /// <summary>
+        /// 校验表单数据序列化后是否超出单文档上限。
+        /// </summary>
+        private static bool IsFormDataSizeAllowed(FormData entity)
         {
-            return EntityExtension.ToBson(entity).ToBson().Length <= MongoMaxDocumentBytes;
+            var json = entity.SerializeToJson();
+            return Encoding.UTF8.GetByteCount(json) <= MaxDocumentBytes;
         }
 
         /// <summary>
@@ -1143,82 +1088,6 @@ namespace EIMSNext.Service.Host.Controllers
             return allowedFields.Count > 0 && allowedFields.Contains(root);
         }
 
-        private void ApplyPublicProjection(IPublicAccessValidator validator, string? formId, DynamicFindOptions<FormData> query)
-        {
-            if (string.IsNullOrWhiteSpace(formId) || IsPublicCountRequest())
-            {
-                return;
-            }
-
-            var setting = validator.GetCurrentSetting();
-            if (setting?.TargetType != PublicTargetType.Form)
-            {
-                return;
-            }
-
-            if (validator.IsRelatedForm(formId))
-            {
-                return;
-            }
-
-            query.Select = BuildPublicSelectList(IsPublicSingleReadRequest()
-                ? ResolvePublicSingleViewFields(formId)
-                : ResolvePublicListFields(formId));
-        }
-
-        private IEnumerable<string> ResolvePublicSingleViewFields(string formId)
-        {
-            var validator = Resolver.Resolve<IPublicAccessValidator>();
-            var setting = validator.GetCurrentSetting();
-            var visible = setting?.Form.DataLink.Fields?
-                .Where(x => x.Visible)
-                .Select(x => x.Field)
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            return visible?.Count > 0 ? visible : ResolveOrdinaryFields(formId);
-        }
-
-        private IEnumerable<string> ResolvePublicListFields(string formId)
-        {
-            var validator = Resolver.Resolve<IPublicAccessValidator>();
-            var setting = validator.GetCurrentSetting();
-            var display = setting?.Form.QueryLink.DisplayFields?
-                .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            return display?.Count > 0 ? display : ResolveOrdinaryFields(formId).Take(5);
-        }
-
-        private IEnumerable<string> ResolveOrdinaryFields(string formId)
-        {
-            var form = _formDefService.Get(formId);
-            return FlattenOrdinaryFields(form?.Content?.Items ?? []);
-        }
-
-        private static IEnumerable<string> FlattenOrdinaryFields(IEnumerable<FieldDef> fields)
-        {
-            foreach (var field in fields)
-            {
-                var publicSystemField = IsPublicSystemField(field);
-                if ((!publicSystemField && field.Hidden) || IsOrgField(field.Type))
-                {
-                    continue;
-                }
-
-                if (field.Type == FieldType.TableForm && field.Columns?.Count > 0)
-                {
-                    foreach (var sub in FlattenOrdinaryFields(field.Columns))
-                    {
-                        yield return $"{field.Field}>{sub}";
-                    }
-                    continue;
-                }
-
-                yield return field.Field;
-            }
-        }
-
         private static bool IsPublicSystemField(FieldDef field)
         {
             return PublicFormSystemFieldHelper.IsPublicSystemField(field.Field) &&
@@ -1226,42 +1095,10 @@ namespace EIMSNext.Service.Host.Controllers
                     PublicFormSystemFieldHelper.IsPublicSystemField(field.SystemKind));
         }
 
-        private static bool IsOrgField(string? type)
-        {
-            return type == FieldType.Department1 ||
-                   type == FieldType.Department2 ||
-                   type == FieldType.Employee1 ||
-                   type == FieldType.Employee2;
-        }
-
-        private static DynamicFieldList BuildPublicSelectList(IEnumerable<string> fields)
-        {
-            var select = new DynamicFieldList
-            {
-                DynamicField.Create(Fields.Id),
-                DynamicField.Create(Fields.AppId),
-                DynamicField.Create(Fields.FormId),
-                DynamicField.Create(Fields.DataTitle),
-                DynamicField.Create(Fields.CreateTime)
-            };
-
-            foreach (var field in fields.Distinct(StringComparer.OrdinalIgnoreCase))
-            {
-                select.Add(DynamicField.Create($"{Fields.Data}.{field}"));
-            }
-
-            return select;
-        }
-
         private bool IsPublicSingleReadRequest()
         {
             return HttpContext.Request.Method.Equals(HttpMethods.Get, StringComparison.OrdinalIgnoreCase) &&
                    HttpContext.Request.RouteValues.TryGetValue("key", out _);
-        }
-
-        private bool IsPublicCountRequest()
-        {
-            return HttpContext.Request.Path.Value?.Contains("$count", StringComparison.OrdinalIgnoreCase) == true;
         }
 
         private static string? FindFormId(DynamicFilter? filter)
@@ -1337,7 +1174,6 @@ namespace EIMSNext.Service.Host.Controllers
                     Op = FilterOp.In,
                     Value = requested.Cast<object>().ToList(),
                 },
-                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
                 Take = requested.Count,
             });
 
@@ -1558,7 +1394,6 @@ namespace EIMSNext.Service.Host.Controllers
             var result = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
             {
                 Filter = filter,
-                Select = new DynamicFieldList { DynamicField.Create(Fields.Id, true) },
                 Take = 1,
             })).FirstOrDefault();
 
@@ -1617,3 +1452,4 @@ namespace EIMSNext.Service.Host.Controllers
 
     }
 }
+

@@ -1,3 +1,4 @@
+﻿using System.Linq.Expressions;
 using System.Composition;
 using System.Text.Json;
 
@@ -5,16 +6,14 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Entities;
 using EIMSNext.Mef;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Async.Tasks.Export
 {
@@ -88,31 +87,29 @@ namespace EIMSNext.Async.Tasks.Export
             return rowIndex;
         }
 
-        private static FilterDefinition<IdentityLoginAudit> BuildFilter(string corpId, IdentityLoginAuditExportRequest request)
+        private static Expression<Func<IdentityLoginAudit, bool>> BuildFilter(string corpId, IdentityLoginAuditExportRequest request)
         {
-            var builder = Builders<IdentityLoginAudit>.Filter;
-            var filters = new List<FilterDefinition<IdentityLoginAudit>>
-            {
-                builder.Eq(x => x.CorpId, corpId),
-                builder.Ne(x => x.DeleteFlag, true),
-            };
+            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {
-                filters.Add(builder.Regex(x => x.UserName, new MongoDB.Bson.BsonRegularExpression(request.UserName, "i")));
+                var keyword = DynamicQueryExtensions.EscapeLikePattern(request.UserName);
+                filter = filter.AndAlso(x => EF.Functions.ILike(x.UserName, keyword));
             }
 
             if (request.StartTime.HasValue)
             {
-                filters.Add(builder.Gte(x => x.CreateTime, request.StartTime.Value));
+                var startTime = request.StartTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime >= startTime);
             }
 
             if (request.EndTime.HasValue)
             {
-                filters.Add(builder.Lte(x => x.CreateTime, request.EndTime.Value));
+                var endTime = request.EndTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime <= endTime);
             }
 
-            return filters.Count == 1 ? filters[0] : builder.And(filters);
+            return filter;
         }
     }
 }

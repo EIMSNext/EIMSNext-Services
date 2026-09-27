@@ -1,43 +1,13 @@
-using EIMSNext.Core.Mongo;
-
 using EIMSNext.Flow.Persistence;
-using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using WorkflowCore.Models;
-
-namespace EIMSNext.Flow.Service
+namespace EIMSNext.Flow.Service;
+public sealed class WfDbContext(DbContextOptions<WfDbContext> options) : DbContext(options), IWfDbContext
 {
-    public class WfDbContext : MongoDbContextBase, IWfDbContext
-    {
-        private const string WorkflowInstanceCollectionName = "Wf_WorkflowInstance";
-        private const string SubscriptionCollectionName = "Wf_Subscription";
-        private const string EventCollectionName = "Wf_Event";
-        private const string ExecutionErrorCollectionName = "Wf_ExecutionError";
-        private const string ScheduledCommandCollectionName = "Wf_ScheduledCommand";
+ public DbSet<WorkflowInstance> WorkflowInstances=>Set<WorkflowInstance>(); public DbSet<ExecutionPointer> ExecutionPointers=>Set<ExecutionPointer>(); public DbSet<EventSubscription> EventSubscriptions=>Set<EventSubscription>(); public DbSet<Event> Events=>Set<Event>(); public DbSet<ExecutionError> ExecutionErrors=>Set<ExecutionError>(); public DbSet<ScheduledCommand> ScheduledCommands=>Set<ScheduledCommand>();
 
-        #region Variables
+ /// <inheritdoc />
+ DbContext IWfDbContext.Context => this;
 
-        #endregion
-
-        public WfDbContext(IOptions<MongoDbConfiguration> settings) : base(settings)
-        {
-        }
-
-        #region Properties
-        public IMongoCollection<WorkflowInstance> WorkflowInstances => GetCollection<WorkflowInstance>(WorkflowInstanceCollectionName);
-        public IMongoCollection<EventSubscription> EventSubscriptions => GetCollection<EventSubscription>(SubscriptionCollectionName);
-        public IMongoCollection<Event> Events => GetCollection<Event>(EventCollectionName);
-        public IMongoCollection<ExecutionError> ExecutionErrors => GetCollection<ExecutionError>(ExecutionErrorCollectionName);
-        public IMongoCollection<ScheduledCommand> ScheduledCommands => GetCollection<ScheduledCommand>(ScheduledCommandCollectionName);
-
-        #endregion
-
-        #region Methods
-
-        #endregion
-
-        #region Helper       
-
-        #endregion
-    }
+ protected override void OnModelCreating(ModelBuilder builder) => builder.ConfigureWorkflowStore();
 }

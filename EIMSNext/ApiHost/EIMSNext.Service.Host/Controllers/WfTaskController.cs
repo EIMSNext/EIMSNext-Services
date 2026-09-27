@@ -1,9 +1,8 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using HKH.Mef2.Integration;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Query;
 using EIMSNext.Entities;
 
@@ -22,3 +21,4 @@ namespace EIMSNext.Service.Host.Controllers
 		}
 	}
 }
+

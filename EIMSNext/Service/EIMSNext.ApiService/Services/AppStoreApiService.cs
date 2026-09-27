@@ -1,20 +1,25 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 应用商店的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class AppStoreApiService(IResolver resolver) : ApiServiceBase(resolver)
     {
         private readonly IRepository<AppProfile> _appProfileRepository = resolver.GetRepository<AppProfile>();
 
+        /// <summary>
+        /// 获取应用商店。
+        /// </summary>
         public (long Total, IReadOnlyList<AppProfile> Items) GetAppStore(AppProfileQueryRequest request)
         {
             var query = _appProfileRepository.Queryable
@@ -52,6 +57,9 @@ namespace EIMSNext.ApiService
             return (total, items);
         }
 
+        /// <summary>
+        /// 获取AppStoreDetail。
+        /// </summary>
         public AppProfile? GetAppStoreDetail(string id)
         {
             var profile = _appProfileRepository.Get(id);

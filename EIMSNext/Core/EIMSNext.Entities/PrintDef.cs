@@ -1,5 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -45,6 +45,6 @@ namespace EIMSNext.Entities
         /// <summary>
         /// PDF 打印定义。
         /// </summary>
-        Pdf
+        Pdf = 0,
     }
 }

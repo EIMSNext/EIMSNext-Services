@@ -1,12 +1,10 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
-
 namespace EIMSNext.Identity.Models
 {
+    /// <summary>
+    /// 公开访问设置。
+    /// </summary>
     public sealed class PublicAccessSetting
     {
-        [BsonId]
-        [BsonRepresentation(BsonType.String)]
         public string Id { get; set; } = string.Empty;
 
         public string? CorpId { get; set; }

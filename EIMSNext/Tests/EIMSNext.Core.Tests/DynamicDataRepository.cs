@@ -1,10 +1,14 @@
-using EIMSNext.Core.Mongo.Repositories;
+﻿using EIMSNext.Core.Repositories;
+using EIMSNext.Persistence.PostgreSql;
 
 namespace EIMSNext.Core.Tests
 {
-    public class FormDataRepository : RepositoryBase<FormData>
+    /// <summary>
+    /// 测试用表单数据仓储。
+    /// </summary>
+    public class FormDataRepository : DbRepository<FormData>
     {
-        public FormDataRepository(DbContext dbContext) : base(dbContext)
+        public FormDataRepository(TestPostgreSqlDbContext dbContext) : base(dbContext)
         {
         }
     }

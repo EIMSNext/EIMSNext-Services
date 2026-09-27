@@ -1,37 +1,47 @@
-using HKH.Mef2.Integration;
+﻿using HKH.Mef2.Integration;
 
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.ApiClient.Flow;
 
-using MongoDB.Driver;
 using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// 工作流定义的 API 服务。
+    /// </summary>
     public class WfDefinitionApiService : ApiServiceBase<Wf_Definition, WfDefinitionViewModel, IWfDefinitionService>
     {
         private FlowApiClient _flowClient;
+        /// <summary>
+        /// 初始化WfDefinitionApiService的新实例。
+        /// </summary>
+        /// <param name="resolver">服务解析器。</param>
         public WfDefinitionApiService(IResolver resolver) : base(resolver)
         {
             _flowClient = resolver.Resolve<FlowApiClient>();
         }
 
+        /// <summary>
+        /// 新增实体。
+        /// </summary>
         public override async Task AddAsync(Wf_Definition entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             await base.AddAsync(entity);
             await _flowClient.Load(new LoadDefRequest { WfDefinitionId = entity.ExternalId, Version = entity.Version }, IdentityContext.AccessToken);
         }
-        public override async Task<ReplaceOneResult> ReplaceAsync(Wf_Definition entity)
+        /// <summary>
+        /// 更新实体。
+        /// </summary>
+        public override async Task<int> ReplaceAsync(Wf_Definition entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             var result = await base.ReplaceAsync(entity);
@@ -39,6 +49,9 @@ namespace EIMSNext.ApiService
             return result;
         }
 
+        /// <summary>
+        /// 创建新版本。
+        /// </summary>
         public async Task<Wf_Definition> CreateVersionAsync(string id)
         {
             var source = GetManageableDefinition(id);
@@ -47,6 +60,9 @@ namespace EIMSNext.ApiService
             return result;
         }
 
+        /// <summary>
+        /// 激活版本。
+        /// </summary>
         public async Task<Wf_Definition> ActivateAsync(string id)
         {
             var source = GetManageableDefinition(id);
@@ -55,6 +71,9 @@ namespace EIMSNext.ApiService
             return result;
         }
 
+        /// <summary>
+        /// 按当前身份权限过滤查询。
+        /// </summary>
         protected override IQueryable<WfDefinitionViewModel> FilterByPermission()
         {
             var query = base.FilterByPermission();
@@ -73,7 +92,10 @@ namespace EIMSNext.ApiService
             return query.Where(x => false);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除实体核心逻辑。
+        /// </summary>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var definitions = CoreService.All()

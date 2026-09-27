@@ -1,6 +1,6 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests

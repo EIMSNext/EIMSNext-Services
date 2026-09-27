@@ -1,12 +1,10 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -14,9 +12,16 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+    /// <summary>
+    /// E 币价格的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
     public class ECoinPriceApiService(IResolver resolver)
         : ApiServiceBase<ECoinPrice, ECoinPriceViewModel, IECoinPriceService>(resolver)
     {
+        /// <summary>
+        /// 执行 BatchUpsertAsync 操作。
+        /// </summary>
         public async Task<IReadOnlyList<ECoinPrice>> BatchUpsertAsync(IEnumerable<ECoinPriceBatchItemRequest>? requests)
         {
             var normalized = NormalizeBatch(requests);

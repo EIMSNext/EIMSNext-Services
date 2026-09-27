@@ -1,17 +1,14 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 using NanoidDotNet;
 
 namespace EIMSNext.ApiService
@@ -36,6 +33,10 @@ namespace EIMSNext.ApiService
         private const string ApiKeyAlphabet =
             "_+-0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!@#$%^&*()~`.,?=";
 
+        /// <summary>
+        /// 新增客户端，生成明文密钥并哈希后存储。
+        /// </summary>
+        /// <param name="entity">客户端实体。</param>
         protected override async Task AddAsyncCore(Client entity)
         {
             var plainSecret = GeneratePlainSecret();
@@ -67,7 +68,12 @@ namespace EIMSNext.ApiService
             CachePlainSecret(entity.Id, plainSecret);
         }
 
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(Client entity)
+        /// <summary>
+        /// 替换客户端，保护密钥与凭证字段不被请求体改写。
+        /// </summary>
+        /// <param name="entity">客户端实体。</param>
+        /// <returns>替换结果。</returns>
+        protected override async Task<int> ReplaceAsyncCore(Client entity)
         {
             var existing = await CoreService.GetAsync(entity.Id);
             if (existing == null || existing.CorpId != IdentityContext.CurrentCorpId || existing.DeleteFlag)
@@ -92,7 +98,12 @@ namespace EIMSNext.ApiService
             return await base.ReplaceAsyncCore(entity);
         }
 
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        /// <summary>
+        /// 删除客户端。
+        /// </summary>
+        /// <param name="ids">客户端 ID 集合。</param>
+        /// <returns>删除结果。</returns>
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -100,7 +111,8 @@ namespace EIMSNext.ApiService
                 .ToList();
             if (idList.Count == 0)
             {
-                return new object();
+                // 基类 DeleteAsyncCore 返回受影响行数，空集合下自然为 0。
+                return 0;
             }
 
             var deleting = CoreService.All()
@@ -117,6 +129,11 @@ namespace EIMSNext.ApiService
         }
 
         // ===== 写操作 =====
+        /// <summary>
+        /// 生成新的客户端密钥。
+        /// </summary>
+        /// <param name="id">客户端 ID。</param>
+        /// <returns>客户端凭证。</returns>
         public async Task<ClientCredentials> GenerateSecretAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);
@@ -147,6 +164,11 @@ namespace EIMSNext.ApiService
         }
 
         // ===== 读操作 =====
+        /// <summary>
+        /// 取回客户端的明文密钥（若仍在缓存有效期内）。
+        /// </summary>
+        /// <param name="id">客户端 ID。</param>
+        /// <returns>客户端凭证。</returns>
         public async Task<ClientCredentials> RevealAsync(string id)
         {
             var existing = await CoreService.GetAsync(id);
