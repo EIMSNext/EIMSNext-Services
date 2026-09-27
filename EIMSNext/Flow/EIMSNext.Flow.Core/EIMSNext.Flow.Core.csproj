@@ -13,11 +13,15 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Cache\EIMSNext.Cache.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Print\EIMSNext.Print.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Scripting\EIMSNext.Scripting.csproj" />
     <ProjectReference Include="..\EIMSNext.Flow.Persistence\EIMSNext.Flow.Persistence.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Component\EIMSNext.Component.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
+    <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
+    <ProjectReference Include="..\..\File\EIMSNext.File.Contracts\EIMSNext.File.Contracts.csproj" />
   </ItemGroup>
 </Project>

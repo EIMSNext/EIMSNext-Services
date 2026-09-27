@@ -24,22 +24,22 @@ namespace EIMSNext.Flow.Core
             services.AddSingleton<IExpressionEvaluator, ExpressionEvaluator>();
 
             services.AddTransient<IWorkflowActionService, WorkflowActionService>();
-            services.AddTransient<IDataflowRunner, DataflowRunner>();
+            services.AddTransient<IEventFlowRunner, EventFlowRunner>();
 
             services.AddTransient<WfStartNode>();
             services.AddTransient<WfApproveNode>();
             services.AddTransient<WfCopyToNode>();
             services.AddTransient<WfEndNode>();
 
-            services.AddTransient<DfStartNode>();
-            services.AddTransient<DfEndNode>();
-            services.AddTransient<DfQueryOneNode>();
-            services.AddTransient<DfQueryManyNode>();
-            services.AddTransient<DfInsertNode>();
-            services.AddTransient<DfUpdateNode>();
-            services.AddTransient<DfDeleteNode>();
-            services.AddTransient<DfPrintNode>();
-            services.AddTransient<DfPluginNode>();
+            services.AddTransient<EfStartNode>();
+            services.AddTransient<EfEndNode>();
+            services.AddTransient<EfQueryOneNode>();
+            services.AddTransient<EfQueryManyNode>();
+            services.AddTransient<EfInsertNode>();
+            services.AddTransient<EfUpdateNode>();
+            services.AddTransient<EfDeleteNode>();
+            services.AddTransient<EfPrintNode>();
+            services.AddTransient<EfPluginNode>();
         }
     }
 }

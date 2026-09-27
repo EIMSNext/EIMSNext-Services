@@ -2,9 +2,15 @@ using System.Composition;
 using System.Text.Json;
 
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
+using EIMSNext.Mef;
 
 using HKH.Mef2.Integration;
 
@@ -104,7 +110,7 @@ namespace EIMSNext.Async.Tasks.Export
 
             if (!string.IsNullOrWhiteSpace(request.OperatorName))
             {
-                filters.Add(builder.Regex("CreateBy.Label", new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
+                filters.Add(builder.Regex(x => x.CreateBy!.Label, new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
             }
 
             if (request.StartTime.HasValue)

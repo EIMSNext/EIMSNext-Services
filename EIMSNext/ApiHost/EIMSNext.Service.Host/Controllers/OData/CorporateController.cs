@@ -5,7 +5,7 @@ using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.OData.Formatter;
 using Microsoft.AspNetCore.OData.Deltas;
@@ -22,6 +22,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     public class CorporateController(IResolver resolver) : ODataController<CorporateApiService, Corporate, CorporateViewModel, CorporateRequest>(resolver)
     {
         [Permission(Operation = Common.Operation.NotSet)]
+        [IdentityType(IdentityTypeDefaults.Authenticated)]
         public override Task<ActionResult> Post([FromBody] CorporateRequest model)
         {
             return base.Post(model);

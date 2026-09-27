@@ -1,18 +1,18 @@
 using System.Composition.Hosting;
 using System.Linq.Expressions;
 
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.MongoDb;
-using EIMSNext.Service.Entities;
 
 using MongoDB.Bson;
 
@@ -37,6 +37,7 @@ namespace EIMSNext.Service.Tests
         private InMemoryRepository<CorpOnboardingRequest> _requestRepo = null!;
         private InMemoryRepository<Corporate> _corpRepo = null!;
         private InMemoryRepository<Employee> _empRepo = null!;
+        private InMemoryRepository<EmployeeDepartment> _empDeptRepo = null!;
         private InMemoryRepository<User> _userRepo = null!;
         private InMemoryRepository<Department> _deptRepo = null!;
         private InMemoryRepository<AuditLog> _auditLogRepo = null!;
@@ -49,6 +50,7 @@ namespace EIMSNext.Service.Tests
             _requestRepo = new InMemoryRepository<CorpOnboardingRequest>();
             _corpRepo = new InMemoryRepository<Corporate>();
             _empRepo = new InMemoryRepository<Employee>();
+            _empDeptRepo = new InMemoryRepository<EmployeeDepartment>();
             _userRepo = new InMemoryRepository<User>();
             _deptRepo = new InMemoryRepository<Department>();
             _auditLogRepo = new InMemoryRepository<AuditLog>();
@@ -75,6 +77,7 @@ namespace EIMSNext.Service.Tests
                 [typeof(IRepository<CorpOnboardingRequest>)] = _requestRepo,
                 [typeof(IRepository<Corporate>)] = _corpRepo,
                 [typeof(IRepository<Employee>)] = _empRepo,
+                [typeof(IRepository<EmployeeDepartment>)] = _empDeptRepo,
                 [typeof(IRepository<User>)] = _userRepo,
                 [typeof(IRepository<Department>)] = _deptRepo,
                 [typeof(IRepository<AuditLog>)] = _auditLogRepo,
@@ -110,6 +113,7 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual("test@test.com", employee.WorkEmail);
             Assert.IsTrue(employee.UserBound);
             Assert.AreEqual(EmployeeStatus.PendingReview, employee.Status);
+            Assert.IsTrue(_empDeptRepo.Queryable.Any(x => x.EmployeeId == employee.Id));
         }
 
         [TestMethod]
@@ -168,7 +172,6 @@ namespace EIMSNext.Service.Tests
             var emp = new Employee
             {
                 CorpId = corpId,
-                DepartmentId = deptId,
                 Code = "E001",
                 EmpName = userName,
                 UserBound = true,
@@ -178,6 +181,14 @@ namespace EIMSNext.Service.Tests
             };
             _empRepo.EnsureId(emp);
             await _empRepo.InsertAsync(emp);
+            var relation = new EmployeeDepartment
+            {
+                CorpId = corpId,
+                EmployeeId = emp.Id,
+                DepartmentId = deptId
+            };
+            _empDeptRepo.EnsureId(relation);
+            await _empDeptRepo.InsertAsync(relation);
             return emp;
         }
 
@@ -287,6 +298,8 @@ namespace EIMSNext.Service.Tests
             public Task RefreshAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public void Remove(string key, CacheScope scope, string scopeId = "") { }
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
+            public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
+            public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
         }
 
         private sealed class FakeScopeCache : IScopeCache

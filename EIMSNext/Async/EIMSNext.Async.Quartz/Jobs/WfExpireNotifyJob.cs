@@ -1,9 +1,14 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Repositories;
-using EIMSNext.MongoDb;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Flow.Persistence;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 using Quartz;
@@ -20,18 +25,18 @@ namespace EIMSNext.Async.Quartz.Jobs
 
         protected override async Task ExecuteAsync(IJobExecutionContext context)
         {
-            var todoRepo = Resolver.GetRepository<Wf_Todo>();
+            var taskRepo = Resolver.GetRepository<Wf_Task>();
             var wfDefRepo = Resolver.GetRepository<Wf_Definition>();
             var publisher = Resolver.Resolve<IMessagePublisher>();
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var expiredTodos = todoRepo.Find(x => !x.ExpireHandled && x.ExpireTime.HasValue && x.ExpireTime <= now).ToList();
-            if (expiredTodos.Count == 0)
+            var expiredTasks = taskRepo.Find(x => !x.ExpireHandled && x.ExpireTime.HasValue && x.ExpireTime <= now).ToList();
+            if (expiredTasks.Count == 0)
             {
                 return;
             }
 
-            var workflowCollection = Resolver.Resolve<IMongoDbContex>().Database.GetCollection<WorkflowInstance>("Wf_WorkflowInstance");
-            foreach (var group in expiredTodos.GroupBy(x => new { x.WfInstanceId, x.ApproveNodeId }))
+            var workflowCollection = Resolver.Resolve<IWfDbContext>().WorkflowInstances;
+            foreach (var group in expiredTasks.GroupBy(x => new { x.WfInstanceId, x.ApproveNodeId }))
             {
                 var sample = group.First();
                 var workflow = workflowCollection.Find(x => x.Id == sample.WfInstanceId).FirstOrDefault();
@@ -43,28 +48,46 @@ namespace EIMSNext.Async.Quartz.Jobs
                 var definition = wfDefRepo.Find(x => x.ExternalId == workflow.WorkflowDefinitionId && x.Version == workflow.Version).FirstOrDefault();
                 var step = definition?.Metadata?.Steps?.FirstOrDefault(x => x.Id == sample.ApproveNodeId);
                 var expireSetting = step?.WfNodeSetting?.ApproveSetting?.ExpireSetting;
-                if (expireSetting?.ActionType != WfExpireActionType.AutoNotify)
+                if (expireSetting == null || expireSetting.TimeValue <= 0)
                 {
-                    await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
+                    await MarkExpireHandledAsync(taskRepo, group.Select(x => x.Id), now);
                     continue;
                 }
 
-                await publisher.PublishAsync(new NotifyDispatchTaskArgs
+                if (expireSetting.ActionType == WfExpireActionType.AutoNotify)
                 {
-                    CorpId = sample.CorpId,
-                    MessageType = MessageType.WfExpireNotify,
-                    AppId = sample.AppId,
-                    FormId = sample.FormId,
-                    DataId = sample.DataId,
-                    WfInstanceId = sample.WfInstanceId,
-                    ApproveNodeId = sample.ApproveNodeId
-                });
+                    await publisher.PublishAsync(new NotifyDispatchTaskArgs
+                    {
+                        CorpId = sample.CorpId ?? string.Empty,
+                        MessageType = MessageType.WfExpireNotify,
+                        AppId = sample.AppId,
+                        FormId = sample.FormId,
+                        DataId = sample.DataId,
+                        WfInstanceId = sample.WfInstanceId,
+                        ApproveNodeId = sample.ApproveNodeId,
+                        EventStamp = now,
+                    });
 
-                await MarkExpireHandledAsync(todoRepo, group.Select(x => x.Id), now);
+                    // The notification task is now durably queued. Mark the source tasks
+                    // handled here so the minute-level scan does not publish duplicates.
+                    await MarkExpireHandledAsync(taskRepo, group.Select(x => x.Id), now);
+                }
+                else
+                {
+                    await publisher.PublishAsync(new WorkflowExpireTaskArgs
+                    {
+                        CorpId = sample.CorpId ?? string.Empty,
+                        WfInstanceId = sample.WfInstanceId,
+                        DataId = sample.DataId,
+                        WfNodeId = sample.ApproveNodeId,
+                        TaskIds = group.Select(x => x.Id).Distinct().ToList(),
+                        ActionType = expireSetting.ActionType
+                    });
+                }
             }
         }
 
-        private static Task MarkExpireHandledAsync(IRepository<Wf_Todo> todoRepo, IEnumerable<string> ids, long now)
+        private static Task MarkExpireHandledAsync(IRepository<Wf_Task> taskRepo, IEnumerable<string> ids, long now)
         {
             var idList = ids.Distinct().ToList();
             if (idList.Count == 0)
@@ -72,7 +95,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                 return Task.CompletedTask;
             }
 
-            todoRepo.UpdateMany(Builders<Wf_Todo>.Filter.In(x => x.Id, idList), Builders<Wf_Todo>.Update
+            taskRepo.UpdateMany(Builders<Wf_Task>.Filter.In(x => x.Id, idList), Builders<Wf_Task>.Update
                 .Set(x => x.ExpireHandled, true)
                 .Set(x => x.UpdateTime, now), upsert: false);
             return Task.CompletedTask;

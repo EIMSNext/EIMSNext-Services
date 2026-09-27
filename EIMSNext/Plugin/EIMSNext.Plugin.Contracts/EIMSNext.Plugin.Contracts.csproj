@@ -11,4 +11,7 @@
     <PackageReference Include="HKH.Mef2.Integration.Abstractions" />
     <PackageReference Include="Serilog" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.Json\EIMSNext.Json.csproj" />
+  </ItemGroup>
 </Project>

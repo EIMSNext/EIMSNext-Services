@@ -6,7 +6,7 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Requests;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
@@ -25,7 +25,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("Read")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public async Task<ActionResult> Read([FromBody] SystemMessageReadRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Id))
@@ -38,7 +38,7 @@ namespace EIMSNext.Service.Host.Controllers
         }
 
         [HttpPost("ReadBatch")]
-        [Permission(Operation = Operation.Write)]
+        [Permission(Operation = Operation.Edit)]
         public async Task<ActionResult> ReadBatch([FromBody] DeleteBatch request)
         {
             if (request.Keys?.Count <= 0)

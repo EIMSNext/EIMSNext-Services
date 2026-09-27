@@ -1,6 +1,7 @@
 using Asp.Versioning;
 using EIMSNext.ApiCore;
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.Plugin.Runtime;
+using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
@@ -9,7 +10,7 @@ using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Flow.Host.Extensions;
 using EIMSNext.Flow.Persistence;
 using EIMSNext.Flow.Service;
-using EIMSNext.MongoDb;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Service;
 using EIMSNext.Service.Contracts;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -35,12 +36,12 @@ builder.Services.AddControllers();
 
 builder.Services.AddWorkflow(opt =>
 {
-    opt.UseMongoDB((services) => services.GetRequiredService<IMongoDbContex>().Database);
+    opt.UseMongoDB(services => services.GetRequiredService<IWfDbContext>());
 });
 
 builder.Services.AddStepBodys();
 builder.Services.AddWorkflowServices();
-builder.Services.AddScoped<IDataflowScheduleService, DataflowScheduleService>();
+builder.Services.AddScoped<IEventFlowScheduleService, EventFlowScheduleService>();
 
 builder.Services.AddApiVersioning(opt =>
 {
@@ -84,6 +85,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseSerilogRequestLogging();
 app.UseHttpsRedirection();
+app.UseRouting();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 

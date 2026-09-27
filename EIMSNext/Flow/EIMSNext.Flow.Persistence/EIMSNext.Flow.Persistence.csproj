@@ -11,4 +11,7 @@
     <PackageReference Include="MongoDB.Driver" />
     <PackageReference Include="WorkflowCore" />
   </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
+  </ItemGroup>
 </Project>

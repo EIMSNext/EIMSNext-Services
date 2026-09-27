@@ -1,5 +1,4 @@
-using EIMSNext.Service;
-using EIMSNext.Service.Contracts;
+using EIMSNext.File.Contracts;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace EIMSNext.File

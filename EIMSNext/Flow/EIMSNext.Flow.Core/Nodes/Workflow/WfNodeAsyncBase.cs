@@ -1,10 +1,13 @@
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core.Interfaces;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
@@ -20,24 +23,26 @@ namespace EIMSNext.Flow.Core.Nodes
     {
         protected WfNodeAsyncBase(IResolver resolver) : base(resolver)
         {
-            TodoRepository = resolver.GetRepository<Wf_Todo>();
+            TaskRepository = resolver.GetRepository<Wf_Task>();
             ExecLogRepository = resolver.GetRepository<Wf_ExecLog>();
-            ApprovalLogRepository = resolver.GetRepository<Wf_ApprovalLog>();
+            TaskLogRepository = resolver.GetRepository<Wf_TaskLog>();
             FormDataRepository = resolver.GetRepository<FormData>();
             FormDefRepository = resolver.GetRepository<FormDef>();
             EmployeeRepository = resolver.GetRepository<Employee>();
+            EmployeeDepartmentRepository = resolver.GetRepository<EmployeeDepartment>();
             DepartmentRepository = resolver.GetRepository<Department>();
             Logger = resolver.GetLogger<T>();
         }
 
-        protected IRepository<Wf_Todo> TodoRepository { get; private set; }
+        protected IRepository<Wf_Task> TaskRepository { get; private set; }
         protected IRepository<Wf_ExecLog> ExecLogRepository { get; private set; }
-        protected IRepository<Wf_ApprovalLog> ApprovalLogRepository { get; private set; }
+        protected IRepository<Wf_TaskLog> TaskLogRepository { get; private set; }
         protected IRepository<FormData> FormDataRepository { get; private set; }
         protected IRepository<FormDef> FormDefRepository { get; private set; }
         protected IRepository<Employee> EmployeeRepository { get; private set; }
+        protected IRepository<EmployeeDepartment> EmployeeDepartmentRepository { get; private set; }
         protected IRepository<Department> DepartmentRepository { get; private set; }
-        protected IDataflowRunner DataflowRunner => Resolver.Resolve<IDataflowRunner>();
+        protected IEventFlowRunner EventFlowRunner => Resolver.Resolve<IEventFlowRunner>();
 
         protected ILogger<T> Logger { get; private set; }
         private FormData? FormData { get; set; }
@@ -48,16 +53,16 @@ namespace EIMSNext.Flow.Core.Nodes
             return WfDataContext.FromExpando((ExpandoObject)context.Workflow.Data);
         }
 
-        protected void AddApprovalLog(WorkflowInstance wfInst, Wf_Todo todoTask, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
+        protected void AddTaskLog(WorkflowInstance wfInst, Wf_Task task, WfDataContext dataContext, WfStep wfStep, WfApproveData approveData, IClientSessionHandle? session)
         {
-            var log = new Wf_ApprovalLog()
+            var log = new Wf_TaskLog()
             {
                 CorpId = dataContext.CorpId,
                 AppId = dataContext.AppId,
                 FormId = dataContext.FormId,
                 FormName = GetFormDef(dataContext.FormId).Name,
                 DataId = dataContext.DataId,
-                DataBrief = todoTask.DataBrief,
+                DataBrief = task.DataBrief,
                 Approver = new Operator(approveData.WorkerId, approveData.WorkerCode, approveData.WorkerName),
                 NodeId = wfStep.Id,
                 NodeName = wfStep.Name,
@@ -70,14 +75,33 @@ namespace EIMSNext.Flow.Core.Nodes
                 Round = dataContext.Round
             };
 
-            ApprovalLogRepository.Insert(log, session);
+            TaskLogRepository.Insert(log, session);
         }
 
         protected async Task AddCCLogs(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IEnumerable<string> empIds, IClientSessionHandle? session)
         {
-            var logs = new List<Wf_ApprovalLog>();
-            await EmployeeRepository.Find(x => empIds.Contains(x.Id))
-             .ForEachAsync(emp => logs.Add(new Wf_ApprovalLog()
+            var targetEmpIds = empIds.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
+            if (targetEmpIds.Count == 0)
+            {
+                return;
+            }
+
+            var existedEmpIds = TaskLogRepository.Find(x =>
+                x.DataId == dataContext.DataId
+                && x.NodeId == wfStep.Id
+                && x.Result == ApproveAction.CopyTo
+                && x.Round == dataContext.Round
+                && x.Approver != null
+                && targetEmpIds.Contains(x.Approver.Id))
+                .ToList()
+                .Select(x => x.Approver?.Id ?? string.Empty)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct()
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            var logs = new List<Wf_TaskLog>();
+            await EmployeeRepository.Find(x => targetEmpIds.Contains(x.Id))
+             .ForEachAsync(emp => logs.Add(new Wf_TaskLog()
              {
                  CorpId = dataContext.CorpId,
                  AppId = dataContext.AppId,
@@ -95,9 +119,11 @@ namespace EIMSNext.Flow.Core.Nodes
                   Round = dataContext.Round
               }));
 
+            logs = logs.Where(x => x.Approver != null && !existedEmpIds.Contains(x.Approver.Id)).ToList();
+
             if (logs.Any())
             {
-                ApprovalLogRepository.Insert(logs, session);
+                TaskLogRepository.Insert(logs, session);
             }
         }
 
@@ -109,16 +135,21 @@ namespace EIMSNext.Flow.Core.Nodes
             return ExecutionResult.WaitForActivity(context.ExecutionPointer.EventKey, context.Workflow.Data, DateTime.Now);
         }
 
-        protected async Task<List<Wf_Todo>> CreateTodos(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
+        protected async Task<List<Wf_Task>> CreateTasks(WorkflowInstance wfInst, WfDataContext dataContext, WfStep wfStep, IClientSessionHandle? session)
         {
-            var empIds = await PopulateEmpIds(dataContext, wfStep.WfNodeSetting?.ApproveSetting?.Candidates);
+            var approveSetting = wfStep.WfNodeSetting?.ApproveSetting;
+            var empIds = (await PopulateEmpIds(dataContext, approveSetting?.Candidates)).ToList();
+            if (!empIds.Any() && approveSetting?.NoApproverSetting?.ActionType == NoApproverActionType.TransferToMember)
+            {
+                empIds = (await PopulateEmpIds(dataContext, approveSetting.NoApproverSetting.Candidates)).ToList();
+            }
 
-            var todos = new List<Wf_Todo>();
+            var tasks = new List<Wf_Task>();
             var now = DateTime.UtcNow.ToTimeStampMs();
-            var expireTime = GetExpireTime(wfStep.WfNodeSetting?.ApproveSetting);
+            var expireTime = GetExpireTime(approveSetting);
             empIds.ForEach(empId =>
             {
-                todos.Add(new Wf_Todo
+                tasks.Add(new Wf_Task
                 {
                     CorpId = dataContext.CorpId,
                     AppId = dataContext.AppId,
@@ -138,12 +169,12 @@ namespace EIMSNext.Flow.Core.Nodes
                 });
             });
 
-            if ((todos.Any()))
+            if ((tasks.Any()))
             {
-                TodoRepository.Insert(todos, session);
+                TaskRepository.Insert(tasks, session);
             }
 
-            return todos;
+            return tasks;
         }
 
         private static long? GetExpireTime(ApproveSetting? approveSetting)
@@ -168,11 +199,11 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task<IEnumerable<string>> PopulateEmpIds(WfDataContext dataContext, IList<ApprovalCandidate>? candidates)
         {
-            var resolver = new WorkflowCandidateResolver(EmployeeRepository, DepartmentRepository, FormDefRepository, FormDataRepository);
+            var resolver = new WorkflowCandidateResolver(EmployeeRepository, EmployeeDepartmentRepository, DepartmentRepository, FormDefRepository, FormDataRepository);
             return await resolver.ResolveEmployeeIdsAsync(dataContext, candidates);
         }
 
-        public DeleteResult DeleteTodos(string corpId, string dataId, string nodeId, IClientSessionHandle? session)
+        public DeleteResult DeleteTasks(string corpId, string dataId, string nodeId, IClientSessionHandle? session)
         {
             var filter = new DynamicFilter()
             {
@@ -183,7 +214,19 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             };
 
-            return TodoRepository.Delete(filter, session);
+            return TaskRepository.Delete(filter, session);
+        }
+
+        protected Wf_Task? ClaimTask(string workflowInstanceId, string dataId, string nodeId, string employeeId, IClientSessionHandle? session)
+        {
+            var filter = Builders<Wf_Task>.Filter.And(
+                Builders<Wf_Task>.Filter.Eq(x => x.WfInstanceId, workflowInstanceId),
+                Builders<Wf_Task>.Filter.Eq(x => x.DataId, dataId),
+                Builders<Wf_Task>.Filter.Eq(x => x.ApproveNodeId, nodeId),
+                Builders<Wf_Task>.Filter.Eq(x => x.EmployeeId, employeeId));
+            return session == null
+                ? TaskRepository.Collection.FindOneAndDelete(filter)
+                : TaskRepository.Collection.FindOneAndDelete(session, filter);
         }
 
         public UpdateResult UpdateWorkflowStatus(string corpId, string dataId, FlowStatus flowStatus, IClientSessionHandle? session)
@@ -209,13 +252,17 @@ namespace EIMSNext.Flow.Core.Nodes
             if (rule == WorkflowAutoProcessRule.FirstNodeOnly)
             {
                 var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
-                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId != wfStep.Id;
+                return !string.IsNullOrWhiteSpace(firstApproveNodeId) && firstApproveNodeId == wfStep.Id;
             }
 
             if (rule == WorkflowAutoProcessRule.ContinuousApproval)
             {
-                var lastApproval = ApprovalLogRepository
-                    .Find(x => x.DataId == dataContext.DataId)
+                var lastApproval = TaskLogRepository
+                    .Find(x => x.DataId == dataContext.DataId
+                        && x.Result != ApproveAction.CopyTo
+                        && x.Result != ApproveAction.Transfer
+                        && x.Result != ApproveAction.AutoTransfer
+                        && x.Result != ApproveAction.ChangeApprover)
                     .SortByDescending(x => x.ApprovalTime)
                     .FirstOrDefault();
                 return lastApproval?.Approver?.Id == dataContext.WfStarter?.Id;
@@ -273,12 +320,24 @@ namespace EIMSNext.Flow.Core.Nodes
             return brief;
         }
 
-        protected async Task RunDataflow(DfRunParamter paramter)
+        protected async Task RunEventFlow(EfRunParameter paramter)
         {
-            var dfExecResult = await DataflowRunner.RunAsync(paramter);
-            if (!dfExecResult.Success)
+            var isWorkflowTransition = paramter.WorkflowTransition
+                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
+                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
+            EfExecResult efExecResult;
+            if (isWorkflowTransition)
             {
-                throw new UnLogException(dfExecResult.Error);
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
+            else
+            {
+                using var suppression = MongoTransactionScope.SuppressAmbient();
+                efExecResult = await EventFlowRunner.RunAsync(paramter);
+            }
+            if (!efExecResult.Success)
+            {
+                throw new UnLogException(efExecResult.Error);
             }
         }
     }

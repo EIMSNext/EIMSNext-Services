@@ -1,40 +1,69 @@
-﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Configuration;
 
 namespace EIMSNext.Common
 {
     /// <summary>
-    /// 配置
+    /// 应用程序配置，从 <see cref="IConfiguration"/> 中读取并组合各主机配置。
     /// </summary>
     public class AppSetting
     {
-        private readonly IConfiguration _config;
+        /// <summary>
+        /// 获取服务主机配置。
+        /// </summary>
+        public ServiceHostSettings ServiceHost { get; }
+
+        /// <summary>
+        /// 获取 Web 主机配置。
+        /// </summary>
+        public WebHostSettings WebHost { get; }
+
+        /// <summary>
+        /// 获取文件存储配置。
+        /// </summary>
+        public StorageSettings Storage { get; }
+
+        /// <summary>
+        /// 获取身份认证主机配置。
+        /// </summary>
+        public IdentityHostSettings IdentityHost { get; }
         /// <summary>
         /// 
         /// </summary>
         /// <param name="config"></param>
         public AppSetting(IConfiguration config)
         {
-            _config = config;
+            var serviceHost = config.GetSection("ServiceHost");
+            ServiceHost = new ServiceHostSettings
+            {
+                BaseUrl = serviceHost.GetSection("BaseUrl").Value,
+            };
+
+            var webHost = config.GetSection("WebHost");
+            WebHost = new WebHostSettings
+            {
+                BaseUrl = webHost.GetSection("BaseUrl").Value,
+            };
+
+            var storage = config.GetSection("Storage");
+            Storage = new StorageSettings
+            {
+                BaseUrl = storage.GetSection("BaseUrl").Value ?? string.Empty,
+                LocalPath = storage.GetSection("LocalPath").Value,
+                UploadFolder = storage.GetSection("UploadFolder").Value ?? "upload",
+                PublicUrl = storage.GetSection("PublicUrl").Value ?? WebHost.BaseUrl,
+            };
+
+            var identityHost = config.GetSection("IdentityHost");
+            IdentityHost = new IdentityHostSettings
+            {
+                BaseUrl = identityHost.GetSection("BaseUrl").Value,
+                Authority = identityHost.GetSection("Authority").Value,
+                Issuer = identityHost.GetSection("Issuer").Value,
+                Audience = identityHost.GetSection("Audience").Value,
+                RequireHttpsMetadata = bool.TryParse(identityHost.GetSection("RequireHttpsMetadata").Value, out var requireHttpsMetadata)
+                    ? requireHttpsMetadata
+                    : null,
+            };
         }
-        /// <summary>
-        /// 当前网站RootUrl
-        /// </summary>
-        public string? HostUrl => _config.GetSection("HostUrl").Value;
-        /// <summary>
-        /// 上传文件存储目录
-        /// </summary>
-        public string FileBasePath => _config.GetSection("FileBasePath").Value ?? "upload";
-        /// <summary>
-        /// 文件服务器地址
-        /// </summary>
-        public string? FileHostUrl => _config.GetSection("FileHostUrl").Value ?? HostUrl;
-        /// <summary>
-        /// OAuth的Authority
-        /// </summary>
-        public string? OAuth_Authority => _config.GetSection("OAuth:Authority").Value;
-        /// <summary>
-        /// OAuth的TokenEndPoint
-        /// </summary>
-        public string? OAuth_TokenEndPoint => _config.GetSection("OAuth:TokenEndPoint").Value;
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Storage.Abstractions
+namespace EIMSNext.Storage.Abstractions
 {
     public interface IStorageProvider
     {

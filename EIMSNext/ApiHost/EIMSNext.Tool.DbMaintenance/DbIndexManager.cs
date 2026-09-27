@@ -1,12 +1,13 @@
-using EIMSNext.Auth.Entities;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
+using EIMSNext.Persistence.Mongo.Outbox;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 using MongoDB.Driver;
 
 using WorkflowCore.Models;
 
-namespace EIMSNext.Auth.DbMaintenance
+namespace EIMSNext.Identity.DbMaintenance
 {
     public class DbIndexManager
     {
@@ -21,7 +22,8 @@ namespace EIMSNext.Auth.DbMaintenance
         {
             var background = new CreateIndexOptions { Background = true };
 
-            CreateAuthIndexes(background);
+            CreateIdentityIndexes(background);
+            CreateCorporateSettingIndexes(background);
             CreateOrganizationIndexes(background);
             CreatePluginStoreIndexes(background);
             CreateDefinitionIndexes(background);
@@ -30,11 +32,15 @@ namespace EIMSNext.Auth.DbMaintenance
             CreateWebhookIndexes(background);
             CreateWorkflowBusinessIndexes(background);
             CreateWorkflowRuntimeIndexes(background);
-            CreateDataflowScheduleIndexes(background);
+            CreateEventFlowScheduleIndexes(background);
+            CreateEventFlowExecutionIndexes(background);
+            CreateWorkbenchIndexes(background);
             CreateLogIndexes(background);
+            CreateEventFlowLogIndexes(background);
+            CreateOutboxIndexes(background);
         }
 
-        private void CreateAuthIndexes(CreateIndexOptions options)
+        private void CreateIdentityIndexes(CreateIndexOptions options)
         {
             CreateIndex(_dbContext.Users,
                 Builders<User>.IndexKeys.Ascending(x => x.Email).Ascending(x => x.Disabled),
@@ -46,32 +52,55 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_user_phone_disabled");
 
-            CreateIndex(_dbContext.AuditLogins,
-                Builders<AuditLogin>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Descending(x => x.CreateTime),
+            CreateIndex(_dbContext.IdentityLoginAudits,
+                Builders<IdentityLoginAudit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Descending(x => x.CreateTime),
                 options,
-                "ix_auditlogin_corp_delete_createtime");
+                "ix_identityloginaudit_corp_delete_createtime");
         }
 
         private void CreateOrganizationIndexes(CreateIndexOptions options)
         {
             CreateCorpIdIndex<Department>(options, "ix_department_corpid");
             CreateCorpIdIndex<Employee>(options, "ix_employee_corpid");
-            CreateCorpIdIndex<Role>(options, "ix_role_corpid");
+            CreateCorpIdIndex<EmployeeDepartment>(options, "ix_employeedepartment_corpid");
+            CreateCorpIdIndex<EmployeeGroup>(options, "ix_employeegroup_corpid");
 
             CreateIndex(GetCollection<Employee>(),
                 Builders<Employee>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.UserId),
                 options,
                 "ix_employee_corp_user");
 
-            CreateIndex(GetCollection<Employee>(),
-                Builders<Employee>.IndexKeys.Ascending(x => x.DepartmentId).Ascending(x => x.Status).Ascending(x => x.IsDummy),
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys.Ascending(x => x.EmployeeId).Ascending(x => x.DepartmentId),
+                CreateUniqueOptions(options),
+                "ix_employeedepartment_employee_department_unique");
+
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys.Ascending(x => x.DepartmentId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_employee_department_status_dummy");
+                "ix_employeedepartment_department_employee");
+
+            CreateIndex(GetCollection<EmployeeDepartment>(),
+                Builders<EmployeeDepartment>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.SortValue),
+                options,
+                "ix_employeedepartment_corp_employee_sort");
+
+            CreateIndex(GetCollection<TenantAdminGroup>(),
+                Builders<TenantAdminGroup>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Ascending(x => x.EmployeeIds)
+                    .Ascending(x => x.Type),
+                options,
+                "ix_tenantadmingroup_corp_delete_employee_type");
 
             CreateIndex(GetCollection<Employee>(),
-                Builders<Employee>.IndexKeys.Ascending("Roles.RoleId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
+                Builders<Employee>.IndexKeys.Ascending("EmployeeGroups.EmployeeGroupId").Ascending(x => x.Status).Ascending(x => x.IsDummy),
                 options,
-                "ix_employee_role_status_dummy");
+                "ix_employee_employeegroup_status_dummy");
         }
 
         private void CreatePluginStoreIndexes(CreateIndexOptions options)
@@ -110,6 +139,24 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<PluginInstall>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.Enabled),
                 options,
                 "ix_plugininstall_corp_enabled");
+
+            CreateIndex(GetCollection<ECoinPrice>(),
+                Builders<ECoinPrice>.IndexKeys.Ascending(x => x.TargetType).Ascending(x => x.FeatureId),
+                CreateUniqueOptions(options),
+                "ix_ecoinprice_target_feature_unique");
+        }
+
+        private void CreateCorporateSettingIndexes(CreateIndexOptions options)
+        {
+            var indexOptions = CreateUniqueOptions(options);
+            CreateIndex(
+                GetCollection<CorporateSetting>(),
+                Builders<CorporateSetting>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.Name)
+                    .Ascending(x => x.DeleteFlag),
+                indexOptions,
+                "ix_corporatesetting_corp_name_unique");
         }
 
         private void CreateDefinitionIndexes(CreateIndexOptions options)
@@ -124,10 +171,29 @@ namespace EIMSNext.Auth.DbMaintenance
                 options,
                 "ix_formdef_corp_app_delete");
 
+            CreateIndex(GetCollection<CrossBinding>(),
+                Builders<CrossBinding>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.TargetAppId)
+                    .Ascending(x => x.SourceFormId)
+                    .Ascending(x => x.DeleteFlag),
+                CreateUniqueOptions(options),
+                "ix_crossbinding_target_form_delete_unique");
+
             CreateIndex(GetCollection<DashboardDef>(),
                 Builders<DashboardDef>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.AppId).Ascending(x => x.DeleteFlag),
                 options,
                 "ix_dashboarddef_corp_app_delete");
+
+            CreateIndex(GetCollection<SerialNoSequence>(),
+                Builders<SerialNoSequence>.IndexKeys
+                    .Ascending(x => x.SerialNoType)
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.AppId)
+                    .Ascending(x => x.FormId)
+                    .Ascending(x => x.Key),
+                CreateUniqueOptions(options),
+                "ix_serialnosequence_scope_unique");
 
             CreateIndex(GetCollection<Wf_Definition>(),
                 Builders<Wf_Definition>.IndexKeys.Ascending(x => x.ExternalId).Ascending(x => x.Version),
@@ -167,6 +233,26 @@ namespace EIMSNext.Auth.DbMaintenance
                 Builders<FormData>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DeleteFlag).Ascending(x => x.AppId),
                 options,
                 "ix_formdata_corp_delete_app");
+
+            CreateIndex(GetCollection<FormDataChangeLog>(),
+                Builders<FormDataChangeLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.DataId).Descending(x => x.OperateTime),
+                options,
+                "ix_formdatachangelog_corp_data_operatetime");
+
+            CreateIndex(GetCollection<FormDataChangeLog>(),
+                Builders<FormDataChangeLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.FormId).Descending(x => x.OperateTime),
+                options,
+                "ix_formdatachangelog_corp_form_operatetime");
+
+            CreateIndex(GetCollection<FormDataImportLog>(),
+                Builders<FormDataImportLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.FormId).Ascending(x => x.Status).Descending(x => x.CreateTime),
+                options,
+                "ix_formdataimportlog_corp_form_status_createtime");
+
+            CreateIndex(GetCollection<FormDataImportLog>(),
+                Builders<FormDataImportLog>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.CreateBy!.Value).Descending(x => x.CreateTime),
+                options,
+                "ix_formdataimportlog_corp_createby_createtime");
         }
 
         private void CreateFormNotifyIndexes(CreateIndexOptions options)
@@ -237,95 +323,95 @@ namespace EIMSNext.Auth.DbMaintenance
 
         private void CreateWorkflowBusinessIndexes(CreateIndexOptions options)
         {
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.EmployeeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_wftodo_data_employee");
+                "ix_wftask_data_employee");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.ApproveNodeId).Ascending(x => x.EmployeeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.ApproveNodeId).Ascending(x => x.EmployeeId),
                 options,
-                "ix_wftodo_data_node_employee");
+                "ix_wftask_data_node_employee");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.WfInstanceId).Ascending(x => x.ApproveNodeId),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.WfInstanceId).Ascending(x => x.ApproveNodeId),
                 options,
-                "ix_wftodo_instance_node");
+                "ix_wftask_instance_node");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.CorpId).Descending(x => x.ApproveNodeStartTime),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.CorpId).Descending(x => x.ApproveNodeStartTime),
                 options,
-                "ix_wftodo_corp_starttime");
+                "ix_wftask_corp_starttime");
 
-            CreateIndex(GetCollection<Wf_Todo>(),
-                Builders<Wf_Todo>.IndexKeys.Ascending(x => x.ExpireHandled).Ascending(x => x.ExpireTime),
+            CreateIndex(GetCollection<Wf_Task>(),
+                Builders<Wf_Task>.IndexKeys.Ascending(x => x.ExpireHandled).Ascending(x => x.ExpireTime),
                 options,
-                "ix_wftodo_expire");
+                "ix_wftask_expire");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.Round).Ascending(x => x.ApprovalTime),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.Round).Ascending(x => x.ApprovalTime),
                 options,
-                "ix_wfapprovallog_data_round_time");
+                "ix_wftasklog_data_round_time");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Descending(x => x.ApprovalTime),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Descending(x => x.ApprovalTime),
                 options,
-                "ix_wfapprovallog_data_time");
+                "ix_wftasklog_data_time");
 
-            CreateIndex(GetCollection<Wf_ApprovalLog>(),
-                Builders<Wf_ApprovalLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.NodeType),
+            CreateIndex(GetCollection<Wf_TaskLog>(),
+                Builders<Wf_TaskLog>.IndexKeys.Ascending(x => x.DataId).Ascending(x => x.NodeType),
                 options,
-                "ix_wfapprovallog_data_nodetype");
+                "ix_wftasklog_data_nodetype");
         }
 
         private void CreateWorkflowRuntimeIndexes(CreateIndexOptions options)
         {
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.NextExecution),
                 options,
                 "ix_workflowinstance_status_nextexecution");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Reference).Ascending(x => x.Status).Descending(x => x.CreateTime),
                 options,
                 "ix_workflowinstance_reference_status_createtime");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.WorkflowDefinitionId).Ascending(x => x.Status),
                 options,
                 "ix_workflowinstance_definition_status");
 
-            CreateIndex(GetCollection<WorkflowInstance>("Wf_WorkflowInstance"),
+            CreateIndex(_dbContext.WorkflowInstances,
                 Builders<WorkflowInstance>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.CompleteTime),
                 options,
                 "ix_workflowinstance_status_completetime");
 
-            CreateIndex(GetCollection<EventSubscription>("Wf_Subscription"),
+            CreateIndex(_dbContext.WorkflowEventSubscriptions,
                 Builders<EventSubscription>.IndexKeys.Ascending(x => x.EventName).Ascending(x => x.EventKey).Ascending(x => x.SubscribeAsOf).Ascending(x => x.ExternalToken),
                 options,
                 "ix_subscription_event_lookup");
 
-            CreateIndex(GetCollection<EventSubscription>("Wf_Subscription"),
+            CreateIndex(_dbContext.WorkflowEventSubscriptions,
                 Builders<EventSubscription>.IndexKeys.Ascending(x => x.WorkflowId),
                 options,
                 "ix_subscription_workflowid");
 
-            CreateIndex(GetCollection<Event>("Wf_Event"),
+            CreateIndex(_dbContext.WorkflowEvents,
                 Builders<Event>.IndexKeys.Ascending(x => x.IsProcessed).Ascending(x => x.EventTime),
                 options,
                 "ix_event_processed_time");
 
-            CreateIndex(GetCollection<Event>("Wf_Event"),
+            CreateIndex(_dbContext.WorkflowEvents,
                 Builders<Event>.IndexKeys.Ascending(x => x.EventName).Ascending(x => x.EventKey).Ascending(x => x.EventTime),
                 options,
                 "ix_event_name_key_time");
 
-            CreateIndex(GetCollection<ScheduledCommand>("Wf_ScheduledCommand"),
+            CreateIndex(_dbContext.WorkflowScheduledCommands,
                 Builders<ScheduledCommand>.IndexKeys.Ascending(x => x.CommandName).Ascending(x => x.Data),
                 CreateUniqueOptions(options),
                 "ix_scheduledcommand_name_data_unique");
 
-            CreateIndex(GetCollection<ScheduledCommand>("Wf_ScheduledCommand"),
+            CreateIndex(_dbContext.WorkflowScheduledCommands,
                 Builders<ScheduledCommand>.IndexKeys.Ascending(x => x.ExecuteTime),
                 options,
                 "ix_scheduledcommand_executetime");
@@ -344,33 +430,175 @@ namespace EIMSNext.Auth.DbMaintenance
                 "ix_auditlog_corp_entity_action_createtime");
         }
 
-        private void CreateDataflowScheduleIndexes(CreateIndexOptions options)
+        private void CreateEventFlowLogIndexes(CreateIndexOptions options)
         {
-            CreateCorpIdIndex<DataflowScheduleItem>(options, "ix_dataflowscheduleitem_corpid");
-
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            // Ef_RunLog
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
                     .Ascending(x => x.CorpId)
-                    .Ascending(x => x.DataflowId)
+                    .Ascending(x => x.EventFlowId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_efrunlog_corp_eventflow_delete_triggertime");
+
+            CreateIndex(GetCollection<Ef_RunLog>(),
+                Builders<Ef_RunLog>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.AppId)
+                    .Ascending(x => x.DeleteFlag)
+                    .Descending(x => x.TriggerTime),
+                options,
+                "ix_efrunlog_corp_app_delete_triggertime");
+
+            // Ef_RunLogNode
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_efrunlognode_corp_runlog_starttime");
+
+            CreateIndex(GetCollection<Ef_RunLogNode>(),
+                Builders<Ef_RunLogNode>.IndexKeys
+                    .Ascending(x => x.RunLogId)
+                    .Ascending(x => x.StartTime),
+                options,
+                "ix_efrunlognode_runlog_starttime");
+        }
+
+        private void CreateEventFlowScheduleIndexes(CreateIndexOptions options)
+        {
+            CreateCorpIdIndex<EventFlowScheduleItem>(options, "ix_eventflowscheduleitem_corpid");
+
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_corp_dataflow_triggertime");
+                "ix_eventflowscheduleitem_corp_eventflow_triggertime");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
-                    .Ascending(x => x.DataflowId)
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
+                    .Ascending(x => x.EventFlowId)
                     .Ascending(x => x.SourceType)
                     .Ascending(x => x.FormId)
                     .Ascending(x => x.DataId),
                 CreateUniqueOptions(options),
-                "ix_dataflowscheduleitem_dataflow_source_form_data_unique");
+                "ix_eventflowscheduleitem_eventflow_source_form_data_unique");
 
-            CreateIndex(GetCollection<DataflowScheduleItem>(),
-                Builders<DataflowScheduleItem>.IndexKeys
+            CreateIndex(GetCollection<EventFlowScheduleItem>(),
+                Builders<EventFlowScheduleItem>.IndexKeys
                     .Ascending(x => x.ScheduleVersion)
                     .Ascending(x => x.TriggerTime),
                 options,
-                "ix_dataflowscheduleitem_version_triggertime");
+                "ix_eventflowscheduleitem_version_triggertime");
+        }
+
+        private void CreateWorkbenchIndexes(CreateIndexOptions options)
+        {
+            CreateIndex(GetCollection<WorkbenchConfig>(),
+                Builders<WorkbenchConfig>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchconfig_corp_employee_delete");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId)
+                    .Ascending(x => x.DeleteFlag),
+                options,
+                "ix_workbenchfavorite_target");
+
+            CreateIndex(GetCollection<WorkbenchFavorite>(),
+                Builders<WorkbenchFavorite>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Ascending(x => x.SortIndex),
+                options,
+                "ix_workbenchfavorite_sort");
+
+            var recentTargetUniqueOptions = new CreateIndexOptions<WorkbenchRecentVisit>
+            {
+                Background = options.Background,
+                Unique = true,
+                Name = "ix_workbenchrecent_target_unique",
+                PartialFilterExpression = Builders<WorkbenchRecentVisit>.Filter.Eq(x => x.DeleteFlag, false)
+            };
+            GetCollection<WorkbenchRecentVisit>().Indexes.CreateOne(new CreateIndexModel<WorkbenchRecentVisit>(
+                Builders<WorkbenchRecentVisit>.IndexKeys
+                    .Ascending(x => x.CorpId)
+                    .Ascending(x => x.EmployeeId)
+                    .Ascending(x => x.TargetType)
+                    .Ascending(x => x.TargetId),
+                recentTargetUniqueOptions));
+
+            CreateIndex(GetCollection<WorkbenchRecentVisit>(),
+                Builders<WorkbenchRecentVisit>.IndexKeys.Ascending(x => x.CorpId).Ascending(x => x.EmployeeId).Descending(x => x.LastVisitTime),
+                options,
+                "ix_workbenchrecent_lastvisit");
+        }
+
+        private void CreateEventFlowExecutionIndexes(CreateIndexOptions options)
+        {
+            CreateIndex(GetCollection<EventFlowNodeExecution>(),
+                Builders<EventFlowNodeExecution>.IndexKeys.Ascending(x => x.ExecutionKey),
+                CreateUniqueOptions(options),
+                "ix_eventflownodeexecution_key_unique");
+
+            CreateIndex(GetCollection<EventFlowNodeExecution>(),
+                Builders<EventFlowNodeExecution>.IndexKeys
+                    .Ascending(x => x.ExecutionId)
+                    .Ascending(x => x.EventFlowId)
+                    .Ascending(x => x.NodeId)
+                    .Ascending(x => x.TargetKey),
+                options,
+                "ix_eventflownodeexecution_lookup");
+
+            CreateIndex(GetCollection<WorkflowTransitionExecution>(),
+                Builders<WorkflowTransitionExecution>.IndexKeys.Ascending(x => x.ExecutionId),
+                CreateUniqueOptions(options),
+                "ix_workflowtransitionexecution_id_unique");
+        }
+
+        private void CreateOutboxIndexes(CreateIndexOptions options)
+        {
+            // OutboxMessage：投递层幂等唯一键（防重复入队）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.IdempotencyKey),
+                CreateUniqueOptions(options),
+                "ix_outboxmessage_idempotencykey_unique");
+
+            // OutboxMessage：扫描待投递（Pending 且 OutAt 已到期）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.OutAt),
+                options,
+                "ix_outboxmessage_status_outat");
+
+            // OutboxMessage：取死信补偿窗口（Failed 且 LastAttemptTime 最旧）。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.Status).Ascending(x => x.LastAttemptTime),
+                options,
+                "ix_outboxmessage_status_lastattempt");
+
+            // 仅 Sent 记录会写 SentAt，TTL 不会删除 Pending/Failed 记录。
+            CreateIndex(GetCollection<OutboxMessage>(),
+                Builders<OutboxMessage>.IndexKeys.Ascending(x => x.SentAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_outboxmessage_sentat_ttl");
+
+            // ProcessedMessage：一个业务事件可投递给多个目标，按事件 + 目标去重。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.EventKey).Ascending(x => x.Target),
+                CreateUniqueOptions(options),
+                "ix_processedmessage_event_target_unique");
+
+            // MongoDB TTL 仅支持 BSON Date；保留 30 天，覆盖正常重投和人工补偿窗口。
+            CreateIndex(GetCollection<ProcessedMessage>(),
+                Builders<ProcessedMessage>.IndexKeys.Ascending(x => x.ProcessedAt),
+                new CreateIndexOptions { Background = options.Background, ExpireAfter = TimeSpan.FromDays(30) },
+                "ix_processedmessage_processedat_ttl");
         }
 
         private void CreateCorpIdIndex<T>(CreateIndexOptions options, string name) where T : CorpEntityBase
@@ -380,12 +608,12 @@ namespace EIMSNext.Auth.DbMaintenance
 
         private IMongoCollection<T> GetCollection<T>()
         {
-            return _dbContext.Database.GetCollection<T>(typeof(T).Name);
+            return _dbContext.GetCollection<T>();
         }
 
         private IMongoCollection<T> GetCollection<T>(string name)
         {
-            return _dbContext.Database.GetCollection<T>(name);
+            return _dbContext.GetCollection<T>(name);
         }
 
         private static CreateIndexOptions CreateUniqueOptions(CreateIndexOptions source)
@@ -399,6 +627,7 @@ namespace EIMSNext.Auth.DbMaintenance
             {
                 Background = options.Background,
                 Unique = options.Unique,
+                ExpireAfter = options.ExpireAfter,
                 Name = name
             };
             collection.Indexes.CreateOne(new CreateIndexModel<T>(keys, indexOptions));

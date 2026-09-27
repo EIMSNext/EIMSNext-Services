@@ -3,7 +3,8 @@ using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
@@ -21,7 +22,7 @@ namespace EIMSNext.Service.Host.Controllers
 		[Permission(Operation = Operation.Read)]
 		public async Task<ActionResult> Export([FromBody] AuditLogExportRequest request)
 		{
-			return Ok(ApiResult.Success(await ApiService.ExportAsync(request)));
+			return Ok(await ApiService.ExportAsync(request));
 		}
 	}
 }

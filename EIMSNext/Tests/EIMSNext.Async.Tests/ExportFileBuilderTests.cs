@@ -1,10 +1,14 @@
 using System.Text;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Tasks.Export;
-using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using HKH.CSV;
 using NPOI.XSSF.UserModel;
 
@@ -53,12 +57,12 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
-        public void GetAuditLoginCellValue_ShouldPreventFormulaInjection()
+        public void GetIdentityLoginAuditCellValue_ShouldPreventFormulaInjection()
         {
             var column = new ExportColumn { Key = "userName", Header = "登录人", Type = ExportColumnType.String };
-            var row = new AuditLogin { UserName = "=cmd|' /C calc'!A0" };
+            var row = new IdentityLoginAudit { UserName = "=cmd|' /C calc'!A0" };
 
-            var value = AuditLoginExportProcessor.GetCellValue(column, row);
+            var value = IdentityLoginAuditExportProcessor.GetCellValue(column, row);
 
             Assert.AreEqual("'=cmd|' /C calc'!A0", value.Text);
         }
@@ -119,17 +123,17 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
-        public void BuildAuditLoginExcel_ShouldFreezeFirstRow()
+        public void BuildIdentityLoginAuditExcel_ShouldFreezeFirstRow()
         {
             var columns = new List<ExportColumn>
             {
                 new() { Key = "userName", Header = "登录人", Type = ExportColumnType.String }
             };
-            var rows = new List<AuditLogin> { new() { UserName = "Alice" } };
+            var rows = new List<IdentityLoginAudit> { new() { UserName = "Alice" } };
 
             using var workbookBuilder = ExportFileBuilder.CreateWorkbook();
             var sheet = ExportFileBuilder.InitializeExcelSheet(workbookBuilder, "登录日志", columns, out var styles);
-            AuditLoginExportProcessor.WriteExcelRows(sheet, styles, columns, rows, 1);
+            IdentityLoginAuditExportProcessor.WriteExcelRows(sheet, styles, columns, rows, 1);
 
             using var ms = new MemoryStream();
             workbookBuilder.Write(ms, false);

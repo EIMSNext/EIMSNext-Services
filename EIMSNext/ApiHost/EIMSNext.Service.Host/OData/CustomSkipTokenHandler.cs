@@ -3,6 +3,7 @@ using System.Web;
 using EIMSNext.Common;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
 using Microsoft.AspNetCore.OData.Query;
+using Microsoft.OData;
 
 namespace EIMSNext.Service.Host.OData
 {
@@ -23,7 +24,7 @@ namespace EIMSNext.Service.Host.OData
         public override IQueryable<T> ApplyTo<T>(IQueryable<T> query, SkipTokenQueryOption skipTokenQueryOption, ODataQuerySettings querySettings, ODataQueryOptions queryOptions)
         {
             var decodedSkipTokenQueryOption = DecodeSkipToken(skipTokenQueryOption);
-            return base.ApplyTo(query, decodedSkipTokenQueryOption, querySettings, queryOptions);
+            return ApplyDecodedToken(() => base.ApplyTo(query, decodedSkipTokenQueryOption, querySettings, queryOptions));
         }
 
         /// <summary>
@@ -37,7 +38,7 @@ namespace EIMSNext.Service.Host.OData
         public override IQueryable ApplyTo(IQueryable query, SkipTokenQueryOption skipTokenQueryOption, ODataQuerySettings querySettings, ODataQueryOptions queryOptions)
         {
             var decodedSkipTokenQueryOption = DecodeSkipToken(skipTokenQueryOption);
-            return base.ApplyTo(query, decodedSkipTokenQueryOption, querySettings, queryOptions);
+            return ApplyDecodedToken(() => base.ApplyTo(query, decodedSkipTokenQueryOption, querySettings, queryOptions));
         }
 
         /// <summary>
@@ -80,9 +81,32 @@ namespace EIMSNext.Service.Host.OData
 
         private static SkipTokenQueryOption DecodeSkipToken(SkipTokenQueryOption skipTokenQueryOption)
         {
-            string encodedSkipToken = skipTokenQueryOption.RawValue;
-            string decodedSkipToken = Encoding.UTF8.GetString(Convert.FromBase64String(encodedSkipToken));
-            return new SkipTokenQueryOption(decodedSkipToken, skipTokenQueryOption.Context);
+            try
+            {
+                string encodedSkipToken = skipTokenQueryOption.RawValue;
+                string decodedSkipToken = Encoding.UTF8.GetString(Convert.FromBase64String(encodedSkipToken));
+                return new SkipTokenQueryOption(decodedSkipToken, skipTokenQueryOption.Context);
+            }
+            catch (FormatException ex)
+            {
+                throw new BadRequestException("SkipToken 无效", ex);
+            }
+        }
+
+        private static T ApplyDecodedToken<T>(Func<T> apply)
+        {
+            try
+            {
+                return apply();
+            }
+            catch (ODataException ex)
+            {
+                throw new BadRequestException("SkipToken 无效", ex);
+            }
+            catch (ArgumentException ex)
+            {
+                throw new BadRequestException("SkipToken 无效", ex);
+            }
         }
     }
 }

@@ -1,14 +1,13 @@
 using EIMSNext.ApiService;
 using EIMSNext.Common;
-using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Authorization
 {
     /// <summary>
     /// 权限配置
     /// </summary>
-    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method)]
-    public class PermissionAttribute : TypeFilterAttribute
+    [AttributeUsage(AttributeTargets.Class | AttributeTargets.Method, Inherited = true)]
+    public class PermissionAttribute : Attribute
     {
         /// <summary>
         /// 资源代码
@@ -23,11 +22,5 @@ namespace EIMSNext.Service.Host.Authorization
         /// </summary>
         public Operation Operation { get; set; } = Operation.NotSet;
 
-        /// <summary>
-        /// 
-        /// </summary>
-        public PermissionAttribute() : base(typeof(PermissionFilter))
-        {
-        }
     }
 }

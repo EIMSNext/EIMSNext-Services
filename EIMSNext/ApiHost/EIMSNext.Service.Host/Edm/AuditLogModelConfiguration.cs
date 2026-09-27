@@ -1,5 +1,5 @@
 using EIMSNext.ApiService.ViewModels;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.OData.ModelBuilder;
 
 namespace EIMSNext.Service.Host.Edm

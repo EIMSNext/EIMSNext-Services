@@ -1,10 +1,16 @@
 using Asp.Versioning;
 
-using EIMSNext.Auth.Entities;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.ApiService.RequestModels;
+using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 
 using Microsoft.OData.ModelBuilder;
 
@@ -28,23 +34,30 @@ namespace EIMSNext.Service.Host.Edm
             builder.EnumType<FormType>();
             builder.EnumType<FlowType>();
             builder.EnumType<EventSourceType>();
-            builder.EnumType<FieldChangeType>();
             builder.EnumType<PlatformType>();
             builder.EnumType<CandidateType>();
             builder.EnumType<WfNodeType>();
             builder.EnumType<WfApprovalMode>();
+            builder.EnumType<ApproverType>();
             builder.EnumType<PrintDefType>();
-            builder.EnumType<AuthGroupType>();
-            //builder.EnumType<DataPerms>();
+            builder.EnumType<FormDataPermissionMode>();
+            builder.EnumType<FormListViewType>();
+            builder.EnumType<MobileFormListViewType>();
+            //builder.EnumType<FormDataPermissions>();
             builder.EnumType<MemberType>();
             builder.EnumType<DataChangeType>();
+            builder.EnumType<NotifyTargetType>();
             builder.EnumType<FormNotifyTriggerMode>();
             builder.EnumType<NotifyChannel>();
             builder.EnumType<WfExpireActionType>();
             builder.EnumType<TimeUnit>();
 
             builder.ComplexType<UserCorp>();
-            builder.ComplexType<EmpRole>();
+            builder.ComplexType<EmployeeGroupRef>();
+            builder.ComplexType<EmpDept>();
+            builder.ComplexType<Operator>();
+            builder.ComplexType<DepartmentRef>();
+            builder.ComplexType<EmployeeDepartmentRequest>();
             builder.ComplexType<FieldDef>();
             builder.ComplexType<FieldProp>();
             builder.ComplexType<ValueProp>();
@@ -52,11 +65,12 @@ namespace EIMSNext.Service.Host.Edm
             builder.ComplexType<FormContent>();
             builder.ComplexType<AppMenu>();
             builder.ComplexType<Member>();
-            builder.ComplexType<FieldPerm>();
+            builder.ComplexType<FormFieldPermission>();
 
             builder.ComplexType<WfMetadata>();
             builder.ComplexType<WfStep>();
             builder.ComplexType<ApprovalCandidate>();
+            builder.ComplexType<ByLevelApprovalSetting>();
         }
     }
 }

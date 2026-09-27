@@ -1,7 +1,8 @@
-﻿using EIMSNext.Component;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Component;
+using EIMSNext.Core.Abstractions.Extensions;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service
 {

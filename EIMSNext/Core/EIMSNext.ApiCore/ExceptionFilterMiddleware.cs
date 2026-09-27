@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using EIMSNext.Common;
 using HKH.Common;
 
@@ -74,6 +74,11 @@ namespace EIMSNext.ApiCore
             if (error is HttpException httpException)
             {
                 return (httpException.StatusCode, httpException.StateCode, httpException.Message);
+            }
+
+            if (error is BadHttpRequestException or InvalidDataException)
+            {
+                return (StatusCodes.Status400BadRequest, "badrequest", "请求格式不合法或超出限制");
             }
 
             var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(error) : "抱歉，出错了";

@@ -1,4 +1,4 @@
-﻿using HKH.Mef2.Integration;
+using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 using Quartz;
 

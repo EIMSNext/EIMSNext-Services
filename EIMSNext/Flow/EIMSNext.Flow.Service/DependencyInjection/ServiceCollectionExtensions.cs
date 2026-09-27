@@ -9,8 +9,8 @@ namespace EIMSNext.Flow.Service
         public static void AddWorkflowServices(this IServiceCollection services)
         {
             services.AddScoped<IWorkflowLoader, WorkflowLoader>();
-            services.AddTransient<IDfDataProcessor, DfDataProcessor>();
-            services.AddScoped<IDataflowHookService, DataflowHookService>();
+            services.AddTransient<IEfDataProcessor, EfDataProcessor>();
+            services.AddScoped<IEventFlowHookService, EventFlowHookService>();
         }
     }
 }

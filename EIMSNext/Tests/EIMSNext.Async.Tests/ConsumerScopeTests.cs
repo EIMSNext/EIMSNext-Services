@@ -1,8 +1,12 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 
 using MongoDB.Bson;
 
@@ -107,7 +111,7 @@ namespace EIMSNext.Async.Tests
         {
             public Guid ScopeId { get; } = marker.Id;
 
-            public EIMSNext.MongoDb.IMongoDbContex DbContext => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.IMongoDbContex DbContext => throw new NotSupportedException();
             public MongoDB.Driver.IMongoCollection<TestEntity> Collection => throw new NotSupportedException();
             public IQueryable<TestEntity> Queryable => throw new NotSupportedException();
             public MongoDB.Driver.FilterDefinitionBuilder<TestEntity> FilterBuilder => throw new NotSupportedException();
@@ -115,12 +119,12 @@ namespace EIMSNext.Async.Tests
             public MongoDB.Driver.Search.SearchDefinitionBuilder<TestEntity> SearchBuilder => throw new NotSupportedException();
             public MongoDB.Driver.ProjectionDefinitionBuilder<TestEntity> ProjectionBuilder => throw new NotSupportedException();
             public MongoDB.Driver.UpdateDefinitionBuilder<TestEntity> UpdateBuilder => throw new NotSupportedException();
-            public EIMSNext.Core.MongoDb.MongoTransactionScope NewTransactionScope(MongoDB.Driver.TransactionOptions? transOptions = null) => throw new NotSupportedException();
+            public EIMSNext.Core.Mongo.MongoTransactionScope NewTransactionScope(MongoDB.Driver.TransactionOptions? transOptions = null) => throw new NotSupportedException();
             public MongoDB.Driver.IFindFluent<TestEntity, TestEntity> Find(EIMSNext.Core.Query.DynamicFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public MongoDB.Driver.IFindFluent<TestEntity, TestEntity> Find(EIMSNext.Core.Query.MongoFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public MongoDB.Driver.IFindFluent<TestEntity, TestEntity> Find(EIMSNext.Core.Mongo.Query.MongoFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public MongoDB.Driver.IFindFluent<TestEntity, TestEntity> Find(System.Linq.Expressions.Expression<Func<TestEntity, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<MongoDB.Driver.IAsyncCursor<TestEntity>> FindAsync(EIMSNext.Core.Query.DynamicFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
-            public Task<MongoDB.Driver.IAsyncCursor<TestEntity>> FindAsync(EIMSNext.Core.Query.MongoFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
+            public Task<MongoDB.Driver.IAsyncCursor<TestEntity>> FindAsync(EIMSNext.Core.Mongo.Query.MongoFindOptions<TestEntity> options, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<MongoDB.Driver.IAsyncCursor<TestEntity>> FindAsync(System.Linq.Expressions.Expression<Func<TestEntity, bool>> filter, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public TestEntity? Get(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();
             public Task<TestEntity?> GetAsync(string id, MongoDB.Driver.IClientSessionHandle? session = null) => throw new NotSupportedException();

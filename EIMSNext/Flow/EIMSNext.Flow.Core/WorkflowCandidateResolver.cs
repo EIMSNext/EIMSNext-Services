@@ -3,10 +3,14 @@ using System.Dynamic;
 using System.Text.Json;
 
 using EIMSNext.Common;
-using EIMSNext.Core;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Repositories;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 
 using MongoDB.Driver;
 
@@ -15,17 +19,20 @@ namespace EIMSNext.Flow.Core
     internal sealed class WorkflowCandidateResolver
     {
         private readonly IRepository<Employee> _employeeRepository;
+        private readonly IRepository<EmployeeDepartment> _employeeDepartmentRepository;
         private readonly IRepository<Department> _departmentRepository;
         private readonly IRepository<FormDef> _formDefRepository;
         private readonly IRepository<FormData> _formDataRepository;
 
         public WorkflowCandidateResolver(
             IRepository<Employee> employeeRepository,
+            IRepository<EmployeeDepartment> employeeDepartmentRepository,
             IRepository<Department> departmentRepository,
             IRepository<FormDef> formDefRepository,
             IRepository<FormData> formDataRepository)
         {
             _employeeRepository = employeeRepository;
+            _employeeDepartmentRepository = employeeDepartmentRepository;
             _departmentRepository = departmentRepository;
             _formDefRepository = formDefRepository;
             _formDataRepository = formDataRepository;
@@ -40,7 +47,7 @@ namespace EIMSNext.Flow.Core
             }
 
             var deptIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            var roleIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var employeeGroupIds = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var managerRequests = new Dictionary<string, HashSet<int>>(StringComparer.OrdinalIgnoreCase);
             FormData? formData = null;
             FormDef? formDef = null;
@@ -52,13 +59,16 @@ namespace EIMSNext.Flow.Core
                     case CandidateType.Department:
                         if (!string.IsNullOrWhiteSpace(candidate.CandidateId))
                         {
-                            deptIds.Add(candidate.CandidateId);
+                            foreach (var departmentId in GetDepartmentScopeIds(candidate.CandidateId, candidate.CascadedDept))
+                            {
+                                deptIds.Add(departmentId);
+                            }
                         }
                         break;
-                    case CandidateType.Role:
+                    case CandidateType.EmployeeGroup:
                         if (!string.IsNullOrWhiteSpace(candidate.CandidateId))
                         {
-                            roleIds.Add(candidate.CandidateId);
+                            employeeGroupIds.Add(candidate.CandidateId);
                         }
                         break;
                     case CandidateType.Employee:
@@ -80,18 +90,23 @@ namespace EIMSNext.Flow.Core
 
             if (deptIds.Count > 0)
             {
+                var employeeIds = _employeeDepartmentRepository.Queryable
+                    .Where(x => deptIds.Contains(x.DepartmentId))
+                    .Select(x => x.EmployeeId)
+                    .Distinct()
+                    .ToList();
                 await _employeeRepository.Find(new MongoFindOptions<Employee>
                 {
-                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.DepartmentId, deptIds))
+                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, employeeIds))
                 })
                     .ForEachAsync(x => empIds.Add(x.Id));
             }
 
-            if (roleIds.Count > 0)
+            if (employeeGroupIds.Count > 0)
             {
                 await _employeeRepository.Find(new MongoFindOptions<Employee>
                 {
-                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.ElemMatch(x => x.Roles, r => roleIds.Contains(r.RoleId)))
+                    Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.ElemMatch(x => x.EmployeeGroups, r => employeeGroupIds.Contains(r.EmployeeGroupId)))
                 }).ForEachAsync(x => empIds.Add(x.Id));
             }
 
@@ -133,12 +148,15 @@ namespace EIMSNext.Flow.Core
             }
 
             var starter = _employeeRepository.Get(dataContext.WfStarter.Id);
-            if (starter == null || string.IsNullOrWhiteSpace(starter.DepartmentId))
+            if (starter == null)
             {
                 return;
             }
 
-            MergeManagerLevels(managerRequests, starter.DepartmentId, levels);
+            foreach (var departmentId in GetEmployeeDepartmentIds(starter.Id))
+            {
+                MergeManagerLevels(managerRequests, departmentId, levels);
+            }
         }
 
         private void ExpandFormFieldCandidate(
@@ -180,7 +198,10 @@ namespace EIMSNext.Flow.Core
                         }
                         else
                         {
-                            deptIds.Add(value);
+                            foreach (var departmentId in GetDepartmentScopeIds(value, candidate.CascadedDept))
+                            {
+                                deptIds.Add(departmentId);
+                            }
                         }
                     }
                     break;
@@ -192,12 +213,15 @@ namespace EIMSNext.Flow.Core
                         {
                             Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, values))
                         }).ToList();
-                        foreach (var employee in employees)
+                        var employeeIds = employees.Select(x => x.Id).ToList();
+                        var employeeDepartments = _employeeDepartmentRepository.Queryable
+                            .Where(x => employeeIds.Contains(x.EmployeeId))
+                            .Select(x => x.DepartmentId)
+                            .Distinct()
+                            .ToList();
+                        foreach (var departmentId in employeeDepartments)
                         {
-                            if (!string.IsNullOrWhiteSpace(employee.DepartmentId))
-                            {
-                                MergeManagerLevels(managerRequests, employee.DepartmentId, managerLevels);
-                            }
+                            MergeManagerLevels(managerRequests, departmentId, managerLevels);
                         }
                     }
                     else
@@ -231,11 +255,14 @@ namespace EIMSNext.Flow.Core
             {
                 if (targetLevels.Contains(currentLevel))
                 {
+                    var managerEmployeeIds = _employeeDepartmentRepository.Queryable
+                        .Where(x => x.DepartmentId == currentDepartmentId && x.IsManager)
+                        .Select(x => x.EmployeeId)
+                        .Distinct()
+                        .ToList();
                     await _employeeRepository.Find(new MongoFindOptions<Employee>
                     {
-                        Filter = BuildActiveEmployeeFilter(
-                            Builders<Employee>.Filter.Eq(x => x.DepartmentId, currentDepartmentId)
-                            & Builders<Employee>.Filter.Eq(x => x.IsManager, true))
+                        Filter = BuildActiveEmployeeFilter(Builders<Employee>.Filter.In(x => x.Id, managerEmployeeIds))
                     })
                         .ForEachAsync(x => result.Add(x.Id));
                     targetLevels.Remove(currentLevel);
@@ -247,6 +274,38 @@ namespace EIMSNext.Flow.Core
             }
 
             return result.ToList();
+        }
+
+        private List<string> GetEmployeeDepartmentIds(string employeeId)
+        {
+            if (string.IsNullOrWhiteSpace(employeeId))
+            {
+                return [];
+            }
+
+            return _employeeDepartmentRepository.Queryable
+                .Where(x => x.EmployeeId == employeeId)
+                .Select(x => x.DepartmentId)
+                .Distinct()
+                .ToList();
+        }
+
+        private List<string> GetDepartmentScopeIds(string departmentId, bool cascaded)
+        {
+            if (string.IsNullOrWhiteSpace(departmentId))
+            {
+                return [];
+            }
+
+            var query = _departmentRepository.Queryable
+                .Where(x => !x.DeleteFlag && x.Id == departmentId);
+            if (cascaded)
+            {
+                query = _departmentRepository.Queryable
+                    .Where(x => !x.DeleteFlag && (x.Id == departmentId || x.HeriarchyId.Contains($"|{departmentId}|")));
+            }
+
+            return query.Select(x => x.Id).Distinct().ToList();
         }
 
         private FormData GetFormData(string dataId)

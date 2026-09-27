@@ -2,23 +2,28 @@ using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Scripting;
 using EIMSNext.Component;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Service
 {
     public static class FormNotifyRuntime
     {
-        public static async Task PublishToChannelsAsync(IMessagePublisher publisher, string corpId, string notifyId, string title, string detail, string url, long expireTime, MessageCategory category, NotifyChannel channels, List<NotifyReceiver> receivers, MessageType messageType, CancellationToken ct)
+        public static async Task PublishToChannelsAsync(IOutboxPublisher publisher, string corpId, string notifyId, string title, string detail, string url, long expireTime, MessageCategory category, NotifyChannel channels, List<NotifyReceiver> receivers, MessageType messageType, CancellationToken ct, long eventStamp = 0)
         {
             if (channels.HasFlag(NotifyChannel.System))
             {
-                await publisher.PublishAsync(new SystemMessageTaskArgs
+                await publisher.EnqueueAsync(new SystemMessageTaskArgs
                 {
                     CorpId = corpId,
                     NotifyId = notifyId,
@@ -28,13 +33,14 @@ namespace EIMSNext.Service
                     ExpireTime = expireTime,
                     Category = category,
                     Receivers = receivers,
-                    MessageType = messageType
+                    MessageType = messageType,
+                    EventStamp = eventStamp
                 }, ct);
             }
 
             if (channels.HasFlag(NotifyChannel.Email))
             {
-                await publisher.PublishAsync(new EmailNotifyTaskArgs
+                await publisher.EnqueueAsync(new EmailNotifyTaskArgs
                 {
                     CorpId = corpId,
                     NotifyId = notifyId,
@@ -42,7 +48,8 @@ namespace EIMSNext.Service
                     Detail = detail,
                     Url = url,
                     Receivers = receivers,
-                    MessageType = messageType
+                    MessageType = messageType,
+                    EventStamp = eventStamp
                 }, ct);
             }
         }

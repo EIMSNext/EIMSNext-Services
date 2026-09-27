@@ -1,12 +1,12 @@
 using EIMSNext.Core.Services;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Contracts
 {
     public interface ISystemMessageService : IService<SystemMessage>
     {
         Task<long> GetUnreadCountAsync(string empId);
-        Task MarkReadAsync(string id);
-        Task MarkReadBatchAsync(IEnumerable<string> ids);
+        Task MarkReadAsync(string id, string corpId, string empId);
+        Task MarkReadBatchAsync(IEnumerable<string> ids, string corpId, string empId);
     }
 }

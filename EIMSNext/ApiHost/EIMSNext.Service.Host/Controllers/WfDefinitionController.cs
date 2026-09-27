@@ -7,7 +7,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using Microsoft.AspNetCore.Mvc;
 
 namespace EIMSNext.Service.Host.Controllers
@@ -22,46 +22,45 @@ namespace EIMSNext.Service.Host.Controllers
 	    [HttpPost("CreateVersion")]
 	    public async Task<IActionResult> CreateVersion([FromBody] WfDefinitionVersionActionRequest request)
 	    {
-	        var result = await Resolver.Resolve<IWfDefinitionService>().CreateVersionAsync(request.Id);
-	        var flowClient = Resolver.Resolve<FlowApiClient>();
-	        await flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
-	        return Ok(result);
+	        return Ok(await ApiService.CreateVersionAsync(request.Id));
 	    }
 
 	    [HttpPost("Activate")]
 	    public async Task<IActionResult> Activate([FromBody] WfDefinitionVersionActionRequest request)
 	    {
-	        var result = await Resolver.Resolve<IWfDefinitionService>().ActivateAsync(request.Id);
-	        var flowClient = Resolver.Resolve<FlowApiClient>();
-	        await flowClient.Load(new LoadDefRequest { WfDefinitionId = result.ExternalId, Version = result.Version }, IdentityContext.AccessToken);
-	        return Ok(result);
+	        return Ok(await ApiService.ActivateAsync(request.Id));
 	    }
 
 	    /// <summary>
 	    /// 获取数据流最近一次HTTP触发样例。
 	    /// </summary>
 	    [HttpGet("HttpSample")]
-	    public async Task<IActionResult> GetHttpSampleAsync([FromQuery] string dataflowId, [FromQuery] string corpId)
+	    public async Task<IActionResult> GetHttpSampleAsync([FromQuery] string eventFlowId, [FromQuery] string corpId)
 	    {
-	        if (string.IsNullOrWhiteSpace(dataflowId) || string.IsNullOrWhiteSpace(corpId))
+	        if (string.IsNullOrWhiteSpace(eventFlowId) || string.IsNullOrWhiteSpace(corpId))
 	        {
-	            return BadRequest("dataflowId和corpId不能为空");
+	            return BadRequest("eventFlowId和corpId不能为空");
 	        }
 
-	        var def = Resolver.Resolve<IWfDefinitionService>().Get(dataflowId);
-	        if (def == null || !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
+	        var def = Resolver.Resolve<IWfDefinitionService>().Get(eventFlowId);
+        if (def == null ||
+            def.FlowType != FlowType.EventFlow ||
+            def.DeleteFlag ||
+            !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
 	        {
 	            return NotFound("智能助手不存在");
 	        }
 
-	        var hookApi = Resolver.Resolve<DataflowHookApiService>();
-	        var sample = await hookApi.GetLatestSampleAsync(corpId, dataflowId);
+	        Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(def.AppId);
+
+	        var hookApi = Resolver.Resolve<EventFlowHookApiService>();
+	        var sample = await hookApi.GetLatestSampleAsync(corpId, eventFlowId);
 	        if (sample == null)
 	        {
 	            return ApiResult.Success(new { hasSample = false }).ToActionResult();
 	        }
 
-	        var triggerSetting = def.Metadata.Steps.FirstOrDefault()?.DfNodeSetting?.TriggerSetting;
+	        var triggerSetting = def.Metadata.Steps.FirstOrDefault()?.EfNodeSetting?.TriggerSetting;
 	        var capturedAt = triggerSetting?.HttpTrigger?.SampleCapturedAt ?? sample.CapturedAt;
 
 	        return ApiResult.Success(new

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Distributed;
 
 namespace EIMSNext.Cache
 {
@@ -21,9 +21,13 @@ namespace EIMSNext.Cache
 
         void Remove(string key, CacheScope scope, string scopeId = "");
         Task RemoveAsync(string key, CacheScope scope, string scopeId = "");
+
+        long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
+        Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "");
+        Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "");
     }
     public enum CacheScope
     {
-        Corporate, Employee, Global
+        Corporate, Employee, Client, Global
     }
 }

@@ -1,10 +1,14 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Extensions;
-using EIMSNext.Core.Repositories;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Core.Abstractions.Extensions;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 using MongoDB.Driver;
@@ -110,9 +114,11 @@ namespace EIMSNext.Async.Quartz.Jobs
                     MessageType = MessageType.FormNotify,
                     AppId = notify.AppId,
                     FormId = notify.FormId,
+                    TargetType = notify.TargetType,
                     DataId = string.Empty,
                     FormTriggerMode = FormNotifyTriggerMode.CustomScheduled,
                     Operator = Operator.Empty,
+                    EventStamp = item.TriggerTime,
                     NewData = new FormData
                     {
                         AppId = notify.AppId,
@@ -129,9 +135,11 @@ namespace EIMSNext.Async.Quartz.Jobs
                 MessageType = MessageType.FormNotify,
                 AppId = notify.AppId,
                 FormId = notify.FormId,
+                TargetType = notify.TargetType,
                 DataId = item.DataId ?? string.Empty,
                 FormTriggerMode = FormNotifyTriggerMode.TimeFieldScheduled,
                 Operator = Operator.Empty,
+                EventStamp = item.TriggerTime,
                 NewData = new FormData
                 {
                     Id = item.DataId ?? string.Empty,

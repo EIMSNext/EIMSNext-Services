@@ -1,6 +1,6 @@
-using EIMSNext.Flow.Core.Nodes.Dataflow;
+using EIMSNext.Flow.Core.Nodes.EventFlow;
 using EIMSNext.Common;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Tests
 {
@@ -51,6 +51,22 @@ namespace EIMSNext.Flow.Tests
 
             Assert.IsFalse(setting.ValueIsSubField());
             Assert.IsFalse(setting.ValueIsSingleResultNode());
+        }
+
+        [TestMethod]
+        public void EmptyDataMatch_WithNullItems_IsEmpty()
+        {
+            var match = new DataMatchSetting();
+
+            Assert.IsTrue(match.IsEmpty());
+        }
+
+        [TestMethod]
+        public void EmptyDataMatch_WithEmptyItems_IsEmpty()
+        {
+            var match = new DataMatchSetting { Items = [] };
+
+            Assert.IsTrue(match.IsEmpty());
         }
     }
 }

@@ -1,4 +1,4 @@
-﻿namespace EIMSNext.Scripting
+namespace EIMSNext.Scripting
 {
     public static class ScriptExpression
     {

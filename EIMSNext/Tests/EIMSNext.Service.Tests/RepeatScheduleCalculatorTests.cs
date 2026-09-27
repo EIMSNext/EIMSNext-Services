@@ -1,5 +1,5 @@
 using EIMSNext.Common.Extensions;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests
 {
@@ -257,12 +257,12 @@ namespace EIMSNext.Service.Tests
             Assert.IsNull(param.AfterTime);
         }
 
-        // ---- DataflowTimeTriggerSettingExtensions.ToTimeTriggerParameter ----
+        // ---- EventFlowTimeTriggerSettingExtensions.ToTimeTriggerParameter ----
 
         [TestMethod]
         public void ToTimeTriggerParameter_MapsAllFields()
         {
-            var setting = new DataflowTimeTriggerSetting
+            var setting = new EventFlowTimeTriggerSetting
             {
                 RepeatType = TimerRepeatType.Monthly,
                 RepeatConfig = "{\"mode\":\"monthly\"}",

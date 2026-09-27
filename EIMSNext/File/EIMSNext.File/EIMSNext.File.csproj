@@ -11,7 +11,8 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service.Entities\EIMSNext.Service.Entities.csproj" />
-    <ProjectReference Include="..\..\Service\EIMSNext.Service\EIMSNext.Service.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <ProjectReference Include="..\EIMSNext.File.Contracts\EIMSNext.File.Contracts.csproj" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Storage\EIMSNext.Storage.csproj" />
   </ItemGroup>
 </Project>

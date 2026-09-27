@@ -26,8 +26,10 @@ namespace EIMSNext.Plugin.Contracts
         public bool Required { get; set; }
         public bool AllowCustomValue { get; set; } = true;
         public bool AllowFieldMapping { get; set; } = true;
+        public bool Multiple { get; set; }
         public string? Description { get; set; }
         public IList<string> CompatibleFieldTypes { get; } = new List<string>();
+        public IList<PluginFieldDesc> SubFields { get; } = new List<PluginFieldDesc>();
     }
 
     public class PluginResultFieldDesc
@@ -35,6 +37,8 @@ namespace EIMSNext.Plugin.Contracts
         public required string Key { get; set; }
         public required string Name { get; set; }
         public string FieldType { get; set; } = string.Empty;
+        public bool Multiple { get; set; }
         public string? Description { get; set; }
+        public IList<PluginResultFieldDesc> SubFields { get; } = new List<PluginResultFieldDesc>();
     }
 }

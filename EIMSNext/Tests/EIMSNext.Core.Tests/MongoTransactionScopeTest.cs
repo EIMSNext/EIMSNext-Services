@@ -1,7 +1,9 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.MongoDb;
+using EIMSNext.Core.Mongo;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using MongoDB.Driver;
 
 namespace EIMSNext.Core.Tests
 {
@@ -63,10 +65,150 @@ namespace EIMSNext.Core.Tests
             }
         }
 
+        [TestMethod]
+        public void DisabledRootScopeDoesNotStartTransaction()
+        {
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: false))
+            {
+                Assert.IsNull(scope.SessionHandle);
+                Assert.IsNull(MongoTransactionScope.Transaction);
+                Assert.IsFalse(MongoTransactionScope.IsInTransaction);
+            }
+
+            Assert.IsNull(MongoTransactionScope.Transaction);
+        }
+
+        [TestMethod]
+        public void NestedScopeInheritsEnabledRootTransaction()
+        {
+            using (var root = new MongoTransactionScope(_dbContext!, enabled: true))
+            {
+                var rootSession = root.SessionHandle;
+                Assert.IsNotNull(rootSession);
+                Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+
+                using (var nested = new MongoTransactionScope(_dbContext!, enabled: false))
+                {
+                    Assert.AreSame(rootSession, nested.SessionHandle);
+                    Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+                }
+
+                root.AbortTransaction();
+            }
+        }
+
+        [TestMethod]
+        public void DisabledRootRunsAfterCommitImmediately()
+        {
+            var called = false;
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: false))
+            {
+                MongoTransactionScope.RegisterAfterCommit(() =>
+                {
+                    called = true;
+                    return Task.CompletedTask;
+                });
+
+                Assert.IsTrue(called);
+            }
+        }
+
+        [TestMethod]
+        public void EnabledRootRunsAfterCommitOnlyAfterCommit()
+        {
+            var called = false;
+            using (var scope = new MongoTransactionScope(_dbContext!, enabled: true))
+            {
+                MongoTransactionScope.RegisterAfterCommit(() =>
+                {
+                    called = true;
+                    return Task.CompletedTask;
+                });
+
+                Assert.IsFalse(called);
+                scope.CommitTransaction();
+                Assert.IsFalse(called);
+            }
+
+            Assert.IsTrue(called);
+        }
+
+        [TestMethod]
+        public void SuppressAmbientTemporarilyHidesAndRestoresRootTransaction()
+        {
+            using var root = new MongoTransactionScope(_dbContext!);
+            var session = root.SessionHandle;
+            Assert.IsNotNull(session);
+
+            using (MongoTransactionScope.SuppressAmbient())
+            {
+                Assert.IsNull(MongoTransactionScope.Transaction);
+                Assert.IsFalse(MongoTransactionScope.IsInTransaction);
+            }
+
+            Assert.AreSame(session, MongoTransactionScope.Transaction);
+            Assert.IsTrue(MongoTransactionScope.IsInTransaction);
+            root.AbortTransaction();
+        }
+
+        [TestMethod]
+        public async Task RetryExecutorReusesAmbientTransaction()
+        {
+            await using var root = new MongoTransactionScope(_dbContext!);
+            var ambient = root.SessionHandle;
+            var calls = 0;
+            var result = await MongoTransactionScope.ExecuteWithRetryAsync(
+                _dbContext!,
+                session =>
+                {
+                    calls++;
+                    Assert.AreSame(ambient, session);
+                    return Task.FromResult(42);
+                }, maxRetries: 1);
+
+            Assert.AreEqual(42, result);
+            Assert.AreEqual(1, calls);
+            root.AbortTransaction();
+        }
+
+        [TestMethod]
+        public void SyncRetryExecutorRejectsNegativeRetryCount()
+        {
+            try { MongoTransactionScope.ExecuteWithRetry(_dbContext!, _ => 1, maxRetries: -1); Assert.Fail(); }
+            catch (ArgumentOutOfRangeException) { }
+        }
+
+        [TestMethod]
+        public void SyncRetryExecutorDoesNotRetryNonTransientErrors()
+        {
+            var calls = 0;
+            try { MongoTransactionScope.ExecuteWithRetry<int>(_dbContext!, _ =>
+                {
+                    calls++;
+                    throw new InvalidOperationException("expected");
+                }, maxRetries: 1); Assert.Fail(); }
+            catch (InvalidOperationException) { }
+            Assert.AreEqual(1, calls);
+        }
+
+        [TestMethod]
+        public async Task AsyncRetryExecutorDoesNotRetryNonTransientErrors()
+        {
+            var calls = 0;
+            try { await MongoTransactionScope.ExecuteWithRetryAsync(_dbContext!, _ =>
+                {
+                    calls++;
+                    return Task.FromException<int>(new InvalidOperationException("expected"));
+                }, maxRetries: 1); Assert.Fail(); }
+            catch (InvalidOperationException) { }
+            Assert.AreEqual(1, calls);
+        }
+
         [TestInitialize]
         public void Init()
         {
             _dbContext = DbContext.Create();
+            _dbContext.GetCollection<EntityData>().DeleteMany(Builders<EntityData>.Filter.Empty);
         }
 
         [TestCleanup]

@@ -1,4 +1,4 @@
-using EIMSNext.Auth.Entities;
+using EIMSNext.Entities;
 using EIMSNext.Core.Services;
 
 namespace EIMSNext.Service.Contracts

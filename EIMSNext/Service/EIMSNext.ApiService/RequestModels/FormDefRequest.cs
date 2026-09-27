@@ -1,4 +1,4 @@
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -21,11 +21,6 @@ namespace EIMSNext.ApiService.RequestModels
         /// 表单内容
         /// </summary>
         public FormContent Content { get; set; } = new FormContent();
-
-        /// <summary>
-        /// 是否台账， 台账不支持手动增删改？？？
-        /// </summary>
-        public bool IsLedger { get; set; }
 
         /// <summary>
         /// 是否流程表单

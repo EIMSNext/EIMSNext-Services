@@ -1,6 +1,6 @@
 using System.Dynamic;
 
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Core
 {

@@ -1,4 +1,4 @@
-﻿using MongoDB.Driver;
+using MongoDB.Driver;
 using MongoDB.Driver.Linq;
 using WorkflowCore.Models;
 
@@ -6,23 +6,22 @@ namespace EIMSNext.Flow.Persistence
 {
     public class MongoPersistenceProvider : IMongoPersistenceProvider
     {
-        internal const string WorkflowCollectionName = "Wf_WorkflowInstance";
-        private readonly IMongoDatabase _database;
+        private readonly IWfDbContext _dbContext;
 
-        public MongoPersistenceProvider(IMongoDatabase database)
+        public MongoPersistenceProvider(IWfDbContext dbContext)
         {
-            _database = database;
+            _dbContext = dbContext;
         }
 
-        private IMongoCollection<WorkflowInstance> WorkflowInstances => _database.GetCollection<WorkflowInstance>(WorkflowCollectionName);
+        private IMongoCollection<WorkflowInstance> WorkflowInstances => _dbContext.WorkflowInstances;
 
-        private IMongoCollection<EventSubscription> EventSubscriptions => _database.GetCollection<EventSubscription>("Wf_Subscription");
+        private IMongoCollection<EventSubscription> EventSubscriptions => _dbContext.EventSubscriptions;
 
-        private IMongoCollection<Event> Events => _database.GetCollection<Event>("Wf_Event");
+        private IMongoCollection<Event> Events => _dbContext.Events;
 
-        private IMongoCollection<ExecutionError> ExecutionErrors => _database.GetCollection<ExecutionError>("Wf_ExecutionError");
+        private IMongoCollection<ExecutionError> ExecutionErrors => _dbContext.ExecutionErrors;
 
-        private IMongoCollection<ScheduledCommand> ScheduledCommands => _database.GetCollection<ScheduledCommand>("Wf_ScheduledCommand");
+        private IMongoCollection<ScheduledCommand> ScheduledCommands => _dbContext.ScheduledCommands;
 
         public async Task<string> CreateNewWorkflow(WorkflowInstance workflow, CancellationToken cancellationToken = default)
         {
@@ -35,6 +34,18 @@ namespace EIMSNext.Flow.Persistence
             await WorkflowInstances.ReplaceOneAsync(x => x.Id == workflow.Id, workflow, cancellationToken: cancellationToken);
         }
 
+        private async Task PersistWorkflow(
+            IClientSessionHandle session,
+            WorkflowInstance workflow,
+            CancellationToken cancellationToken)
+        {
+            await WorkflowInstances.ReplaceOneAsync(
+                session,
+                x => x.Id == workflow.Id,
+                workflow,
+                cancellationToken: cancellationToken);
+        }
+
         public async Task PersistWorkflow(WorkflowInstance workflow, List<EventSubscription> subscriptions, CancellationToken cancellationToken = default)
         {
             if (subscriptions == null || subscriptions.Count < 1)
@@ -43,11 +54,11 @@ namespace EIMSNext.Flow.Persistence
                 return;
             }
 
-            using (var session = await _database.Client.StartSessionAsync(cancellationToken: cancellationToken))
+            using (var session = await _dbContext.StartSessionAsync(cancellationToken))
             {
                 session.StartTransaction();
-                await PersistWorkflow(workflow, cancellationToken);
-                await EventSubscriptions.InsertManyAsync(subscriptions, cancellationToken: cancellationToken);
+                await PersistWorkflow(session, workflow, cancellationToken);
+                await EventSubscriptions.InsertManyAsync(session, subscriptions, cancellationToken: cancellationToken);
                 await session.CommitTransactionAsync(cancellationToken);
             }
         }
@@ -119,6 +130,12 @@ namespace EIMSNext.Flow.Persistence
         public IQueryable<WorkflowInstance> GetWorkflowInstances()
         {
             return WorkflowInstances.AsQueryable();
+        }
+
+        public async Task ClearWorkflowRuntime(string workflowInstanceId, CancellationToken cancellationToken = default)
+        {
+            await EventSubscriptions.DeleteManyAsync(x => x.WorkflowId == workflowInstanceId, cancellationToken);
+            await ExecutionErrors.DeleteManyAsync(x => x.WorkflowId == workflowInstanceId, cancellationToken);
         }
 
         public async Task<string> CreateEventSubscription(EventSubscription subscription, CancellationToken cancellationToken = default)

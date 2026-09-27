@@ -1,0 +1,75 @@
+using EIMSNext.ApiService.RequestModels;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
+using HKH.Mef2.Integration;
+
+namespace EIMSNext.ApiService
+{
+    /// <summary>
+    /// 应用商店的 API 服务。
+    /// </summary>
+    /// <param name="resolver">服务解析器。</param>
+    public class AppStoreApiService(IResolver resolver) : ApiServiceBase(resolver)
+    {
+        private readonly IRepository<AppProfile> _appProfileRepository = resolver.GetRepository<AppProfile>();
+
+        /// <summary>
+        /// 获取应用商店。
+        /// </summary>
+        public (long Total, IReadOnlyList<AppProfile> Items) GetAppStore(AppProfileQueryRequest request)
+        {
+            var query = _appProfileRepository.Queryable
+                .Where(x => !x.DeleteFlag)
+                .Where(x => x.Status == AppProfileStatus.Published);
+
+            if (!string.IsNullOrWhiteSpace(request.Keyword))
+            {
+                query = query.Where(x => x.Name.Contains(request.Keyword) || x.Summary.Contains(request.Keyword) || x.Tags.Contains(request.Keyword));
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Category))
+            {
+                query = query.Where(x => x.Category == request.Category);
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.Industry))
+            {
+                query = query.Where(x => x.Industry == request.Industry);
+            }
+
+            if (request.Recommended == true)
+            {
+                query = query.Where(x => x.IsRecommended);
+            }
+
+            var total = query.Count();
+            var items = query
+                .OrderByDescending(x => x.IsRecommended)
+                .ThenByDescending(x => x.SortIndex)
+                .Skip(Math.Max(0, request.Skip))
+                .Take(Math.Clamp(request.Take <= 0 ? 24 : request.Take, 1, 100))
+                .ToList();
+
+            return (total, items);
+        }
+
+        /// <summary>
+        /// 获取AppStoreDetail。
+        /// </summary>
+        public AppProfile? GetAppStoreDetail(string id)
+        {
+            var profile = _appProfileRepository.Get(id);
+            if (profile == null || profile.DeleteFlag)
+                return null;
+            if (profile.Status != AppProfileStatus.Published)
+                return null;
+            return profile;
+        }
+    }
+}

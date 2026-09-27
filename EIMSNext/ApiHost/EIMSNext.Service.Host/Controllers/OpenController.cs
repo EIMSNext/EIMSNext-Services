@@ -1,13 +1,18 @@
 using Asp.Versioning;
 
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.ApiService;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Common;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Service.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Host.Requests;
+using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,8 +26,7 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiController, ApiVersion(1.0), ApiVersion(2.0)]
     public class OpenController(IResolver resolver) : ControllerBase
     {
-        private readonly IResolver _resolver = resolver;
-        private readonly IRepository<AppProfile> _appProfileRepository = resolver.GetRepository<AppProfile>();
+        private readonly AppStoreApiService _appStoreApiService = resolver.Resolve<AppStoreApiService>();
         private readonly IAppInstallService _appInstallService = resolver.Resolve<IAppInstallService>();
 
         /// <summary>
@@ -30,56 +34,38 @@ namespace EIMSNext.Service.Host.Controllers
         /// </summary>
         /// <returns></returns>
         [HttpGet("api/v{version:apiVersion}/Ping")]
+        [AllowAnonymous]
         public IActionResult Ping()
         {
             return ApiResult.Success("API Server is running.").ToActionResult();
         }
 
         [HttpGet("api/Version")]
+        [AllowAnonymous]
         public string Version()
         {
             return Assembly.GetExecutingAssembly().GetName().Version!.ToString();
         }
 
         [HttpGet("api/v{version:apiVersion}/open/appstore")]
+        [AllowAnonymous]
         public IActionResult GetAppStore([FromQuery] AppProfileQueryRequest request)
         {
-            var query = _appProfileRepository.Queryable.Where(x => !x.DeleteFlag);
-
-            if (!string.IsNullOrWhiteSpace(request.Keyword))
-            {
-                query = query.Where(x => x.Name.Contains(request.Keyword) || x.Summary.Contains(request.Keyword) || x.Tags.Contains(request.Keyword));
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.Category))
-            {
-                query = query.Where(x => x.Category == request.Category);
-            }
-
-            if (!string.IsNullOrWhiteSpace(request.Industry))
-            {
-                query = query.Where(x => x.Industry == request.Industry);
-            }
-
-            if (request.Recommended == true)
-            {
-                query = query.Where(x => x.IsRecommended);
-            }
-
-            var total = query.Count();
-            var items = query.OrderByDescending(x => x.IsRecommended).ThenByDescending(x => x.SortIndex).Skip(request.Skip).Take(request.Take).ToList();
+            var (total, items) = _appStoreApiService.GetAppStore(request);
             return ApiResult.Success(new { total, items }).ToActionResult();
         }
 
         [HttpGet("api/v{version:apiVersion}/open/appstore/{id}")]
+        [AllowAnonymous]
         public IActionResult GetAppStoreDetail(string id)
         {
-            var profile = _appProfileRepository.Get(id);
+            var profile = _appStoreApiService.GetAppStoreDetail(id);
             return profile == null ? NotFound() : ApiResult.Success(profile).ToActionResult();
         }
 
         [HttpPost("api/v{version:apiVersion}/open/appstore/{id}/install")]
         [Authorize]
+        [IdentityType(IdentityType.Corp_Admins)]
         public async Task<IActionResult> Install(string id)
         {
             var appId = await _appInstallService.InstallAsync(id);

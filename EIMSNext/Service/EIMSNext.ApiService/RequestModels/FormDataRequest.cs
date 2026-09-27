@@ -1,5 +1,6 @@
 using System.Dynamic;
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -9,7 +10,7 @@ namespace EIMSNext.ApiService.RequestModels
     public class FormDataRequest : RequestBase
     {
         /// <summary>
-        /// 0 - Save, 1 - Submit
+        /// DataAction enum: 1 - Save, 2 - Submit
         /// </summary>
         public DataAction Action { get; set; } = DataAction.Save;
 

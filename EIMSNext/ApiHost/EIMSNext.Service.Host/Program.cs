@@ -1,24 +1,37 @@
 using Asp.Versioning;
+
 using EIMSNext.ApiCore;
-using EIMSNext.ApiCore.Plugin;
+using EIMSNext.ApiCore.Idempotency;
+using EIMSNext.Plugin.Runtime;
+using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Plugin.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.ApiService;
+using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
+
 using HKH.Mef2.Integration;
+
 using Microsoft.AspNetCore.OData;
 using Microsoft.AspNetCore.OData.Formatter.Deserialization;
 using Microsoft.AspNetCore.OData.Formatter.Serialization;
+using Microsoft.AspNetCore.OData.Query;
 using Microsoft.AspNetCore.OData.Routing.Conventions;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Options;
-using MongoDB.Driver;
+
 using Serilog;
+
 using Swashbuckle.AspNetCore.SwaggerGen;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -32,22 +45,21 @@ builder.Host.UseSerilog((ctx, cfg) =>
     cfg.ReadFrom.Configuration(ctx.Configuration)
         .Enrich.FromLogContext()
         .Enrich.WithProperty("Application", "EIMSNext.Service.Host"));
-// Add services to the container.
-builder.Services.AddControllers().AddOData(
-         options =>
-         {
-             options.TimeZone = TimeZoneInfo.Utc;
-             options.EnableQueryFeatures(EIMSNext.Common.Constants.MaxPageSize)
-             //移除$metadata访问
-             .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
 
-             options.RouteOptions.EnableControllerNameCaseInsensitive = true;
-             options.RouteOptions.EnableActionNameCaseInsensitive = true;
-             options.RouteOptions.EnablePropertyNameCaseInsensitive = true;
-         }
-    );
+builder.Services.AddControllers(options =>
+{
+    options.Filters.Add<IdentityTypeFilter>();
+    options.Filters.Add<PermissionFilter>();
+}).AddOData(options =>
+{
+    options.TimeZone = TimeZoneInfo.Utc;
+    options.EnableQueryFeatures(EIMSNext.Common.Constants.MaxPageSize)
+        .Conventions.Remove(options.Conventions.OfType<MetadataRoutingConvention>().First());
 
-//builder.Services.AddSingleton<SkipTokenHandler, CustomSkipTokenHandler>();
+    options.RouteOptions.EnableControllerNameCaseInsensitive = true;
+    options.RouteOptions.EnableActionNameCaseInsensitive = true;
+    options.RouteOptions.EnablePropertyNameCaseInsensitive = true;
+});
 
 builder.Services.AddHealthChecks().AddCheck("health", () => HealthCheckResult.Healthy());
 
@@ -56,42 +68,36 @@ builder.Services.AddApiVersioning(opt =>
     opt.DefaultApiVersion = new ApiVersion(1.0);
     opt.AssumeDefaultVersionWhenUnspecified = true;
     opt.ReportApiVersions = true;
-
     opt.ApiVersionReader = new UrlSegmentApiVersionReader();
 }).AddMvc().AddApiExplorer(opt =>
 {
     opt.GroupNameFormat = "'v'VVV";
-})
-    .AddOData(opt => opt.AddRouteComponents("odata/v{version:apiVersion}",
-    (services) =>
-    {
-        services.AddSingleton<ODataEnumDeserializer, LowercaseODataEnumDeserializer>();
-        services.AddSingleton<ODataEnumSerializer, LowercaseODataEnumSerializer>();
-    })
-    )
-    .AddODataApiExplorer(opt =>
+}).AddOData(opt => opt.AddRouteComponents("odata/v{version:apiVersion}", services =>
+{
+    services.AddSingleton<ODataEnumDeserializer, LowercaseODataEnumDeserializer>();
+    services.AddSingleton<ODataEnumSerializer, LowercaseODataEnumSerializer>();
+    services.AddSingleton<SkipTokenHandler, CustomSkipTokenHandler>();
+})).AddODataApiExplorer(opt =>
 {
     opt.GroupNameFormat = "'v'VVV";
 });
 
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
+builder.Services.AddScoped<IPublicAccessValidator, PublicAccessValidator>();
 builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddRabbitMqMessaging(builder.Configuration);
 
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddTransient<ISwaggerGenHandler, SwaggerGenHandler>();
 builder.Services.AddTransient<IConfigureOptions<SwaggerGenOptions>, VersioningSwaggerGenOptions>();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Setup Databases
 using (var serviceScope = app.Services.GetRequiredService<IServiceScopeFactory>().CreateScope())
 {
-    EnsureSeedData(serviceScope.ServiceProvider.GetService<IResolver>()!);
+    await EnsureSeedData(serviceScope.ServiceProvider.GetRequiredService<IResolver>());
 }
 
-// Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -111,44 +117,57 @@ app.UseCustomMiddlewares();
 app.UseMiddleware<ODataMetadataMiddleware>();
 app.UseMiddleware<ODataCountRequestMiddleware>();
 app.UseODataQueryRequest();
-//app.UseODataBatching();
 //app.UseHttpsRedirection();
-
-//app.UseStaticFiles(new StaticFileOptions()
-//{
-//    OnPrepareResponse = (e) =>
-//    {
-//        e.Context.Response.Headers.AccessControlAllowOrigin = e.Context.Request.Headers.Origin;
-//        e.Context.Response.Headers.AccessControlAllowMethods = "PUT,POST,GET,DELETE,OPTIONS,HEAD,PATCH";
-//        e.Context.Response.Headers.AccessControlAllowHeaders = e.Context.Request.Headers.AccessControlRequestHeaders;
-//        e.Context.Response.Headers.AccessControlAllowCredentials = "true";
-//    }
-//});
 
 app.UseRouting();
 app.UseAuthentication();
+app.UseMiddleware<IdempotencyMiddleware>();
 app.UseAuthorization();
 app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();
 
-async void EnsureSeedData(IResolver resolver)
+async Task EnsureSeedData(IResolver resolver)
 {
-    resolver.GetServiceContext().Operator = new Operator("", "", "");
     var corpService = resolver.GetService<Corporate>();
-    var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
-    if (!corpService!.All().Any())
+    if (corpService.All().Any())
+        return;
+
+    var serviceContext = resolver.GetServiceContext();
+    serviceContext.UserId = "admin";
+    serviceContext.Operator = new Operator("", "admin", "Admin");
+
+    var userRepo = resolver.GetRepository<User>();
+    var adminUser = userRepo.Queryable.FirstOrDefault(x => x.Id == "admin");
+    if (adminUser == null && !userRepo.Queryable.Any())
     {
-        await corpService.AddAsync(
-              new Corporate
-              {
-                  Code = "2008080800008",
-                  Name = "EIMS Team",
-                   Description = "EIMS Team",
-               });
+        adminUser = new User
+        {
+            Id = "admin",
+            Name = "Admin",
+            Password = HKH.Common.Security.BCrypt.HashPassword("123456"),
+            Email = "admin@eimsnext.com",
+            Phone = "12345678901",
+            CreateTime = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()
+        };
+        await userRepo.InsertAsync(adminUser);
     }
 
+    if (adminUser == null)
+    {
+        throw new InvalidOperationException("初始化企业需要 admin 用户，请先初始化 Auth 数据。");
+    }
+
+    serviceContext.User = adminUser;
+    await corpService.AddAsync(new Corporate
+    {
+        Code = "2008080800008",
+        Name = "EIMS Team",
+        Description = "EIMS Team",
+    });
+
+    var pluginProfileRepo = resolver.GetRepository<PluginProfile>();
     if (!pluginProfileRepo.Queryable.Any(x => x.PluginId == "sampleplugin" && !x.DeleteFlag))
     {
         var profile = new PluginProfile
@@ -166,53 +185,21 @@ async void EnsureSeedData(IResolver resolver)
             IsRecommended = true,
             Status = "Published",
             SortIndex = 1000,
-            InstallCount = 0,
-            PublishedAt = DateTime.UtcNow,
-            HelpDocUrl = string.Empty,
-            TemplateUrl = string.Empty,
-            PricingPlans =
-            [
-                new PluginPricingPlan
-                {
-                    Id = "free",
-                    Name = "免费试用",
-                    Price = 0,
-                    DurationDays = 30,
-                    Unit = "天",
-                    IsTrial = true
-                }
-            ],
-            Functions =
-            [
-                new PluginFunctionSnapshot
-                {
-                    Id = "EchoReceipt",
-                    Name = "收款单回显",
-                    Description = "演示插件字段映射、执行结果开放字段与下游节点联动",
-                    InputFields =
-                    [
-                        new PluginFieldDesc { Key = "bizNo", Name = "单据编号", FieldType = "Input", Required = true },
-                        new PluginFieldDesc { Key = "amount", Name = "金额", FieldType = "Number", Required = true },
-                        new PluginFieldDesc { Key = "bizDate", Name = "业务日期", FieldType = "TimeStamp" },
-                        new PluginFieldDesc { Key = "remark", Name = "备注", FieldType = "TextArea" },
-                        new PluginFieldDesc { Key = "items", Name = "明细子表", FieldType = "TableForm" }
-                    ]
-                },
-                new PluginFunctionSnapshot
-                {
-                    Id = "EchoMixedData",
-                    Name = "通用字段回显",
-                    Description = "用于验证插件切换方法、字段重置和结果字段选择",
-                    InputFields =
-                    [
-                        new PluginFieldDesc { Key = "title", Name = "标题", FieldType = "Input", Required = true },
-                        new PluginFieldDesc { Key = "description", Name = "描述", FieldType = "TextArea" },
-                        new PluginFieldDesc { Key = "owner", Name = "负责人", FieldType = "Employee1" },
-                        new PluginFieldDesc { Key = "ownerDept", Name = "归属部门", FieldType = "Department1" }
-                    ]
-                }
-            ]
+            PublishedAt = DateTime.UtcNow
         };
         await pluginProfileRepo.InsertAsync(profile);
+    }
+
+    var corporateSettingService = resolver.GetService<CorporateSetting>();
+    if (corporateSettingService != null && !corporateSettingService.All()
+        .Any(x => x.CorpId == "test-corp" && x.Name == CorporateSettingNames.SsoSecret && !x.DeleteFlag))
+    {
+        await corporateSettingService.AddAsync(new CorporateSetting
+        {
+            CorpId = "test-corp",
+            Name = CorporateSettingNames.SsoSecret,
+            Value = string.Empty,
+            Desc = "SSO Secret"
+        });
     }
 }

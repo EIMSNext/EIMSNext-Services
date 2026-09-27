@@ -1,4 +1,5 @@
-using EIMSNext.Core.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo.Entities;
 
 namespace EIMSNext.ApiService
 {
@@ -13,6 +14,10 @@ namespace EIMSNext.ApiService
 
         string CurrentCorpId { get; }
 
+        string CurrentDashboardId { get; }
+
         string AccessToken { get; }
+
+        PublicScope PublicScope { get; }
     }
 }

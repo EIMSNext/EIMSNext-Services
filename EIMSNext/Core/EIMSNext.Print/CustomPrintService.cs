@@ -1,4 +1,4 @@
-﻿using EIMSNext.Print.Abstractions;
+using EIMSNext.Print.Abstractions;
 
 namespace EIMSNext.Print
 {

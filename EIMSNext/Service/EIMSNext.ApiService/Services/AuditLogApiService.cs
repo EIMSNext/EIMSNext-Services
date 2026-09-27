@@ -4,16 +4,24 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Async.Abstractions.Messaging;
-using EIMSNext.Core;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
-using EIMSNext.Service.Entities;
+using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// 审计日志的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class AuditLogApiService(IResolver resolver) : ApiServiceBase<AuditLog, AuditLogViewModel,IAuditLogService>(resolver)
 	{
 		private static readonly Dictionary<string, ExportColumnType> AuditLogColumnTypes = new(StringComparer.OrdinalIgnoreCase)
@@ -26,6 +34,9 @@ namespace EIMSNext.ApiService
 			["clientIp"] = ExportColumnType.String,
 		};
 
+		/// <summary>
+		/// 执行 ExportAsync 操作。
+		/// </summary>
 		public async Task<ExportResponse> ExportAsync(AuditLogExportRequest request)
 		{
 			ValidateAuditLogExportRequest(request);
@@ -39,7 +50,6 @@ namespace EIMSNext.ApiService
 			{
 				ExportType = ExportType.AuditLog,
 				request.Format,
-				ActualFormat = actualFormat,
 				request.Columns,
 				request.EntityType,
 				request.Action,
@@ -117,7 +127,7 @@ namespace EIMSNext.ApiService
 
 			if (!string.IsNullOrWhiteSpace(request.OperatorName))
 			{
-				filters.Add(builder.Regex("CreateBy.Label", new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
+				filters.Add(builder.Regex(x => x.CreateBy!.Label, new MongoDB.Bson.BsonRegularExpression(request.OperatorName, "i")));
 			}
 
 			if (request.StartTime.HasValue)

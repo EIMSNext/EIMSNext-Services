@@ -13,6 +13,8 @@ namespace EIMSNext.Async.Tests
     [TestClass]
     public class QuartzJobScopeTests
     {
+        private static ServiceProvider? _provider;
+
         [TestMethod]
         public async Task QuartzJob_UsesNewScopePerExecution()
         {
@@ -29,7 +31,9 @@ namespace EIMSNext.Async.Tests
                 q.AddJob<ScopedTestJob>(opts => opts.StoreDurably().WithIdentity(jobKey));
             });
 
-            await using var provider = services.BuildServiceProvider();
+            // Quartz retains the first DI logger factory in process-global state.
+            // Keep this test provider alive until the test process exits.
+            var provider = _provider = services.BuildServiceProvider();
             var schedulerFactory = provider.GetRequiredService<ISchedulerFactory>();
             var scheduler = await schedulerFactory.GetScheduler();
 

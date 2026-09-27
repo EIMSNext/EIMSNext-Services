@@ -1,12 +1,42 @@
-using HKH.Mef2.Integration;
-using EIMSNext.Core.Services;
-using EIMSNext.Service.Entities;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
+using HKH.Mef2.Integration;
 
 namespace EIMSNext.ApiService
 {
+	/// <summary>
+	/// Web 推送日志的 API 服务。
+	/// </summary>
+	/// <param name="resolver">服务解析器。</param>
 	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, WebPushLogViewModel, IWebPushLogService>(resolver)
 	{
-	}
+        /// <summary>
+        /// 按当前身份权限过滤查询。
+        /// </summary>
+        protected override IQueryable<WebPushLogViewModel> FilterByPermission()
+        {
+            var query = base.FilterByPermission();
+            var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
+            if (evaluator.HasUnrestrictedManagementIdentity)
+            {
+                return query;
+            }
+
+            if (IdentityContext.IdentityType == IdentityType.AppAdmin)
+            {
+                var appIds = evaluator.GetSnapshot().ManageableAppIds;
+                return query.Where(x => appIds.Contains(x.AppId));
+            }
+
+            return query.Where(x => false);
+        }
+    }
 }

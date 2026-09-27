@@ -23,7 +23,7 @@ dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintena
 也可通过环境变量覆盖 Mongo 配置，例如：
 
 ```powershell
-$env:MongoDb__ConnectionString = "mongodb://localhost:27017"
+$env:MongoDb__ConnectionString = "mongodb://127.0.0.1:27017"
 $env:MongoDb__Database = "EIMS"
 dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj
 ```

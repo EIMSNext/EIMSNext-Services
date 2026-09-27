@@ -1,14 +1,22 @@
 using System.Text.Json.Nodes;
 
-using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.CloudEvent;
-using EIMSNext.Core;
-using EIMSNext.Service.Entities;
+using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Notification;
+using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Mongo;
+using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Query;
+using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Services.Extensions;
+using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 namespace EIMSNext.Async.Tasks.Consumers
 {
     public class WebhookConsumer : TaskConsumerBase<WebhookTaskArgs, WebhookConsumer>
@@ -46,11 +54,34 @@ namespace EIMSNext.Async.Tasks.Consumers
                     && x.AppId == args.AppId
                     && x.FormId == args.FormId);
             var eventHub = resolver.Resolve<IEventHub>();
+            var processingRepository = resolver.Resolve<IMessageProcessingRepository>();
+            var baseKey = resolver.Resolve<IOutboxIdempotencyKeyFactory>().Create(args);
             foreach (var webhook in webhooks)
             {
-                var webhookPayload = payload.DeepClone();
-                ApplyAliases(webhookPayload, aliasConfig?.FieldAlias ?? []);
-                await eventHub.SendAsync(webhook, args.Trigger, webhookPayload);
+                var target = webhook.Id;
+                var leaseToken = await processingRepository.TryAcquireAsync(baseKey, target, DateTime.UtcNow.AddMinutes(5), ct);
+                if (leaseToken == null)
+                {
+                    Logger.LogInformation("Webhook notify dedup: key={Key}, target={Target}, skipped", baseKey, target);
+                    continue;
+                }
+
+                try
+                {
+                    var webhookPayload = payload.DeepClone();
+                    ApplyAliases(webhookPayload, aliasConfig?.FieldAlias ?? []);
+                    await eventHub.SendAsync(webhook, args.Trigger, args.EventId, webhookPayload);
+                    await processingRepository.MarkCompletedAsync(baseKey, target, leaseToken, DateTime.UtcNow.ToTimeStampMs(), ct);
+                }
+                catch (TaskRequeueException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogWarning(ex, "Webhook external effect failed; message will be requeued. key={Key}, target={Target}", baseKey, target);
+                    throw new TaskRequeueException("Webhook external effect failed.", TimeSpan.FromSeconds(30));
+                }
             }
         }
 

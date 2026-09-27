@@ -1,4 +1,4 @@
-using EIMSNext.Core.Repositories;
+using EIMSNext.Core.Mongo.Repositories;
 
 namespace EIMSNext.Core.Tests
 {
