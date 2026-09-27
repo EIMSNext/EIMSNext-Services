@@ -1,16 +1,13 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -54,7 +51,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体核心逻辑。
         /// </summary>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(CrossBinding entity)
+        protected override Task<int> ReplaceAsyncCore(CrossBinding entity)
         {
             ValidateBindingTarget(entity.TargetAppId, entity.SourceAppId, entity.SourceFormId);
             EnsureNotDuplicated(entity);
@@ -64,7 +61,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             var bindings = CoreService.All()

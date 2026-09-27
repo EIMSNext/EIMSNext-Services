@@ -2,11 +2,9 @@ using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Nodes.EventFlow;
@@ -16,6 +14,7 @@ using HKH.Mef2.Integration;
 using Microsoft.Extensions.Logging;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -42,16 +41,19 @@ namespace EIMSNext.Flow.Core.Nodes
             return (EfDataContext)context.Workflow.Data;
         }
 
-        protected ExecutionResult ExecuteWithLog(IStepExecutionContext context, Func<EfDataContext, ExecutionResult> action, string successSummary = "执行成功")
+        /// <summary>
+        /// 带执行日志的节点执行包装（异步）。
+        /// </summary>
+        protected async Task<ExecutionResult> ExecuteWithLogAsync(IStepExecutionContext context, Func<EfDataContext, Task<ExecutionResult>> action, string successSummary = "执行成功")
         {
             var dataContext = GetDataContext(context);
             var startTime = DateTime.UtcNow.ToTimeStampMs();
 
             try
             {
-                var result = action(dataContext);
+                var result = await action(dataContext);
                 var endTime = DateTime.UtcNow.ToTimeStampMs();
-                CreateExecLog(context.Workflow, dataContext, Metadata!, string.Empty, startTime, endTime, summary: successSummary);
+                await CreateExecLogAsync(context.Workflow, dataContext, Metadata!, string.Empty, startTime, endTime, summary: successSummary);
                 return result;
             }
             catch (Exception ex)
@@ -59,7 +61,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 var endTime = DateTime.UtcNow.ToTimeStampMs();
                 var failure = ClassifyFailure(Metadata!, ex);
                 dataContext.ErrMsg = failure.Reason;
-                CreateExecLog(
+                await CreateExecLogAsync(
                     context.Workflow,
                     dataContext,
                     Metadata!,
@@ -73,7 +75,10 @@ namespace EIMSNext.Flow.Core.Nodes
             }
         }
 
-        protected void CreateFailureExecLog(
+        /// <summary>
+        /// 节点失败日志（异步）：直接同步写库会阻塞线程，且 PostgreSQL 侧只有异步仓储接口。
+        /// </summary>
+        protected async Task CreateFailureExecLogAsync(
             WorkflowInstance wfInst,
             EfDataContext dataContext,
             WfStep wfStep,
@@ -84,12 +89,12 @@ namespace EIMSNext.Flow.Core.Nodes
         {
             var failure = ClassifyFailure(wfStep, null, errMsg, pluginFailure);
             dataContext.ErrMsg = failure.Reason;
-            CreateExecLog(wfInst, dataContext, wfStep, errMsg, startTime, endTime, failure.Reason, failure.Suggestion, failure.Summary);
+            await CreateExecLogAsync(wfInst, dataContext, wfStep, errMsg, startTime, endTime, failure.Reason, failure.Suggestion, failure.Summary);
         }
 
         protected Dictionary<string, object> GetNodeScriptData(EfDataContext dataContext)
         {
-            var wrapData = new ExpandoObject();
+            var wrapData = new Dictionary<string, object?>();
             foreach (var item in dataContext.NodeDatas)
             {
                 if (item.Value.ActionDatas.Count > 0)
@@ -97,20 +102,16 @@ namespace EIMSNext.Flow.Core.Nodes
                     if (item.Value.SingleResult) //只有单个的会直接参与公式运算？
                     {
                         var formData = item.Value.ActionDatas.First().FormData;
-                        var pData = formData.Data;
-                        pData.TryAdd("createBy", formData.CreateBy);
+                        var pData = WithCreateBy(formData);
 
                         wrapData.TryAdd($"n_{item.Value.NodeId}", pData);
                     }
                     else
                     {
-                        var list = new List<ExpandoObject>();
+                        var list = new List<Dictionary<string, object?>>();
                         item.Value.ActionDatas.ForEach(actionData =>
                         {
-                            var pData = actionData.FormData.Data;
-                            pData.TryAdd("createBy", actionData.FormData.CreateBy);
-
-                            list.Add(pData);
+                            list.Add(WithCreateBy(actionData.FormData));
                         });
 
                         wrapData.TryAdd($"n_{item.Value.NodeId}", list);
@@ -121,7 +122,25 @@ namespace EIMSNext.Flow.Core.Nodes
             return new Dictionary<string, object>() { ["data"] = wrapData };
         }
 
-        protected void CreateExecLog(
+        /// <summary>
+        /// 取一份带 <c>createBy</c> 的数据副本供脚本使用。
+        /// </summary>
+        /// <remarks>
+        /// 原先直接对 <see cref="FormData.Data"/> 做 <c>TryAdd("createBy", …)</c>，
+        /// 把审计对象写进了业务数据字典：它会随 Data 序列化进 jsonb，还会改动被 EF 跟踪的实体。
+        /// 在副本上补充，脚本表达式照旧可以引用 createBy。
+        /// </remarks>
+        private static Dictionary<string, object?> WithCreateBy(FormData formData)
+        {
+            var data = new Dictionary<string, object?>(formData.Data);
+            data.TryAdd("createBy", formData.CreateBy);
+            return data;
+        }
+
+        /// <summary>
+        /// 写入节点执行日志（异步）。
+        /// </summary>
+        protected async Task CreateExecLogAsync(
             WorkflowInstance wfInst,
             EfDataContext dataContext,
             WfStep wfStep,
@@ -158,7 +177,7 @@ namespace EIMSNext.Flow.Core.Nodes
                     Summary = string.IsNullOrWhiteSpace(summary) ? (success ? "执行成功" : failureReason) : summary,
                     Success = success
                 };
-                RunLogNodeRepository.Insert(runLogNode);
+                await RunLogNodeRepository.InsertAsync(runLogNode);
             }
             catch (Exception ex)    //写日志失败不影响整个数据流程
             {
@@ -321,7 +340,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             AppId = dataContext.AppId,
                             CorpId = dataContext.CorpId,
                             FormId = formDef.Id,
-                            Data = new ExpandoObject(),
+                            Data = new Dictionary<string, object?>(),
                             CreateBy = dataContext.WfStarter,
                             CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                         };
@@ -361,7 +380,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             AppId = dataContext.AppId,
                             CorpId = dataContext.CorpId,
                             FormId = formDef.Id,
-                            Data = new ExpandoObject(),
+                            Data = new Dictionary<string, object?>(),
                             CreateBy = dataContext.WfStarter,
                             CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                         };
@@ -380,7 +399,7 @@ namespace EIMSNext.Flow.Core.Nodes
                     AppId = dataContext.AppId,
                     CorpId = dataContext.CorpId,
                     FormId = formDef.Id,
-                    Data = new ExpandoObject(),
+                    Data = new Dictionary<string, object?>(),
                     CreateBy = dataContext.WfStarter,
                     CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 };
@@ -407,10 +426,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     {
                         var field = fieldSetting.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
                         var mainField = field[0];//.Replace("data.", "");
-                        List<ExpandoObject> arrData = new List<ExpandoObject>();
-                        if (insertData.Data.ContainsKey(mainField))
-                            arrData = insertData.Data.GetValue<List<ExpandoObject>>(mainField, arrData);
-                        else
+                        var arrData = insertData.Data.GetRows(mainField);
+                        if (!insertData.Data.ContainsKey(mainField))
                             insertData.Data.AddOrUpdate(mainField, arrData);
 
                         if (fieldSetting.ValueIsSubField())
@@ -448,10 +465,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     {
                         var field = fieldSetting.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
                         var mainField = field[0];//.Replace("data.", "");
-                        List<ExpandoObject> arrData = new List<ExpandoObject>();
-                        if (insertData.Data.ContainsKey(mainField))
-                            arrData = insertData.Data.GetValue<List<ExpandoObject>>(mainField, arrData);
-                        else
+                        var arrData = insertData.Data.GetRows(mainField);
+                        if (!insertData.Data.ContainsKey(mainField))
                             insertData.Data.AddOrUpdate(mainField, arrData);
 
                         if (fieldSetting.ValueIsSubField())
@@ -504,10 +519,8 @@ namespace EIMSNext.Flow.Core.Nodes
                     {
                         var field = fieldSetting.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
                         var mainField = field[0];//.Replace("data.", "");
-                        List<ExpandoObject> arrData = new List<ExpandoObject>();
-                        if (insertData.Data.ContainsKey(mainField))
-                            arrData = insertData.Data.GetValue<List<ExpandoObject>>(mainField, arrData);
-                        else
+                        var arrData = insertData.Data.GetRows(mainField);
+                        if (!insertData.Data.ContainsKey(mainField))
                             insertData.Data.AddOrUpdate(mainField, arrData);
 
                         if (fieldSetting.ValueIsSubField())
@@ -561,7 +574,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 主表单字段对子表单字段
         /// </summary>
-        protected void SetMainToSub(FormData target, List<ExpandoObject> subForm, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void SetMainToSub(FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             var value = (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value;
             if (subForm.Count > 0)
@@ -570,7 +583,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             else
             {
-                var subData = new ExpandoObject();
+                var subData = new Dictionary<string, object?>();
                 subData.AddOrUpdate(subField, value);
                 subForm.Add(subData);
             }
@@ -578,7 +591,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>
-        protected void SetSubToSub(FormData target, List<ExpandoObject> subForm, string subField, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
+        protected void SetSubToSub(FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
         {
             var valArrField = fieldSetting.ValueField!.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
             var valMainField = valArrField[0];//.Replace("data.", "");
@@ -591,14 +604,15 @@ namespace EIMSNext.Flow.Core.Nodes
                 {
                     for (var i = 0; i < valArrData.Count(); i++)
                     {
-                        var subData = new ExpandoObject();
+                        var subData = new Dictionary<string, object?>();
                         if (subForm.Count() > i)
                             subData = subForm.ElementAt(i);
                         else
                         {
                             if (subForm.Count() > 0)
                             {     //复制数据，因为如果其他字段为主表字段，则需要每一行都被赋值
-                                subData = subForm.ElementAt(i - 1).SerializeToJson().DeserializeFromJson<ExpandoObject>()!;
+                                subData = subForm.ElementAt(i - 1).SerializeToJson().DeserializeFromJson<Dictionary<string, object?>>()
+                                    ?? new Dictionary<string, object?>();
                             }
 
                             subForm.Add(subData);
@@ -640,7 +654,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 主表单字段对子表单字段
         /// </summary>
-        protected void UpdateMainToSub(ExpandoObject subItem, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void UpdateMainToSub(IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value);
         }
@@ -648,7 +662,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 多条记录的主表单(SingleResultNode=false)对主表单字段
         /// </summary>
-        protected void UpdateMultiMainToSub(ExpandoObject subItem, int mIndex, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void UpdateMultiMainToSub(IDictionary<string, object?> subItem, int mIndex, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             var valueField = fieldSetting.ValueField!;
             var valueExp = $"data.n_{valueField.Field.NodeId}[{mIndex}].{valueField.Field.Field}";
@@ -658,7 +672,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>
-        protected void UpdateSubToSub(ExpandoObject subItem, string subField, FormFieldSetting fieldSetting, int i, Dictionary<string, object>? scriptData)
+        protected void UpdateSubToSub(IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, int i, Dictionary<string, object>? scriptData)
         {
             subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{i}]."), scriptData).Value);
         }

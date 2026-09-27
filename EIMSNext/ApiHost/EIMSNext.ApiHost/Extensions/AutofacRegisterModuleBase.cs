@@ -1,11 +1,14 @@
-using System.Reflection;
+﻿using System.Reflection;
 using Autofac;
 
 using EIMSNext.ApiHost.Authorization;
 using EIMSNext.Common;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services;
+using EIMSNext.Persistence.PostgreSql;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace EIMSNext.ApiHost.Extensions
 {
@@ -25,8 +28,17 @@ namespace EIMSNext.ApiHost.Extensions
         protected override void Load(ContainerBuilder builder)
         {
             builder.RegisterType<AppSetting>().AsSelf().SingleInstance();
-            builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).SingleInstance();
-            builder.RegisterType<AggregateService>().AsSelf().SingleInstance();
+
+            builder.RegisterGeneric(typeof(DbRepository<>)).As(typeof(IRepository<>)).InstancePerLifetimeScope();
+            builder.Register(c =>
+            {
+                var settings = c.Resolve<IOptions<PostgreSqlOptions>>().Value;
+                var options = new DbContextOptionsBuilder<PostgreSqlDbContext>();
+                PostgreSqlPersistenceRegistration.ConfigurePostgreSql(options, settings);
+                return options.Options;
+            }).As<DbContextOptions<PostgreSqlDbContext>>().InstancePerLifetimeScope();
+            builder.RegisterType<PostgreSqlDbContext>().AsSelf().As<DbContext>().InstancePerLifetimeScope();
+
             builder.RegisterType<DefaultResolver>().AsImplementedInterfaces().InstancePerLifetimeScope();
             builder.RegisterType<IdentityContext>().AsImplementedInterfaces().InstancePerLifetimeScope();
 

@@ -10,6 +10,6 @@ namespace EIMSNext.Service.Contracts
         /// <summary>
         /// 重建数据流调度。
         /// </summary>
-        Task RebuildScheduleAsync(Wf_Definition definition, MongoDB.Driver.IClientSessionHandle? session = null);
+        Task RebuildScheduleAsync(Wf_Definition definition);
     }
 }

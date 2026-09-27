@@ -70,6 +70,7 @@ public sealed class PublicTokenServiceTests
 
         public IQueryable<Client> Clients => Enumerable.Empty<Client>().AsQueryable();
         public IQueryable<User> Users => Enumerable.Empty<User>().AsQueryable();
+        public IQueryable<UserCorp> UserCorps => Enumerable.Empty<UserCorp>().AsQueryable();
         public IQueryable<EmployeeLookup> Employees => Enumerable.Empty<EmployeeLookup>().AsQueryable();
         public IQueryable<PublicAccessSetting> PublicSettings => _publicSettings;
         public IQueryable<CorporateSettingReadModel> CorporateSettings => Enumerable.Empty<CorporateSettingReadModel>().AsQueryable();

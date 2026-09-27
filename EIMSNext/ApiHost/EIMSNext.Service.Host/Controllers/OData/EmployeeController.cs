@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -6,11 +6,8 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
@@ -37,16 +34,18 @@ namespace EIMSNext.Service.Host.Controllers.OData
             ResourceCode = Resources.Employee,
             Operation = Operation.Read,
             AccessControlLevel = AccessControlLevel.Allow)]
+        // 多对多例外：员工→员工部门关系表→部门（或员工→员工组关系表→员工组）允许多查一层（3 层），其余仍受基类 2 层限制。
+        [EnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize, MaxExpansionDepth = 2, MaxNodeCount = 200)]
         public override IActionResult Get(ODataQueryOptions<EmployeeViewModel> options)
-        {
-            return base.Get(options);
-        }
+            => base.Get(options);
 
         [HttpGet]
         [Permission(
             ResourceCode = Resources.Employee,
             Operation = Operation.Read,
             AccessControlLevel = AccessControlLevel.Allow)]
+        // 多对多例外：与集合查询一致，允许员工→关系表→目标的 3 层 $expand。
+        [EnableQuery(MaxExpansionDepth = 2, MaxNodeCount = 200)]
         public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<EmployeeViewModel> options)
         {
             return base.Get(key, options);
@@ -186,3 +185,4 @@ namespace EIMSNext.Service.Host.Controllers.OData
         }
     }
 }
+

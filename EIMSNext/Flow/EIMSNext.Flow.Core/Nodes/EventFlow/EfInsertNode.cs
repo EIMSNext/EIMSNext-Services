@@ -14,7 +14,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLog(context, dataContext =>
+            return ExecuteWithLogAsync(context, async dataContext =>
             {
                 var processor = Resolver.Resolve<IEfDataProcessor>();
                 if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
@@ -37,12 +37,12 @@ namespace EIMSNext.Flow.Core.Nodes
                         FormId = insertSetting.FormId,
                         ActionDatas = insertDatas
                     };
-                    dataContext.NodeDatas[Metadata.Id] = processor.ProcessNode(context.Workflow, nodeData, "insert");
+                    dataContext.NodeDatas[Metadata.Id] = await processor.ProcessNodeAsync(context.Workflow, nodeData, "insert");
 
                 }
 
                 return ExecutionResult.Next();
-            });
+            }).GetAwaiter().GetResult();
         }
     }
 }

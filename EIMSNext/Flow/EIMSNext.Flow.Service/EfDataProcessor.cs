@@ -1,23 +1,21 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Security.Cryptography;
 using System.Text;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Common.Extensions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
-using MongoDB.Driver;
 
 namespace EIMSNext.Flow.Service
 {
@@ -62,7 +60,8 @@ namespace EIMSNext.Flow.Service
             var dataContext = (EfDataContext)inst.Data;
             var executionId = string.IsNullOrWhiteSpace(dataContext.ExecutionId) ? inst.Id : dataContext.ExecutionId;
             var completionKey = BuildNodeCompletionKey(executionId, dataContext.EventFlowId, nodeId);
-            var completion = NodeExecutionRepository.Find(x => x.ExecutionKey == completionKey, MongoTransactionScope.Transaction)
+            // EF Core 下事务由 Ambient TransactionScope 隐式承载（同一 DbContext 实例共享连接与事务），
+            var completion = NodeExecutionRepository.Find(x => x.ExecutionKey == completionKey)
                 .FirstOrDefault();
             if (completion?.Status != EventFlowNodeExecutionStatus.Completed || string.IsNullOrWhiteSpace(completion.ResultSnapshot))
             {
@@ -74,18 +73,23 @@ namespace EIMSNext.Flow.Service
             return nodeData != null;
         }
 
-        public EfNodeData ProcessNode(WorkflowInstance inst, EfNodeData nodeData, string actionType)
+        /// <summary>
+        /// 执行 EventFlow 节点的写数据动作。
+        /// </summary>
+        public async Task<EfNodeData> ProcessNodeAsync(WorkflowInstance inst, EfNodeData nodeData, string actionType)
         {
-            if (MongoTransactionScope.IsInTransaction)
-                return ProcessNodeCore(inst, nodeData, actionType, MongoTransactionScope.Transaction!);
+            if (TransactionScope.IsInTransaction && TransactionScope.IsInTransactionFor(WfDefinitionRepository.DbContext))
+            {
+                return await ProcessNodeCoreAsync(inst, nodeData, actionType);
+            }
 
-            return MongoTransactionScope.ExecuteWithRetry(
+            return await TransactionScope.ExecuteWithRetryAsync(
                 WfDefinitionRepository.DbContext,
-                session => ProcessNodeCore(inst, nodeData, actionType, session),
+                () => ProcessNodeCoreAsync(inst, nodeData, actionType),
                 maxRetries: 1);
         }
 
-        private EfNodeData ProcessNodeCore(WorkflowInstance inst, EfNodeData nodeData, string actionType, IClientSessionHandle session)
+        private async Task<EfNodeData> ProcessNodeCoreAsync(WorkflowInstance inst, EfNodeData nodeData, string actionType)
         {
             var dataContext = (EfDataContext)inst.Data;
             InitServiceContext(dataContext);
@@ -107,7 +111,7 @@ namespace EIMSNext.Flow.Service
 
                     var targetKey = EnsureStableTargetKey(action, executionId, dataContext.EventFlowId, nodeData.NodeId, actions.IndexOf(action));
                     var executionKey = BuildExecutionKey(executionId, dataContext.EventFlowId, nodeData.NodeId, actionType, targetKey);
-                    var existing = NodeExecutionRepository.Find(x => x.ExecutionKey == executionKey, session).FirstOrDefault();
+                    var existing = NodeExecutionRepository.Find(x => x.ExecutionKey == executionKey).FirstOrDefault();
                     if (existing?.Status == EventFlowNodeExecutionStatus.Completed && !string.IsNullOrWhiteSpace(existing.ResultSnapshot))
                     {
                         var restored = existing.ResultSnapshot.DeserializeFromJson<EfNodeData>();
@@ -147,41 +151,41 @@ namespace EIMSNext.Flow.Service
                     };
                     if (existing == null)
                     {
-                        NodeExecutionRepository.Insert(execution, session);
+                        await NodeExecutionRepository.InsertAsync(execution);
                     }
                     else
                     {
-                        var claimFilter = Builders<EventFlowNodeExecution>.Filter.And(
-                            Builders<EventFlowNodeExecution>.Filter.Eq(x => x.Id, existing.Id),
-                            Builders<EventFlowNodeExecution>.Filter.Eq(x => x.Status, existing.Status),
-                            Builders<EventFlowNodeExecution>.Filter.Lte(x => x.LeaseUntil, now));
-                        var claimUpdate = Builders<EventFlowNodeExecution>.Update
-                            .Set(x => x.Status, EventFlowNodeExecutionStatus.Processing)
-                            .Set(x => x.ProcessingOwner, ProcessingOwner)
-                            .Set(x => x.ProcessingStartedTime, now)
-                            .Set(x => x.LeaseUntil, now + 300000)
-                            .Inc(x => x.AttemptCount, 1);
-                        var claimOptions = new FindOneAndUpdateOptions<EventFlowNodeExecution>
-                        {
-                            ReturnDocument = ReturnDocument.After
-                        };
-                        execution = NodeExecutionRepository.Collection.FindOneAndUpdate(session, claimFilter, claimUpdate, claimOptions);
-                        if (execution == null)
+                        // PostgreSQL 的 UPDATE 不能返回整行（ExecuteUpdate 不产出 RETURNING），
+                        // 因此拆成「条件 UPDATE 抢锁 → 按受影响行数判定是否抢到 → 抢到后按主键回读」。
+                        // 条件 UPDATE 自带行锁，多个并发执行者只有一个能拿到 affected == 1；抢不到的一方直接抛异常。
+                        var affected = await NodeExecutionRepository.UpdateManyAsync(
+                            x => x.Id == execution.Id
+                                && x.Status == existing.Status
+                                && x.LeaseUntil <= now,
+                            setters => setters
+                                .SetProperty(x => x.Status, EventFlowNodeExecutionStatus.Processing)
+                                .SetProperty(x => x.ProcessingOwner, ProcessingOwner)
+                                .SetProperty(x => x.ProcessingStartedTime, now)
+                                .SetProperty(x => x.LeaseUntil, now + 300000)
+                                .SetProperty(x => x.AttemptCount, existing.AttemptCount + 1));
+                        if (affected == 0)
                         {
                             throw new InvalidOperationException($"EventFlow 节点已被其他请求接管: {executionKey}");
                         }
+
+                        execution = (await NodeExecutionRepository.GetAsync(execution.Id))!;
                     }
 
                     switch (action.State)
                     {
                         case DataState.Inserted:
-                            FormDataService.Add([action.FormData], session);
+                            await FormDataService.AddAsync([action.FormData]);
                             break;
                         case DataState.Modified:
-                            FormDataService.Replace(action.FormData, session);
+                            await FormDataService.ReplaceAsync(action.FormData);
                             break;
                         case DataState.Removed:
-                            FormDataService.Delete([action.FormData.Id], session);
+                            await FormDataService.DeleteAsync([action.FormData.Id]);
                             break;
                     }
 
@@ -195,24 +199,22 @@ namespace EIMSNext.Flow.Service
                         SingleResult = nodeData.SingleResult,
                         ActionDatas = [action]
                     };
-                    NodeExecutionRepository.Update(execution.Id,
-                        Builders<EventFlowNodeExecution>.Update
-                            .Set(x => x.ResultSnapshot, snapshot.SerializeToJson())
-                            .Set(x => x.Status, EventFlowNodeExecutionStatus.Completed)
-                            .Set(x => x.ProcessingOwner, string.Empty)
-                            .Set(x => x.LeaseUntil, 0)
-                            .Set(x => x.CompletedTime, now),
-                        upsert: false,
-                        session: session);
+                    await NodeExecutionRepository.UpdateAsync(execution.Id,
+                        setters => setters
+                            .SetProperty(x => x.ResultSnapshot, snapshot.SerializeToJson())
+                            .SetProperty(x => x.Status, EventFlowNodeExecutionStatus.Completed)
+                            .SetProperty(x => x.ProcessingOwner, string.Empty)
+                            .SetProperty(x => x.LeaseUntil, 0)
+                            .SetProperty(x => x.CompletedTime, now));
                 }
 
                 nodeData.ActionDatas = restoredActions;
                 var completionKey = BuildNodeCompletionKey(executionId, dataContext.EventFlowId, nodeData.NodeId);
-                var completion = NodeExecutionRepository.Find(x => x.ExecutionKey == completionKey, session).FirstOrDefault();
+                var completion = NodeExecutionRepository.Find(x => x.ExecutionKey == completionKey).FirstOrDefault();
                 var completionSnapshot = nodeData.SerializeToJson();
                 if (completion == null)
                 {
-                    NodeExecutionRepository.Insert(new EventFlowNodeExecution
+                    await NodeExecutionRepository.InsertAsync(new EventFlowNodeExecution
                     {
                         Id = NodeExecutionRepository.NewId(),
                         ExecutionKey = completionKey,
@@ -230,21 +232,20 @@ namespace EIMSNext.Flow.Service
                         Status = EventFlowNodeExecutionStatus.Completed,
                         ResultSnapshot = completionSnapshot,
                         CompletedTime = DateTime.UtcNow.ToTimeStampMs()
-                    }, session);
+                    });
                 }
                 else
                 {
-                    NodeExecutionRepository.Update(completion.Id,
-                        Builders<EventFlowNodeExecution>.Update
-                            .Set(x => x.Status, EventFlowNodeExecutionStatus.Completed)
-                            .Set(x => x.ResultSnapshot, completionSnapshot)
-                            .Set(x => x.CompletedTime, DateTime.UtcNow.ToTimeStampMs()),
-                        upsert: false,
-                        session: session);
+                    var completedTime = DateTime.UtcNow.ToTimeStampMs();
+                    await NodeExecutionRepository.UpdateAsync(completion.Id,
+                        setters => setters
+                            .SetProperty(x => x.Status, EventFlowNodeExecutionStatus.Completed)
+                            .SetProperty(x => x.ResultSnapshot, completionSnapshot)
+                            .SetProperty(x => x.CompletedTime, completedTime));
                 }
                 return nodeData;
             }
-            catch (MongoWriteException ex) when (IsExecutionKeyDuplicate(ex))
+            catch (DbUpdateException ex) when (IsExecutionKeyDuplicate(ex))
             {
                 if (TryRestoreNode(inst, nodeData.NodeId, out var restored))
                 {
@@ -277,11 +278,20 @@ namespace EIMSNext.Flow.Service
             return action.FormData.Id;
         }
 
-        private static bool IsExecutionKeyDuplicate(MongoWriteException exception)
+        /// <summary>
+        /// 判断异常是否为 <c>EventFlowNodeExecution.ExecutionKey</c> 唯一索引冲突。
+        /// </summary>
+        private static bool IsExecutionKeyDuplicate(DbUpdateException exception)
         {
-            var message = exception.WriteError?.Message ?? exception.Message;
-            return exception.WriteError?.Category == ServerErrorCategory.DuplicateKey
-                && message.Contains("eventflownodeexecution", StringComparison.OrdinalIgnoreCase);
+            var postgres = exception.InnerException as Npgsql.PostgresException
+                ?? exception.InnerException?.InnerException as Npgsql.PostgresException;
+            if (postgres is null || postgres.SqlState != "23505")
+            {
+                return false;
+            }
+
+            return postgres.ConstraintName?.Contains("EventFlowNodeExecution", StringComparison.OrdinalIgnoreCase) == true
+                || postgres.MessageText.Contains("eventflownodeexecution", StringComparison.OrdinalIgnoreCase);
         }
 
         public void Process(WorkflowInstance inst)

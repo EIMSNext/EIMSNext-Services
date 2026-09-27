@@ -1,6 +1,6 @@
-using EIMSNext.Entities;
+﻿using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Core.Interfaces

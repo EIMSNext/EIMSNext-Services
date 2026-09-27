@@ -1,5 +1,4 @@
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
+﻿using EIMSNext.Core.Query;
 
 namespace EIMSNext.Core.Tests
 {
@@ -15,7 +14,8 @@ namespace EIMSNext.Core.Tests
             Assert.AreEqual(200, zero.GetEffectiveTake());
             Assert.AreEqual(200, negative.GetEffectiveTake());
             Assert.AreEqual(25, new DynamicFindOptions<object> { Take = 25 }.GetEffectiveTake());
-            Assert.AreEqual(200, new MongoFindOptions<object> { Take = 0 }.GetEffectiveTake());
+            // 其 EF Core 等价物是 QueryFindOptions<T>（同一套 Take 语义）。
+            Assert.AreEqual(200, new QueryFindOptions<object> { Take = 0 }.GetEffectiveTake());
         }
 
         [TestMethod]

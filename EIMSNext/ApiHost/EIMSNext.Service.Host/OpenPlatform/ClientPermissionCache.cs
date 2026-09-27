@@ -153,3 +153,4 @@ namespace EIMSNext.Service.Host.OpenPlatform
         public List<string> IpWhitelist { get; set; } = new();
     }
 }
+

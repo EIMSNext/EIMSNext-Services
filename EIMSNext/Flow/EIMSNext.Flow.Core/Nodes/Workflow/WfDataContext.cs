@@ -1,8 +1,9 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Entities;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core
 {
@@ -22,28 +23,28 @@ namespace EIMSNext.Flow.Core
             EventIds = eventIds;
         }
 
-        public static WfDataContext FromExpando(ExpandoObject expando)
+        public static WfDataContext FromData(IDictionary<string, object?> data)
         {
             var ctx = new WfDataContext();
-            ctx.CorpId = expando.GetValue(WfConsts.CorpId, string.Empty);
-            ctx.UserId = expando.GetValue(WfConsts.UserId, string.Empty);
-            ctx.AccessToken = expando.GetValue(WfConsts.AccessToken, string.Empty);
-            ctx.AppId = expando.GetValue(WfConsts.AppId, string.Empty);
-            ctx.FormId = expando.GetValue(WfConsts.FormId, string.Empty);
-            ctx.DataId = expando.GetValue(WfConsts.DataId, string.Empty);
+            ctx.CorpId = data.GetValue(WfConsts.CorpId, string.Empty);
+            ctx.UserId = data.GetValue(WfConsts.UserId, string.Empty);
+            ctx.AccessToken = data.GetValue(WfConsts.AccessToken, string.Empty);
+            ctx.AppId = data.GetValue(WfConsts.AppId, string.Empty);
+            ctx.FormId = data.GetValue(WfConsts.FormId, string.Empty);
+            ctx.DataId = data.GetValue(WfConsts.DataId, string.Empty);
 
-            var empdo = expando.GetValueOrDefault<ExpandoObject>(WfConsts.WfStarter);
-            if (empdo != null)
+            var starter = data.GetValueOrDefault<IDictionary<string, object?>>(WfConsts.WfStarter);
+            if (starter != null)
             {
-                var empId = empdo.GetValue(WfConsts.EmpId, string.Empty);
-                var empCode = empdo.GetValue(WfConsts.EmpCode, string.Empty);
-                var empName = empdo.GetValue(WfConsts.EmpName, string.Empty);
+                var empId = starter.GetValue(WfConsts.EmpId, string.Empty);
+                var empCode = starter.GetValue(WfConsts.EmpCode, string.Empty);
+                var empName = starter.GetValue(WfConsts.EmpName, string.Empty);
                 ctx.WfStarter = new Operator(empId, empCode, empName);
             }
 
-            ctx.EfCascade = (CascadeMode)expando.GetValue<int>(WfConsts.EfCascade, 0);
-            ctx.EventIds = expando.GetValue<string?>(WfConsts.EventIds, null);
-            ctx.Round = expando.GetValue<int>(WfConsts.ApprovalRounnd, 1);
+            ctx.EfCascade = (CascadeMode)data.GetValue<int>(WfConsts.EfCascade, 0);
+            ctx.EventIds = data.GetValue<string?>(WfConsts.EventIds, null);
+            ctx.Round = data.GetValue<int>(WfConsts.ApprovalRounnd, 1);
 
             return ctx;
         }
@@ -61,6 +62,8 @@ namespace EIMSNext.Flow.Core
         public bool MatchParallel { get; set; }
         public int Round { get; set; } = 1;
 
+        // WorkflowCore 的 WorkflowInstance.Data 是包内的 ExpandoObject 类型，写入口保持 ExpandoObject；
+        // 读取侧一律走 IDictionary（见 FromData），不关心实际容器。
         public ExpandoObject ToExpando()
         {
             var data = new ExpandoObject();

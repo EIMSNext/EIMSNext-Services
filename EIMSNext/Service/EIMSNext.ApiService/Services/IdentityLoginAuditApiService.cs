@@ -1,3 +1,4 @@
+﻿using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -7,17 +8,15 @@ using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.ApiService
 {
@@ -103,34 +102,33 @@ namespace EIMSNext.ApiService
         private async Task<long> CountExportAsync(IdentityLoginAuditExportRequest request)
         {
             var filter = BuildIdentityLoginAuditFilter(request);
-            return await Resolver.GetRepository<IdentityLoginAudit>().CountAsync(filter);
+            return await Resolver.GetRepository<IdentityLoginAudit>().Find(filter).LongCountAsync();
         }
 
-        private FilterDefinition<IdentityLoginAudit> BuildIdentityLoginAuditFilter(IdentityLoginAuditExportRequest request)
+        private Expression<Func<IdentityLoginAudit, bool>> BuildIdentityLoginAuditFilter(IdentityLoginAuditExportRequest request)
         {
-            var builder = Builders<IdentityLoginAudit>.Filter;
-            var filters = new List<FilterDefinition<IdentityLoginAudit>>
-            {
-                builder.Eq(x => x.CorpId, IdentityContext.CurrentCorpId),
-                builder.Ne(x => x.DeleteFlag, true),
-            };
+            var corpId = IdentityContext.CurrentCorpId;
+            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {
-                filters.Add(builder.Regex(x => x.UserName, new MongoDB.Bson.BsonRegularExpression(request.UserName, "i")));
+                var keyword = DynamicQueryExtensions.EscapeLikePattern(request.UserName);
+                filter = filter.AndAlso(x => EF.Functions.ILike(x.UserName, keyword));
             }
 
             if (request.StartTime.HasValue)
             {
-                filters.Add(builder.Gte(x => x.CreateTime, request.StartTime.Value));
+                var startTime = request.StartTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime >= startTime);
             }
 
             if (request.EndTime.HasValue)
             {
-                filters.Add(builder.Lte(x => x.CreateTime, request.EndTime.Value));
+                var endTime = request.EndTime.Value;
+                filter = filter.AndAlso(x => x.CreateTime <= endTime);
             }
 
-            return filters.Count == 1 ? filters[0] : builder.And(filters);
+            return filter;
         }
 
         private static void ValidateLoginExportRequest(IdentityLoginAuditExportRequest request)

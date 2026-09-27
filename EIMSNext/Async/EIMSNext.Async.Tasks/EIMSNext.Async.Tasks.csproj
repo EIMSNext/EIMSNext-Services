@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.2.0.0</Version>
+    <Version>2.0.0.0</Version>
     <AcceptNPOIOSMFLicense>true</AcceptNPOIOSMFLicense>
   </PropertyGroup>
   <ItemGroup>
@@ -34,3 +34,4 @@
     </AssemblyAttribute>
   </ItemGroup>
 </Project>
+

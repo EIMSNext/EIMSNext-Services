@@ -3,14 +3,14 @@ using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service;
 
 public sealed class CorporateSettingService(IResolver resolver)
     : EntityServiceBase<CorporateSetting>(resolver), ICorporateSettingService
 {
-    protected override Task BeforeAdd(IEnumerable<CorporateSetting> entities, IClientSessionHandle? session)
+    protected override Task BeforeAdd(IEnumerable<CorporateSetting> entities)
     {
         var settings = entities.ToList();
         foreach (var setting in settings)
@@ -28,7 +28,7 @@ public sealed class CorporateSettingService(IResolver resolver)
 
         foreach (var setting in settings)
         {
-            if (Exists(setting.CorpId!, setting.Name, session))
+            if (Exists(setting.CorpId!, setting.Name))
             {
                 throw new BadRequestException($"企业配置已存在: {setting.CorpId}/{setting.Name}");
             }
@@ -37,10 +37,10 @@ public sealed class CorporateSettingService(IResolver resolver)
         return Task.CompletedTask;
     }
 
-    protected override Task BeforeReplace(CorporateSetting entity, IClientSessionHandle? session)
+    protected override Task BeforeReplace(CorporateSetting entity)
     {
         Normalize(entity);
-        if (Exists(entity.CorpId!, entity.Name, session, entity.Id))
+        if (Exists(entity.CorpId!, entity.Name, entity.Id))
         {
             throw new BadRequestException($"企业配置已存在: {entity.CorpId}/{entity.Name}");
         }
@@ -48,19 +48,13 @@ public sealed class CorporateSettingService(IResolver resolver)
         return Task.CompletedTask;
     }
 
-    private bool Exists(string corpId, string name, IClientSessionHandle? session, string? excludedId = null)
+    private bool Exists(string corpId, string name, string? excludedId = null)
     {
-        var filter = Builders<CorporateSetting>.Filter.And(
-            Builders<CorporateSetting>.Filter.Eq(x => x.CorpId, corpId),
-            Builders<CorporateSetting>.Filter.Eq(x => x.Name, name),
-            Builders<CorporateSetting>.Filter.Eq(x => x.DeleteFlag, false),
-            excludedId == null
-                ? Builders<CorporateSetting>.Filter.Empty
-                : Builders<CorporateSetting>.Filter.Ne(x => x.Id, excludedId));
-
-        return session == null
-            ? Collection.Find(filter).Limit(1).Any()
-            : Collection.Find(session, filter).Limit(1).Any();
+        return Repository.Queryable.Any(x =>
+            x.CorpId == corpId
+            && x.Name == name
+            && !x.DeleteFlag
+            && (excludedId == null || x.Id != excludedId));
     }
 
     private static void Normalize(CorporateSetting setting)

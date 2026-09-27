@@ -1,11 +1,10 @@
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.ApiService
 {
@@ -41,9 +40,10 @@ namespace EIMSNext.ApiService
             var (field, value) = ResolveDedupKey(setting, wxOpenId, ip, corpId, formId);
             var filter = BuildDupFilter(corpId, formId, field, value);
 
-            var collection = Resolver.Resolve<IFormDataService>().Collection;
-            var count = collection.CountDocuments(filter.ToFilterDefinition<FormData>(), new CountOptions { Limit = 1 });
-            if (count > 0)
+            var hasSubmitted = Resolver.Resolve<IFormDataService>()
+                .Find(filter)
+                .Any();
+            if (hasSubmitted)
             {
                 throw new PublicOneSubmitDuplicateException();
             }

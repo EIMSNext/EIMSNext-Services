@@ -1,16 +1,14 @@
-using System.Composition.Hosting;
+﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
 using EIMSNext.Async.Tasks.Consumers;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
 using Microsoft.Extensions.DependencyInjection;
-using MongoDB.Driver;
 using RabbitMQ.Client;
 
 namespace EIMSNext.Async.Tests
@@ -167,8 +165,6 @@ namespace EIMSNext.Async.Tests
 
             public int MarkFailedCalls { get; private set; }
 
-            public IMongoCollection<FormDataImportLog> Collection => throw new NotSupportedException();
-
             public FormDataImportLog? Get(string id) => ImportLog?.Id == id ? ImportLog : null;
 
             public Task<bool> TryMarkProcessingAsync(string id, int retryCount)
@@ -202,31 +198,34 @@ namespace EIMSNext.Async.Tests
             public Task IncrementRetryAsync(string id) => throw new NotSupportedException();
             public IQueryable<FormDataImportLog> All() => throw new NotSupportedException();
             public IQueryable<FormDataImportLog> Query(Expression<Func<FormDataImportLog, bool>> where) => throw new NotSupportedException();
-            public IFindFluent<FormDataImportLog, FormDataImportLog> Find(DynamicFindOptions<FormDataImportLog> options) => throw new NotSupportedException();
-            public IFindFluent<FormDataImportLog, FormDataImportLog> Find(Expression<Func<FormDataImportLog, bool>> filter) => throw new NotSupportedException();
+            public IQueryable<FormDataImportLog> Find(DynamicFindOptions<FormDataImportLog> options) => throw new NotSupportedException();
+            public IQueryable<FormDataImportLog> Find(Expression<Func<FormDataImportLog, bool>> filter) => throw new NotSupportedException();
+            public IQueryable<FormDataImportLog> Find(DynamicFilter filter) => throw new NotSupportedException();
+            public List<FormDataImportLog> FindList(DynamicFilter filter) => throw new NotSupportedException();
             public long Count(DynamicFilter filter) => throw new NotSupportedException();
             public long Count(Expression<Func<FormDataImportLog, bool>> filter) => throw new NotSupportedException();
             public bool Exists(Expression<Func<FormDataImportLog, bool>> where) => throw new NotSupportedException();
             public bool Exists(DynamicFilter where) => throw new NotSupportedException();
             public void Add(FormDataImportLog entity) => throw new NotSupportedException();
             public void Add(IEnumerable<FormDataImportLog> entities) => throw new NotSupportedException();
-            public ReplaceOneResult Replace(FormDataImportLog entity) => throw new NotSupportedException();
-            public object Delete(string id) => throw new NotSupportedException();
-            public object Delete(IEnumerable<string> ids) => throw new NotSupportedException();
-            public object Delete(DynamicFilter filter) => throw new NotSupportedException();
+            public int Replace(FormDataImportLog entity) => throw new NotSupportedException();
+            public int Delete(string id) => throw new NotSupportedException();
+            public int Delete(IEnumerable<string> ids) => throw new NotSupportedException();
+            public int Delete(DynamicFilter filter) => throw new NotSupportedException();
             public Task<FormDataImportLog?> GetAsync(string id) => throw new NotSupportedException();
-            public Task<IAsyncCursor<FormDataImportLog>> FindAsync(DynamicFindOptions<FormDataImportLog> options) => throw new NotSupportedException();
-            public Task<IAsyncCursor<FormDataImportLog>> FindAsync(Expression<Func<FormDataImportLog, bool>> filter) => throw new NotSupportedException();
+            public Task<List<FormDataImportLog>> FindAsync(DynamicFindOptions<FormDataImportLog> options, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<List<FormDataImportLog>> FindAsync(Expression<Func<FormDataImportLog, bool>> filter, CancellationToken cancellationToken = default) => throw new NotSupportedException();
+            public Task<List<FormDataImportLog>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default) => throw new NotSupportedException();
             public Task<long> CountAsync(DynamicFilter filter) => throw new NotSupportedException();
             public Task<long> CountAsync(Expression<Func<FormDataImportLog, bool>> filter) => throw new NotSupportedException();
             public Task<bool> ExistsAsync(Expression<Func<FormDataImportLog, bool>> where) => throw new NotSupportedException();
             public Task<bool> ExistsAsync(DynamicFilter where) => throw new NotSupportedException();
             public Task AddAsync(FormDataImportLog entity) => throw new NotSupportedException();
             public Task AddAsync(IEnumerable<FormDataImportLog> entities) => throw new NotSupportedException();
-            public Task<ReplaceOneResult> ReplaceAsync(FormDataImportLog entity) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(string id) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-            public Task<object> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
+            public Task<int> ReplaceAsync(FormDataImportLog entity) => throw new NotSupportedException();
+            public Task<int> DeleteAsync(string id) => throw new NotSupportedException();
+            public Task<int> DeleteAsync(IEnumerable<string> ids) => throw new NotSupportedException();
+            public Task<int> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
         }
 
         private sealed class FakeMessageRouteResolver : IMessageRouteResolver

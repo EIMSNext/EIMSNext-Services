@@ -1,10 +1,14 @@
-using EIMSNext.Core.Mongo.Repositories;
+﻿using EIMSNext.Core.Repositories;
+using EIMSNext.Persistence.PostgreSql;
 
 namespace EIMSNext.Core.Tests
 {
-    public class EntityDataRepository : RepositoryBase<EntityData>
+    /// <summary>
+    /// 测试用仓储。
+    /// </summary>
+    public class EntityDataRepository : DbRepository<EntityData>
     {
-        public EntityDataRepository(DbContext dbContext) : base(dbContext)
+        public EntityDataRepository(TestPostgreSqlDbContext dbContext) : base(dbContext)
         {
         }
     }

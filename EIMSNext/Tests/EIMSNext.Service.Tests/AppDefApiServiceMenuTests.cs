@@ -1,5 +1,4 @@
-using System.Composition.Hosting;
-using System.Linq.Expressions;
+﻿using System.Composition.Hosting;
 
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -7,21 +6,15 @@ using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
+using EIMSNext.TestSupport;
 
 using HKH.Mef2.Integration;
 
 using Microsoft.Extensions.Caching.Distributed;
 using Microsoft.Extensions.Caching.Memory;
-
-using MongoDB.Driver;
 
 namespace EIMSNext.Service.Tests
 {
@@ -247,58 +240,43 @@ namespace EIMSNext.Service.Tests
         {
         }
 
-        private class FakeEntityService<T> : IService<T> where T : class, IMongoEntity
+        /// <summary>
+        /// 内存字典版实体服务。
+        /// </summary>
+        private class FakeEntityService<T> : StubEntityService<T>
+            where T : class, IEntityKey
         {
             private readonly Dictionary<string, T> _items = new(StringComparer.Ordinal);
 
-            public IMongoCollection<T> Collection => throw new NotSupportedException();
-            public T? Get(string id) => _items.GetValueOrDefault(id);
-            public IQueryable<T> All() => _items.Values.AsQueryable();
-            public IQueryable<T> Query(Expression<Func<T, bool>> where) => All().Where(where);
-            public IFindFluent<T, T> Find(DynamicFindOptions<T> options) => throw new NotSupportedException();
-            public IFindFluent<T, T> Find(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-            public long Count(DynamicFilter filter) => throw new NotSupportedException();
-            public long Count(Expression<Func<T, bool>> filter) => All().LongCount(filter);
-            public bool Exists(Expression<Func<T, bool>> where) => All().Any(where);
-            public bool Exists(DynamicFilter where) => throw new NotSupportedException();
-            public void Add(T entity) => _items[entity.Id] = entity;
-            public void Add(IEnumerable<T> entities)
+            public override T? Get(string id) => _items.GetValueOrDefault(id);
+
+            public override IQueryable<T> All() => _items.Values.AsQueryable();
+
+            public override void Add(T entity) => _items[entity.Id] = entity;
+
+            public override void Add(IEnumerable<T> entities)
             {
                 foreach (var entity in entities) Add(entity);
             }
-            public ReplaceOneResult Replace(T entity)
+
+            public override int Replace(T entity)
             {
                 _items[entity.Id] = entity;
-                return null!;
+                return 1;
             }
-            public object Delete(string id) => _items.Remove(id);
-            public object Delete(IEnumerable<string> ids)
+
+            public override int Delete(string id) => _items.Remove(id) ? 1 : 0;
+
+            public override int Delete(IEnumerable<string> ids)
             {
-                foreach (var id in ids) _items.Remove(id);
-                return true;
+                var affected = 0;
+                foreach (var id in ids)
+                {
+                    if (_items.Remove(id)) affected++;
+                }
+
+                return affected;
             }
-            public object Delete(DynamicFilter filter) => throw new NotSupportedException();
-            public Task<T?> GetAsync(string id) => Task.FromResult(Get(id));
-            public Task<IAsyncCursor<T>> FindAsync(DynamicFindOptions<T> options) => throw new NotSupportedException();
-            public Task<IAsyncCursor<T>> FindAsync(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-            public Task<long> CountAsync(DynamicFilter filter) => throw new NotSupportedException();
-            public Task<long> CountAsync(Expression<Func<T, bool>> filter) => Task.FromResult(Count(filter));
-            public Task<bool> ExistsAsync(Expression<Func<T, bool>> where) => Task.FromResult(Exists(where));
-            public Task<bool> ExistsAsync(DynamicFilter where) => throw new NotSupportedException();
-            public Task AddAsync(T entity)
-            {
-                Add(entity);
-                return Task.CompletedTask;
-            }
-            public Task AddAsync(IEnumerable<T> entities)
-            {
-                Add(entities);
-                return Task.CompletedTask;
-            }
-            public Task<ReplaceOneResult> ReplaceAsync(T entity) => Task.FromResult(Replace(entity));
-            public Task<object> DeleteAsync(string id) => Task.FromResult(Delete(id));
-            public Task<object> DeleteAsync(IEnumerable<string> ids) => Task.FromResult(Delete(ids));
-            public Task<object> DeleteAsync(DynamicFilter filter) => throw new NotSupportedException();
         }
 
         private sealed class FakeCacheClient : ICacheClient
@@ -317,6 +295,7 @@ namespace EIMSNext.Service.Tests
             public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
             public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
             public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
+            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
         }
     }
 }

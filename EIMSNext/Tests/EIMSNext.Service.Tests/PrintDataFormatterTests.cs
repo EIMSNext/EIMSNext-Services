@@ -17,7 +17,7 @@ public class PrintDataFormatterTests
             Id = "data-1",
             FormId = "form-1",
             FlowStatus = FlowStatus.Approved,
-            Data = new ExpandoObject(),
+            Data = new Dictionary<string, object?>(),
         };
         var logs = new[]
         {
@@ -28,7 +28,7 @@ public class PrintDataFormatterTests
         };
 
         var result = (IDictionary<string, object?>)PrintDataFormatter.Format(data, Array.Empty<FieldDef>(), logs);
-        var approvalLogs = (List<ExpandoObject>)result[PrintDataFormatter.ApprovalLogs]!;
+        var approvalLogs = (List<Dictionary<string, object?>>)result[PrintDataFormatter.ApprovalLogs]!;
 
         Assert.AreEqual(2, approvalLogs.Count);
         Assert.AreEqual("已审批", valuesFor(result, "flowStatus"));

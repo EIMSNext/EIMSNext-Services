@@ -1,23 +1,22 @@
 using System.Collections;
-using System.Dynamic;
 
 namespace EIMSNext.Core.Abstractions.Extensions
 {
     /// <summary>
-    /// 动态对象比较器，用于比较两个 <see cref="ExpandoObject"/> 的属性变化。
+    /// 动态对象比较器，用于比较两个动态字典（FormData.Data，原 ExpandoObject / 现 Dictionary）的属性变化。
     /// </summary>
     public class ExpandoComparer
     {
         /// <summary>
-        /// 比较两个ExpandoObject对象，返回所有变化的属性列表
+        /// 比较两个动态字典，返回所有变化的属性列表
         /// </summary>
         /// <param name="original">修改前的对象</param>
         /// <param name="modified">修改后的对象</param>
         /// <returns><see cref="IList{ExpandoChangeLog}"/> 变更列表。</returns>
-        public static IList<ExpandoChangeLog> Compare(ExpandoObject original, ExpandoObject modified)
+        public static IList<ExpandoChangeLog> Compare(IDictionary<string, object?> original, IDictionary<string, object?> modified)
         {
-            var oriDict = original as IDictionary<string, object> ?? new Dictionary<string, object>();
-            var modDict = modified as IDictionary<string, object> ?? new Dictionary<string, object>();
+            var oriDict = original;
+            var modDict = modified;
 
             var changeLogs = new List<ExpandoChangeLog>();
 
@@ -74,7 +73,7 @@ namespace EIMSNext.Core.Abstractions.Extensions
         }
 
         /// <summary>
-        /// 深度对比两个值（支持数组、嵌套ExpandoObject、普通值类型）
+        /// 深度对比两个值（支持数组、嵌套动态字典、普通值类型）
         /// </summary>
         /// <param name="value1">第一个值</param>
         /// <param name="value2">第二个值</param>
@@ -85,10 +84,10 @@ namespace EIMSNext.Core.Abstractions.Extensions
             if (value1 == null && value2 == null) return true;
             if (value1 == null || value2 == null) return false;
 
-            // 如果是ExpandoObject，递归对比内部属性
-            if (value1 is ExpandoObject exp1 && value2 is ExpandoObject exp2)
+            // 如果是动态字典（Dictionary / ExpandoObject），递归对比内部属性
+            if (value1 is IDictionary<string, object?> dict1 && value2 is IDictionary<string, object?> dict2)
             {
-                var expChanges = Compare(exp1, exp2);
+                var expChanges = Compare(dict1, dict2);
                 return !expChanges.Any();
             }
 

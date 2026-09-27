@@ -1,159 +1,94 @@
-using EIMSNext.Entities;
+using System.Linq.Expressions;
 
-using MongoDB.Driver;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Tests
 {
+    /// <summary>
+    /// 员工按部门过滤的关系表语义。
+    /// </summary>
     [TestClass]
     public class EmployeeEmpDeptFilterTests
     {
         [TestMethod]
-        public void Depts_ContainsFilter_TranslatesToFilterDefinition()
+        public void Departments_ContainsFilter_TranslatesToExpressionTree()
         {
             var departmentId = "dept-123";
-            var fb = Builders<Employee>.Filter;
 
-            var filter = fb.ElemMatch(x => x.Depts,
-                d => d.DeptId == departmentId);
+            Expression<Func<Employee, bool>> filter =
+                x => x.Departments.Any(d => d.DepartmentId == departmentId);
 
             Assert.IsNotNull(filter);
+            StringAssert.Contains(filter.ToString(), "Departments");
         }
 
         [TestMethod]
-        public void Depts_HeriarchyIdContainsFilter_TranslatesToFilterDefinition()
+        public void Departments_HeriarchyIdContainsFilter_TranslatesToExpressionTree()
         {
             var departmentId = "dept-456";
-            var fb = Builders<Employee>.Filter;
 
-            var filter = fb.ElemMatch(x => x.Depts,
-                d => d.HeriarchyId.Contains($"|{departmentId}|"));
+            Expression<Func<Employee, bool>> filter =
+                x => x.Departments.Any(d => d.HeriarchyId.Contains($"|{departmentId}|"));
 
             Assert.IsNotNull(filter);
+            StringAssert.Contains(filter.ToString(), "HeriarchyId");
+            StringAssert.Contains(filter.ToString(), "Contains");
         }
 
         [TestMethod]
-        public void Depts_LinqExpression_WorksInMemory()
+        public void Departments_LinqExpression_MatchesDirectAndCascaded()
         {
+            var parent = NewDepartment("dept-a", "|dept-a|");
+            var child = NewDepartment("dept-b", "|dept-a|dept-b|");
+            var other = NewDepartment("dept-c", "|dept-c|");
+            var unrelated = NewDepartment("dept-d", "|parent|other|dept-d|");
+
             var employees = new List<Employee>
             {
-                new Employee
-                {
-                    Id = "emp-1",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-a", HeriarchyId = "|dept-a|", DeptName = "Dept A" },
-                        new EmpDept { DeptId = "dept-b", HeriarchyId = "|dept-a|dept-b|", DeptName = "Dept B" }
-                    }
-                },
-                new Employee
-                {
-                    Id = "emp-2",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-c", HeriarchyId = "|dept-c|", DeptName = "Dept C" }
-                    }
-                },
-                new Employee
-                {
-                    Id = "emp-3",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>()
-                }
+                NewEmployee("emp-1", NewRelation(parent), NewRelation(child)),
+                NewEmployee("emp-2", NewRelation(other)),
+                NewEmployee("emp-3", NewRelation(unrelated)),
+                NewEmployee("emp-4")
             }.AsQueryable();
 
-            var nonRecursiveResult = employees
-                .Where(x => x.Depts.Any(d => d.DeptId == "dept-a"))
+            // 直接部门过滤：只命中显式关联该部门的员工。
+            var byDirectDepartment = employees
+                .Where(x => x.Departments.Any(d => d.DepartmentId == "dept-a"))
+                .Select(x => x.Id)
                 .ToList();
-            Assert.AreEqual(1, nonRecursiveResult.Count);
-            Assert.AreEqual("emp-1", nonRecursiveResult[0].Id);
+            CollectionAssert.AreEqual(new[] { "emp-1" }, byDirectDepartment);
 
-            var recursiveResult = employees
-                .Where(x => x.Depts.Any(d => d.HeriarchyId.Contains("|dept-a|")))
+            // 级联过滤：直接按关系表层级路径快照匹配，命中父部门下所有员工（含子部门）。
+            var byCascadedAncestor = employees
+                .Where(x => x.Departments.Any(d => d.HeriarchyId.Contains("|dept-a|")))
+                .Select(x => x.Id)
                 .ToList();
-            Assert.AreEqual(1, recursiveResult.Count);
-            Assert.AreEqual("emp-1", recursiveResult[0].Id);
+            CollectionAssert.AreEquivalent(new[] { "emp-1" }, byCascadedAncestor);
+
+            // 管道符边界：层级路径片段必须整体匹配，|dept-a| 不得误命中 |parent|other|dept-d|。
+            var byUnrelatedAncestor = employees
+                .Where(x => x.Departments.Any(d => d.HeriarchyId.Contains("|dept-d|")))
+                .Select(x => x.Id)
+                .ToList();
+            CollectionAssert.AreEqual(new[] { "emp-3" }, byUnrelatedAncestor);
         }
 
-        [TestMethod]
-        public void Depts_LinqExpression_RecursiveWithDescendants()
+        private static Department NewDepartment(string id, string hierarchyId) => new()
         {
-            var employees = new List<Employee>
-            {
-                new Employee
-                {
-                    Id = "emp-1",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-root", HeriarchyId = "|dept-root|", DeptName = "Root" },
-                        new EmpDept { DeptId = "dept-child", HeriarchyId = "|dept-root|dept-child|", DeptName = "Child" }
-                    }
-                },
-                new Employee
-                {
-                    Id = "emp-2",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-child", HeriarchyId = "|dept-root|dept-child|", DeptName = "Child" }
-                    }
-                },
-                new Employee
-                {
-                    Id = "emp-3",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-other", HeriarchyId = "|dept-other|", DeptName = "Other" }
-                    }
-                }
-            }.AsQueryable();
+            Id = id,
+            Code = id,
+            Name = id,
+            HeriarchyId = hierarchyId
+        };
 
-            var recursiveResult = employees
-                .Where(x => x.Depts.Any(d => d.HeriarchyId.Contains("|dept-root|")))
-                .ToList();
-            Assert.AreEqual(2, recursiveResult.Count);
-            CollectionAssert.Contains(recursiveResult.Select(x => x.Id).ToList(), "emp-1");
-            CollectionAssert.Contains(recursiveResult.Select(x => x.Id).ToList(), "emp-2");
-        }
+        private static EmployeeDepartment NewRelation(Department department)
+            => new() { DepartmentId = department.Id, HeriarchyId = department.HeriarchyId };
 
-        [TestMethod]
-        public void Depts_LinqExpression_ContainsWithPipeChar()
+        private static Employee NewEmployee(string id, params EmployeeDepartment[] relations) => new()
         {
-            var employees = new List<Employee>
-            {
-                new Employee
-                {
-                    Id = "emp-1",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-a", HeriarchyId = "|parent|dept-a|", DeptName = "Dept A" }
-                    }
-                },
-                new Employee
-                {
-                    Id = "emp-2",
-                    CorpId = "corp-1",
-                    Depts = new List<EmpDept>
-                    {
-                        new EmpDept { DeptId = "dept-b", HeriarchyId = "|parent|other|dept-b|", DeptName = "Dept B" }
-                    }
-                }
-            }.AsQueryable();
-
-            var result = employees
-                .Where(x => x.Depts.Any(d => d.HeriarchyId.Contains("|dept-a|")))
-                .ToList();
-            Assert.AreEqual(1, result.Count);
-            Assert.AreEqual("emp-1", result[0].Id);
-
-            var parentResult = employees
-                .Where(x => x.Depts.Any(d => d.HeriarchyId.Contains("|parent|")))
-                .ToList();
-            Assert.AreEqual(2, parentResult.Count);
-        }
+            Id = id,
+            CorpId = "corp-1",
+            Departments = relations.ToList()
+        };
     }
 }

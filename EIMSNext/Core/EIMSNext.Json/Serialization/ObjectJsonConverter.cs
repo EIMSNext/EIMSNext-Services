@@ -3,51 +3,19 @@ using System.Text.Json.Serialization;
 
 namespace EIMSNext.Json.Serialization
 {
+    /// <summary>
+    /// <see cref="object"/> 声明成员的深度还原转换器。
+    /// </summary>
+    /// <remarks>
+    /// 还原规则统一委托给 <see cref="DynamicValueReader"/>，与 <see cref="DictionaryJsonConverter"/>、
+    /// 持久化层、导入层保持一致（整数→long、小数→decimal、嵌套对象→Dictionary、数组→List）。
+    /// 此前这里单独实现了「int 优先、无 decimal」的一套规则，与其余路径不一致。
+    /// </remarks>
     public class ObjectJsonConverter : JsonConverter<object>
     {
         public override object? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
         {
-            switch (reader.TokenType)
-            {
-                case JsonTokenType.True:
-                    return true;
-                case JsonTokenType.False:
-                    return false;
-                case JsonTokenType.Number:
-                    if (reader.TryGetInt32(out int intValue))
-                        return intValue;
-                    if (reader.TryGetInt64(out long longValue))
-                        return longValue;
-                    return reader.GetDouble();
-                case JsonTokenType.String:
-                    return reader.GetString();
-                case JsonTokenType.StartObject:
-                    // 递归处理嵌套对象，转换为 Dictionary<string, object>
-                    var dict = new Dictionary<string, object?>();
-                    while (reader.Read())
-                    {
-                        if (reader.TokenType == JsonTokenType.EndObject)
-                            return dict;
-                        if (reader.TokenType != JsonTokenType.PropertyName)
-                            throw new JsonException();
-                        string? propertyName = reader.GetString();
-                        reader.Read();
-                        if(!string.IsNullOrEmpty(propertyName))
-                        dict[propertyName] = Read(ref reader, typeof(object), options);
-                    }
-                    throw new JsonException();
-                case JsonTokenType.StartArray:
-                    // 递归处理数组，转换为 List<object>
-                    var list = new List<object?>();
-                    while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
-                    {
-                        list.Add(Read(ref reader, typeof(object), options));
-                    }
-                    return list;
-                default:
-                    // 处理 null 或其他未覆盖的类型
-                    return JsonDocument.ParseValue(ref reader).RootElement.Clone();
-            }
+            return DynamicValueReader.ReadValue(ref reader);
         }
 
         public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)

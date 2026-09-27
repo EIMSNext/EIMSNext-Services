@@ -15,3 +15,4 @@ public sealed class CorporateSettingController(IResolver resolver)
     : ODataController<CorporateSettingApiService, CorporateSetting, CorporateSettingViewModel, CorporateSettingRequest>(resolver)
 {
 }
+

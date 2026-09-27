@@ -44,3 +44,4 @@ public sealed class FileAccessMiddleware(RequestDelegate next)
         */
     }
 }
+

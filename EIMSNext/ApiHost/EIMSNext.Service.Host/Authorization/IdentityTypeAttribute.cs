@@ -63,3 +63,4 @@ namespace EIMSNext.Service.Host.Authorization
         public const IdentityType Authenticated = BusinessUser | IdentityType.NoCorp;
     }
 }
+

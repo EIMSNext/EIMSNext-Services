@@ -1,6 +1,6 @@
 using System.Dynamic;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.ApiService.RequestModels
 {
@@ -27,6 +27,6 @@ namespace EIMSNext.ApiService.RequestModels
         /// <summary>
         /// 表单内容
         /// </summary>
-        public ExpandoObject Data { get; set; } = new ExpandoObject();
+        public Dictionary<string, object?> Data { get; set; } = new();
     }
 }

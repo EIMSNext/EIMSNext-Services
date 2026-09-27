@@ -1,15 +1,31 @@
-using EIMSNext.Core.Mongo;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Infrastructure;
 using WorkflowCore.Models;
 
-namespace EIMSNext.Flow.Persistence
+namespace EIMSNext.Flow.Persistence;
+
+/// <summary>
+/// 工作流持久化上下文抽象。
+/// </summary>
+/// <remarks>
+/// <para>
+/// 这里保留 <see cref="Database"/> 与 <see cref="SaveChangesAsync"/> 等成员，是为了让使用方
+/// 不必依赖具体的 <c>WfDbContext</c> 类型。新增了 <see cref="Context"/>：
+/// </para>
+/// </remarks>
+public interface IWfDbContext : IAsyncDisposable
 {
-    public interface IWfDbContext : IMongoDbContex
-    {
-        IMongoCollection<WorkflowInstance> WorkflowInstances { get; }
-        IMongoCollection<EventSubscription> EventSubscriptions { get; }
-        IMongoCollection<Event> Events { get; }
-        IMongoCollection<ExecutionError> ExecutionErrors { get; }
-        IMongoCollection<ScheduledCommand> ScheduledCommands { get; }
-    }
+    DbSet<WorkflowInstance> WorkflowInstances { get; }
+    DbSet<ExecutionPointer> ExecutionPointers { get; }
+    DbSet<EventSubscription> EventSubscriptions { get; }
+    DbSet<Event> Events { get; }
+    DbSet<ExecutionError> ExecutionErrors { get; }
+    DbSet<ScheduledCommand> ScheduledCommands { get; }
+    DatabaseFacade Database { get; }
+    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 获取底层 EF Core 上下文，用于建立事务作用域。
+    /// </summary>
+    DbContext Context { get; }
 }

@@ -1,7 +1,7 @@
-using EIMSNext.Cache;
+﻿using EIMSNext.Cache;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services;
 using EIMSNext.Mef;
 
@@ -51,10 +51,10 @@ namespace EIMSNext.Core.Services.Extensions
         /// <summary>
         /// 解析指定实体类型的仓储。
         /// </summary>
-        /// <typeparam name="T">实现 <see cref="IMongoEntity"/> 的实体类型。</typeparam>
+        /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
         /// <param name="resolver">依赖解析器。</param>
         /// <returns>实体仓储。</returns>
-        public static IRepository<T> GetRepository<T>(this IResolver resolver) where T : IMongoEntity
+        public static IRepository<T> GetRepository<T>(this IResolver resolver) where T : class, IEntityKey
         {
             return resolver.Resolve<IRepository<T>>();
         }
@@ -62,10 +62,10 @@ namespace EIMSNext.Core.Services.Extensions
         /// <summary>
         /// 解析指定实体类型的服务。
         /// </summary>
-        /// <typeparam name="T">实现 <see cref="IMongoEntity"/> 的实体类型。</typeparam>
+        /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
         /// <param name="resolver">依赖解析器。</param>
         /// <returns>实体服务。</returns>
-        public static IService<T> GetService<T>(this IResolver resolver) where T : IMongoEntity
+        public static IService<T> GetService<T>(this IResolver resolver) where T : IEntityKey
         {
             return resolver.Resolve<IService<T>>();
         }
@@ -74,10 +74,10 @@ namespace EIMSNext.Core.Services.Extensions
         /// 解析指定实体类型的自定义服务。
         /// </summary>
         /// <typeparam name="S">服务实现类型。</typeparam>
-        /// <typeparam name="T">实现 <see cref="IMongoEntity"/> 的实体类型。</typeparam>
+        /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
         /// <param name="resolver">依赖解析器。</param>
         /// <returns>自定义服务实例。</returns>
-        public static S GetService<S, T>(this IResolver resolver) where T : IMongoEntity where S : class, IService<T>
+        public static S GetService<S, T>(this IResolver resolver) where T : IEntityKey where S : class, IService<T>
         {
             return resolver.Resolve<S>();
         }

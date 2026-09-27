@@ -109,26 +109,26 @@ namespace EIMSNext.Core.Abstractions
         /// <summary>
         /// 无操作。
         /// </summary>
-        None,
+        None = 0,
         /// <summary>
         /// 保存草稿
         /// </summary>
-        Save,
+        Save = 1,
         /// <summary>
         /// 流程提交
         /// </summary>
-        Submit,
+        Submit = 2,
         /// <summary>
         /// 流程审批
         /// </summary>
-        Approve,
+        Approve = 3,
         /// <summary>
         /// 流程退回
         /// </summary>
-        Return,
+        Return = 4,
         /// <summary>
         /// 数据流内部写入
         /// </summary>
-        EventFlow
+        EventFlow = 5,
     }
 }

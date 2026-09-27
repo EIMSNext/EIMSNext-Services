@@ -1,13 +1,12 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 
 namespace EIMSNext.Entities
 {
@@ -99,15 +98,15 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表单
         /// </summary>
-        Form,
+        Form = 0,
         /// <summary>
         /// 仪表盘
         /// </summary>
-        Dashboard,
+        Dashboard = 1,
         /// <summary>
         /// 表单分组
         /// </summary>
-        Group
+        Group = 2,
     }
 
     /// <summary>

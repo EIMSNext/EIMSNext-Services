@@ -1,12 +1,12 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities;
 
 /// <summary>
 /// Read-only projection of the business CorporateSetting collection.
 /// </summary>
-public sealed class CorporateSettingReadModel : MongoEntityBase
+public sealed class CorporateSettingReadModel : KeyedEntityBase
 {
     public string? CorpId { get; set; }
 

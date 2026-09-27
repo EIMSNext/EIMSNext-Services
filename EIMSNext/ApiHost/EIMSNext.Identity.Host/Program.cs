@@ -1,10 +1,8 @@
-using EIMSNext.ApiCore;
+﻿using EIMSNext.ApiCore;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Extensions;
@@ -86,7 +84,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     {
         foreach (var client in seedClients)
         {
-            context.AddClient(client);
+            context.AddClient(client).GetAwaiter().GetResult();
         }
     }
     else
@@ -149,9 +147,10 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     {
         foreach (var user in SeedData.GetUsers())
         {
-            context.AddUser(user);
+            context.AddUser(user).GetAwaiter().GetResult();
         }
     }
 
 }
+
 

@@ -1,12 +1,17 @@
 using System.Security.Cryptography.X509Certificates;
+using EIMSNext.Common;
 using EIMSNext.Identity.AccountSecurity;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Models;
 using EIMSNext.Identity.Persistence;
 using EIMSNext.Identity.Services;
 using EIMSNext.Identity.Utilities;
+using EIMSNext.Persistence.PostgreSql;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using OpenIddict.Abstractions;
 using OpenIddict.Server;
 using OpenIddict.Server.AspNetCore;
@@ -18,6 +23,20 @@ namespace EIMSNext.Identity.Extensions
     {
         public static IServiceCollection AddIdentityServices(this IServiceCollection services, IConfiguration configuration, string contentRootPath)
         {
+            services.AddPostgreSqlConfiguration(configuration);
+            services.AddDbContext<IdentityDbContext>((provider, options) =>
+            {
+                var settings = provider.GetRequiredService<IOptions<PostgreSqlOptions>>().Value;
+                options.UseNpgsql(settings.ConnectionString, npgsql =>
+                {
+                    npgsql.EnableRetryOnFailure(settings.MaxRetryCount);
+                    npgsql.MigrationsHistoryTable("__EfMigrationsHistory");
+                });
+                options.UseEimsJsonPathOperators();
+                options.EnableSensitiveDataLogging(settings.EnableSensitiveDataLogging);
+            });
+            services.AddScoped<IIdentityDbContext>(provider => provider.GetRequiredService<IdentityDbContext>());
+
             services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
             services.AddOptions<IdentityLoginAuditQueueOptions>()
                 .Bind(configuration.GetSection(IdentityLoginAuditQueueOptions.SectionName))
@@ -26,9 +45,12 @@ namespace EIMSNext.Identity.Extensions
                 .Validate(options => options.FlushIntervalMs >= 10, "IdentityLoginAuditQueue:FlushIntervalMs must be at least 10.")
                 .Validate(options => options.ShutdownDrainSeconds > 0, "IdentityLoginAuditQueue:ShutdownDrainSeconds must be greater than zero.")
                 .ValidateOnStart();
-            services.AddSingleton<IIdentityDbContext, IdentityDbContext>();
             services.AddSingleton<IdentityLoginAuditQueue>();
-            services.AddHostedService<IdentityLoginAuditWriterService>();
+            services.AddHostedService(sp => new IdentityLoginAuditWriterService(
+                sp.GetRequiredService<IdentityLoginAuditQueue>(),
+                sp.GetRequiredService<IServiceScopeFactory>(),
+                sp.GetRequiredService<IOptions<IdentityLoginAuditQueueOptions>>(),
+                sp.GetRequiredService<ILogger<IdentityLoginAuditWriterService>>()));
             services.AddScoped<IUserService, UserService>();
             services.AddScoped<IPublicTokenService, PublicTokenService>();
             services.AddScoped<PublicSettingLookupService>();

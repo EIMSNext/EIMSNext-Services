@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
@@ -39,7 +37,8 @@ namespace EIMSNext.Flow.Host.Controllers
         private readonly IWfTaskService _taskService;
         private readonly IWorkflowActionService _workflowActionService;
         private readonly IWorkflowInstancePurger _workflowPurger;
-        private readonly IMongoPersistenceProvider _store;
+        private readonly IWorkflowPersistenceProvider _store;
+        private readonly IWfDbContext _workflowDb;
 
         public WorkflowController(IResolver resolver) : base(resolver)
         {
@@ -52,7 +51,8 @@ namespace EIMSNext.Flow.Host.Controllers
             _taskService = resolver.Resolve<IWfTaskService>();
             _workflowActionService = resolver.Resolve<IWorkflowActionService>();
             _workflowPurger = resolver.Resolve<IWorkflowInstancePurger>();
-            _store = (IMongoPersistenceProvider)_wfHost.PersistenceStore;
+            _store = (IWorkflowPersistenceProvider)_wfHost.PersistenceStore;
+            _workflowDb = resolver.Resolve<IWfDbContext>();
         }
 
         [HttpPost, Route("Load")]
@@ -119,7 +119,6 @@ namespace EIMSNext.Flow.Host.Controllers
             var workerId = IdentityContext.CurrentEmployee.Id;
             var workerCode = IdentityContext.CurrentEmployee.Code;
             var task = _taskService.Query(x => x.DataId == request.DataId && x.EmployeeId == workerId)
-                .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(request.WfNodeId) || x.ApproveNodeId == request.WfNodeId);
             if (task == null)
             {
@@ -148,7 +147,7 @@ namespace EIMSNext.Flow.Host.Controllers
             var act = await _wfHost.GetPendingActivity($"{request.WfInstanceId}_{request.DataId}_{request.WfNodeId}", workerId);
             if (act == null) return BadRequest($"指定数据/流程节点不可审批");
 
-            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, Guid.NewGuid().ToString());
+            var approveData = new WfApproveData(IdentityContext.CurrentCorpId, IdentityContext.CurrentUserID, workerId, workerCode, IdentityContext.CurrentEmployee.EmpName, request.Action, request.Comment, request.Signature, TsidIdGenerator.NewId());
 
             await _wfHost.SubmitActivitySuccess(act.Token, approveData.ToExpando());
             var errMsg = WaitForComplete(approveData.ExecLogId);
@@ -485,9 +484,9 @@ namespace EIMSNext.Flow.Host.Controllers
 
             WorkflowInstance? wfInst;
             if (!string.IsNullOrEmpty(request.WfInstanceId))
-                wfInst = _store.GetWorkflowInstances().Where(x => x.Id == request.WfInstanceId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+                wfInst = _workflowDb.WorkflowInstances.Where(x => x.Id == request.WfInstanceId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
             else
-                wfInst = _store.GetWorkflowInstances().Where(x => x.Reference == request.DataId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+                wfInst = _workflowDb.WorkflowInstances.Where(x => x.Reference == request.DataId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
 
             if (wfInst != null)
             {
@@ -623,10 +622,10 @@ namespace EIMSNext.Flow.Host.Controllers
         {
             if (!string.IsNullOrEmpty(wfInstanceId))
             {
-                return _store.GetWorkflowInstances().FirstOrDefault(x => x.Id == wfInstanceId && x.Status == WorkflowStatus.Runnable);
+                return _workflowDb.WorkflowInstances.FirstOrDefault(x => x.Id == wfInstanceId && x.Status == WorkflowStatus.Runnable);
             }
 
-            return _store.GetWorkflowInstances().FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
+            return _workflowDb.WorkflowInstances.FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
         }
 
         private Wf_Task? ResolveCurrentTask(string dataId, string? wfNodeId)
@@ -638,13 +637,12 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return _taskService.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
-                .ToList()
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }
 
         private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)
         {
-            return _store.GetWorkflowInstances()
+            return _workflowDb.WorkflowInstances
                 .Where(x => x.Reference == dataId && x.Status == WorkflowStatus.Suspended)
                 .OrderByDescending(x => x.CreateTime)
                 .FirstOrDefault();
@@ -652,7 +650,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
         private async Task<string> RestartWorkflowInstanceAsync(WorkflowInstance wfInst, WfDataContext data)
         {
-            var existingData = WfDataContext.FromExpando((ExpandoObject)wfInst.Data);
+            var existingData = WfDataContext.FromData((IDictionary<string, object?>)wfInst.Data);
             var restartData = new WfDataContext(
                 data.CorpId,
                 data.UserId,
@@ -688,7 +686,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (defIds?.Count > 0)
             {
-                var wfInstIds = _store.GetWorkflowInstancesByDefId(defIds, WorkflowStatus.Runnable).Select(x => x.Id).ToList();
+                var wfInstIds = _workflowDb.WorkflowInstances.Where(x => defIds.Contains(x.WorkflowDefinitionId) && x.Status == WorkflowStatus.Runnable).Select(x => x.Id).ToList();
                 var terminateResults = await Task.WhenAll(wfInstIds.Select(async id => new
                 {
                     Id = id,
@@ -915,3 +913,4 @@ namespace EIMSNext.Flow.Host.Controllers
         public WfExpireActionType ActionType { get; set; }
     }
 }
+

@@ -1,12 +1,12 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-
-using MongoDB.Bson;
 
 namespace EIMSNext.Core.Tests
 {
+    /// <summary>
+    /// 仓储读写测试。
+    /// </summary>
     [TestClass]
     public class EntityRepositoryTest : TestBase
     {
@@ -23,14 +23,20 @@ namespace EIMSNext.Core.Tests
              new FieldDef{ Id="field_1", Label="field_111", Type= FieldType.Input}, new FieldDef{ Id="field_2", Label="field_222", Type= FieldType.Select1 } }
             };
 
-            resp.Insert(data, _scope?.SessionHandle);
+            resp.Insert(data);
 
-            var result = resp.Find(new DynamicFindOptions<EntityData> { Filter = new DynamicFilter { Field = "createTime", Op = FilterOp.Gt, Value = DateTime.Today.ToTimeStampMs() } }, _scope?.SessionHandle);
-            Assert.AreEqual(1, result.CountDocuments());
+            // 过滤值先在内存里算好再塞进 DynamicFilter：DynamicFilter 的 Value 是普通对象，
+            // 由表达式构造器读取，不参与 EF 的 SQL 翻译。
+            var todayStart = DateTime.Today.ToTimeStampMs();
+
+            var result = resp.Find(new DynamicFindOptions<EntityData> { Filter = new DynamicFilter { Field = "createTime", Op = FilterOp.Gt, Value = todayStart } });
+            Assert.AreEqual(1, result.Count());
 
             _scope?.CommitTransaction();
-            //Query不能执行事务内查询
-            var cnt = resp.Queryable.Where(x => x.CreateTime > DateTime.Today.ToTimeStampMs()).Count();
+
+            // 那是自定义扩展方法，EF Core 无法翻译（会报 could not be translated）。
+            // 先求值成局部变量，表达式里只剩常量比较。
+            var cnt = resp.Queryable.Where(x => x.CreateTime > todayStart).Count();
             Assert.AreEqual(1, cnt);
 
             resp.Delete(data.Id);

@@ -1,18 +1,15 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -160,7 +157,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体核心逻辑。
         /// </summary>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(EmployeeGroup entity)
+        protected override Task<int> ReplaceAsyncCore(EmployeeGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改员工组的权限");
             EnsureEmployeeGroupCategoryBelongsToCurrentCorp(entity.EmployeeGroupCategoryId);
@@ -170,14 +167,15 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除员工组的权限");
 
             var employeeGroupIds = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            var referenced = Resolver.GetRepository<Employee>().Queryable
+            // 引用检查看关系表 EmployeeGroupMember。
+            var referenced = Resolver.GetRepository<EmployeeGroupMember>().Queryable
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
-                .Any(x => x.EmployeeGroups.Any(r => employeeGroupIds.Contains(r.EmployeeGroupId)));
+                .Any(x => employeeGroupIds.Contains(x.EmployeeGroupId));
             if (referenced)
             {
                 throw new BadRequestException("该员工组有员工使用，不能删除");

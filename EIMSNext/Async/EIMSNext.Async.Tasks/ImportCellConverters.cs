@@ -2,6 +2,7 @@ using System.Collections;
 using System.Globalization;
 using System.Text.Json;
 using EIMSNext.Entities;
+using EIMSNext.Json.Serialization;
 using NPOI.SS.UserModel;
 
 namespace EIMSNext.Async.Tasks
@@ -12,16 +13,24 @@ namespace EIMSNext.Async.Tasks
     /// </summary>
     internal static class ImportCellConverters
     {
+        /// <summary>
+        /// 数值单元格 → 动态字段值。
+        /// </summary>
+        /// <remarks>
+        /// Excel 单元格值是 <see cref="double"/>，但 FormData.Data 的数值契约是
+        /// 「整数 long、小数 decimal」（见 <see cref="DynamicValueReader"/>）。
+        /// 这里必须归一化，否则导入的 12 存成 <c>12.0d</c>、DB 读回是 <c>12L</c>，
+        /// 变更日志用 <c>Equals</c> 比较会判出一条不存在的修改。
+        /// </remarks>
         public static object ConvertNumber(ICell? cell, string text)
         {
-            if (cell?.CellType == CellType.Numeric)
-            {
-                return cell.NumericCellValue;
-            }
+            var value = cell?.CellType == CellType.Numeric
+                ? cell.NumericCellValue
+                : double.TryParse(text, out var parsed)
+                    ? parsed
+                    : throw new FormatException("数字格式无效");
 
-            return double.TryParse(text, out var value)
-                ? value
-                : throw new FormatException("数字格式无效");
+            return DynamicValueReader.NormalizeNumber(value);
         }
 
         public static object ConvertTimestamp(ICell? cell, string text)
@@ -41,21 +50,19 @@ namespace EIMSNext.Async.Tasks
             return new DateTimeOffset(DateTime.SpecifyKind(date, DateTimeKind.Local)).ToUnixTimeMilliseconds();
         }
 
+        /// <summary>
+        /// 可编辑数值 → 动态字段值（同样归一化到 long / decimal，理由见 <see cref="ConvertNumber"/>）。
+        /// </summary>
         public static object ConvertEditableNumber(object raw)
         {
             return raw switch
             {
-                byte value => value,
-                short value => value,
-                int value => value,
-                long value => value,
-                float value => value,
-                double value => value,
-                decimal value => value,
+                byte or sbyte or short or ushort or int or uint or long or float or double or decimal
+                    => DynamicValueReader.NormalizeNumber(raw)!,
                 _ => double.TryParse(ToCellText(raw), NumberStyles.Any, CultureInfo.InvariantCulture, out var invariantValue)
-                    ? invariantValue
+                    ? DynamicValueReader.NormalizeNumber(invariantValue)
                     : double.TryParse(ToCellText(raw), out var localValue)
-                        ? localValue
+                        ? DynamicValueReader.NormalizeNumber(localValue)
                         : throw new FormatException("数字格式无效"),
             };
         }
@@ -247,40 +254,22 @@ namespace EIMSNext.Async.Tasks
             };
         }
 
+        /// <summary>
+        /// 把 <see cref="JsonElement"/> 还原为 CLR 类型（非 JsonElement 原样返回）。
+        /// </summary>
+        /// <remarks>
+        /// 规则统一委托给 EIMSNext.Json 层的 <see cref="DynamicValueReader"/>：
+        /// 导入写入 FormData.Data 的值必须与 DB 读回、API 请求路径的类型完全一致
+        /// （整数→long、小数→decimal），否则变更日志用 <c>Equals</c> 比较会判出不存在的修改。
+        /// </remarks>
         public static object? UnwrapJsonValue(object? value)
         {
-            if (value is not JsonElement element)
-            {
-                return value;
-            }
-
-            return element.ValueKind switch
-            {
-                JsonValueKind.Null or JsonValueKind.Undefined => null,
-                JsonValueKind.String => element.GetString(),
-                JsonValueKind.Number => element.TryGetInt64(out var longValue)
-                    ? longValue
-                    : element.TryGetDouble(out var doubleValue)
-                        ? doubleValue
-                        : element.ToString(),
-                JsonValueKind.True => true,
-                JsonValueKind.False => false,
-                JsonValueKind.Array => element.EnumerateArray().Select(item => UnwrapJsonValue(item)).ToList(),
-                JsonValueKind.Object => ToExpandoObject(element),
-                _ => element.ToString(),
-            };
+            return value is JsonElement element ? DynamicValueReader.FromJsonElement(element) : value;
         }
 
-        public static global::System.Dynamic.ExpandoObject ToExpandoObject(JsonElement element)
+        public static Dictionary<string, object?> ToDictionary(JsonElement element)
         {
-            var expando = new global::System.Dynamic.ExpandoObject();
-            var dict = (IDictionary<string, object?>)expando;
-            foreach (var prop in element.EnumerateObject())
-            {
-                dict[prop.Name] = UnwrapJsonValue(prop.Value);
-            }
-
-            return expando;
+            return DynamicValueReader.ToDictionary(element);
         }
     }
 }

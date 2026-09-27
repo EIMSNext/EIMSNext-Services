@@ -1,5 +1,4 @@
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
+﻿using EIMSNext.Core.Query;
 using EIMSNext.Entities;
 
 namespace EIMSNext.ApiService

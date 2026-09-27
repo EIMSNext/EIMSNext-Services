@@ -1,16 +1,15 @@
+﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
-using MongoDB.Driver;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace EIMSNext.Service
@@ -23,38 +22,41 @@ namespace EIMSNext.Service
             _flowClient = resolver.Resolve<FlowApiClient>();
         }
 
-        public override async Task<object> DeleteAsync(string id)
+        public override async Task<int> DeleteAsync(string id)
         {
-            var appIds = GetAppIds(FilterBuilder.Eq(x => x.Id, id));
+            var appIds = GetAppIds(x => x.Id == id);
             var result = await base.DeleteAsync(id);
             await DeleteFlowDefinitionsAfterCommitAsync(appIds);
             return result;
         }
 
-        public override async Task<object> DeleteAsync(IEnumerable<string> ids)
+        public override async Task<int> DeleteAsync(IEnumerable<string> ids)
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-            var appIds = GetAppIds(FilterBuilder.In(x => x.Id, idList));
+            var appIds = GetAppIds(x => idList.Contains(x.Id));
             var result = await base.DeleteAsync(idList);
             await DeleteFlowDefinitionsAfterCommitAsync(appIds);
             return result;
         }
 
-        public override async Task<object> DeleteAsync(DynamicFilter filter)
+        public override async Task<int> DeleteAsync(DynamicFilter filter)
         {
-            var mongoFilter = filter.ToFilterDefinition<AppDef>();
-            var appIds = GetAppIds(mongoFilter);
+            var appIds = GetAppIds(filter);
             var result = await base.DeleteAsync(filter);
             await DeleteFlowDefinitionsAfterCommitAsync(appIds);
             return result;
         }
 
-        protected override async Task AfterDelete(FilterDefinition<AppDef> filter, IClientSessionHandle? session)
+        protected override async Task AfterDelete(Expression<Func<AppDef, bool>> filter)
         {
-            await base.AfterDelete(filter, session);
+            await base.AfterDelete(filter);
 
-            var deletedAppIds = Repository.Find(new MongoFindOptions<AppDef> { Filter = filter }, session)
-                .Project(x => x.Id)
+            // 同 FormDefService.AfterDelete：软删除已经生效，必须忽略全局 `!DeleteFlag` 过滤，
+            // 否则读不到刚删掉的 App，子 FormDef / DashboardDef 的级联删除会被静默跳过。
+            var deletedAppIds = Repository.Queryable
+                .IgnoreQueryFilters()
+                .Where(filter)
+                .Select(x => x.Id)
                 .ToList();
             if (deletedAppIds.Count == 0)
                 return;
@@ -63,7 +65,7 @@ namespace EIMSNext.Service
             {
                 var formDefRepo = Resolver.GetRepository<FormDef>();
                 var formIds = formDefRepo.Find(x => x.AppId == appId && !x.DeleteFlag)
-                    .Project(x => x.Id)
+                    .Select(x => x.Id)
                     .ToList();
                 if (formIds.Count > 0)
                 {
@@ -72,7 +74,7 @@ namespace EIMSNext.Service
 
                 var dashboardRepo = Resolver.GetRepository<DashboardDef>();
                 var dashboardIds = dashboardRepo.Find(x => x.AppId == appId && !x.DeleteFlag)
-                    .Project(x => x.Id)
+                    .Select(x => x.Id)
                     .ToList();
                 if (dashboardIds.Count > 0)
                 {
@@ -82,10 +84,20 @@ namespace EIMSNext.Service
             }
         }
 
-        private List<string> GetAppIds(FilterDefinition<AppDef> filter)
+        private List<string> GetAppIds(Expression<Func<AppDef, bool>> filter)
         {
-            return Repository.Collection.Find(filter)
-                .Project(x => x.Id)
+            return Repository.Find(filter)
+                .Select(x => x.Id)
+                .ToList()
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        private List<string> GetAppIds(DynamicFilter filter)
+        {
+            return Repository.Find(filter)
+                .Select(x => x.Id)
                 .ToList()
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .Distinct(StringComparer.OrdinalIgnoreCase)

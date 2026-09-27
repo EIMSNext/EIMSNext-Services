@@ -1,7 +1,7 @@
+using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using Microsoft.Extensions.Logging;
-using MongoDB.Bson;
 
 namespace EIMSNext.Identity.Services
 {
@@ -25,7 +25,7 @@ namespace EIMSNext.Identity.Services
         {
             if (string.IsNullOrWhiteSpace(entity.Id))
             {
-                entity.Id = ObjectId.GenerateNewId().ToString();
+                entity.Id = TsidIdGenerator.NewId();
             }
 
             if (_queue.TryEnqueue(entity))

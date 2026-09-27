@@ -1,14 +1,12 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using HKH.Mef2.Integration;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService.ViewModels;
@@ -17,7 +15,6 @@ using EIMSNext.ApiService;
 
 using Microsoft.AspNetCore.OData.Query;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.Service.Host.Controllers.OData
 {
@@ -34,3 +31,4 @@ namespace EIMSNext.Service.Host.Controllers.OData
         // 不再预过滤 AppId/RunLogId，避免 ToList 内存物化。
 	}
 }
+

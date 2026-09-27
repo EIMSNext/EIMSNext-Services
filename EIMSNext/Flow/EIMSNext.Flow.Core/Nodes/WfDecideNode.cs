@@ -5,6 +5,7 @@ using EIMSNext.Entities;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 using WorkflowCore.Primitives;
+using EIMSNext.Core.Extensions;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -41,7 +42,7 @@ namespace EIMSNext.Flow.Core.Nodes
             }
             else
             {
-                var wfDataContext = (ExpandoObject)context.Workflow.Data;
+                var wfDataContext = (IDictionary<string, object?>)context.Workflow.Data;
                 wfDataContext.AddOrUpdate(WfConsts.MatchedResult, false);
                 wfDataContext.AddOrUpdate(WfConsts.MatchParallel, Metadata!.NodeType == WfNodeType.Branch);
             }

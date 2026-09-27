@@ -11,3 +11,4 @@ namespace EIMSNext.Service.Host.Requests
         public string CorpId { get; set; } = "";
     }
 }
+

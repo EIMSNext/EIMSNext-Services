@@ -178,3 +178,4 @@ namespace EIMSNext.Identity.Host
         public static BuiltInClientValidationResult Failure(string error, string description) => new(false, error, description);
     }
 }
+

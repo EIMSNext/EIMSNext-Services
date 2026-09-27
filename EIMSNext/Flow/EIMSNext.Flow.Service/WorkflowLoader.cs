@@ -266,14 +266,16 @@ namespace EIMSNext.Flow.Service
             {
                 if (step.Outcomes.Count > 0)
                 {
+                    //同时带 SelectNextStep 与 NextStepId 的只有分支节点：前者是各条件分支，后者是兜底分支。
+                    //兜底必须在所有条件分支之后追加，且只在无一命中时成立，故用 NoMatchExpression 而非 outcome.value。
                     if (dataType == typeof(EfDataContext))
                     {
-                        Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
+                        Expression<Func<EfDataContext, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(WfConsts.NoMatchExpression, data, outcome);
                         step.Outcomes.Add(new ExpressionOutcome<EfDataContext>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
                     }
                     else
                     {
-                        Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression("outcome.value==1", data, outcome);
+                        Expression<Func<ExpandoObject, object, bool>> sourceExpr = (data, outcome) => _expressionEvaluator.EvaluateOutcomeExpression(WfConsts.NoMatchExpression, data, outcome);
                         step.Outcomes.Add(new ExpressionOutcome<ExpandoObject>(sourceExpr) { ExternalNextStepId = $"{source.NextStepId}" });
                     }
                 }

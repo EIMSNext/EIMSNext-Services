@@ -1,19 +1,16 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -120,7 +117,7 @@ namespace EIMSNext.ApiService
                         {
                             Id = menu.MenuId,
                             Title = menu.Title,
-                            TargetType = "group",
+                            TargetType = null,
                             Icon = menu.Icon,
                             IconColor = menu.IconColor,
                             Children = children
@@ -195,7 +192,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台配置实体。</param>
         /// <returns>替换结果。</returns>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchConfig entity)
+        protected override Task<int> ReplaceAsyncCore(WorkbenchConfig entity)
         {
             EnsureOwner(entity.EmployeeId);
             entity.EmployeeId = CurrentEmployeeId;
@@ -207,7 +204,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">工作台配置 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
@@ -307,7 +304,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台收藏实体。</param>
         /// <returns>替换结果。</returns>
-        protected override Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchFavorite entity)
+        protected override Task<int> ReplaceAsyncCore(WorkbenchFavorite entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -326,13 +323,13 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">工作台收藏 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -433,7 +430,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">工作台最近访问实体。</param>
         /// <returns>替换结果。</returns>
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(WorkbenchRecentVisit entity)
+        protected override async Task<int> ReplaceAsyncCore(WorkbenchRecentVisit entity)
         {
             EnsureOwner(entity.EmployeeId);
             var target = ResolveTarget(entity.TargetType, entity.TargetId);
@@ -445,7 +442,7 @@ namespace EIMSNext.ApiService
             ApplyTarget(entity, target);
             entity.EmployeeId = CurrentEmployeeId;
             var result = await CoreService.TouchRecentVisitAsync(entity);
-            if (result.MatchedCount == 0)
+            if (result == 0)
             {
                 throw new BadRequestException("最近使用记录不存在");
             }
@@ -458,13 +455,13 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="ids">最近访问记录 ID 集合。</param>
         /// <returns>删除结果。</returns>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             EnsureDeleteIds(ids);
             return await base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -479,7 +476,7 @@ namespace EIMSNext.ApiService
             entity.IconColor = target.IconColor;
         }
 
-        private static bool IsRecentTargetType(string targetType)
+        private static bool IsRecentTargetType(WorkbenchTargetType targetType)
         {
             return targetType == WorkbenchTargetType.Form ||
                    targetType == WorkbenchTargetType.Dashboard;
@@ -521,7 +518,7 @@ namespace EIMSNext.ApiService
     /// <param name="Title">标题。</param>
     /// <param name="Icon">图标。</param>
     /// <param name="IconColor">图标颜色。</param>
-    public record WorkbenchTargetInfo(string TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
+    public record WorkbenchTargetInfo(WorkbenchTargetType TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
 
     /// <summary>
     /// 工作台目标解析器。
@@ -536,7 +533,7 @@ namespace EIMSNext.ApiService
         /// <param name="targetType">目标类型。</param>
         /// <param name="targetId">目标 ID。</param>
         /// <returns>工作台目标信息，无权限或不存在时返回 null。</returns>
-        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, string targetType, string targetId)
+        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, WorkbenchTargetType targetType, string targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId))
             {

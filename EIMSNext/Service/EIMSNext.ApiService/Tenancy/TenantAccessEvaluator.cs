@@ -1,11 +1,9 @@
-using EIMSNext.ApiService.ViewModels;
+﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
@@ -210,9 +208,13 @@ namespace EIMSNext.ApiService
             }
 
             var empId = employee.Id;
-            var employeeGroupIds = employee.EmployeeGroups.Select(x => x.EmployeeGroupId).ToList();
+            // 员工组归属由关系表 EmployeeGroupMember 承载。
+            var employeeGroupIds = Resolver.GetRepository<EmployeeGroupMember>().Queryable
+                .Where(x => x.EmployeeId == empId && !x.DeleteFlag)
+                .Select(x => x.EmployeeGroupId)
+                .ToList();
             var deptIds = GetCurrentEmployeeDeptIds();
-            var ancestorDeptIds = GetCurrentEmployeeAncestorDepartmentIds(deptIds);
+            var ancestorDeptIds = GetCurrentEmployeeAncestorDepartmentIds();
 
             return Resolver.GetService<FormDataPermissionGroup>()
                 .Query(x =>
@@ -637,28 +639,22 @@ namespace EIMSNext.ApiService
                 .ToList();
         }
 
-        private List<string> GetCurrentEmployeeAncestorDepartmentIds(IEnumerable<string> deptIds)
+        private List<string> GetCurrentEmployeeAncestorDepartmentIds()
         {
-            var idList = deptIds.ToList();
-            if (idList.Count == 0)
+            var employee = IdentityContext.CurrentEmployee as Employee;
+            if (employee == null)
             {
                 return [];
             }
 
-            var allDepts = Resolver.GetService<Department>()
-                .Query(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag)
-                .Select(x => new { x.Id, x.HeriarchyId })
-                .ToList();
-            var hierarchyIds = allDepts
-                .Where(x => idList.Contains(x.Id))
+            // 祖先部门直接从关系表的层级路径快照展开，省去全量拉取 Department 表再回溯。
+            return Resolver.GetRepository<EmployeeDepartment>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == employee.Id)
                 .Select(x => x.HeriarchyId)
+                .ToList()
                 .Where(x => !string.IsNullOrWhiteSpace(x))
-                .ToList();
-
-            return allDepts
-                .Where(x => hierarchyIds.Any(h => h.Contains($"|{x.Id}|")))
-                .Select(x => x.Id)
-                .Distinct()
+                .SelectMany(x => x.Split('|', StringSplitOptions.RemoveEmptyEntries))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
 
@@ -671,11 +667,17 @@ namespace EIMSNext.ApiService
             }
 
             var deptIds = GetCurrentEmployeeDeptIds();
+            // 员工组归属由关系表 EmployeeGroupMember 承载。
+            var employeeGroupIds = Resolver.GetRepository<EmployeeGroupMember>().Queryable
+                .Where(x => x.EmployeeId == employee.Id && !x.DeleteFlag)
+                .Select(x => x.EmployeeGroupId)
+                .ToHashSet();
+
             return new EmployeeMemberScope(
                 employee.Id,
-                employee.EmployeeGroups.Select(x => x.EmployeeGroupId).ToHashSet(),
+                employeeGroupIds,
                 deptIds.ToHashSet(),
-                GetCurrentEmployeeAncestorDepartmentIds(deptIds).ToHashSet());
+                GetCurrentEmployeeAncestorDepartmentIds().ToHashSet());
         }
 
         private List<string> GetPublishedDashboardAppIds(EmployeeMemberScope memberScope)

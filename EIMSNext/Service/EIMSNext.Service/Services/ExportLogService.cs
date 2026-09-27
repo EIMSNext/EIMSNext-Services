@@ -3,7 +3,7 @@ using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Service
 {
@@ -17,7 +17,7 @@ namespace EIMSNext.Service
                     x.CreateBy.Value == createBy &&
                     x.DedupKey == dedupKey &&
                     (x.Status == ExportLogStatus.Pending || x.Status == ExportLogStatus.Processing))
-                .SortByDescending(x => x.CreateTime)
+                .OrderByDescending(x => x.CreateTime)
                 .FirstOrDefaultAsync();
         }
 
@@ -25,32 +25,33 @@ namespace EIMSNext.Service
         {
             return Repository.UpdateAsync(
                 id,
-                UpdateBuilder.Set(x => x.Status, ExportLogStatus.Processing),
-                upsert: false);
+                setters => setters.SetProperty(x => x.Status, ExportLogStatus.Processing));
         }
 
         public Task MarkSucceededAsync(string id, string fileName, string downloadUrl, long totalCount, ExportFormat actualFormat)
         {
-            var update = UpdateBuilder
-                .Set(x => x.Status, ExportLogStatus.Succeeded)
-                .Set(x => x.FileName, fileName)
-                .Set(x => x.DownloadUrl, downloadUrl)
-                .Set(x => x.TotalCount, totalCount)
-                .Set(x => x.ActualFormat, actualFormat)
-                .Set(x => x.FinishTime, DateTime.UtcNow.ToTimeStampMs())
-                .Set(x => x.ErrorMessage, null as string);
-
-            return Repository.UpdateAsync(id, update, upsert: false);
+            var finishTime = DateTime.UtcNow.ToTimeStampMs();
+            return Repository.UpdateAsync(
+                id,
+                setters => setters
+                    .SetProperty(x => x.Status, ExportLogStatus.Succeeded)
+                    .SetProperty(x => x.FileName, fileName)
+                    .SetProperty(x => x.DownloadUrl, downloadUrl)
+                    .SetProperty(x => x.TotalCount, totalCount)
+                    .SetProperty(x => x.ActualFormat, actualFormat)
+                    .SetProperty(x => x.FinishTime, finishTime)
+                    .SetProperty(x => x.ErrorMessage, null as string));
         }
 
         public Task MarkFailedAsync(string id, string errorMessage)
         {
-            var update = UpdateBuilder
-                .Set(x => x.Status, ExportLogStatus.Failed)
-                .Set(x => x.ErrorMessage, errorMessage)
-                .Set(x => x.FinishTime, DateTime.UtcNow.ToTimeStampMs());
-
-            return Repository.UpdateAsync(id, update, upsert: false);
+            var finishTime = DateTime.UtcNow.ToTimeStampMs();
+            return Repository.UpdateAsync(
+                id,
+                setters => setters
+                    .SetProperty(x => x.Status, ExportLogStatus.Failed)
+                    .SetProperty(x => x.ErrorMessage, errorMessage)
+                    .SetProperty(x => x.FinishTime, finishTime));
         }
     }
 }

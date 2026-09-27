@@ -1,7 +1,6 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Component;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
@@ -358,15 +357,22 @@ namespace EIMSNext.ApiService
 
             try
             {
-                var doc = MongoDB.Bson.BsonDocument.Parse(item.Details);
-                if (!doc.TryGetValue("datasource", out var datasourceValue) ||
-                    !datasourceValue.IsBsonDocument ||
-                    !datasourceValue.AsBsonDocument.TryGetValue("id", out var idValue))
+                // 统一用 System.Text.Json 解析，取值语义保持一致：
+                // 仅当 datasource 是对象且存在 id 时才返回。
+                using var doc = System.Text.Json.JsonDocument.Parse(item.Details);
+                if (!doc.RootElement.TryGetProperty("datasource", out var datasource) ||
+                    datasource.ValueKind != System.Text.Json.JsonValueKind.Object ||
+                    !datasource.TryGetProperty("id", out var idValue))
                 {
                     return null;
                 }
 
-                return idValue.IsString ? idValue.AsString : idValue.ToString();
+                return idValue.ValueKind switch
+                {
+                    System.Text.Json.JsonValueKind.String => idValue.GetString(),
+                    System.Text.Json.JsonValueKind.Null or System.Text.Json.JsonValueKind.Undefined => null,
+                    _ => idValue.ToString(),
+                };
             }
             catch
             {

@@ -1,4 +1,4 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.Idempotency;
@@ -9,16 +9,15 @@ using EIMSNext.Entities;
 using EIMSNext.Async.RabbitMQ;
 using EIMSNext.Component;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.Extensions;
 using EIMSNext.Service.Host.OData;
+using EIMSNext.Persistence.PostgreSql;
 
 using HKH.Mef2.Integration;
 
@@ -37,6 +36,7 @@ using Swashbuckle.AspNetCore.SwaggerGen;
 var builder = WebApplication.CreateBuilder(args);
 
 builder.ConfigWebEnvironment();
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 builder.Services.AddServiceComponents();
 
 builder.Host.UseAutofac<AutofacRegisterModule>();
@@ -203,3 +203,4 @@ async Task EnsureSeedData(IResolver resolver)
         });
     }
 }
+

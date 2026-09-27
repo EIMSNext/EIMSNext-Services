@@ -1,10 +1,10 @@
-using Asp.Versioning;
+﻿using Asp.Versioning;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Service.Host.Authorization;
 using HKH.Mef2.Integration;
 using Microsoft.AspNetCore.Mvc;
@@ -26,3 +26,4 @@ namespace EIMSNext.Service.Host.Controllers
 		}
 	}
 }
+

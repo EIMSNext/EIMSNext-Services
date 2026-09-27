@@ -118,3 +118,4 @@ static string? GetArgument(string name)
 
 record Model(List<Field> Fields);
 record Field(string Name, string Type, string Description, bool Required);
+

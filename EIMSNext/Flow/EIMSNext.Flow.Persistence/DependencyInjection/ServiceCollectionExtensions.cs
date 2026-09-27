@@ -1,32 +1,32 @@
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-
+using Microsoft.Extensions.Logging;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
-namespace EIMSNext.Flow.Persistence
+namespace EIMSNext.Flow.Persistence;
+
+public static class ServiceCollectionExtensions
 {
-    public static class ServiceCollectionExtensions
-    {       
-        public static WorkflowOptions UseMongoDB(
-            this WorkflowOptions options,
-            Func<IServiceProvider, IWfDbContext> createDbContext)
+    public static WorkflowOptions UsePostgreSql<TContext>(this WorkflowOptions options)
+        where TContext : DbContext, IWfDbContext
+    {
+        ArgumentNullException.ThrowIfNull(options);
+        // WorkflowCore owns a long-lived provider. Its factory creates a separate
+        // context for every operation, including background workers and retries.
+        options.UsePersistence(sp =>
         {
-            if (options == null) throw new ArgumentNullException(nameof(options));
-            if (createDbContext == null) throw new ArgumentNullException(nameof(createDbContext));
-
-            options.UsePersistence(sp =>
-            {
-                var dbContext = createDbContext(sp);
-                return new MongoPersistenceProvider(dbContext);
-            });
-            options.Services.AddTransient<IWorkflowInstancePurger>(sp =>
-            {
-                var dbContext = createDbContext(sp);
-                return new WorkflowPurger(dbContext);
-            });
-            options.Services.AddTransient<IWorkflowPurger>(sp => sp.GetRequiredService<IWorkflowInstancePurger>());
-
-            return options;
-        }
+            var factory = sp.GetRequiredService<IDbContextFactory<TContext>>();
+            return new PostgreSqlPersistenceProvider(
+                async cancellationToken => await factory.CreateDbContextAsync(cancellationToken),
+                sp.GetRequiredService<ILogger<PostgreSqlPersistenceProvider>>());
+        });
+        options.Services.AddTransient<IWorkflowInstancePurger>(sp =>
+        {
+            var factory = sp.GetRequiredService<IDbContextFactory<TContext>>();
+            return new WorkflowPurger(async cancellationToken => await factory.CreateDbContextAsync(cancellationToken));
+        });
+        options.Services.AddTransient<IWorkflowPurger>(sp => sp.GetRequiredService<IWorkflowInstancePurger>());
+        return options;
     }
 }

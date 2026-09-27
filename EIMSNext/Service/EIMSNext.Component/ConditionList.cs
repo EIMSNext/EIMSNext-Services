@@ -1,6 +1,5 @@
-using EIMSNext.Common;
+﻿using EIMSNext.Common;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Scripting;
 using EIMSNext.Entities;
 

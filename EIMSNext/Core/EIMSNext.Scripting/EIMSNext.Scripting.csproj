@@ -5,7 +5,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.2.0.0</Version>
+    <Version>2.0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <None Remove="filter.js" />
@@ -21,3 +21,4 @@
     <PackageReference Include="Serilog" />
   </ItemGroup>
 </Project>
+

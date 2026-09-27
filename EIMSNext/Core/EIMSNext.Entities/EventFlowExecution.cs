@@ -1,11 +1,11 @@
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
     /// <summary>
     /// EventFlow 数据节点的幂等执行结果。
     /// </summary>
-    public sealed class EventFlowNodeExecution : MongoEntityBase
+    public sealed class EventFlowNodeExecution : KeyedEntityBase
     {
         public string ExecutionKey { get; set; } = string.Empty;
         public string ExecutionId { get; set; } = string.Empty;
@@ -38,7 +38,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 工作流节点流转触发的一批 EventFlow 的执行状态。
     /// </summary>
-    public sealed class WorkflowTransitionExecution : MongoEntityBase
+    public sealed class WorkflowTransitionExecution : KeyedEntityBase
     {
         public string ExecutionId { get; set; } = string.Empty;
         public string WorkflowInstanceId { get; set; } = string.Empty;

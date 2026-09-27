@@ -61,28 +61,6 @@ namespace EIMSNext.Core.Query
     /// </summary>
     public static class FilterOp
     {
-        /// <summary>数组任意元素等于。</summary>
-        public const string AnyEq = "anyeq";
-        /// <summary>数组任意元素大于。</summary>
-        public const string AnyGt = "anygt";
-        /// <summary>数组任意元素大于等于。</summary>
-        public const string AnyGte = "anygte";
-        /// <summary>数组任意元素属于。</summary>
-        public const string AnyIn = "anyin";
-        /// <summary>数组任意元素小于。</summary>
-        public const string AnyLt = "anylt";
-        /// <summary>数组任意元素小于等于。</summary>
-        public const string AnyLte = "anylte";
-        /// <summary>数组任意元素不等于。</summary>
-        public const string AnyNe = "anyne";
-        /// <summary>数组任意元素不属于。</summary>
-        public const string AnyNin = "anynin";
-        /// <summary>数组任意字符串属于。</summary>
-        public const string AnyStringIn = "anystringin";
-        /// <summary>数组任意字符串不属于。</summary>
-        public const string AnyStringNin = "anystringnin";
-        /// <summary>元素匹配。</summary>
-        public const string ElemMatch = "elemmatch";
         /// <summary>等于。</summary>
         public const string Eq = "eq";
         /// <summary>存在。</summary>
@@ -105,10 +83,6 @@ namespace EIMSNext.Core.Query
         public const string Ne = "ne";
         /// <summary>不属于。</summary>
         public const string Nin = "nin";
-        /// <summary>字符串属于。</summary>
-        public const string StringIn = "stringin";
-        /// <summary>字符串不属于。</summary>
-        public const string StringNin = "stringnin";
         /// <summary>文本搜索。</summary>
         public const string Text = "text";
         /// <summary>为空。</summary>

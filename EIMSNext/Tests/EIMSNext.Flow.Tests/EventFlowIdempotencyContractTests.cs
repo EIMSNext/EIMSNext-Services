@@ -27,7 +27,7 @@ namespace EIMSNext.Flow.Tests
                         {
                             Id = "data-1",
                             FormId = "form-1",
-                            Data = new ExpandoObject()
+                            Data = new Dictionary<string, object?>()
                         }
                     }
                 ]
@@ -58,7 +58,7 @@ namespace EIMSNext.Flow.Tests
             return new EfRunParameter(
                 "user-1",
                 "token",
-                new FormData { Id = "data-1", FormId = "form-1", Data = new ExpandoObject() },
+                new FormData { Id = "data-1", FormId = "form-1", Data = new Dictionary<string, object?>() },
                 EventSourceType.Form,
                 EventType.Approving,
                 "node-1",

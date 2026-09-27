@@ -96,3 +96,4 @@ public class ODataCountRequestMiddleware
         request.Method = HttpMethods.Get;
     }
 }
+

@@ -1,12 +1,12 @@
+﻿using System.Linq.Expressions;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Repositories;
 using HKH.CSV;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using NPOI.SS.UserModel;
 
 namespace EIMSNext.Async.Tasks.Export
@@ -21,7 +21,7 @@ namespace EIMSNext.Async.Tasks.Export
         protected static async Task<ExportFileBuilder.ExportFileResult> ExportCsvByBatchAsync<TEntity>(
             string fileName,
             List<ExportColumn> columns,
-            FilterDefinition<TEntity> filter,
+            Expression<Func<TEntity, bool>> filter,
             IResolver resolver,
             CancellationToken ct,
             int batchSize,
@@ -42,13 +42,12 @@ namespace EIMSNext.Async.Tasks.Export
 
                 while (true)
                 {
-                    var batchFilter = BuildSeekFilter(filter, repo.FilterBuilder, lastCreateTime, lastId);
-                    var rows = await repo.Find(new MongoFindOptions<TEntity>
-                    {
-                        Filter = batchFilter,
-                        Sort = repo.SortBuilder.Descending(x => x.CreateTime).Descending(x => x.Id),
-                        Take = batchSize,
-                    }).ToListAsync(ct);
+                    var batchFilter = BuildSeekFilter(filter, lastCreateTime, lastId);
+                    var rows = await repo.Find(batchFilter)
+                        .OrderByDescending(x => x.CreateTime)
+                        .ThenByDescending(x => x.Id)
+                        .Take(batchSize)
+                        .ToListAsync(ct);
 
                     if (rows.Count == 0)
                     {
@@ -78,7 +77,7 @@ namespace EIMSNext.Async.Tasks.Export
         protected static async Task<ExportFileBuilder.ExportFileResult> ExportExcelByBatchAsync<TEntity>(
             string fileName,
             List<ExportColumn> columns,
-            FilterDefinition<TEntity> filter,
+            Expression<Func<TEntity, bool>> filter,
             IResolver resolver,
             CancellationToken ct,
             int batchSize,
@@ -98,13 +97,12 @@ namespace EIMSNext.Async.Tasks.Export
 
                 while (true)
                 {
-                    var batchFilter = BuildSeekFilter(filter, repo.FilterBuilder, lastCreateTime, lastId);
-                    var rows = await repo.Find(new MongoFindOptions<TEntity>
-                    {
-                        Filter = batchFilter,
-                        Sort = repo.SortBuilder.Descending(x => x.CreateTime).Descending(x => x.Id),
-                        Take = batchSize,
-                    }).ToListAsync(ct);
+                    var batchFilter = BuildSeekFilter(filter, lastCreateTime, lastId);
+                    var rows = await repo.Find(batchFilter)
+                        .OrderByDescending(x => x.CreateTime)
+                        .ThenByDescending(x => x.Id)
+                        .Take(batchSize)
+                        .ToListAsync(ct);
 
                     if (rows.Count == 0)
                     {
@@ -147,9 +145,20 @@ namespace EIMSNext.Async.Tasks.Export
             return new FileStream(tempFile, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous | FileOptions.SequentialScan | FileOptions.DeleteOnClose);
         }
 
-        internal static FilterDefinition<T> BuildSeekFilter<T>(
-            FilterDefinition<T> baseFilter,
-            FilterDefinitionBuilder<T> builder,
+        /// <summary>
+        /// 在基础过滤条件上叠加 seek（keyset）分页条件。
+        /// </summary>
+        /// <param name="lastCreateTime">上一批最后一行的 CreateTime。</param>
+        /// <remarks>
+        /// <para>
+        /// 排序键为 <c>(CreateTime desc, Id desc)</c>，seek 条件是
+        /// <c>CreateTime &lt; lastCreateTime OR (CreateTime == lastCreateTime AND Id &lt; lastId)</c>。
+        /// 这是为了在导出大表时避免 <c>OFFSET</c> 逐页扫描——PostgreSQL 的 <c>OFFSET</c>
+        /// 需要丢弃前面所有行，深分页会退化成 O(n²)。
+        /// </para>
+        /// </remarks>
+        internal static Expression<Func<T, bool>> BuildSeekFilter<T>(
+            Expression<Func<T, bool>> baseFilter,
             long? lastCreateTime,
             string? lastId)
             where T : EntityBase
@@ -159,13 +168,12 @@ namespace EIMSNext.Async.Tasks.Export
                 return baseFilter;
             }
 
-            var seekFilter = builder.Or(
-                builder.Lt(x => x.CreateTime, lastCreateTime.Value),
-                builder.And(
-                    builder.Eq(x => x.CreateTime, lastCreateTime.Value),
-                    builder.Lt(x => x.Id, lastId)));
+            var createTime = lastCreateTime.Value;
+            var id = lastId;
+            Expression<Func<T, bool>> seek = x =>
+                x.CreateTime < createTime || (x.CreateTime == createTime && string.Compare(x.Id, id) < 0);
 
-            return builder.And(baseFilter, seekFilter);
+            return baseFilter.AndAlso(seek);
         }
 
         protected static string SanitizeFileName(string? fileName)

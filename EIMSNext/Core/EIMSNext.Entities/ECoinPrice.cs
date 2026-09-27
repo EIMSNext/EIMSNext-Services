@@ -1,5 +1,5 @@
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo.Entities;
+﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
 {
@@ -11,17 +11,17 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 短信能力。
         /// </summary>
-        SMS,
+        SMS = 0,
 
         /// <summary>
         /// 电子邮件能力。
         /// </summary>
-        EMail,
+        EMail = 1,
 
         /// <summary>
         /// 插件能力。
         /// </summary>
-        Plugin
+        Plugin = 2,
     }
 
     /// <summary>
@@ -32,18 +32,18 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 按 E 币余额计费。
         /// </summary>
-        ECoin,
+        ECoin = 0,
 
         /// <summary>
         /// 按订阅计费。
         /// </summary>
-        Subscription
+        Subscription = 1,
     }
 
     /// <summary>
     /// 平台能力的统一定价。
     /// </summary>
-    public class ECoinPrice : MongoEntityBase
+    public class ECoinPrice : KeyedEntityBase
     {
         /// <summary>
         /// 被定价能力的目标类别。

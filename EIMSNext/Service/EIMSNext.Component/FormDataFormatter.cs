@@ -1,19 +1,18 @@
 using System.Collections;
-using System.Dynamic;
 using System.Globalization;
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
+using EIMSNext.Core.Extensions;
 using EIMSNext.Entities;
 
 namespace EIMSNext.Component
 {
     public static class FormDataFormatter
     {
-        public static ExpandoObject Format(FormData data, IList<FieldDef> fieldDefs)
+        public static Dictionary<string, object?> Format(FormData data, IList<FieldDef> fieldDefs)
         {
-            var result = new ExpandoObject();
-            var resultDict = (IDictionary<string, object?>)result;
+            var resultDict = new Dictionary<string, object?>();
 
             resultDict[Fields.CreateBy] = data.CreateBy;
             resultDict[Fields.CreateTime] = FormatTimestamp(data.CreateTime, Constants.Defaut_DateFormat);
@@ -26,7 +25,7 @@ namespace EIMSNext.Component
                 .Where(x => !string.IsNullOrWhiteSpace(x.Field))
                 .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
 
-            var dataDict = (IDictionary<string, object?>)data.Data;
+            var dataDict = data.Data;
             foreach (var item in dataDict)
             {
                 if (!fieldMap.TryGetValue(item.Key, out var fieldDef))
@@ -37,19 +36,18 @@ namespace EIMSNext.Component
                 resultDict[item.Key] = FormatFieldValue(item.Value, fieldDef);
             }
 
-            return result;
+            return resultDict;
         }
 
-        public static ExpandoObject FormatForDisplay(FormData data, IList<FieldDef> fieldDefs)
+        public static Dictionary<string, object?> FormatForDisplay(FormData data, IList<FieldDef> fieldDefs)
         {
-            var result = new ExpandoObject();
-            var resultDict = (IDictionary<string, object?>)result;
+            var resultDict = new Dictionary<string, object?>();
 
             var fieldMap = fieldDefs
                 .Where(x => !string.IsNullOrWhiteSpace(x.Field))
                 .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
 
-            var dataDict = (IDictionary<string, object?>)data.Data;
+            var dataDict = data.Data;
             foreach (var item in dataDict)
             {
                 if (!fieldMap.TryGetValue(item.Key, out var fieldDef))
@@ -60,7 +58,7 @@ namespace EIMSNext.Component
                 resultDict[item.Key] = FormatDisplayFieldValue(item.Value, fieldDef);
             }
 
-            return result;
+            return resultDict;
         }
 
         private static object? FormatFieldValue(object? value, FieldDef fieldDef)
@@ -106,7 +104,7 @@ namespace EIMSNext.Component
             var values = new List<string>();
             foreach (var item in EnumerateItemsOrSingle(value))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 if (dict == null)
                 {
                     if (item != null) values.Add(item.ToString()!);
@@ -114,7 +112,7 @@ namespace EIMSNext.Component
                 }
 
                 var selectedData = dict.FirstOrDefault(x => string.Equals(x.Key, "data", StringComparison.OrdinalIgnoreCase)).Value;
-                var selectedDataDict = AsDictionary(selectedData);
+                var selectedDataDict = selectedData.AsDictionary();
                 if (selectedDataDict != null)
                 {
                     var dataText = selectedDataDict
@@ -142,7 +140,7 @@ namespace EIMSNext.Component
             var names = new List<string>();
             foreach (var item in EnumerateItemsOrSingle(value))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 var display = dict == null
                     ? item?.ToString()
                     : GetDictionaryValue(dict, "name") ?? GetDictionaryValue(dict, "fileName") ?? GetDictionaryValue(dict, "url");
@@ -166,24 +164,23 @@ namespace EIMSNext.Component
         {
             if (value == null || columns == null || columns.Count == 0)
             {
-                return new List<ExpandoObject>();
+                return new List<Dictionary<string, object?>>();
             }
 
             var columnMap = columns
                 .Where(x => !string.IsNullOrWhiteSpace(x.Field))
                 .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
 
-            var rows = new List<ExpandoObject>();
+            var rows = new List<Dictionary<string, object?>>();
             foreach (var row in EnumerateItems(value))
             {
-                var rowDict = AsDictionary(row);
+                var rowDict = row.AsDictionary();
                 if (rowDict == null)
                 {
                     continue;
                 }
 
-                var rowResult = new ExpandoObject();
-                var rowResultDict = (IDictionary<string, object?>)rowResult;
+                var rowResultDict = new Dictionary<string, object?>();
                 foreach (var item in rowDict)
                 {
                     if (!columnMap.TryGetValue(item.Key, out var columnDef))
@@ -194,7 +191,7 @@ namespace EIMSNext.Component
                     rowResultDict[item.Key] = FormatFieldValue(item.Value, columnDef);
                 }
 
-                rows.Add(rowResult);
+                rows.Add(rowResultDict);
             }
 
             return rows;
@@ -204,24 +201,23 @@ namespace EIMSNext.Component
         {
             if (value == null || columns == null || columns.Count == 0)
             {
-                return new List<ExpandoObject>();
+                return new List<Dictionary<string, object?>>();
             }
 
             var visibleColumns = columns
                 .Where(x => !x.Hidden && !string.IsNullOrWhiteSpace(x.Field))
                 .ToDictionary(x => x.Field, StringComparer.OrdinalIgnoreCase);
 
-            var rows = new List<ExpandoObject>();
+            var rows = new List<Dictionary<string, object?>>();
             foreach (var row in EnumerateItemsOrSingle(value))
             {
-                var rowDict = AsDictionary(row);
+                var rowDict = row.AsDictionary();
                 if (rowDict == null)
                 {
                     continue;
                 }
 
-                var rowResult = new ExpandoObject();
-                var rowResultDict = (IDictionary<string, object?>)rowResult;
+                var rowResultDict = new Dictionary<string, object?>();
                 foreach (var item in rowDict)
                 {
                     if (!visibleColumns.TryGetValue(item.Key, out var columnDef))
@@ -232,7 +228,7 @@ namespace EIMSNext.Component
                     rowResultDict[item.Key] = FormatDisplayFieldValue(item.Value, columnDef);
                 }
 
-                rows.Add(rowResult);
+                rows.Add(rowResultDict);
             }
 
             return rows;
@@ -243,7 +239,7 @@ namespace EIMSNext.Component
             var labels = new List<string>();
             foreach (var item in EnumerateItemsOrSingle(value))
             {
-                var dict = AsDictionary(item);
+                var dict = item.AsDictionary();
                 if (dict != null && dict.TryGetValue("label", out var labelObj))
                 {
                     var label = labelObj?.ToString();
@@ -412,36 +408,5 @@ namespace EIMSNext.Component
             yield return value;
         }
 
-        private static IDictionary<string, object?>? AsDictionary(object? value)
-        {
-            if (value is ExpandoObject expandoObject)
-            {
-                return (IDictionary<string, object?>)expandoObject;
-            }
-
-            if (value is IDictionary<string, object?> dict)
-            {
-                return dict;
-            }
-
-            if (value is IDictionary<string, object> objectDict)
-            {
-                return objectDict.ToDictionary(x => x.Key, x => (object?)x.Value);
-            }
-
-            if (value is JsonElement jsonElement && jsonElement.ValueKind == JsonValueKind.Object)
-            {
-                var expando = new ExpandoObject();
-                var expandoDict = (IDictionary<string, object?>)expando;
-                foreach (var property in jsonElement.EnumerateObject())
-                {
-                    expandoDict[property.Name] = property.Value;
-                }
-
-                return expandoDict;
-            }
-
-            return null;
-        }
     }
 }

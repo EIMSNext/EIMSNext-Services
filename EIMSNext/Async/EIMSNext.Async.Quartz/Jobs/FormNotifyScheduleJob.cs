@@ -1,17 +1,16 @@
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Abstractions.Extensions;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using MongoDB.Driver;
+using Npgsql;
 using Quartz;
 
 namespace EIMSNext.Async.Quartz.Jobs
@@ -42,13 +41,13 @@ namespace EIMSNext.Async.Quartz.Jobs
                 var notify = notifyRepo.Get(item.NotifyId);
                 if (notify == null || notify.Disabled || notify.ScheduleVersion != item.ScheduleVersion)
                 {
-                    await scheduleRepo.DeleteAsync(item.Id);
+                    await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                     continue;
                 }
 
                 if (notify.EndTime.HasValue && item.TriggerTime > notify.EndTime.Value)
                 {
-                    await scheduleRepo.DeleteAsync(item.Id);
+                    await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
                     continue;
                 }
 
@@ -76,10 +75,26 @@ namespace EIMSNext.Async.Quartz.Jobs
                 });
                 return true;
             }
-            catch (MongoWriteException ex) when (ex.WriteError?.Category == ServerErrorCategory.DuplicateKey)
+            catch (DbUpdateException ex) when (IsDispatchLogDuplicate(ex))
             {
                 return false;
             }
+        }
+
+        /// <summary>
+        /// 判断异常是否为 <c>FormNotifyDispatchLog</c> 的幂等唯一索引冲突。
+        /// </summary>
+        private static bool IsDispatchLogDuplicate(DbUpdateException exception)
+        {
+            var postgres = exception.InnerException as PostgresException
+                ?? exception.InnerException?.InnerException as PostgresException;
+            if (postgres is null || postgres.SqlState != "23505")
+            {
+                return false;
+            }
+
+            return postgres.ConstraintName?.Contains("FormNotifyDispatchLog", StringComparison.OrdinalIgnoreCase) == true
+                || postgres.MessageText.Contains("formnotifydispatchlog", StringComparison.OrdinalIgnoreCase);
         }
 
         private static async Task AdvanceScheduleAsync(IRepository<FormNotifyScheduleItem> scheduleRepo, IRepository<FormNotify> notifyRepo, FormNotifyScheduleItem item, FormNotify notify)
@@ -87,10 +102,12 @@ namespace EIMSNext.Async.Quartz.Jobs
             var next = FormNotifyScheduleCalculator.CalculateNextTriggerTime(notify, item.AnchorTime, item.TriggerTime);
             if (notify.TriggerMode == FormNotifyTriggerMode.CustomScheduled)
             {
-                var notifyUpdate = notifyRepo.UpdateBuilder
-                    .Set(x => x.LastTriggerTime, item.TriggerTime)
-                    .Set(x => x.NextTriggerTime, next);
-                await notifyRepo.UpdateAsync(notify.Id, notifyUpdate, false);
+                // UpdateAsync(id, setters => setters.SetProperty(...))，同样翻译成单条 UPDATE。
+                await notifyRepo.UpdateAsync(
+                    notify.Id,
+                    setters => setters
+                        .SetProperty(x => x.LastTriggerTime, item.TriggerTime)
+                        .SetProperty(x => x.NextTriggerTime, next));
             }
 
             if (next.HasValue)
@@ -100,7 +117,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             }
             else
             {
-                await scheduleRepo.DeleteAsync(item.Id);
+                await scheduleRepo.DeleteManyAsync(x => x.Id == item.Id);
             }
         }
 
@@ -124,7 +141,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                         AppId = notify.AppId,
                         FormId = notify.FormId,
                         CorpId = notify.CorpId,
-                        Data = new System.Dynamic.ExpandoObject()
+                        Data = new Dictionary<string, object?>()
                     }
                 });
             }
@@ -146,7 +163,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                     AppId = notify.AppId,
                     FormId = notify.FormId,
                     CorpId = notify.CorpId,
-                    Data = new System.Dynamic.ExpandoObject()
+                    Data = new Dictionary<string, object?>()
                 }
             });
         }

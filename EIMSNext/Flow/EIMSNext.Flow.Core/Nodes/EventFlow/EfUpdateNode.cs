@@ -3,15 +3,15 @@ using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Nodes.EventFlow;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;
 using HKH.Mef2.Integration;
-using MongoDB.Driver;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
+using EIMSNext.Core.Extensions;
+using EIMSNext.Component;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -23,14 +23,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLog(context, dataContext =>
+            return ExecuteWithLogAsync(context, async dataContext =>
             {
-            var processor = Resolver.Resolve<IEfDataProcessor>();
-            if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
-            {
-                dataContext.NodeDatas[Metadata.Id] = restored!;
-                return ExecutionResult.Next();
-            }
+                var processor = Resolver.Resolve<IEfDataProcessor>();
+                if (processor.TryRestoreNode(context.Workflow, Metadata!.Id, out var restored))
+                {
+                    dataContext.NodeDatas[Metadata.Id] = restored!;
+                    return ExecutionResult.Next();
+                }
 
             var updateSetting = Metadata!.EfNodeSetting!.UpdateSetting!;
             var formDef = GetFormDef(dataContext, updateSetting.FormId);
@@ -122,7 +122,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
                                             foreach (var toUpdate in toUpdates)
                                             {
-                                                var toUpdateSubData = GetSubFormData(toUpdate.FormData, subFormField);
+                                                var toUpdateSubData = toUpdate.FormData.Data.GetRows(subFormField);
 
                                                 var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);
 
@@ -131,7 +131,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                                     if (updateSetting.InsertIfNoData)
                                                     {
                                                         //添加新数据
-                                                        toUpdateSubItem = new ExpandoObject();
+                                                        toUpdateSubItem = new Dictionary<string, object?>();
 
                                                         updateSetting.FieldSettings.ForEach(x =>
                                                         {
@@ -164,6 +164,8 @@ namespace EIMSNext.Flow.Core.Nodes
                                                         }
                                                     });
                                                 }
+                                            // GetRows 是纯读：改完的行集合显式写回 Data，保持原有「新增行落库」行为。
+                                            toUpdate.FormData.Data[subFormField] = toUpdateSubData;
                                             }
                                         }
                                     }
@@ -184,7 +186,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
                                     foreach (var toUpdate in toUpdates)
                                     {
-                                        var toUpdateSubData = GetSubFormData(toUpdate.FormData, subFormField);
+                                        var toUpdateSubData = toUpdate.FormData.Data.GetRows(subFormField);
 
                                         var toUpdateSubItem = toUpdateSubData?.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(subMatchExp, x.ToScriptData()).Value);
 
@@ -193,7 +195,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                             if (updateSetting.InsertIfNoData)
                                             {
                                                 //添加新数据
-                                                toUpdateSubItem = new ExpandoObject();
+                                                toUpdateSubItem = new Dictionary<string, object?>();
 
                                                 updateSetting.InsertFieldSettings.ForEach(x =>
                                                 {
@@ -229,6 +231,8 @@ namespace EIMSNext.Flow.Core.Nodes
                                                 }
                                             });
                                         }
+                                    // GetRows 是纯读：改完的行集合显式写回 Data，保持原有「新增行落库」行为。
+                                    toUpdate.FormData.Data[subFormField] = toUpdateSubData;
                                     }
                                 }
                             }
@@ -257,7 +261,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                             AppId = dataContext.AppId,
                                             CorpId = dataContext.CorpId,
                                             FormId = formDef.Id,
-                                            Data = new ExpandoObject(),
+                                            Data = new Dictionary<string, object?>(),
                                             CreateBy = dataContext.WfStarter,
                                             CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                                         };
@@ -313,49 +317,14 @@ namespace EIMSNext.Flow.Core.Nodes
                     FormId = updateSetting.FormId,
                     ActionDatas = actionDatas
                 };
-                dataContext.NodeDatas[Metadata.Id] = processor.ProcessNode(context.Workflow, nodeData, "update");
+                dataContext.NodeDatas[Metadata.Id] = await processor.ProcessNodeAsync(context.Workflow, nodeData, "update");
             }
 
             return ExecutionResult.Next();
-            });
+            }).GetAwaiter().GetResult();
 
         }
 
-        private static List<ExpandoObject> GetSubFormData(FormData formData, string field)
-        {
-            var raw = formData.Data.GetValueOrDefault(field);
-            if (raw is List<ExpandoObject> typed)
-                return typed;
-
-            var result = new List<ExpandoObject>();
-            if (raw is System.Collections.IEnumerable items && raw is not string)
-            {
-                foreach (var item in items)
-                {
-                    if (item is ExpandoObject expando)
-                    {
-                        result.Add(expando);
-                    }
-                    else if (item is IDictionary<string, object?> dictionary)
-                    {
-                        var expandoItem = new ExpandoObject();
-                        var target = (IDictionary<string, object?>)expandoItem;
-                        foreach (var pair in dictionary)
-                            target[pair.Key] = pair.Value;
-                        result.Add(expandoItem);
-                    }
-                    else if (item is JsonElement element && element.ValueKind == JsonValueKind.Object)
-                    {
-                        var expandoItem = element.Deserialize<ExpandoObject>();
-                        if (expandoItem != null)
-                            result.Add(expandoItem);
-                    }
-                }
-            }
-
-            formData.Data.AddOrUpdate(field, result);
-            return result;
-        }
 
         protected string BuildFieldMatchExp(DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex = -1)
         {

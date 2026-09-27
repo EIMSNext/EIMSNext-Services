@@ -1,18 +1,15 @@
-using EIMSNext.ApiService.RequestModels;
+﻿using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Mongo;
-using EIMSNext.Core.Mongo.Entities;
-using EIMSNext.Core.Mongo.Repositories;
+using EIMSNext.Core.Entities;
+using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Mongo.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
 
-using MongoDB.Driver;
 
 namespace EIMSNext.ApiService
 {
@@ -127,7 +124,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 更新实体核心逻辑。
         /// </summary>
-        protected override async Task<ReplaceOneResult> ReplaceAsyncCore(TenantAdminGroup entity)
+        protected override async Task<int> ReplaceAsyncCore(TenantAdminGroup entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有修改管理组的权限");
 
@@ -158,7 +155,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 删除实体核心逻辑。
         /// </summary>
-        protected override async Task<object> DeleteAsyncCore(IEnumerable<string> ids)
+        protected override async Task<int> DeleteAsyncCore(IEnumerable<string> ids)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureUnrestrictedManagement("没有删除管理组的权限");
 
@@ -357,9 +354,12 @@ namespace EIMSNext.ApiService
             }
 
             var userIds = employees.Select(x => x.UserId).Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
-            var ownerUserIds = Resolver.GetService<User>().All()
-                .Where(x => userIds.Contains(x.Id) && x.Crops.Any(c => c.CorpId == IdentityContext.CurrentCorpId && c.IsCorpOwner))
-                .Select(x => x.Id)
+            var ownerUserIds = Resolver.GetRepository<UserCorp>().Queryable
+                .Where(x =>
+                    userIds.Contains(x.UserId) &&
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    x.IsCorpOwner)
+                .Select(x => x.UserId)
                 .ToHashSet();
 
             if (employees.Any(x => ownerUserIds.Contains(x.UserId)))
@@ -419,7 +419,7 @@ namespace EIMSNext.ApiService
             EnsureIdsExist<EmployeeGroup>(entity.ContactEmployeeGroupIds, "通讯录员工组");
         }
 
-        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : Core.Mongo.Entities.CorpEntityBase
+        private void EnsureIdsExist<T>(IEnumerable<string> ids, string name) where T : CorpEntityBase
         {
             var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct().ToList();
             if (idList.Count == 0)

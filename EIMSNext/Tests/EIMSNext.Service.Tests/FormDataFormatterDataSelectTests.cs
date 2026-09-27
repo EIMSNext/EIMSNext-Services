@@ -12,11 +12,13 @@ namespace EIMSNext.Service.Tests
         [TestMethod]
         public void FormatForDisplay_DataSelect_IncludesLabelsAndValues()
         {
-            dynamic data = new ExpandoObject();
-            data.sourceSelection = new[]
+            var data = new Dictionary<string, object?>
             {
-                new Dictionary<string, object?> { ["label"] = "商品名称", ["value"] = "测试商品" },
-                new Dictionary<string, object?> { ["label"] = "数量", ["value"] = "35" },
+                ["sourceSelection"] = new[]
+                {
+                    new Dictionary<string, object?> { ["label"] = "商品名称", ["value"] = "测试商品" },
+                    new Dictionary<string, object?> { ["label"] = "数量", ["value"] = "35" },
+                },
             };
 
             var formData = new FormData { Data = data };

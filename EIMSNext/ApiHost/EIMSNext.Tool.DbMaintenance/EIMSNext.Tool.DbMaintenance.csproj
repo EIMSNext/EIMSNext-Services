@@ -6,19 +6,19 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <Authors>EIMSNext Team</Authors>
-    <Version>1.2.0.0</Version>
+    <Version>2.0.0.0</Version>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="..\..\Core\EIMSNext.Persistence.Mongo\EIMSNext.Persistence.Mongo.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Core\EIMSNext.Core.csproj" />
-    <ProjectReference Include="..\..\Flow\EIMSNext.Flow.Persistence\EIMSNext.Flow.Persistence.csproj" />
-    <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
+    <PackageReference Include="Npgsql" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <ProjectReference Include="..\..\Core\EIMSNext.Common\EIMSNext.Common.csproj" />
   </ItemGroup>
   <ItemGroup>
+    <None Update="Sql\*.sql"><CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory></None>
     <None Update="appsettings.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
   </ItemGroup>
 </Project>
+
+

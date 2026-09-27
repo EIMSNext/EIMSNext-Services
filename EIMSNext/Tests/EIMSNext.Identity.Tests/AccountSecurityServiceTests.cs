@@ -229,6 +229,7 @@ namespace EIMSNext.Identity.Tests
 
             public IQueryable<Client> Clients => _clients.AsQueryable();
             public IQueryable<User> Users => _users.AsQueryable();
+            public IQueryable<UserCorp> UserCorps => Array.Empty<UserCorp>().AsQueryable();
             public IQueryable<EmployeeLookup> Employees => Array.Empty<EmployeeLookup>().AsQueryable();
             public IQueryable<EIMSNext.Identity.Models.PublicAccessSetting> PublicSettings => _publicSettings.AsQueryable();
             public IQueryable<CorporateSettingReadModel> CorporateSettings => _corporateSettings.AsQueryable();

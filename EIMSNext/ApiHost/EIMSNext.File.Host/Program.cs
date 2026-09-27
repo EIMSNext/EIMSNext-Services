@@ -10,9 +10,11 @@ using Microsoft.Extensions.Options;
 using Serilog;
 using Swashbuckle.AspNetCore.SwaggerGen;
 using EIMSNext.File.Host;
+using EIMSNext.Persistence.PostgreSql;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.ConfigWebEnvironment();
+builder.Services.AddPostgreSqlPersistence(builder.Configuration);
 
 // Add services to the container.
 builder.Host.UseAutofac<AutofacRegisterModule>();
@@ -83,5 +85,6 @@ app.MapHealthChecks("/health");
 app.MapControllers();
 
 app.Run();
+
 
 
