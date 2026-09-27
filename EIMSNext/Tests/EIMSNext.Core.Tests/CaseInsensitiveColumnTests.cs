@@ -30,9 +30,9 @@ namespace EIMSNext.Core.Tests
             Assert.AreEqual("citext", user.FindProperty(nameof(User.Email))!.GetColumnType());
             Assert.AreEqual("citext", user.FindProperty(nameof(User.Name))!.GetColumnType());
             Assert.AreEqual(
-                "citext",
+                "integer",
                 user.FindProperty(nameof(User.Platform))!.GetColumnType(),
-                "以文本落库的枚举列也应是 citext。");
+                "枚举列落整数，不参与大小写无关比较。");
 
             var employee = model.FindEntityType(typeof(Employee))!;
             Assert.AreEqual("citext", employee.FindProperty("Id")!.GetColumnType());
@@ -43,6 +43,9 @@ namespace EIMSNext.Core.Tests
             var relation = model.FindEntityType(typeof(EmployeeDepartment))!;
             Assert.AreEqual("citext", relation.FindProperty(nameof(EmployeeDepartment.DepartmentId))!.GetColumnType());
             Assert.AreEqual("C", relation.FindProperty(nameof(EmployeeDepartment.DepartmentId))!.GetCollation());
+
+            var favorite = model.FindEntityType(typeof(WorkbenchFavorite))!;
+            Assert.AreEqual("integer", favorite.FindProperty(nameof(WorkbenchFavorite.TargetType))!.GetColumnType());
         }
 
         /// <summary>真实库行为：混大小写落库的邮箱，用任意大小写都能等值命中。</summary>
@@ -54,7 +57,7 @@ namespace EIMSNext.Core.Tests
 
             // 只给 Id/Email/Name/Platform，其余 NOT NULL 文本列由 001 基线脚本补的 default '' 兜底。
             db.Database.ExecuteSqlRaw(
-                """insert into "User" ("Id", "Email", "Phone", "Name", "Platform") values ('zz-ci-column-user', 'MixedCase@Example.COM', '', 'ci', 'Public')""");
+                """insert into "User" ("Id", "Email", "Phone", "Name", "Platform") values ('zz-ci-column-user', 'MixedCase@Example.COM', '', 'ci', 0)""");
 
             Assert.IsNotNull(
                 db.Users.AsNoTracking().FirstOrDefault(x => x.Email == "mixedcase@example.com"),
@@ -74,7 +77,7 @@ namespace EIMSNext.Core.Tests
             using var transaction = db.Database.BeginTransaction();
 
             db.Database.ExecuteSqlRaw(
-                """insert into "User" ("Id", "Email", "Phone", "Name", "Platform") values ('Zz-Ci-Id-User', 'zz-ci-id@example.com', '', 'ci', 'Public')""");
+                """insert into "User" ("Id", "Email", "Phone", "Name", "Platform") values ('Zz-Ci-Id-User', 'zz-ci-id@example.com', '', 'ci', 0)""");
 
             Assert.IsNotNull(
                 db.Users.AsNoTracking().FirstOrDefault(x => x.Id == "zz-ci-id-user"),

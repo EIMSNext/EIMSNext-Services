@@ -131,12 +131,6 @@ namespace EIMSNext.ApiService
                 if (data is not null) row["data"] = data;
             }
 
-            if (row.TryGetValue("flowStatus", out var flowStatus) && flowStatus is string status &&
-                Enum.TryParse<FlowStatus>(status, true, out var parsedStatus))
-            {
-                row["flowStatus"] = (int)parsedStatus;
-            }
-
             NormalizeJsonObject(row, "createBy");
             NormalizeJsonObject(row, "updateBy");
 

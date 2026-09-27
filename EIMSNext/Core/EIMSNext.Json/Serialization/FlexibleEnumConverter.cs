@@ -62,9 +62,14 @@ namespace EIMSNext.Json.Serialization
 
             public override void Write(Utf8JsonWriter writer, TEnum value, JsonSerializerOptions options)
             {
-                //序列化时统一输出为字符串（可选：可配置为数字）
-                //输出为整型字符串与ODataEnumSerializer统一
-                writer.WriteNumberValue(Convert.ToInt32(value));
+                var numeric = Convert.ToInt64(value);
+                if (typeof(TEnum).IsDefined(typeof(FlagsAttribute), false))
+                {
+                    writer.WriteNumberValue(numeric);
+                    return;
+                }
+
+                writer.WriteStringValue(numeric.ToString());
             }
         }
     }

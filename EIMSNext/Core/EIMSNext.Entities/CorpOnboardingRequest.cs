@@ -51,22 +51,18 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 入企来源，管理员邀请或用户申请。
         /// </summary>
-        public string SourceType { get; set; } = CorpOnboardingSourceType.UserApply;
+        public CorpOnboardingSourceType SourceType { get; set; } = CorpOnboardingSourceType.UserApply;
     }
 
     /// <summary>
     /// 入企来源类型。
     /// </summary>
-    public static class CorpOnboardingSourceType
+    public enum CorpOnboardingSourceType
     {
-        /// <summary>
-        /// 管理员邀请员工加入。
-        /// </summary>
-        public const string AdminInvite = "AdminInvite";
+        /// <summary>管理员邀请员工加入。</summary>
+        AdminInvite = 0,
 
-        /// <summary>
-        /// 用户申请加入企业。
-        /// </summary>
-        public const string UserApply = "UserApply";
+        /// <summary>用户申请加入企业。</summary>
+        UserApply = 1,
     }
 }

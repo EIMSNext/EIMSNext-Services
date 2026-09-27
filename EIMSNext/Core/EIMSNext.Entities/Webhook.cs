@@ -25,7 +25,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 
         /// </summary>
-        public string SourceType { get; set; } = WebHookSource.Form;
+        public WebHookSource SourceType { get; set; } = WebHookSource.Form;
 
         /// <summary>
         /// 推送地址
@@ -84,13 +84,11 @@ namespace EIMSNext.Entities
     }
 
     /// <summary>
-    /// 
+    /// WebHook 来源类型。
     /// </summary>
-    public static class WebHookSource
+    public enum WebHookSource
     {
-        /// <summary>
-        /// 动态表单
-        /// </summary>
-        public const string Form = "form";
+        /// <summary>动态表单。</summary>
+        Form = 0,
     }
 }

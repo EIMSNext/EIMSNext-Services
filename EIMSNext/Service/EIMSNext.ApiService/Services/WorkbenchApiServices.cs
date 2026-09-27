@@ -117,7 +117,7 @@ namespace EIMSNext.ApiService
                         {
                             Id = menu.MenuId,
                             Title = menu.Title,
-                            TargetType = "group",
+                            TargetType = null,
                             Icon = menu.Icon,
                             IconColor = menu.IconColor,
                             Children = children
@@ -329,7 +329,7 @@ namespace EIMSNext.ApiService
             return base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -461,7 +461,7 @@ namespace EIMSNext.ApiService
             return await base.DeleteAsyncCore(ids);
         }
 
-        private WorkbenchTargetInfo? ResolveTarget(string targetType, string targetId)
+        private WorkbenchTargetInfo? ResolveTarget(WorkbenchTargetType targetType, string targetId)
         {
             return WorkbenchTargetResolver.Resolve(Resolver, IdentityContext, targetType, targetId);
         }
@@ -476,7 +476,7 @@ namespace EIMSNext.ApiService
             entity.IconColor = target.IconColor;
         }
 
-        private static bool IsRecentTargetType(string targetType)
+        private static bool IsRecentTargetType(WorkbenchTargetType targetType)
         {
             return targetType == WorkbenchTargetType.Form ||
                    targetType == WorkbenchTargetType.Dashboard;
@@ -518,7 +518,7 @@ namespace EIMSNext.ApiService
     /// <param name="Title">标题。</param>
     /// <param name="Icon">图标。</param>
     /// <param name="IconColor">图标颜色。</param>
-    public record WorkbenchTargetInfo(string TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
+    public record WorkbenchTargetInfo(WorkbenchTargetType TargetType, string TargetId, string AppId, string Title, string Icon, string IconColor);
 
     /// <summary>
     /// 工作台目标解析器。
@@ -533,7 +533,7 @@ namespace EIMSNext.ApiService
         /// <param name="targetType">目标类型。</param>
         /// <param name="targetId">目标 ID。</param>
         /// <returns>工作台目标信息，无权限或不存在时返回 null。</returns>
-        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, string targetType, string targetId)
+        public static WorkbenchTargetInfo? Resolve(IResolver resolver, IIdentityContext identityContext, WorkbenchTargetType targetType, string targetId)
         {
             if (string.IsNullOrWhiteSpace(targetId))
             {

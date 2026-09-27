@@ -6,22 +6,16 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 工作台收藏和访问记录目标类型。
     /// </summary>
-    public static class WorkbenchTargetType
+    public enum WorkbenchTargetType
     {
-        /// <summary>
-        /// 应用。
-        /// </summary>
-        public const string App = "app";
+        /// <summary>应用。</summary>
+        App = 0,
 
-        /// <summary>
-        /// 表单。
-        /// </summary>
-        public const string Form = "form";
+        /// <summary>表单。</summary>
+        Form = 1,
 
-        /// <summary>
-        /// 仪表盘。
-        /// </summary>
-        public const string Dashboard = "dashboard";
+        /// <summary>仪表盘。</summary>
+        Dashboard = 2,
     }
 
     /// <summary>
@@ -58,7 +52,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 收藏目标类型。
         /// </summary>
-        public string TargetType { get; set; } = string.Empty;
+        public WorkbenchTargetType TargetType { get; set; }
 
         /// <summary>
         /// 收藏目标 Id。
@@ -104,7 +98,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 访问目标类型。
         /// </summary>
-        public string TargetType { get; set; } = string.Empty;
+        public WorkbenchTargetType TargetType { get; set; }
 
         /// <summary>
         /// 访问目标 Id。

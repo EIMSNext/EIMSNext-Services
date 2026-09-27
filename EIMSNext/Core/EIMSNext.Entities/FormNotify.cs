@@ -149,19 +149,19 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 数据提交时
         /// </summary>
-        DataAdded,
+        DataAdded = 0,
         /// <summary>
         /// 数据修改后
         /// </summary>
-        DataChanged,
+        DataChanged = 1,
         /// <summary>
         /// 自定义
         /// </summary>
-        CustomScheduled,
+        CustomScheduled = 2,
         /// <summary>
         /// 表单内时间字段
         /// </summary>
-        TimeFieldScheduled
+        TimeFieldScheduled = 3,
     }
 
     /// <summary>
@@ -192,23 +192,23 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 数据通知
         /// </summary>
-        DataNotify,
+        DataNotify = 0,
         /// <summary>
         /// 应用通知
         /// </summary>
-        AppNotify,
+        AppNotify = 1,
         /// <summary>
         /// 系统通知
         /// </summary>
-        SystemNotify,
+        SystemNotify = 2,
         /// <summary>
         /// 系统公告
         /// </summary>
-        SystemNotice,
+        SystemNotice = 3,
         /// <summary>
         /// 流程通知
         /// </summary>
-        FlowNotify
+        FlowNotify = 4,
     }
 
     /// <summary>
@@ -219,26 +219,26 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表单提醒
         /// </summary>
-        FormNotify,
+        FormNotify = 0,
         /// <summary>
         /// 待办提醒
         /// </summary>
-        WfTaskNotify,
+        WfTaskNotify = 1,
         /// <summary>
         /// 待办超时提醒
         /// </summary>
-        WfExpireNotify,
+        WfExpireNotify = 2,
         /// <summary>
         /// 待办催办提醒
         /// </summary>
-        WfUrgeNotify,
+        WfUrgeNotify = 3,
         /// <summary>
         /// 导出提醒
         /// </summary>
-        ExportNotify,
+        ExportNotify = 4,
         /// <summary>
         /// 导入提醒
         /// </summary>
-        ImportNotify
+        ImportNotify = 5,
     }
 }

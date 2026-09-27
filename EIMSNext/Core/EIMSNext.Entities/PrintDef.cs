@@ -45,6 +45,6 @@ namespace EIMSNext.Entities
         /// <summary>
         /// PDF 打印定义。
         /// </summary>
-        Pdf
+        Pdf = 0,
     }
 }

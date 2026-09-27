@@ -1,3 +1,5 @@
+using EIMSNext.Entities;
+
 namespace EIMSNext.ApiService.RequestModels
 {
     /// <summary>
@@ -18,7 +20,7 @@ namespace EIMSNext.ApiService.RequestModels
     public class WorkbenchFavoriteRequest : RequestBase
     {
         /// <summary>目标类型。</summary>
-        public string TargetType { get; set; } = string.Empty;
+        public WorkbenchTargetType TargetType { get; set; }
 
         /// <summary>目标 ID。</summary>
         public string TargetId { get; set; } = string.Empty;
@@ -33,7 +35,7 @@ namespace EIMSNext.ApiService.RequestModels
     public class WorkbenchRecentVisitRequest : RequestBase
     {
         /// <summary>目标类型。</summary>
-        public string TargetType { get; set; } = string.Empty;
+        public WorkbenchTargetType TargetType { get; set; }
 
         /// <summary>目标 ID。</summary>
         public string TargetId { get; set; } = string.Empty;

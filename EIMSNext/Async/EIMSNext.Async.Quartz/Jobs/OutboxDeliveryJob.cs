@@ -43,7 +43,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             var now = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
 
             // IQueryable 的 Where/OrderBy/Take。查询直接在数据库端翻译为
-            // SELECT ... WHERE "Status" = 'Pending' AND "OutAt" <= @now ORDER BY "OutAt" LIMIT 200
+            // SELECT ... WHERE "Status" = 0 AND "OutAt" <= @now ORDER BY "OutAt" LIMIT 200
             var ready = await _outboxRepo.Queryable
                 .Where(x => x.Status == OutboxStatus.Pending && x.OutAt <= now)
                 .OrderBy(x => x.OutAt)

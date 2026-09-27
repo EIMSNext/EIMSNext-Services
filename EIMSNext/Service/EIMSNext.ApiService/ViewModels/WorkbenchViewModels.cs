@@ -58,8 +58,8 @@ namespace EIMSNext.ApiService.ViewModels
         /// <summary>标题。</summary>
         public string Title { get; set; } = string.Empty;
 
-        /// <summary>目标类型。</summary>
-        public string TargetType { get; set; } = string.Empty;
+        /// <summary>目标类型；目录节点为 null。</summary>
+        public WorkbenchTargetType? TargetType { get; set; }
 
         /// <summary>图标。</summary>
         public string Icon { get; set; } = string.Empty;

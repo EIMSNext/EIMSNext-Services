@@ -63,19 +63,19 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 管理自身数据
         /// </summary>
-        ManageSelfData,
+        ManageSelfData = 0,
         /// <summary>
         /// 查看所有数据
         /// </summary>
-        ViewAllData,
+        ViewAllData = 1,
         /// <summary>
         /// 管理所有数据
         /// </summary>
-        ManageAllData,
+        ManageAllData = 2,
         /// <summary>
         /// 自定义权限
         /// </summary>
-        Custom,
+        Custom = 3,
     }
 
     /// <summary>

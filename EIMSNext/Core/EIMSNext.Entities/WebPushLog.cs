@@ -25,7 +25,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 来源类型
         /// </summary>
-        public string SourceType { get; set; } = WebHookSource.Form;
+        public WebHookSource SourceType { get; set; } = WebHookSource.Form;
 
         /// <summary>
         /// 触发类型

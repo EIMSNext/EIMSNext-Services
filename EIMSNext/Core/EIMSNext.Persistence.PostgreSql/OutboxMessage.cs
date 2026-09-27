@@ -21,7 +21,7 @@ public sealed class OutboxMessage : KeyedEntityBase
     public DateTime? SentAt { get; set; }
 }
 
-public enum OutboxStatus { Pending, Sent, Failed }
+public enum OutboxStatus { Pending = 0, Sent = 1, Failed = 2 }
 
 /// <summary>
 /// 幂等去重表，记录已处理的消费事件，防止重复投递导致业务重复执行。
@@ -30,15 +30,15 @@ public sealed class ProcessedMessage : KeyedEntityBase
 {
     public string EventKey { get; set; } = string.Empty;
     public string Target { get; set; } = string.Empty;
-    public string Status { get; set; } = ProcessedMessageStatus.Processing;
+    public ProcessedMessageStatus Status { get; set; } = ProcessedMessageStatus.Processing;
     public DateTime? LeaseUntil { get; set; }
     public string? LeaseToken { get; set; }
     public long? ProcessedTime { get; set; }
     public DateTime? ProcessedAt { get; set; }
 }
 
-public static class ProcessedMessageStatus
+public enum ProcessedMessageStatus
 {
-    public const string Processing = "Processing";
-    public const string Completed = "Completed";
+    Processing = 0,
+    Completed = 1,
 }

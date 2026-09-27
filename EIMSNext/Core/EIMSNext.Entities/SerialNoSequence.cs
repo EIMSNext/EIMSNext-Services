@@ -49,7 +49,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表单
         /// </summary>
-        Form
+        Form = 2,
     }
 
     /// <summary>

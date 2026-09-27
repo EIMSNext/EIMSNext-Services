@@ -50,9 +50,6 @@ public static class EIMSNextModelConfiguration
         // Dictionary<string, object> 是 EF 属性包共享类型的 CLR 形状，预约定 Properties<>() 会抛
         // SharedTypeEntityType 异常，只能在 ApplyEIMSNextModel 里用 HasConversion 逐属性配置。
         configurationBuilder.Properties<Operator>().HaveConversion<OperatorJsonConverter>();
-
-        // EF Core 默认落整数，会让历史数据 "Published" 读不回来，因此必须显式转换。
-        configurationBuilder.Properties<Enum>().HaveConversion<string>();
     }
 
     /// <summary>
@@ -193,15 +190,14 @@ public static class EIMSNextModelConfiguration
         Mapped<WorkflowTransitionExecution>(modelBuilder)?.Property(x => x.Error).HasColumnType("text");
 
         // ------------------------------------------------------------ 字符列
-        // 全部字符列（主键与外键、业务文本、以文本落库的枚举列，见 ConfigureEIMSNextConventions
-        // 的 Properties<Enum>）统一用 citext：EF 会把对应参数一并按 citext 发送，等值 / IN / LIKE
-        // 天然大小写无关且走索引，不必在 LINQ 里包 ToLower()，也不必在写路径折叠大小写。
-        // 只挑当前已是字符型的列，避免把 jsonb 列改掉。
+        // 全部字符列（主键与外键、业务文本）统一用 citext：EF 会把对应参数一并按 citext 发送，
+        // 等值 / IN / LIKE 天然大小写无关且走索引，不必在 LINQ 里包 ToLower()。
+        // 只挑 CLR 类型确为 string 的属性，枚举落 integer（EF 默认），jsonb 列也不在此列。
         foreach (var entity in modelBuilder.Model.GetEntityTypes())
         {
             foreach (var property in entity.GetProperties())
             {
-                if (!IsTextualClrType(property.ClrType)) continue;
+                if (property.ClrType != typeof(string)) continue;
                 if (!IsCharacterColumn(property.GetColumnType())) continue;
 
                 property.SetColumnType(CaseInsensitiveType);
@@ -283,19 +279,6 @@ public static class EIMSNextModelConfiguration
     private static bool IsIdentifierName(string name)
         => string.Equals(name, "Id", StringComparison.Ordinal)
            || (name.EndsWith("Id", StringComparison.Ordinal) && name.Length > 2);
-
-    /// <summary>
-    /// 判断 CLR 类型是否可能落成字符列：<c>string</c> 或枚举（枚举经
-    /// <c>Properties&lt;Enum&gt;().HaveConversion&lt;string&gt;()</c> 落成 text）。
-    /// </summary>
-    /// <remarks>
-    /// 可空枚举的 <see cref="Type.IsEnum"/> 为 false，因此先剥掉 <see cref="Nullable{T}"/>。
-    /// </remarks>
-    private static bool IsTextualClrType(Type clrType)
-    {
-        var type = Nullable.GetUnderlyingType(clrType) ?? clrType;
-        return type == typeof(string) || type.IsEnum;
-    }
 
     /// <summary>
     /// 判断列类型是否为字符型（可换成 citext）。

@@ -27,9 +27,9 @@ namespace EIMSNext.Json.Tests
             var options = new JsonSerializerOptions();
             options.Converters.Add(new FlexibleEnumConverterFactory());
 
-            // Serialize as number
+            // 序列化输出数字字符串，与 OData 枚举表示统一
             var json = JsonSerializer.Serialize(SampleEnum.A, options);
-            Assert.AreEqual("1", json);
+            Assert.AreEqual("\"1\"", json);
 
             // Deserialize from numeric string
             var v1 = JsonSerializer.Deserialize<SampleEnum>("2", options);

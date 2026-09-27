@@ -974,73 +974,73 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 无
         /// </summary>
-        None,
+        None = 0,
         /// <summary>
         /// 开始节点
         /// </summary>
-        Start,
+        Start = 1,
         /// <summary>
         /// 结束节点
         /// </summary>
-        End,
+        End = 2,
         /// <summary>
         /// 分支节点
         /// </summary>
-        Branch,
+        Branch = 3,
         /// <summary>
         /// 分支项
         /// </summary>
-        BranchItem,
+        BranchItem = 4,
         /// <summary>
         /// 条件节点
         /// </summary>
-        Condition,
+        Condition = 5,
         /// <summary>
         /// 其他条件（默认分支）
         /// </summary>
-        ConditionOther,
+        ConditionOther = 6,
         //工作流节点
         /// <summary>
         /// 审批节点
         /// </summary>
-        Approve,
+        Approve = 7,
         /// <summary>
         /// 抄送节点
         /// </summary>
-        CopyTo,
+        CopyTo = 8,
         //数据流节点
         /// <summary>
         /// 查询单条数据
         /// </summary>
-        QueryOne,
+        QueryOne = 9,
         /// <summary>
         /// 查询多条数据
         /// </summary>
-        QueryMany,
+        QueryMany = 10,
         /// <summary>
         /// 插入数据
         /// </summary>
-        Insert,
+        Insert = 11,
         /// <summary>
         /// 更新数据
         /// </summary>
-        Update,
+        Update = 12,
         /// <summary>
         /// 删除数据
         /// </summary>
-        Delete,
+        Delete = 13,
         /// <summary>
         /// 打印
         /// </summary>
-        Print,
+        Print = 14,
         /// <summary>
         /// 插件
         /// </summary>
-        Plugin,
+        Plugin = 15,
         /// <summary>
         /// 分支节点（第二种类型）
         /// </summary>
-        Branch2,
+        Branch2 = 16,
     }
 
     /// <summary>
@@ -1164,23 +1164,23 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 无
         /// </summary>
-        None,
+        None = 0,
         /// <summary>
         /// 表单
         /// </summary>
-        Form,
+        Form = 1,
         /// <summary>
         /// 按钮
         /// </summary>
-        Button,
+        Button = 2,
         /// <summary>
         /// 定时触发。
         /// </summary>
-        Schedule,
+        Schedule = 3,
         /// <summary>
         /// HTTP触发。
         /// </summary>
-        Http
+        Http = 4,
     }
 
     /// <summary>

@@ -26,8 +26,8 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
         /// <code language="sql">
         /// insert into "ProcessedMessage" (...) values (...)
         /// on conflict ("EventKey", "Target") do update
-        ///     set "Status" = 'Processing', "LeaseUntil" = ..., "LeaseToken" = ...
-        ///     where P."Status" &lt;&gt; 'Completed'
+        ///     set "Status" = @status, "LeaseUntil" = ..., "LeaseToken" = ...
+        ///     where P."Status" &lt;&gt; @completed
         ///       and (P."LeaseUntil" is null or P."LeaseUntil" &lt;= now())
         /// returning "LeaseToken"
         /// </code>
@@ -69,8 +69,8 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
                     command.Parameters.AddWithValue("id", repository.NewId());
                     command.Parameters.AddWithValue("eventKey", eventKey);
                     command.Parameters.AddWithValue("target", target);
-                    command.Parameters.AddWithValue("status", ProcessedMessageStatus.Processing);
-                    command.Parameters.AddWithValue("completed", ProcessedMessageStatus.Completed);
+                    command.Parameters.AddWithValue("status", (int)ProcessedMessageStatus.Processing);
+                    command.Parameters.AddWithValue("completed", (int)ProcessedMessageStatus.Completed);
                     command.Parameters.AddWithValue("leaseUntil", leaseUntil);
                     command.Parameters.AddWithValue("token", token);
                     command.Parameters.AddWithValue("now", DateTime.UtcNow);

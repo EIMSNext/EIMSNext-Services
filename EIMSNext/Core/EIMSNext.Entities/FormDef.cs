@@ -98,15 +98,15 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表单
         /// </summary>
-        Form,
+        Form = 0,
         /// <summary>
         /// 仪表盘
         /// </summary>
-        Dashboard,
+        Dashboard = 1,
         /// <summary>
         /// 表单分组
         /// </summary>
-        Group
+        Group = 2,
     }
 
     /// <summary>
