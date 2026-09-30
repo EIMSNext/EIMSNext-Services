@@ -7,8 +7,6 @@ namespace EIMSNext.Service.Contracts
 {
     public interface ISerialNoSequenceService : IService<SerialNoSequence>
     {
-        string NextCorpCode(PlatformType platform);
-
         /// <summary>
         /// 获取下一个表单级流水号计数(纯计数号,由调用方按需拼接)
         /// </summary>

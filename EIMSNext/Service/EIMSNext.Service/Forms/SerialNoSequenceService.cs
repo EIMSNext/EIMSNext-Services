@@ -14,70 +14,9 @@ namespace EIMSNext.Service
 {
     public class SerialNoSequenceService(IResolver resolver) : EntityServiceBase<SerialNoSequence>(resolver), ISerialNoSequenceService
     {
-        private static Dictionary<SerialNoType, string> defaultSNFormats = new Dictionary<SerialNoType, string> {
-            {SerialNoType.Corporate, "{0:yyyyMMdd}{1:00}{2:0000}" },
-            {SerialNoType.Form,"{0:yyyyMMdd}{1:0000}" }
-        };
-
-        public string NextCorpCode(PlatformType platform)
-        {
-            return NextSerialNo(new NextSerialNoParameter(SerialNoType.Corporate, platform, string.Empty, string.Empty, string.Empty));
-        }
-
         public int NextFormSerialNo(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle)
         {
             return NextFormSerialNoInternal(corpId, appId, formId, key, cycle);
-        }
-
-        private string NextSerialNo(NextSerialNoParameter parameter)
-        {
-            if (parameter.SerialNoType == SerialNoType.Corporate)
-            {
-                var utcToday = UtcDay();
-                var sequence = NextCorporateSerialNo(utcToday);
-                var fmt = defaultSNFormats[SerialNoType.Corporate];
-                return string.Format(fmt, utcToday, (int)parameter.Platform, sequence);
-            }
-            throw new NotSupportedException("Unknown SerialNoType");
-        }
-
-        private int NextCorporateSerialNo(DateTime utcToday)
-        {
-            // 当日首先生成时把计数器重置为 1，否则自增。
-            // 同一语句内完成「不存在则插入、存在则按条件重置或自增」，天然原子。
-            const string sql = """
-                insert into "SerialNoSequence" as s
-                    ("Id", "SerialNoType", "CorpId", "AppId", "FormId", "Key", "CurrDate", "CurrId",
-                     "CreateTime", "UpdateTime", "DeleteFlag")
-                values (@id, @serialNoType, @corpId, @appId, @formId, @key, @currDate, 1,
-                        @now, @now, false)
-                on conflict ("SerialNoType", "CorpId", "AppId", "FormId", "Key") do update
-                    set "CurrId" = case when s."CurrDate" is distinct from excluded."CurrDate" then 1
-                                        else s."CurrId" + 1 end,
-                        "CurrDate" = excluded."CurrDate",
-                        "UpdateTime" = excluded."UpdateTime"
-                returning "CurrId"
-                """;
-
-            var id = Repository.NewId();
-            var now = DateTime.UtcNow.ToTimeStampMs();
-            return ExecuteScalarInt(sql, cmd =>
-            {
-                cmd.Parameters.AddWithValue("id", id);
-                cmd.Parameters.AddWithValue("serialNoType", (int)SerialNoType.Corporate);
-                cmd.Parameters.AddWithValue("corpId", string.Empty);
-                cmd.Parameters.AddWithValue("appId", string.Empty);
-                cmd.Parameters.AddWithValue("formId", string.Empty);
-                cmd.Parameters.AddWithValue("key", string.Empty);
-                cmd.Parameters.AddWithValue("currDate", utcToday);
-                cmd.Parameters.AddWithValue("now", now);
-            });
-        }
-
-        private static DateTime UtcDay()
-        {
-            var now = DateTime.UtcNow;
-            return new DateTime(now.Year, now.Month, now.Day, 0, 0, 0, DateTimeKind.Utc);
         }
 
         /// <summary>
@@ -85,10 +24,11 @@ namespace EIMSNext.Service
         /// </summary>
         private int NextFormSerialNoInternal(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle)
         {
-            var anchor = GetCycleAnchor(DateTime.UtcNow, cycle);
+            var anchor = GetCycleAnchor(SerialNoClock.Now, cycle);
 
-            // 序列计数使用当前 PostgreSQL DbContext 的连接和事务，
-            // 由 PostgreSqlCommandBuilder 绑定 CurrentTransaction，保证命令不会脱离业务事务。
+            // 序列计数走独立短事务（自动提交，不进表单保存的业务事务）：
+            // 行锁仅持有到本条 upsert 提交，不再被业务事务拖到 Commit 才释放——T2 并发塌陷的根因。
+            // 语义取舍：号已分配但业务事务回滚时该号被消耗（产生空洞），与号段/重启场景一致。
             const string sql = """
                 insert into "SerialNoSequence" as s
                     ("Id", "SerialNoType", "CorpId", "AppId", "FormId", "Key", "CurrDate", "CurrId",
@@ -105,21 +45,33 @@ namespace EIMSNext.Service
 
             var id = Repository.NewId();
             var now = DateTime.UtcNow.ToTimeStampMs();
+            // 取号连接走独立小连接池：与业务池隔离，最多占 8 个连接（每条约 1ms 的短事务），
+            // 避免 100 并发时业务连接 + 取号连接叠加击穿 PG max_connections（53300）。
+            SerialNoConnectionString ??= new NpgsqlConnectionStringBuilder(
+                Repository.DbContext.Database.GetConnectionString())
+            {
+                ApplicationName = "EIMS.SerialNo",
+                MaxPoolSize = 8
+            }.ConnectionString;
             for (var attempt = 0; attempt < 5; attempt++)
             {
                 try
                 {
-                    return ExecuteScalarInt(sql, cmd =>
-                    {
-                        cmd.Parameters.AddWithValue("id", id);
-                        cmd.Parameters.AddWithValue("serialNoType", (int)SerialNoType.Form);
-                        cmd.Parameters.AddWithValue("corpId", corpId ?? string.Empty);
-                        cmd.Parameters.AddWithValue("appId", appId ?? string.Empty);
-                        cmd.Parameters.AddWithValue("formId", formId ?? string.Empty);
-                        cmd.Parameters.AddWithValue("key", key ?? string.Empty);
-                        cmd.Parameters.AddWithValue("currDate", anchor);
-                        cmd.Parameters.AddWithValue("now", now);
-                    });
+                    using var connection = new NpgsqlConnection(SerialNoConnectionString);
+                    connection.Open();
+                    using var command = connection.CreateCommand();
+                    command.CommandText = sql;
+                    // 字符串参数显式标 citext，与 PostgreSqlCommandBuilder 行为保持一致
+                    command.Parameters.AddWithValue("id", id).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+                    command.Parameters.AddWithValue("serialNoType", (int)SerialNoType.Form);
+                    command.Parameters.AddWithValue("corpId", corpId ?? string.Empty).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+                    command.Parameters.AddWithValue("appId", appId ?? string.Empty).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+                    command.Parameters.AddWithValue("formId", formId ?? string.Empty).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+                    command.Parameters.AddWithValue("key", key ?? string.Empty).DataTypeName = EIMSNextModelConfiguration.CaseInsensitiveType;
+                    command.Parameters.AddWithValue("currDate", anchor);
+                    command.Parameters.AddWithValue("now", now);
+                    var result = command.ExecuteScalar();
+                    return result is null or DBNull ? 0 : Convert.ToInt32(result);
                 }
                 catch (PostgresException ex) when (IsRetryable(ex) && attempt < 4)
                 {
@@ -131,16 +83,7 @@ namespace EIMSNext.Service
             throw new InvalidOperationException("流水号生成冲突，请重试");
         }
 
-        /// <summary>
-        /// 在当前 DbContext 连接上执行返回单个整数的计数语句。
-        /// </summary>
-        private int ExecuteScalarInt(string sql, Action<NpgsqlCommand> bind)
-        {
-            using var command = PostgreSqlCommandBuilder.Create(Repository.DbContext, sql);
-            bind(command);
-            var result = command.ExecuteScalar();
-            return result is null or DBNull ? 0 : Convert.ToInt32(result);
-        }
+        private static string? SerialNoConnectionString;
 
         private static bool IsRetryable(PostgresException exception)
         {
@@ -153,15 +96,17 @@ namespace EIMSNext.Service
         /// Day   -> 当天 00:00:00
         /// Month -> 当月 1 号 00:00:00
         /// Year  -> 当年 1 月 1 号 00:00:00
+        /// 锚点按本地日历日期派生；CurrDate 为 timestamptz，Npgsql 只接受 Utc Kind，
+        /// 故保留 Utc（仅作分段标记，不代表真实瞬时）。
         /// </summary>
-        private static DateTime GetCycleAnchor(DateTime utcNow, SerialNoResetCycle cycle)
+        private static DateTime GetCycleAnchor(DateTime localNow, SerialNoResetCycle cycle)
         {
             return cycle switch
             {
                 SerialNoResetCycle.Never => DateTime.MinValue,
-                SerialNoResetCycle.Day => new DateTime(utcNow.Year, utcNow.Month, utcNow.Day, 0, 0, 0, DateTimeKind.Utc),
-                SerialNoResetCycle.Month => new DateTime(utcNow.Year, utcNow.Month, 1, 0, 0, 0, DateTimeKind.Utc),
-                SerialNoResetCycle.Year => new DateTime(utcNow.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+                SerialNoResetCycle.Day => new DateTime(localNow.Year, localNow.Month, localNow.Day, 0, 0, 0, DateTimeKind.Utc),
+                SerialNoResetCycle.Month => new DateTime(localNow.Year, localNow.Month, 1, 0, 0, 0, DateTimeKind.Utc),
+                SerialNoResetCycle.Year => new DateTime(localNow.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc),
                 _ => DateTime.MinValue
             };
         }

@@ -32,7 +32,8 @@ namespace EIMSNext.Core.Repositories
         /// <summary>
         /// 初始化 <see cref="TransactionScope"/> 类的新实例。
         /// </summary>
-        /// 用于明确表达「这段操作不需要事务」。</param>
+        /// <param name="dbContext">工作单元所属的数据库上下文，为 null 时只登记标记（测试替身）。</param>
+        /// <param name="enabled">为 <c>false</c> 时明确表达「这段操作不需要事务」：不开真实事务，但提交时仍会落库。</param>
         public TransactionScope(DbContext dbContext, bool enabled = true)
         {
             _dbContext = dbContext;
@@ -113,7 +114,13 @@ namespace EIMSNext.Core.Repositories
         /// </summary>
         public void CommitTransaction()
         {
-            if (!_isRootScope || _ownTransaction is null) return;
+            if (!_isRootScope) return;
+            if (_ownTransaction is null)
+            {
+                CommitWithoutTransaction();
+                return;
+            }
+
             _dbContext.SaveChanges();
             _ownTransaction.Commit();
             _completed = true;
@@ -125,10 +132,41 @@ namespace EIMSNext.Core.Repositories
         /// </summary>
         public async Task CommitTransactionAsync(CancellationToken cancellationToken = default)
         {
-            if (!_isRootScope || _ownTransaction is null) return;
+            if (!_isRootScope) return;
+            if (_ownTransaction is null)
+            {
+                await CommitWithoutTransactionAsync(cancellationToken).ConfigureAwait(false);
+                return;
+            }
 
             await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
             await _ownTransaction.CommitAsync(cancellationToken).ConfigureAwait(false);
+            _completed = true;
+            CaptureAfterCommit();
+        }
+
+        /// <summary>
+        /// 无事务模式（<c>TransNeeded = false</c>）下的提交：不起事务，但工作单元仍要落库。
+        /// </summary>
+        /// <remarks>
+        /// 落库只发生在提交阶段（<c>AddCoreAsync</c> 之类只是把实体放进变更跟踪器）。
+        /// 若此处因为「没有自己的事务」直接返回，调用方会拿到成功响应而库里一条记录都没有。
+        /// 没有 DbContext（仓储替身）时无工作单元可刷，视为已提交。
+        /// </remarks>
+        private void CommitWithoutTransaction()
+        {
+            _dbContext?.SaveChanges();
+            _completed = true;
+            CaptureAfterCommit();
+        }
+
+        private async Task CommitWithoutTransactionAsync(CancellationToken cancellationToken)
+        {
+            if (_dbContext is not null)
+            {
+                await _dbContext.SaveChangesAsync(cancellationToken).ConfigureAwait(false);
+            }
+
             _completed = true;
             CaptureAfterCommit();
         }

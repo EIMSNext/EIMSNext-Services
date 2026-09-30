@@ -29,7 +29,8 @@ namespace EIMSNext.Core.Repositories
         public override IQueryable<T> Find(QueryFindOptions<T> options)
         {
             ArgumentNullException.ThrowIfNull(options);
-            return Apply(options, Queryable);
+            var source = options.IncludeDeleted ? Queryable.IgnoreQueryFilters() : Queryable;
+            return Apply(options, source);
         }
 
         /// <inheritdoc />
@@ -46,7 +47,11 @@ namespace EIMSNext.Core.Repositories
 
         /// <inheritdoc />
         public override Task<List<T>> FindAsync(QueryFindOptions<T> options, CancellationToken cancellationToken = default)
-            => Apply(options, Queryable).ToListAsync(cancellationToken);
+        {
+            ArgumentNullException.ThrowIfNull(options);
+            var source = options.IncludeDeleted ? Queryable.IgnoreQueryFilters() : Queryable;
+            return Apply(options, source).ToListAsync(cancellationToken);
+        }
 
         /// <inheritdoc />
         public override Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)

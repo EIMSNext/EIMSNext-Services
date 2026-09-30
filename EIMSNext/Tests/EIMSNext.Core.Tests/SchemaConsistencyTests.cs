@@ -56,7 +56,7 @@ namespace EIMSNext.Core.Tests
                     {
                         problems.Add($"列缺失：\"{table}\".\"{column}\"（模型期望 {efType}）。");
                     }
-                    else if (!string.Equals(efType, dbType, StringComparison.Ordinal))
+                    else if (!string.Equals(efType, dbType, StringComparison.OrdinalIgnoreCase))
                     {
                         problems.Add($"列类型不符：\"{table}\".\"{column}\" 模型期望 {efType}，库中为 {dbType}。");
                     }

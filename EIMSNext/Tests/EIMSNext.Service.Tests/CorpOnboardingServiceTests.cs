@@ -143,7 +143,7 @@ namespace EIMSNext.Service.Tests
 
         private async Task<Corporate> SeedCorporateAsync(string id = CorpId, string name = CorpName, string code = "")
         {
-            var corp = new Corporate { Id = id, Name = name, Code = string.IsNullOrEmpty(code) ? id : code };
+            var corp = new Corporate { Id = id, Name = name };
             _corpRepo.EnsureId(corp);
             await _corpRepo.InsertAsync(corp);
             return corp;

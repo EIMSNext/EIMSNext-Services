@@ -604,12 +604,12 @@ namespace EIMSNext.ApiService
         {
             if (string.IsNullOrWhiteSpace(request.FormId))
             {
-                throw new ArgumentException("表单ID不能为空");
+                throw new BadRequestException("表单ID不能为空");
             }
 
             if (request.Columns == null || request.Columns.Count == 0)
             {
-                throw new ArgumentException("导出列不能为空");
+                throw new BadRequestException("导出列不能为空");
             }
 
             request.Columns = request.Columns
@@ -620,10 +620,10 @@ namespace EIMSNext.ApiService
 
             if (request.Columns.Count == 0)
             {
-                throw new ArgumentException("导出列不能为空");
+                throw new BadRequestException("导出列不能为空");
             }
 
-            var formDef = _formDefService.Get(request.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
+            var formDef = _formDefService.Get(request.FormId) ?? throw new BadRequestException("表单不存在或已被删除");
             var fields = formDef.Content?.Items ?? [];
             request.Columns = request.Columns
                 .Where(column => !IsDataSelectFieldPath(column.Key, fields))
@@ -817,14 +817,16 @@ namespace EIMSNext.ApiService
         {
             if (string.IsNullOrWhiteSpace(id))
             {
-                throw new ArgumentException("导入任务ID不能为空");
+                throw new BadRequestException("导入任务ID不能为空");
             }
 
+            // 任务不存在、跨企业或非本人创建，统一返回 404 而不泄露任务是否存在；
+            // 之前抛 ArgumentException 会被兜底成 500（N28）。
             var importLog = Resolver.Resolve<IFormDataImportLogService>().Get(id);
             if (importLog == null ||
                 !string.Equals(importLog.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException("导入任务不存在或无权访问");
+                throw new NotFoundException("导入任务不存在");
             }
             if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
             {
@@ -842,7 +844,7 @@ namespace EIMSNext.ApiService
                 return importLog;
             }
 
-            throw new ArgumentException("导入任务不存在或无权访问");
+            throw new NotFoundException("导入任务不存在");
         }
 
         private List<FormDataImportEditableErrorRow> ReadEditableErrorRows(FormDataImportLog importLog)

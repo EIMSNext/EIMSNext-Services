@@ -204,7 +204,7 @@ namespace EIMSNext.Service
 
             EnsureId(manifest.Profile, "AppProfile");
             EnsureId(manifest.Template, "AppTemplate");
-            if (!string.Equals(manifest.Profile.TemplateId, manifest.Template.Id, StringComparison.Ordinal))
+            if (!string.Equals(manifest.Profile.TemplateId, manifest.Template.Id, StringComparison.OrdinalIgnoreCase))
             {
                 throw new BadRequestException("AppProfile.TemplateId 与 AppTemplate.Id 不一致");
             }
@@ -299,7 +299,7 @@ namespace EIMSNext.Service
             var permissionGroupRepo = _resolver.GetRepository<FormDataPermissionGroupTemplate>();
 
             var profile = profileRepo.Get(manifest.Profile.Id);
-            if (profile != null && (profile.DeleteFlag || !string.Equals(profile.TemplateId, manifest.Template.Id, StringComparison.Ordinal)))
+            if (profile != null && (profile.DeleteFlag || !string.Equals(profile.TemplateId, manifest.Template.Id, StringComparison.OrdinalIgnoreCase)))
             {
                 throw new BadRequestException("目标 AppProfile 已删除或关联了不同的 TemplateId");
             }
@@ -446,7 +446,7 @@ namespace EIMSNext.Service
                 {
                     throw new BadRequestException($"{resourceName} 存在重复 ID: {resource.Id}");
                 }
-                if (!string.Equals(appTemplateId(resource), templateId, StringComparison.Ordinal))
+                if (!string.Equals(appTemplateId(resource), templateId, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new BadRequestException($"{resourceName} {resource.Id} 归属的 AppTemplateId 不正确");
                 }
@@ -459,7 +459,7 @@ namespace EIMSNext.Service
             foreach (var entity in incoming)
             {
                 var existing = repo.Get(entity.Id);
-                if (existing != null && !string.Equals(appTemplateId(existing), templateId, StringComparison.Ordinal))
+                if (existing != null && !string.Equals(appTemplateId(existing), templateId, StringComparison.OrdinalIgnoreCase))
                 {
                     throw new BadRequestException($"目标 {resourceName} ID 已被其他应用模板占用: {entity.Id}");
                 }

@@ -27,7 +27,9 @@ public sealed class EimsNpgsqlQuerySqlGenerator(
     protected override Expression VisitExtension(Expression extensionExpression)
         => extensionExpression is JsonPathExistsExpression jsonPathExists
             ? VisitJsonPathExists(jsonPathExists)
-            : base.VisitExtension(extensionExpression);
+            : extensionExpression is JsonbArrayContainsExpression jsonbArrayContains
+                ? VisitJsonbArrayContains(jsonbArrayContains)
+                : base.VisitExtension(extensionExpression);
 
     private Expression VisitJsonPathExists(JsonPathExistsExpression jsonPathExists)
     {
@@ -35,6 +37,15 @@ public sealed class EimsNpgsqlQuerySqlGenerator(
         Sql.Append(" @? ");
         Visit((Expression)jsonPathExists.JsonPath);
         return jsonPathExists;
+    }
+
+    private Expression VisitJsonbArrayContains(JsonbArrayContainsExpression jsonbArrayContains)
+    {
+        Visit((Expression)jsonbArrayContains.JsonbColumn);
+        Sql.Append(" @> jsonb_build_array(");
+        Visit((Expression)jsonbArrayContains.Element);
+        Sql.Append(")");
+        return jsonbArrayContains;
     }
 }
 
@@ -67,7 +78,9 @@ public sealed class EimsNpgsqlSqlNullabilityProcessor(
         out bool nullable)
         => sqlExpression is JsonPathExistsExpression jsonPathExists
             ? VisitJsonPathExists(jsonPathExists, allowOptimizedExpansion, out nullable)
-            : base.VisitCustomSqlExpression(sqlExpression, allowOptimizedExpansion, out nullable);
+            : sqlExpression is JsonbArrayContainsExpression jsonbArrayContains
+                ? VisitJsonbArrayContains(jsonbArrayContains, allowOptimizedExpansion, out nullable)
+                : base.VisitCustomSqlExpression(sqlExpression, allowOptimizedExpansion, out nullable);
 
     private SqlExpression VisitJsonPathExists(
         JsonPathExistsExpression jsonPathExists,
@@ -78,6 +91,17 @@ public sealed class EimsNpgsqlSqlNullabilityProcessor(
         var jsonPath = Visit(jsonPathExists.JsonPath, allowOptimizedExpansion, out _);
         nullable = jsonNullable;
         return jsonPathExists.Update(json, jsonPath);
+    }
+
+    private SqlExpression VisitJsonbArrayContains(
+        JsonbArrayContainsExpression jsonbArrayContains,
+        bool allowOptimizedExpansion,
+        out bool nullable)
+    {
+        var column = Visit(jsonbArrayContains.JsonbColumn, allowOptimizedExpansion, out var columnNullable);
+        var element = Visit(jsonbArrayContains.Element, allowOptimizedExpansion, out var elementNullable);
+        nullable = columnNullable || elementNullable;
+        return jsonbArrayContains.Update(column, element);
     }
 }
 

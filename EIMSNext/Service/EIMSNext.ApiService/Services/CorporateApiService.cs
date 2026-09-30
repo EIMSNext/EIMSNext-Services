@@ -70,7 +70,6 @@ namespace EIMSNext.ApiService
 			html.Append("<h2>新企业创建通知</h2><h3>企业信息</h3><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">");
 			AppendRow(html, "企业 ID", corporate.Id);
 			AppendRow(html, "企业名称", corporate.Name);
-			AppendRow(html, "企业编码", corporate.Code);
 			AppendRow(html, "企业简介", corporate.Description);
 			AppendRow(html, "注册来源", corporate.Platform.ToString());
 			html.Append("</table><h3>企业 Owner 用户信息</h3><table border=\"1\" cellpadding=\"6\" cellspacing=\"0\">");

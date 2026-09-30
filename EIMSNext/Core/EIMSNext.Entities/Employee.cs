@@ -75,11 +75,11 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 是否为系统用户
         /// </summary>
-        public bool IsSystem => IsDummy && Id.Equals("system");
+        public bool IsSystem => IsDummy && Id.Equals("system", StringComparison.OrdinalIgnoreCase);
         /// <summary>
         /// 是否为匿名用户
         /// </summary>
-        public bool IsAnonymous => IsDummy && Id.Equals("public");
+        public bool IsAnonymous => IsDummy && Id.Equals("public", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>

@@ -37,20 +37,24 @@ namespace EIMSNext.ApiService
                 return new FormDataReadScope(false, CreateNoMatchFilter(), []);
             }
 
+            // Members 是 jsonb 列，EF Core 无法把它上面的 Any(...) + 客户端集合 Contains(...) 翻译成 SQL，
+            // 因此这里先按可翻译的条件（租户/表单/删除/停用/权限组ID）在库内缩小范围，
+            // 再把成员匹配放到内存执行。权限组数量很小，不会造成全表加载。
             var groups = Resolver.GetService<FormDataPermissionGroup>()
                 .Query(group =>
                     group.CorpId == IdentityContext.CurrentCorpId &&
                     !group.DeleteFlag &&
                     !group.Disabled &&
-                    (string.IsNullOrEmpty(formId) || group.FormId == formId) &&
-                    group.Members.Any(member =>
-                        (member.Type == MemberType.Employee && member.Id == subjects.EmployeeId) ||
-                        (member.Type == MemberType.EmployeeGroup && subjects.EmployeeGroupIds.Contains(member.Id)) ||
-                        (member.Type == MemberType.Department &&
-                            (subjects.DepartmentIds.Contains(member.Id) ||
-                             (member.CascadedDept && subjects.AncestorDepartmentIds.Contains(member.Id))))))
+                    (string.IsNullOrEmpty(formId) || group.FormId == formId))
                 .Where(group => string.IsNullOrWhiteSpace(permissionGroupId) ||
-                    string.Equals(group.Id, permissionGroupId, StringComparison.OrdinalIgnoreCase))
+                    group.Id == permissionGroupId)
+                .ToList()
+                .Where(group => group.Members.Any(member =>
+                    (member.Type == MemberType.Employee && member.Id == subjects.EmployeeId) ||
+                    (member.Type == MemberType.EmployeeGroup && subjects.EmployeeGroupIds.Contains(member.Id)) ||
+                    (member.Type == MemberType.Department &&
+                        (subjects.DepartmentIds.Contains(member.Id) ||
+                         (member.CascadedDept && subjects.AncestorDepartmentIds.Contains(member.Id))))))
                 .Where(group => GetEffectiveFormDataPermissions(group).HasFlag(FormDataPermissions.View))
                 .ToList();
             if (groups.Count == 0)

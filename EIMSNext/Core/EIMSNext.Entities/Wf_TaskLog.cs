@@ -25,6 +25,10 @@ namespace EIMSNext.Entities
         /// </summary>
         public string DataId { get; set; } = string.Empty;
         /// <summary>
+        /// 流程实例ID
+        /// </summary>
+        public string WfInstanceId { get; set; } = string.Empty;
+        /// <summary>
         /// 工作流版本
         /// </summary>
         public int WfVersion { get; set; }

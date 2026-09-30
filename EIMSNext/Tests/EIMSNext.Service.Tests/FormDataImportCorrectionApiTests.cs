@@ -371,6 +371,7 @@ namespace EIMSNext.Service.Tests
             }
 
             public override FormData? Get(string id) => Items.GetValueOrDefault(id);
+            public FormData? GetIncludingDeleted(string id) => Items.GetValueOrDefault(id);
             public override IQueryable<FormData> All() => Items.Values.AsQueryable();
 
             /// <summary>

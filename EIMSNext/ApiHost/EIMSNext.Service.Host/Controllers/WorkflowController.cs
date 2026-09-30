@@ -113,9 +113,15 @@ namespace EIMSNext.Service.Host.Controllers
                 var taskLog = taskLogService.Query(x => x.DataId == request.DataId).FirstOrDefault();
                 var currentDef = wfDefinitionService.Find(data.FormId);
 
-                if (currentDef == null && taskLog == null)
+                // 未配置流程、或没有任何启用流程版本（且此前没有实例可续跑）的表单，
+                // 与普通表单一致：不执行流程，数据直接生效。
+                if (taskLog == null && (currentDef == null || currentDef.Disabled))
                 {
-                    return Error(-1, "发起流程失败：未找到已启用流程版本");
+                    await Resolver.GetRepository<FormData>().UpdateAsync(
+                        data.Id,
+                        setters => setters.SetProperty(x => x.FlowStatus, FlowStatus.Approved));
+
+                    return Ok(new WfResponse { Id = string.Empty, Status = WorkflowStatus.Complete });
                 }
 
                 var startReq = new StartRequest
@@ -479,7 +485,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             if (IdentityContext.IdentityType != global::EIMSNext.ApiService.IdentityType.System &&
                 (string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) ||
-                 !string.Equals(data.CorpId, IdentityContext.CurrentCorpId, StringComparison.Ordinal)))
+                 !string.Equals(data.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase)))
             {
                 return NotFound(message);
             }

@@ -57,7 +57,7 @@ namespace EIMSNext.Plugin.Contracts
             }
 
             normalized[key] = NormalizeValue(attribute.FieldType, normalized[existingKey]);
-            if (!string.Equals(existingKey, key, StringComparison.Ordinal))
+            if (!string.Equals(existingKey, key, StringComparison.OrdinalIgnoreCase))
             {
                 normalized.Remove(existingKey);
             }
@@ -79,7 +79,7 @@ namespace EIMSNext.Plugin.Contracts
             }
 
             normalized[key] = NormalizeSubListValue(normalized[existingKey], itemType);
-            if (!string.Equals(existingKey, key, StringComparison.Ordinal))
+            if (!string.Equals(existingKey, key, StringComparison.OrdinalIgnoreCase))
             {
                 normalized.Remove(existingKey);
             }

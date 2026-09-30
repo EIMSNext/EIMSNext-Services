@@ -80,13 +80,17 @@ public sealed class CorporateSettingService(IResolver resolver)
 
         public bool Equals((string? CorpId, string Name) x, (string? CorpId, string Name) y)
         {
-            return string.Equals(x.CorpId, y.CorpId, StringComparison.Ordinal)
-                && string.Equals(x.Name, y.Name, StringComparison.Ordinal);
+            return string.Equals(x.CorpId, y.CorpId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase);
         }
 
         public int GetHashCode((string? CorpId, string Name) obj)
         {
-            return HashCode.Combine(obj.CorpId, obj.Name);
+            // 必须与上面 Equals 的 IgnoreCase 语义一致，否则 Distinct/HashSet 会先按哈希分流、
+            // 根本走不到 Equals，去重结果不确定。
+            return HashCode.Combine(
+                obj.CorpId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(obj.CorpId),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
         }
     }
 }

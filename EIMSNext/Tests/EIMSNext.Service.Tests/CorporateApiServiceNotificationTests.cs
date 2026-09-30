@@ -31,7 +31,6 @@ public class CorporateApiServiceNotificationTests
         {
             Id = "corp-mail-test",
             Name = "Contoso <script>",
-            Code = "C-001",
             Description = "<b>description</b>"
         };
 
@@ -57,7 +56,7 @@ public class CorporateApiServiceNotificationTests
         var publisher = new RecordingPublisher();
         var service = new CorporateApiService(CreateResolver(string.Empty, publisher));
 
-        await service.AddAsync(new Corporate { Id = "corp-no-mail", Name = "No Mail", Code = "C-002" });
+        await service.AddAsync(new Corporate { Id = "corp-no-mail", Name = "No Mail" });
 
         Assert.AreEqual(0, publisher.Messages.Count);
     }

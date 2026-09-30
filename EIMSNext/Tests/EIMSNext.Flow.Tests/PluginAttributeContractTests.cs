@@ -130,7 +130,7 @@ namespace EIMSNext.Flow.Tests
         }
 
         [TestMethod]
-        public void Execute_Rejects_Unannotated_And_CaseVariant_Functions()
+        public void Execute_Rejects_Unannotated_Functions_But_Accepts_CaseVariants()
         {
             using var plugin = new AttributePlugin();
 
@@ -141,8 +141,10 @@ namespace EIMSNext.Flow.Tests
                 new PluginSetting(),
                 new PluginExecArgs { FunName = "ECHO", FunArgs = "{}" });
 
+            // 未标注 [PluginFunction] 的方法必须拒绝；函数名匹配按 OrdinalIgnoreCase，
+            // 因此大小写变体应当命中。
             Assert.AreEqual(-1, unannotated.Code);
-            Assert.AreEqual(-1, caseVariant.Code);
+            Assert.AreEqual(0, caseVariant.Code);
         }
 
         [Plugin("attribute-plugin", "Attribute Plugin", Version = "1.2")]

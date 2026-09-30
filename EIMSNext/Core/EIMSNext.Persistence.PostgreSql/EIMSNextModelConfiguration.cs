@@ -91,6 +91,15 @@ public static class EIMSNextModelConfiguration
             .HasTranslation(args => new JsonPathExistsExpression(args[0], args[1]))
             .HasParameter("json").HasStoreType("jsonb");
 
+        // JsonbArrayContains 翻译成 `jsonb @> jsonb_build_array(element)` 运算符：
+        // 与 JsonMatch 同理，必须生成运算符而非函数调用才能命中 jsonb_path_ops GIN 索引
+        // （jsonb_path_ops 只服务 @>，不服务 ?/@?/@@）。用于 jsonb 数组列「包含某元素」的判定。
+        modelBuilder.HasDbFunction(() => PgJsonFunctions.JsonbArrayContains(default!, default!))
+            .HasName("eims_json_array_contains")
+            .HasSchema("public")
+            .HasTranslation(args => new JsonbArrayContainsExpression(args[0], args[1]))
+            .HasParameter("jsonbColumn").HasStoreType("jsonb");
+
         // 排序专用：返回 jsonb 而不是 text，避免数字退化成字典序（"10" < "9"）。
         // CLR 侧声明为 string 只是表达式树的载体；该调用只出现在 ORDER BY 里，
         // 不会投影回客户端，因此不涉及 jsonb → string 的反序列化。
@@ -284,7 +293,7 @@ public static class EIMSNextModelConfiguration
     /// <c>Identifier</c> 这类同首字母的词——它们不是本模型的列，此处仍要求以 <c>Id</c> 收尾。
     /// </remarks>
     private static bool IsIdentifierName(string name)
-        => string.Equals(name, "Id", StringComparison.Ordinal)
+        => string.Equals(name, "Id", StringComparison.OrdinalIgnoreCase)
            || (name.EndsWith("Id", StringComparison.Ordinal) && name.Length > 2);
 
     /// <summary>

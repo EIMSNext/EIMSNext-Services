@@ -46,7 +46,7 @@ namespace EIMSNext.Service.Host.Controllers
         if (def == null ||
             def.FlowType != FlowType.EventFlow ||
             def.DeleteFlag ||
-            !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
+            !string.Equals(def.CorpId, corpId, StringComparison.OrdinalIgnoreCase))
 	        {
 	            return NotFound("智能助手不存在");
 	        }

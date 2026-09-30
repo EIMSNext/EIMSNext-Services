@@ -53,6 +53,7 @@ namespace EIMSNext.Core.Query
                 Sort = options.Sort.ToSortDefinition<T>(),
                 Skip = options.GetEffectiveSkip(),
                 Take = options.GetEffectiveTake(),
+                IncludeDeleted = options.IncludeDeleted,
             };
         }
 

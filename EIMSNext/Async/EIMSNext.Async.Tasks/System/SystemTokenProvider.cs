@@ -35,7 +35,8 @@ public sealed class SystemTokenProvider : ISystemTokenProvider
         return response.Data.access_token;
     }
 
-    private sealed class SystemTokenResponse
+    // RestSharp 只能反序列化公共类型，私有嵌套类会导致所有系统令牌获取恒失败。
+    public sealed class SystemTokenResponse
     {
         public string access_token { get; set; } = string.Empty;
     }

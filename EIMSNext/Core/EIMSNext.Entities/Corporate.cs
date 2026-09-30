@@ -17,10 +17,6 @@ namespace EIMSNext.Entities
         /// </summary>
         public string Description { get; set; } = "";
         /// <summary>
-        /// 企业编码， yyyyMMdd+2位平台编码+四位流水
-        /// </summary>
-        public string Code { get; set; } = "";
-        /// <summary>
         /// 注册来源
         /// </summary>
         public PlatformType Platform { get; set; }

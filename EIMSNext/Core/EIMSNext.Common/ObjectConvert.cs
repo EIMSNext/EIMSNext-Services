@@ -74,21 +74,24 @@ namespace EIMSNext.Common
                 var targetProps = target.GetProperties(BindingFlags.Public | BindingFlags.Instance).Where(p => p.CanWrite);
 
                 // 创建成员绑定表达式集合
-                var bindings = targetProps
-                    .Select(targetProp =>
+                var bindings = new List<MemberBinding>();
+                foreach (var targetProp in targetProps)
+                {
+                    var sourceProp = source.GetProperty(targetProp.Name, BindingFlags.Public | BindingFlags.Instance);
+
+                    if (sourceProp == null) continue;
+
+                    // 同名属性未必类型兼容（如 Employee.Departments 与 EmployeeRequest.Departments
+                    // 的元素类型不同）。Expression.Bind 只接受特定可赋值关系，且比 IsAssignableFrom
+                    // 宽松（int -> int? 可绑定），因此以「能否绑定」为准，不兼容的属性留给调用方显式映射。
+                    try
                     {
-                        var sourceProp = source.GetProperty(targetProp.Name, BindingFlags.Public | BindingFlags.Instance);
-
-                        if (sourceProp == null) return null;
-
-                        // 创建属性访问表达式：x.Property
-                        var sourceAccess = Expression.Property(parameter, sourceProp);
-
-                        // 创建成员绑定表达式：Property = x.Property
-                        return Expression.Bind(targetProp, sourceAccess);
-                    })
-                    .Where(b => b != null)
-                    .ToList();
+                        bindings.Add(Expression.Bind(targetProp, Expression.Property(parameter, sourceProp)));
+                    }
+                    catch (ArgumentException)
+                    {
+                    }
+                }
 
                 // 创建对象初始化表达式
                 var newExpr = Expression.New(target); // new T()
@@ -283,11 +286,17 @@ namespace EIMSNext.Common
 
                     if (sourceProp == null || !sourceProp.CanRead) continue;
 
-                    // 生成属性赋值表达式
-                    var sourcePropExpr = Expression.Property(sourceParam, sourceProp);
-                    var targetPropExpr = Expression.Property(targetParam, targetProp);
-                    var assignExpr = Expression.Assign(targetPropExpr, sourcePropExpr);
-                    assignments.Add(assignExpr);
+                    // 同 CastExp：同名但类型不兼容的属性跳过（Expression.Assign 会抛 ArgumentException），
+                    // 这类属性由调用方显式映射。
+                    try
+                    {
+                        assignments.Add(Expression.Assign(
+                            Expression.Property(targetParam, targetProp),
+                            Expression.Property(sourceParam, sourceProp)));
+                    }
+                    catch (ArgumentException)
+                    {
+                    }
                 }
 
                 // 构建 Lambda 表达式

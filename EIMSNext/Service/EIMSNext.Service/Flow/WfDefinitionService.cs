@@ -86,6 +86,8 @@ namespace EIMSNext.Service
                 entity.EventSetting = content.EventSetting;
             }
 
+            EnsureSourceId(entity);
+
             var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag).Select(x => x.Version).OrderByDescending(x => x).FirstOrDefault();
 
             entity.Version = maxVersion + 1;
@@ -111,6 +113,8 @@ namespace EIMSNext.Service
             {
                 entity.EventSetting = content.EventSetting;
             }
+
+            EnsureSourceId(entity);
 
             return Task.CompletedTask;
         }
@@ -143,6 +147,36 @@ namespace EIMSNext.Service
             }
 
             return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// 绕过 <see cref="BeforeDelete"/> 的已发布校验删除定义。
+        /// </summary>
+        /// <remarks>
+        /// 删应用/删表单的级联清理会走到这里：主体已不存在，挂在其下的定义（含已发布版本）必须一并清掉，
+        /// 否则会留下永远删不掉的孤儿定义。
+        /// </remarks>
+        public async Task<int> DeleteForceAsync(IEnumerable<string> ids)
+        {
+            var idList = ids.Where(x => !string.IsNullOrWhiteSpace(x)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            if (idList.Count == 0)
+            {
+                return 0;
+            }
+
+            return await Repository.SoftDeleteManyAsync(x => idList.Contains(x.Id));
+        }
+
+        /// <summary>
+        /// 工作流的 <see cref="Wf_Definition.ExternalId"/> 就是表单Id。删表单时按 SourceId 反查定义，
+        /// 这里必须保证它落值，否则级联清理永远匹配不到。
+        /// </summary>
+        private static void EnsureSourceId(Wf_Definition entity)
+        {
+            if (entity.FlowType == FlowType.Workflow && string.IsNullOrWhiteSpace(entity.SourceId))
+            {
+                entity.SourceId = entity.ExternalId;
+            }
         }
     }
 }

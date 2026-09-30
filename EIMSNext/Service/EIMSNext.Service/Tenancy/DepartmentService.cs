@@ -32,7 +32,7 @@ namespace EIMSNext.Service
                         entity.HeriarchyId = $"|{entity.Id}|";
                         entity.HeriarchyName = entity.Name;
                     }
-                    else if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.Ordinal))
+                    else if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.OrdinalIgnoreCase))
                     {
                         throw new BadRequestException("上级部门必须属于当前企业");
                     }
@@ -127,7 +127,7 @@ namespace EIMSNext.Service
                 return;
             }
 
-            if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.Ordinal))
+            if (!string.Equals(parent.CorpId, entity.CorpId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new BadRequestException("上级部门必须属于当前企业");
             }

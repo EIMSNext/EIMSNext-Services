@@ -5,6 +5,7 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Persistence;
@@ -119,7 +120,10 @@ public static class WorkflowModelConfiguration
             // 运维风险高于理论攻击面。因此这里用 Objects 而不是白名单 Binder。
             TypeNameHandling = TypeNameHandling.Objects,
             DateParseHandling = DateParseHandling.None,
-            Converters = { new RuntimeObjectConverter() }
+            // 运行期对象图可能成环，成环会让整笔 PersistWorkflow 事务失败、实例被反复重跑，
+            // 忽略重复引用即可让 WorkflowInstance 状态正常落库。
+            ReferenceLoopHandling = ReferenceLoopHandling.Ignore,
+            Converters = { new RuntimeObjectConverter(), new StepExecutionContextConverter() }
         };
 
         public static string Write<T>(T value) => JsonConvert.SerializeObject(value, Settings);
@@ -192,6 +196,24 @@ public static class WorkflowModelConfiguration
                 if (token is JArray array) return array.Select(Convert).ToArray();
                 return (token as JValue)?.Value;
             }
+        }
+
+        // ExecutionResult.Persist(context) 会把整个运行期上下文写进 ExecutionPointer.PersistenceData，
+        // 而 StepExecutionContext 反向引用 WorkflowInstance、并持有带 LambdaExpression 的 Step
+        // （输出映射 MemberMapParameter），在 jsonb 里既会成环、又无法反序列化 —— 导致整笔
+        // PersistWorkflow 失败、实例状态不落地并被引擎反复重跑。运行期上下文由引擎重新构建，
+        // 落库时只保留其中真正的持久化载荷。
+        private sealed class StepExecutionContextConverter : JsonConverter
+        {
+            public override bool CanRead => false;
+
+            public override bool CanConvert(Type objectType) => typeof(IStepExecutionContext).IsAssignableFrom(objectType);
+
+            public override void WriteJson(JsonWriter writer, object? value, JsonSerializer serializer)
+                => serializer.Serialize(writer, ((IStepExecutionContext)value!).PersistenceData);
+
+            public override object? ReadJson(JsonReader reader, Type objectType, object? existingValue, JsonSerializer serializer)
+                => throw new NotSupportedException();
         }
     }
 }

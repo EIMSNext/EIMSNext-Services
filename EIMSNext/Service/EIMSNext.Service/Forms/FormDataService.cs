@@ -346,6 +346,13 @@ namespace EIMSNext.Service
             return result;
         }
 
+        public FormData? GetIncludingDeleted(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return null;
+
+            return Repository.Queryable.IgnoreQueryFilters().FirstOrDefault(x => x.Id == id);
+        }
+
         public async Task RestoreAsync(IEnumerable<string> ids)
         {
             var idList = ids
@@ -356,9 +363,17 @@ namespace EIMSNext.Service
 
             await ExecuteWithTransactionRetryAsync(async () =>
             {
-                await PatchManyCoreAsync(
-                    x => idList.Contains(x.Id) && x.DeleteFlag,
-                    setters => setters.SetProperty(x => x.DeleteFlag, false)).ConfigureAwait(false);
+                // 恢复的是已逻辑删除的行（DeleteFlag=true），必须显式忽略全局 !DeleteFlag 过滤，
+                // 否则查询过滤会把目标行排除在外，UpdateMany 找不到任何行 → 恢复无效果。
+                var updated = await Repository.Queryable
+                    .IgnoreQueryFilters()
+                    .Where(x => idList.Contains(x.Id) && x.DeleteFlag)
+                    .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.DeleteFlag, false))
+                    .ConfigureAwait(false);
+                if (updated > 0)
+                {
+                    CreateAuditLog(DbAction.Update, null, null, $"restore: {string.Join(",", idList)}");
+                }
             }).ConfigureAwait(false);
         }
 
@@ -460,8 +475,10 @@ namespace EIMSNext.Service
         {
             if (ids.Count == 0) return 0;
 
+            // 物理删除（回收站彻底删除 / 强制删除）必须能命中已逻辑删除的行，
+            // 否则全局 !DeleteFlag 过滤会把目标行排除，删除静默失败（N29）。
             return physical
-                ? Repository.DeleteManyAsync(x => ids.Contains(x.Id)).GetAwaiter().GetResult()
+                ? Repository.Queryable.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ExecuteDelete()
                 : Repository.SoftDeleteManyAsync(ids).GetAwaiter().GetResult();
         }
 
@@ -470,7 +487,7 @@ namespace EIMSNext.Service
             if (ids.Count == 0) return 0;
 
             return physical
-                ? await Repository.DeleteManyAsync(x => ids.Contains(x.Id)).ConfigureAwait(false)
+                ? await Repository.Queryable.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ExecuteDeleteAsync().ConfigureAwait(false)
                 : await Repository.SoftDeleteManyAsync(ids).ConfigureAwait(false);
         }
 
@@ -840,7 +857,7 @@ namespace EIMSNext.Service
                         var fmt = seg.TryGetProperty("format", out var fe) && fe.ValueKind == JsonValueKind.String
                             ? fe.GetString()
                             : "yyyyMMdd";
-                        sb.Append(DateTime.UtcNow.ToString(NormalizeDateFormat(fmt), CultureInfo.InvariantCulture));
+                        sb.Append(SerialNoClock.Now.ToString(NormalizeDateFormat(fmt), CultureInfo.InvariantCulture));
                         break;
                     }
                 case "field":

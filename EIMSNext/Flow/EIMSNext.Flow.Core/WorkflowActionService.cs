@@ -34,6 +34,7 @@ namespace EIMSNext.Flow.Core
         private readonly DbSet<WorkflowInstance> _workflowInstances;
         private readonly DbSet<EventSubscription> _eventSubscriptions;
         private readonly IWorkflowHost _workflowHost;
+        private readonly IWorkflowPersistenceProvider _persistence;
         private readonly IWfDbContext _dbContext;
 
         public WorkflowActionService(IResolver resolver)
@@ -48,6 +49,7 @@ namespace EIMSNext.Flow.Core
             _employeeDepartmentRepo = resolver.GetRepository<EmployeeDepartment>();
             _departmentRepo = resolver.GetRepository<Department>();
             _workflowHost = resolver.Resolve<IWorkflowHost>();
+            _persistence = (IWorkflowPersistenceProvider)_workflowHost.PersistenceStore;
             _dbContext = resolver.Resolve<IWfDbContext>();
             // 现在 WorkflowCore 的存储已落在 EF Core 上，直接用 DbSet。
             _workflowInstances = _dbContext.WorkflowInstances;
@@ -65,15 +67,17 @@ namespace EIMSNext.Flow.Core
             workflowInstance.CompleteTime = null;
             ResetWorkflowPointers(workflowInstance, definition);
 
-            await TransactionScope.ExecuteWithRetryAsync(_dbContext.Context, async () =>
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
             {
                 await _taskRepo.DeleteManyAsync(x => x.WfInstanceId == workflowInstance.Id);
-                await ReplaceWorkflowInstanceAsync(workflowInstance);
-                await _eventSubscriptions
-                    .Where(x => x.WorkflowId == workflowInstance.Id)
-                    .ExecuteDeleteAsync();
                 await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Start, task.ApproveNodeId, task.ApproveNodeName, ApproveAction.Withdraw, comment, dataContext.Round - 1));
             }).ConfigureAwait(false);
+
+            await PersistWorkflowInstanceAsync(workflowInstance);
+            await _eventSubscriptions
+                .Where(x => x.WorkflowId == workflowInstance.Id)
+                .ExecuteDeleteAsync();
+            await UpdateFormStatus(task.DataId, FlowStatus.Draft);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
         }
@@ -130,6 +134,11 @@ namespace EIMSNext.Flow.Core
             if (string.IsNullOrWhiteSpace(targetEmployeeId))
             {
                 throw new BadRequestException("加签目标不能为空");
+            }
+
+            if (targetEmployeeId == context.CurrentEmployeeId)
+            {
+                throw new BadRequestException("加签目标不能是本人");
             }
 
             await ValidateNodeActionEnabledAsync(workflowInstance, task, NodeActionType.AddSign);
@@ -240,36 +249,33 @@ namespace EIMSNext.Flow.Core
             var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
             dataContext.Round += 1;
             workflowInstance.Data = dataContext.ToExpando();
-            workflowInstance.NextExecution = null;
             workflowInstance.CompleteTime = null;
-
-            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
-            {
-            await _taskRepo.DeleteManyAsync(x => x.WfInstanceId == workflowInstance.Id);
+            ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
 
             if (target.NodeType == WfNodeType.Start)
             {
                 workflowInstance.Status = WorkflowStatus.Suspended;
-                ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
-                await ReplaceWorkflowInstanceAsync(workflowInstance);
-                await _eventSubscriptions
-                    .Where(x => x.WorkflowId == workflowInstance.Id)
-                    .ExecuteDeleteAsync();
-                await UpdateFormStatus(task.DataId, FlowStatus.Draft);
+                workflowInstance.NextExecution = null;
             }
             else
             {
+                // 回退到审批节点：必须让队列处理器重新拾取实例，引擎重跑目标节点时会重新
+                // 登记待处理活动并重建 Wf_Task。只重置内存指针（不落库、不唤醒）会让流程卡死。
                 workflowInstance.Status = WorkflowStatus.Runnable;
-                ResetWorkflowPointers(workflowInstance, definition, target.NodeId);
-                await ReplaceWorkflowInstanceAsync(workflowInstance);
-                await _eventSubscriptions
-                    .Where(x => x.WorkflowId == workflowInstance.Id)
-                    .ExecuteDeleteAsync();
-                await UpdateFormStatus(task.DataId, FlowStatus.Approving);
+                workflowInstance.NextExecution = 0;
             }
 
-            await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, action, comment, dataContext.Round - 1));
+            await TransactionScope.ExecuteWithRetryAsync(_taskRepo.DbContext, async () =>
+            {
+                await _taskRepo.DeleteManyAsync(x => x.WfInstanceId == workflowInstance.Id);
+                await _taskLogRepo.InsertAsync(CreateTaskLog(context, workflowInstance, task, WfNodeType.Approve, task.ApproveNodeId, task.ApproveNodeName, action, comment, dataContext.Round - 1));
             }).ConfigureAwait(false);
+
+            await PersistWorkflowInstanceAsync(workflowInstance);
+            await _eventSubscriptions
+                .Where(x => x.WorkflowId == workflowInstance.Id)
+                .ExecuteDeleteAsync();
+            await UpdateFormStatus(task.DataId, target.NodeType == WfNodeType.Start ? FlowStatus.Draft : FlowStatus.Approving);
 
             return new WorkflowActionResult { WorkflowInstanceId = workflowInstance.Id };
         }
@@ -495,6 +501,7 @@ namespace EIMSNext.Flow.Core
                 FormId = dataContext.FormId,
                 FormName = GetFormDef(dataContext.FormId)?.Name ?? string.Empty,
                 DataId = dataContext.DataId,
+                WfInstanceId = workflowInstance.Id,
                 DataBrief = GetDataBrief(dataContext.FormId, dataContext.DataId),
                 Approver = dataContext.WfStarter,
                 NodeId = startStep.Id,
@@ -705,6 +712,7 @@ namespace EIMSNext.Flow.Core
                 FormId = task.FormId,
                 FormName = GetFormDef(task.FormId)?.Name ?? string.Empty,
                 DataId = task.DataId,
+                WfInstanceId = workflowInstance.Id,
                 WfVersion = workflowInstance.Version,
                 NodeId = nodeId,
                 NodeName = nodeName,
@@ -743,16 +751,25 @@ namespace EIMSNext.Flow.Core
         }
 
         /// <summary>
+        /// 把实例指针重置到发起节点（供「撤回后重新发起」等场景复用同一实例）。
+        /// </summary>
+        public void ResetToStart(WorkflowInstance workflowInstance)
+        {
+            var definition = GetWorkflowDefinition(workflowInstance) ?? throw new BadRequestException("流程定义不存在");
+            ResetWorkflowPointers(workflowInstance, definition);
+        }
+
+        /// <summary>
+        /// 持久化工作流实例及其执行指针。
         /// </summary>
         /// <remarks>
-        /// <c>DbSet.Update</c> + <c>SaveChangesAsync</c> 表达：实体已带主键，
-        /// EF 会生成 <c>UPDATE ... WHERE "Id" = @id</c>。若实例不存在则会抛
-        /// 但本方法的所有调用者都刚从上下文里取出该实例，实例必然存在。
+        /// 必须走 <see cref="IWorkflowPersistenceProvider"/>：<c>WorkflowInstance.ExecutionPointers</c>
+        /// 在 EF 模型里被 <c>Ignore</c>，直接 <c>DbSet.Update</c> 只会写实例行，
+        /// 内存中重置过的指针不会落库——回退/撤回后目标节点会因没有待办指针而永远不再执行。
         /// </remarks>
-        private async Task ReplaceWorkflowInstanceAsync(WorkflowInstance workflowInstance)
+        private Task PersistWorkflowInstanceAsync(WorkflowInstance workflowInstance)
         {
-            _workflowInstances.Update(workflowInstance);
-            await _dbContext.SaveChangesAsync();
+            return _persistence.PersistWorkflow(workflowInstance);
         }
 
         private Wf_Definition? GetWorkflowDefinition(WorkflowInstance wfInst)

@@ -38,7 +38,7 @@ catch (Exception exception)
 /// </summary>
 static string? ReadOption(string[] arguments, string name)
 {
-    var index = Array.FindIndex(arguments, x => string.Equals(x, name, StringComparison.Ordinal));
+    var index = Array.FindIndex(arguments, x => string.Equals(x, name, StringComparison.OrdinalIgnoreCase));
     if (index < 0) return null;
     if (index + 1 >= arguments.Length || arguments[index + 1].StartsWith("--", StringComparison.Ordinal))
         throw new ArgumentException($"{name} requires a value, e.g. {name} 001_CreateTables");

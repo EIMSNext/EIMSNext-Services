@@ -80,12 +80,12 @@ namespace EIMSNext.Identity.Services
             }
 
             var hashed = clientSecret.Sha256();
-            return client.ClientSecrets.Any(x => string.Equals(x.Value, hashed, StringComparison.Ordinal)) ? client : null;
+            return client.ClientSecrets.Any(x => x.Value == hashed) ? client : null;
         }
 
         private static bool IsGrantTypeAllowed(Client client, string? grantType)
         {
-            return !string.IsNullOrWhiteSpace(grantType) && client.AllowedGrantTypes.Any(x => string.Equals(x.GrantType, grantType, StringComparison.Ordinal));
+            return !string.IsNullOrWhiteSpace(grantType) && client.AllowedGrantTypes.Any(x => x.GrantType == grantType);
         }
 
         private static bool AreScopesAllowed(Client client, IReadOnlyCollection<string> scopes)

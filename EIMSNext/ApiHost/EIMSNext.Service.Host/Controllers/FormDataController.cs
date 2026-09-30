@@ -96,7 +96,12 @@ namespace EIMSNext.Service.Host.Controllers
                 Scope = options.Scope,
                 IncludeDeleted = options.IncludeDeleted,
             });
-            return Ok(ApiService.Count(filtered.Filter ?? DynamicFilter.Empty));
+            // Count 必须复用完整的 DynamicFindOptions：IncludeDeleted=true 时，
+            // ApiService.Find(options) 会让仓储跳过全局软删除过滤，保证总数与列表一致。
+            filtered.Skip = 0;
+            filtered.Take = int.MaxValue;
+            filtered.Sort = null;
+            return Ok(ApiService.Find(filtered).LongCount());
         }
 
         /// <summary>
@@ -841,7 +846,15 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 if (batch?.Keys?.Count > 0)
                 {
-                    await ApiService.DeleteAsync(batch.Keys);
+                    // 越权主键必须在进入服务层之前被过滤掉：服务层删除不做企业校验，
+                    // 直接透传会让调用方删掉其他企业的数据。
+                    var ownedKeys = FilterManageableIds(batch.Keys);
+                    if (ownedKeys.Count == 0)
+                    {
+                        return NotFound();
+                    }
+
+                    await ApiService.DeleteAsync(ownedKeys);
                 }
                 else
                 {
@@ -850,7 +863,13 @@ namespace EIMSNext.Service.Host.Controllers
             }
             else
             {
-                await ApiService.DeleteAsync(key);
+                var owned = FilterManageableIds([key]);
+                if (owned.Count == 0)
+                {
+                    return NotFound();
+                }
+
+                await ApiService.DeleteAsync(owned);
             }
             return NoContent();
         }
@@ -1451,4 +1470,3 @@ namespace EIMSNext.Service.Host.Controllers
 
     }
 }
-

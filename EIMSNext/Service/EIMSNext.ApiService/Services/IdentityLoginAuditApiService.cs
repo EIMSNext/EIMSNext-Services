@@ -6,6 +6,7 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Async.Abstractions.Messaging;
+using EIMSNext.Common;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
@@ -135,24 +136,24 @@ namespace EIMSNext.ApiService
         {
             if (request.Columns == null || request.Columns.Count == 0)
             {
-                throw new ArgumentException("导出列不能为空");
+                throw new BadRequestException("导出列不能为空");
             }
 
             foreach (var column in request.Columns)
             {
                 if (string.IsNullOrWhiteSpace(column.Key))
                 {
-                    throw new ArgumentException("导出列标识不能为空");
+                    throw new BadRequestException("导出列标识不能为空");
                 }
 
                 if (string.IsNullOrWhiteSpace(column.Header))
                 {
-                    throw new ArgumentException($"导出列标题不能为空: {column.Key}");
+                    throw new BadRequestException($"导出列标题不能为空: {column.Key}");
                 }
 
                 if (!IdentityLoginAuditColumnTypes.TryGetValue(column.Key, out var type))
                 {
-                    throw new ArgumentException($"不支持的导出列: {column.Key}");
+                    throw new BadRequestException($"不支持的导出列: {column.Key}");
                 }
 
                 column.Type = type;

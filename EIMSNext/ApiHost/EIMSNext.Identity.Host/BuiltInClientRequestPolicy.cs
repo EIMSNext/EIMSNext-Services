@@ -80,7 +80,7 @@ namespace EIMSNext.Identity.Host
             }
 
             if (string.IsNullOrWhiteSpace(grantType) ||
-                !string.Equals(grantType, EIMSNext.Entities.CustomGrantType.Public, StringComparison.Ordinal))
+                grantType != EIMSNext.Entities.CustomGrantType.Public)
             {
                 return BuiltInClientValidationResult.Failure(
                     OpenIddictConstants.Errors.InvalidRequest,
@@ -99,7 +99,7 @@ namespace EIMSNext.Identity.Host
                     "The client application is not allowed to use this endpoint.");
             }
 
-            if (!string.Equals(grantType, CustomGrantType.System, StringComparison.Ordinal))
+            if (grantType != CustomGrantType.System)
             {
                 return BuiltInClientValidationResult.Failure(
                     OpenIddictConstants.Errors.InvalidRequest,
@@ -157,7 +157,7 @@ namespace EIMSNext.Identity.Host
         {
             return !string.IsNullOrWhiteSpace(actualClientId)
                 && !string.IsNullOrWhiteSpace(expectedClientId)
-                && string.Equals(actualClientId, expectedClientId, StringComparison.Ordinal);
+                && actualClientId == expectedClientId;
         }
 
         private static string? NormalizeOrigin(string? origin)

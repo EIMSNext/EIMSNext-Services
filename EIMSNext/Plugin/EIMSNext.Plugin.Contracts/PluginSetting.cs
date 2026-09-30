@@ -53,6 +53,21 @@ namespace EIMSNext.Plugin.Contracts
         public string? FunArgs { get; set; }
     }
 
+    /// <summary>
+    /// 插件执行结果。
+    /// </summary>
+    /// <remarks>
+    /// 错误码约定：
+    /// <list type="bullet">
+    /// <item><description><c>0</c>：成功；</description></item>
+    /// <item><description><c>-1</c>：函数不存在（<c>FindFunction</c> 未命中，大小写不敏感）；</description></item>
+    /// <item><description><c>-2</c>：函数参数数量不为 1；</description></item>
+    /// <item><description><c>-3</c>：函数执行异常；</description></item>
+    /// <item><description><c>-4</c>：插件未启用 / 已禁用 / 授权已过期（业务层拦截，流程节点显式失败，不静默继续）；</description></item>
+    /// <item><description><c>-404</c>：插件运行时未找到（插件未安装或程序集缺失）；</description></item>
+    /// <item><description><c>-409</c>：插件正在重新加载 / 卸载中。</description></item>
+    /// </list>
+    /// </remarks>
     public class PluginExecResult
     {
         public int Code { get; set; }

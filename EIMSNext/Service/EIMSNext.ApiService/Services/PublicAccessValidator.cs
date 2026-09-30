@@ -63,7 +63,7 @@ namespace EIMSNext.ApiService
             var setting = GetCurrentSetting();
             return setting?.TargetType == PublicTargetType.Dashboard &&
                    IsSectionAvailable(setting.Dashboard) &&
-                   string.Equals(setting.TargetId, dashboardId, StringComparison.Ordinal);
+                   string.Equals(setting.TargetId, dashboardId, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>
@@ -95,7 +95,7 @@ namespace EIMSNext.ApiService
 
             if (setting.TargetType == PublicTargetType.Form)
             {
-                return string.Equals(setting.TargetId, formId, StringComparison.Ordinal) && IsAnyFormPublishAvailable();
+                return string.Equals(setting.TargetId, formId, StringComparison.OrdinalIgnoreCase) && IsAnyFormPublishAvailable();
             }
 
             return CanReadDashboardForm(formId);
@@ -109,7 +109,7 @@ namespace EIMSNext.ApiService
         {
             var setting = GetCurrentSetting();
             return setting?.TargetType == PublicTargetType.Form &&
-                   string.Equals(setting.TargetId, formId, StringComparison.Ordinal) &&
+                   string.Equals(setting.TargetId, formId, StringComparison.OrdinalIgnoreCase) &&
                    IsSectionAvailable(setting.Form.FormLink);
         }
 
@@ -127,7 +127,7 @@ namespace EIMSNext.ApiService
 
             if (setting.TargetType == PublicTargetType.Form)
             {
-                return string.Equals(setting.TargetId, formId, StringComparison.Ordinal) &&
+                return string.Equals(setting.TargetId, formId, StringComparison.OrdinalIgnoreCase) &&
                        IsSectionAvailable(setting.Form.DataLink);
             }
 
@@ -148,7 +148,7 @@ namespace EIMSNext.ApiService
 
             if (setting.TargetType == PublicTargetType.Form)
             {
-                if (string.Equals(setting.TargetId, formId, StringComparison.Ordinal))
+                if (string.Equals(setting.TargetId, formId, StringComparison.OrdinalIgnoreCase))
                 {
                     return IsSectionAvailable(setting.Form.QueryLink);
                 }
@@ -306,7 +306,7 @@ namespace EIMSNext.ApiService
 
             _ownerForm ??= Resolver.Resolve<IFormDefService>().Get(setting.TargetId);
             if (_ownerForm == null || _ownerForm.DeleteFlag ||
-                !string.Equals(_ownerForm.CorpId, setting.CorpId, StringComparison.Ordinal))
+                !string.Equals(_ownerForm.CorpId, setting.CorpId, StringComparison.OrdinalIgnoreCase))
             {
                 return;
             }

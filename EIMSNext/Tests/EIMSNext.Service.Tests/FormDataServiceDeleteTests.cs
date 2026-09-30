@@ -399,7 +399,6 @@ namespace EIMSNext.Service.Tests
 
         private sealed class FakeSerialNoSequenceService : StubEntityService<SerialNoSequence>, ISerialNoSequenceService
         {
-            public string NextCorpCode(PlatformType platform) => throw new NotSupportedException();
             public int NextFormSerialNo(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle) => throw new NotSupportedException();
         }
 

@@ -81,6 +81,7 @@ namespace EIMSNext.ApiService
         public override Task AddAsync(FormDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
+            ValidateName(entity.Name);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ValidateFieldIds(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
@@ -95,6 +96,7 @@ namespace EIMSNext.ApiService
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
             var existing = CoreService.Get(entity.Id);
             PublicFormSystemFieldHelper.EnsureExistingPublicFields(entity, existing?.Content);
+            ValidateName(entity.Name);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ValidateFieldIds(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
@@ -149,6 +151,16 @@ namespace EIMSNext.ApiService
             }
 
             return await base.DeleteAsyncCore(idList);
+        }
+
+        private const int MaxNameLength = 100;
+
+        private static void ValidateName(string name)
+        {
+            if (!string.IsNullOrEmpty(name) && name.Length > MaxNameLength)
+            {
+                throw new BadRequestException($"表单名称长度不能超过 {MaxNameLength} 个字符");
+            }
         }
 
         private static void ValidateFieldIds(IEnumerable<FieldDef>? fields)

@@ -58,6 +58,7 @@ create index if not exists "IX_EmployeeGroupMember_CorpId_EmployeeId" on "Employ
 create unique index if not exists "UX_EmployeeGroupMember_CorpId_EmployeeId_EmployeeGroupId" on "EmployeeGroupMember" ("CorpId", "EmployeeId", "EmployeeGroupId");
 
 create index if not exists "IX_TenantAdminGroup_CorpId_ParentId" on "TenantAdminGroup" ("CorpId", "ParentId");
+create index if not exists "IX_TenantAdminGroup_EmployeeIds_Gin" on "TenantAdminGroup" using gin ("EmployeeIds" jsonb_path_ops);
 
 create index if not exists "IX_CorporateSetting_CorpId_Name" on "CorporateSetting" ("CorpId", "Name");
 

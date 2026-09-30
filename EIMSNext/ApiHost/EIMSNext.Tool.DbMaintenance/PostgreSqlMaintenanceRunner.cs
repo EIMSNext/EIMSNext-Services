@@ -40,7 +40,7 @@ public sealed class PostgreSqlMaintenanceRunner(IOptions<PostgreSqlOptions> opti
         // 目标版本必须真实存在于脚本目录，避免因为拼错版本号而静默地什么都不执行。
         if (!string.IsNullOrWhiteSpace(targetVersion))
         {
-            if (!scripts.Any(x => string.Equals(x.Version, targetVersion, StringComparison.Ordinal)))
+            if (!scripts.Any(x => string.Equals(x.Version, targetVersion, StringComparison.OrdinalIgnoreCase)))
                 throw new InvalidOperationException($"Target version not found: {targetVersion}");
 
             var skipped = scripts

@@ -8,5 +8,6 @@ namespace EIMSNext.Service.Contracts
         Wf_Definition? Find(string wfExternalId, int? version = null);
         Task<Wf_Definition> CreateVersionAsync(string id);
         Task<Wf_Definition> ActivateAsync(string id);
+        Task<int> DeleteForceAsync(IEnumerable<string> ids);
     }
 }

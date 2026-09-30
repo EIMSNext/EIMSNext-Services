@@ -172,9 +172,8 @@ namespace EIMSNext.TestSupport
         /// </summary>
         /// <remarks>
         /// 内存桩没有真实的 <see cref="DbContext"/>，因此默认返回一个<b>未启用</b>的作用域：
-        /// 它只登记「无事务」的上下文标记，不碰数据库，提交/释放都直接短路
-        /// （<see cref="TransactionScope.CommitTransactionAsync"/>、<c>DisposeAsync</c> 在
-        /// <c>_ownTransaction</c> 为 null 时均为空操作）。
+        /// 它只登记「无事务」的上下文标记，不碰数据库。因为没有 <c>DbContext</c>，
+        /// 提交时的落库会被跳过（<c>_dbContext</c> 为 null），正是内存桩需要的空操作语义。
         /// 这样被测代码里 <c>using var scope = Repository.NewTransactionScope()</c> 这类写法可以直接跑通，
         /// 又不会让内存桩假装拥有真实事务语义。
         /// </remarks>

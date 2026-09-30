@@ -84,9 +84,20 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (!string.IsNullOrEmpty(request.DataId))
             {
-                formData = _formDataservice.Get(request.DataId);
+                // 删除事件由业务侧在软删除之后触发，此时全局过滤已隐藏该行；必须显式忽略软删过滤，
+                // 否则 Removed 事件流永远取不到数据、无法真正执行。
+                formData = request.EventType.HasFlag(EventType.Removed)
+                    ? _formDataservice.GetIncludingDeleted(request.DataId)
+                    : _formDataservice.Get(request.DataId);
+
                 if (formData == null)
                 {
+                    // 删除事件取不到数据时不能当成错误抛回业务侧，否则删除接口整体 500。
+                    if (request.EventType.HasFlag(EventType.Removed))
+                    {
+                        return ApiResult.Success(new { Id = string.Empty, Error = string.Empty }).ToActionResult();
+                    }
+
                     return NotFound("数据不存在");
                 }
 
@@ -141,7 +152,7 @@ namespace EIMSNext.Flow.Host.Controllers
         private bool BelongsToCurrentCorp(string? corpId)
         {
             return !string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) &&
-                   string.Equals(corpId, IdentityContext.CurrentCorpId, StringComparison.Ordinal);
+                   string.Equals(corpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase);
         }
 
         private Operator? ResolveStarter(EfRunRequest request)

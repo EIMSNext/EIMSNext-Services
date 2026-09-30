@@ -112,11 +112,10 @@ namespace EIMSNext.ApiService
             var permissionGroupAppIds = Resolver.GetService<FormDataPermissionGroup>()
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
-                    !x.DeleteFlag &&
-                    x.Members.Any(m =>
-                        (m.Type == MemberType.Employee && m.Id == empId) ||
-                        (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                    !x.DeleteFlag)
+                .Select(x => new { x.AppId, x.Members })
+                .ToList()
+                .Where(x => x.Members.Any(m => MatchesMemberScope(m, empId, employeeGroupIds, deptIds, ancestorDeptIds)))
                 .Select(x => x.AppId)
                 .Distinct()
                 .ToList();
@@ -144,11 +143,10 @@ namespace EIMSNext.ApiService
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
-                    x.Members.Any(m =>
-                        (m.Type == MemberType.Employee && m.Id == empId) ||
-                        (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                    (string.IsNullOrEmpty(appId) || x.AppId == appId))
+                .Select(x => new { x.FormId, x.Members })
+                .ToList()
+                .Where(x => x.Members.Any(m => MatchesMemberScope(m, empId, employeeGroupIds, deptIds, ancestorDeptIds)))
                 .Select(x => x.FormId)
                 .Distinct()
                 .ToList();
@@ -184,12 +182,12 @@ namespace EIMSNext.ApiService
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    (string.IsNullOrEmpty(appId) || x.AppId == appId) &&
-                    (manageableAppIds.Contains(x.AppId) ||
-                     (x.MemberPublishEnabled && x.PublishMembers.Any(m =>
-                         (m.Type == MemberType.Employee && m.Id == empId) ||
-                         (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
-                         (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))))
+                    (string.IsNullOrEmpty(appId) || x.AppId == appId))
+                .Select(x => new { x.Id, x.AppId, x.MemberPublishEnabled, x.PublishMembers })
+                .ToList()
+                .Where(x => manageableAppIds.Contains(x.AppId) ||
+                    (x.MemberPublishEnabled &&
+                     x.PublishMembers.Any(m => MatchesMemberScope(m, empId, employeeGroupIds, deptIds, ancestorDeptIds))))
                 .Select(x => x.Id)
                 .Distinct()
                 .ToList();
@@ -221,11 +219,9 @@ namespace EIMSNext.ApiService
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
                     !x.Disabled &&
-                    (string.IsNullOrEmpty(formId) || x.FormId == formId) &&
-                    x.Members.Any(m =>
-                        (m.Type == MemberType.Employee && m.Id == empId) ||
-                        (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                    (string.IsNullOrEmpty(formId) || x.FormId == formId))
+                .ToList()
+                .Where(x => x.Members.Any(m => MatchesMemberScope(m, empId, employeeGroupIds, deptIds, ancestorDeptIds)))
                 .ToList();
         }
 
@@ -525,7 +521,7 @@ namespace EIMSNext.ApiService
                     !x.DeleteFlag &&
                     x.Type == TenantAdminGroupType.Normal &&
                     x.CanCreateOrDeleteApp &&
-                    x.EmployeeIds.Contains(employeeId))
+                    PgJsonFunctions.JsonbArrayContains(x.EmployeeIds, employeeId))
                 .ToList();
 
             foreach (var group in groups)
@@ -618,7 +614,7 @@ namespace EIMSNext.ApiService
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
                     x.Type == TenantAdminGroupType.Normal &&
-                    x.EmployeeIds.Contains(employeeId))
+                    PgJsonFunctions.JsonbArrayContains(x.EmployeeIds, employeeId))
                 .ToList();
 
             return _normalGroups;
@@ -691,14 +687,27 @@ namespace EIMSNext.ApiService
                 .Query(x =>
                     x.CorpId == IdentityContext.CurrentCorpId &&
                     !x.DeleteFlag &&
-                    x.MemberPublishEnabled &&
-                    x.PublishMembers.Any(m =>
-                        (m.Type == MemberType.Employee && m.Id == empId) ||
-                        (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
-                        (m.Type == MemberType.Department && ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)))))
+                    x.MemberPublishEnabled)
+                .Select(x => new { x.AppId, x.PublishMembers })
+                .ToList()
+                .Where(x => x.PublishMembers.Any(m => MatchesMemberScope(m, empId, employeeGroupIds, deptIds, ancestorDeptIds)))
                 .Select(x => x.AppId)
                 .Distinct()
                 .ToList();
+        }
+
+        /// <summary>
+        /// 判断授权成员是否命中当前员工的人员范围。
+        /// Members / PublishMembers 是 jsonb 列，EF Core 无法翻译在其上的 Any + Contains，
+        /// 因此调用方需先在库内按可翻译条件缩小范围，再用本方法在内存中匹配。
+        /// </summary>
+        private static bool MatchesMemberScope(Member m, string empId, List<string> employeeGroupIds,
+            List<string> deptIds, List<string> ancestorDeptIds)
+        {
+            return (m.Type == MemberType.Employee && m.Id == empId) ||
+                   (m.Type == MemberType.EmployeeGroup && employeeGroupIds.Contains(m.Id)) ||
+                   (m.Type == MemberType.Department &&
+                    ((m.CascadedDept && ancestorDeptIds.Contains(m.Id)) || deptIds.Contains(m.Id)));
         }
 
         private void EnsureEmployeeDepartmentInScope(string employeeId, string scopeMode, IEnumerable<string> departmentIds, string message)

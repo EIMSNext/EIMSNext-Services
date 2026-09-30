@@ -42,6 +42,12 @@ namespace EIMSNext.Core.Query
         public int Take { get; set; } = 20;
 
         /// <summary>
+        /// 是否包含逻辑删除数据。为 true 时跳过模型层挂的全局 <c>!DeleteFlag</c> 查询过滤，
+        /// 使回收站查询能真正读到已软删除的行。
+        /// </summary>
+        public bool IncludeDeleted { get; set; }
+
+        /// <summary>
         /// 获取有效的返回记录数。
         /// </summary>
         /// <returns>有效的返回记录数。</returns>

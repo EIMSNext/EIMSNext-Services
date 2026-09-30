@@ -121,7 +121,7 @@ namespace EIMSNext.Identity.Services
                         throw new InvalidOperationException("当前账号未绑定手机");
                     }
 
-                    if (!string.Equals(user.Phone, target, StringComparison.Ordinal))
+                    if (!string.Equals(user.Phone, target, StringComparison.OrdinalIgnoreCase))
                     {
                         throw new InvalidOperationException("手机号与当前账号绑定手机号不一致");
                     }
@@ -213,7 +213,7 @@ namespace EIMSNext.Identity.Services
                 throw new InvalidOperationException("新密码不能为空");
             }
 
-            if (!string.Equals(request.NewPassword, request.ConfirmPassword, StringComparison.Ordinal))
+            if (request.NewPassword != request.ConfirmPassword)
             {
                 throw new InvalidOperationException("两次输入的新密码不一致");
             }
@@ -307,7 +307,7 @@ namespace EIMSNext.Identity.Services
                 throw new InvalidOperationException("身份验证已失效，请重新验证");
             }
 
-            if (!string.Equals(ticket.UserId, userId, StringComparison.Ordinal))
+            if (!string.Equals(ticket.UserId, userId, StringComparison.OrdinalIgnoreCase))
             {
                 throw new InvalidOperationException("身份验证令牌无效");
             }

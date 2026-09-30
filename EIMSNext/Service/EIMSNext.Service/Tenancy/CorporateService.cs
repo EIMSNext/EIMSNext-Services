@@ -63,8 +63,6 @@ namespace EIMSNext.Service
             var user = Context.User as User;
 
             entity.Platform = Context.User?.Platform ?? PlatformType.Public;
-            if (string.IsNullOrEmpty(entity.Code))
-                entity.Code = (Resolver.GetService<SerialNoSequence>() as ISerialNoSequenceService)!.NextCorpCode(entity.Platform);
 
             Repository.EnsureId(entity);
 

@@ -1,4 +1,5 @@
-﻿using System.Dynamic;
+﻿using System;
+using System.Dynamic;
 using System.Text.Json;
 using System.Collections;
 
@@ -43,8 +44,9 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 if (!IsPluginEnabled(dataContext.CorpId, setting.PluginId))
                 {
-                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
-                    return ExecutionResult.Next();
+                    // 插件未安装/已禁用/授权过期属于配置错误：必须让流程显式失败（而非静默继续），
+                    // 使运维可从节点执行日志中的 Code=-4 立即定位，避免下游节点继续跑出错误数据。
+                    throw new InvalidOperationException("插件执行被拒绝(Code=-4)：插件未启用、已禁用或授权已过期。");
                 }
 
                 var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
