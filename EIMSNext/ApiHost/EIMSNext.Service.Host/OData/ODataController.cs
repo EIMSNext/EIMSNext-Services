@@ -101,7 +101,7 @@ namespace EIMSNext.Service.Host.OData
         [HttpGet]
         [Permission(Operation = Operation.Read)]
         // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
-        [EnableQuery(PageSize = EIMSNext.Common.Constants.DefaultPageSize, MaxExpansionDepth = 1, MaxNodeCount = 200)]
+        [DefaultPageSizeEnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
         public virtual IActionResult Get(ODataQueryOptions<V> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
