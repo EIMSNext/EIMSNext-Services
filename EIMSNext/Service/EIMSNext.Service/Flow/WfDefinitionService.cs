@@ -37,7 +37,7 @@ namespace EIMSNext.Service
 
         public async Task<Wf_Definition> CreateVersionAsync(string id)
         {
-            var source = Get(id) ?? throw new InvalidOperationException("源流程版本不存在");
+            var source = (await GetCoreAsync(id).ConfigureAwait(false)) ?? throw new InvalidOperationException("源流程版本不存在");
             var entity = new Wf_Definition
             {
                 AppId = source.AppId,
@@ -59,7 +59,7 @@ namespace EIMSNext.Service
         {
             return await ExecuteWithTransactionRetryAsync(async () =>
             {
-                var entity = GetCore(id) ?? throw new InvalidOperationException("流程版本不存在");
+                var entity = (await GetCoreAsync(id).ConfigureAwait(false)) ?? throw new InvalidOperationException("流程版本不存在");
                 // 同一 ExternalId 下只会有一个 IsCurrent 版本，切换前先把旧版本落下去。
                 await Repository.UpdateManyAsync(
                     x => x.ExternalId == entity.ExternalId && x.IsCurrent && x.Id != entity.Id,
@@ -72,7 +72,7 @@ namespace EIMSNext.Service
             }).ConfigureAwait(false);
         }
 
-        protected override Task BeforeAdd(IEnumerable<Wf_Definition> entities)
+        protected override async Task BeforeAdd(IEnumerable<Wf_Definition> entities)
         {
             var entity = entities.First();
 
@@ -88,20 +88,22 @@ namespace EIMSNext.Service
 
             EnsureSourceId(entity);
 
-            var maxVersion = Query(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag).Select(x => x.Version).OrderByDescending(x => x).FirstOrDefault();
+            var maxVersion = await Repository.Queryable
+                .Where(x => x.ExternalId == entity.ExternalId && !x.DeleteFlag)
+                .Select(x => (int?)x.Version)
+                .MaxAsync()
+                .ConfigureAwait(false) ?? 0;
 
             entity.Version = maxVersion + 1;
             entity.Metadata.Id = entity.ExternalId;
             entity.Metadata.Version = entity.Version;
             entity.IsCurrent = false;
             entity.Released = false;
-
-            return Task.CompletedTask;
         }
 
-        protected override Task BeforeReplace(Wf_Definition entity)
+        protected override async Task BeforeReplace(Wf_Definition entity)
         {
-            var exist = Get(entity.Id) ?? throw new InvalidOperationException("流程版本不存在");
+            var exist = (await GetCoreAsync(entity.Id).ConfigureAwait(false)) ?? throw new InvalidOperationException("流程版本不存在");
 
             entity.Version = exist.Version;
             if (exist.Released) //release 不允许往回改
@@ -115,8 +117,6 @@ namespace EIMSNext.Service
             }
 
             EnsureSourceId(entity);
-
-            return Task.CompletedTask;
         }
 
         protected override async Task AfterAdd(IEnumerable<Wf_Definition> entities)
@@ -139,14 +139,12 @@ namespace EIMSNext.Service
             await base.AfterReplace(entity);
         }
 
-        protected override Task BeforeDelete(Expression<Func<Wf_Definition, bool>> filter)
+        protected override async Task BeforeDelete(Expression<Func<Wf_Definition, bool>> filter)
         {
-            if (FindCore(filter).Any(x => x.Released))
+            if (await Repository.Queryable.Where(filter).AnyAsync(x => x.Released).ConfigureAwait(false))
             {
                 throw new InvalidOperationException("已启用或历史版本不允许删除");
             }
-
-            return Task.CompletedTask;
         }
 
         /// <summary>

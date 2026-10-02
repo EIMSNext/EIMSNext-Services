@@ -1,4 +1,4 @@
-using System.Dynamic;
+﻿using System.Dynamic;
 using System.Text.Json;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
@@ -12,6 +12,8 @@ using WorkflowCore.Interface;
 using WorkflowCore.Models;
 using EIMSNext.Core.Extensions;
 using EIMSNext.Component;
+using EIMSNext.Core.Repositories;
+using EIMSNext.Core;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -46,6 +48,9 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 var findOpt = Metadata!.EfNodeSetting!.UpdateSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
                 BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+                findOpt.Take = Math.Min(
+                    findOpt.GetEffectiveTake() <= 0 ? WfMetadataParser.DefaultEventFlowNodeTake : findOpt.Take,
+                    WfMetadataParser.DefaultEventFlowNodeTake);
 
                 toUpdates = new List<ActionFormData>();
                 FormDataRepository.Find(findOpt).ToList().ForEach(x => toUpdates.Add(new ActionFormData { State = DataState.Unchanged, FormData = x }));

@@ -48,7 +48,7 @@ namespace EIMSNext.Flow.Host.Controllers
         /// 通过HTTP触发智能助手。
         /// </summary>
         [HttpPost]
-        [Route("api/v{version:apiVersion}/tenant/{corpId}/eventflow/{eventFlowId}")]
+        [Route("api/v{version:apiVersion}/tenant/{corpId}/hook/{eventFlowId}")]
         public async Task<IActionResult> TriggerEventFlowAsync([FromRoute] string corpId, [FromRoute] string eventFlowId)
         {
             var accessor = _resolver.Resolve<IHttpContextAccessor>();

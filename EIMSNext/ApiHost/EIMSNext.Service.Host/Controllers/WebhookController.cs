@@ -26,7 +26,7 @@ namespace EIMSNext.Service.Host.Controllers
     public class WebhookController(IResolver resolver) : ApiControllerBase<WebhookApiService, Webhook, WebhookViewModel>(resolver)
     {
         [HttpPost("Test")]
-        public async Task<IActionResult> TestAsync([FromBody]WebhookRequest request)
+        public async Task<IActionResult> TestAsync([FromBody]WebhookRequest request, CancellationToken cancellationToken)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(request.AppId);
             if (!string.IsNullOrWhiteSpace(request.FormId))
@@ -48,11 +48,22 @@ namespace EIMSNext.Service.Host.Controllers
                 return ApiResult.Fail(400, "服务器地址必须是有效的 HTTP 或 HTTPS 地址").ToActionResult();
             }
 
+            var destination = await WebhookUrlSafety.ResolveAsync(
+                request.Url,
+                HttpContext.RequestServices.GetRequiredService<Microsoft.Extensions.Configuration.IConfiguration>(),
+                cancellationToken);
+            if (destination is null)
+            {
+                return ApiResult.Fail(400, "服务器地址不能指向本机、内网或云元数据地址").ToActionResult();
+            }
+
             try
             {
                 using var client = new RestClient(new RestClientOptions(webhookUri)
                 {
                     Timeout = TimeSpan.FromSeconds(10),
+                    FollowRedirects = false,
+                    ConfigureMessageHandler = _ => WebhookUrlSafety.CreatePinnedHandler(destination),
                 });
 
                 var challenge = Nanoid.Generate(size: 8);

@@ -1,3 +1,5 @@
+using System.Threading;
+
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Plugin.Contracts
@@ -62,8 +64,9 @@ namespace EIMSNext.Plugin.Contracts
     /// <item><description><c>0</c>：成功；</description></item>
     /// <item><description><c>-1</c>：函数不存在（<c>FindFunction</c> 未命中，大小写不敏感）；</description></item>
     /// <item><description><c>-2</c>：函数参数数量不为 1；</description></item>
-    /// <item><description><c>-3</c>：函数执行异常；</description></item>
+    /// <item><description><c>-3</c>：函数执行异常（含参数绑定失败）；</description></item>
     /// <item><description><c>-4</c>：插件未启用 / 已禁用 / 授权已过期（业务层拦截，流程节点显式失败，不静默继续）；</description></item>
+    /// <item><description><c>-408</c>：函数执行超时（<c>Plugin:ExecutionTimeoutSeconds</c>，默认 30s）；</description></item>
     /// <item><description><c>-404</c>：插件运行时未找到（插件未安装或程序集缺失）；</description></item>
     /// <item><description><c>-409</c>：插件正在重新加载 / 卸载中。</description></item>
     /// </list>
@@ -81,6 +84,11 @@ namespace EIMSNext.Plugin.Contracts
         public string? CorpId { get; set; }
         public string? UserId { get; set; }
         public IDictionary<string, object?> Items { get; set; } = new Dictionary<string, object?>();
+
+        /// <summary>
+        /// 本次执行的取消信号。同步插件无法被强制中止，长循环里主动检查它才能真正退出。
+        /// </summary>
+        public CancellationToken CancellationToken { get; set; }
     }
 
     public class PluginRuntimeInfo

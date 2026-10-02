@@ -25,11 +25,11 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            // 而 WorkflowCore 的 Run 契约是同步的，因此在此处统一同步等待。
-            return RunAsync(context).GetAwaiter().GetResult();
+            // EventFlow 节点按 IStepBody.Run 同步派发，这里阻塞等待插件异步执行结果。
+            return ExecuteAsync(context).GetAwaiter().GetResult();
         }
 
-        private async Task<ExecutionResult> RunAsync(IStepExecutionContext context)
+        private async Task<ExecutionResult> ExecuteAsync(IStepExecutionContext context)
         {
             var dataContext = GetDataContext(context);
             var startTime = DateTime.UtcNow.ToTimeStampMs();
@@ -73,7 +73,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
                 if (result.Code != 0)
                 {
-                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    var errorMessage = result.Message ?? "插件执行失败";
+                    if (result.Code == -408)
+                    {
+                        // 超时后插件线程可能仍在运行，不能继续执行后续节点，否则会并发产生副作用。
+                        throw new TimeoutException(errorMessage);
+                    }
+
+                    throw new InvalidOperationException($"插件执行失败(Code={result.Code})：{errorMessage}");
                 }
                 else
                 {

@@ -42,7 +42,7 @@ namespace EIMSNext.Core.Query
         /// <remarks>
         /// 过滤由 <see cref="ToPredicate{T}"/> 翻译，排序由 <see cref="ToSortDefinition{T}"/> 翻译，
         /// 分页沿用 <see cref="DynamicFindOptions{T}.GetEffectiveSkip"/> /
-        /// <see cref="DynamicFindOptions{T}.GetEffectiveTake"/> 的归一化规则（Take &lt;= 0 视为默认 200）。
+        /// <see cref="DynamicFindOptions{T}.GetEffectiveTake"/> 的归一化规则（Take &lt;= 0 视为不限量）。
         /// </remarks>
         public static QueryFindOptions<T> ToQueryFindOptions<T>(this DynamicFindOptions<T>? options)
         {

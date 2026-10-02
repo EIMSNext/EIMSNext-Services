@@ -176,6 +176,17 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void AggregateRows_QuotesDynamicAliases()
+        {
+            var request = Request([], [new Metric { Id = "field\" , (select 1) as \"leak", AggFun = "count" }]);
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "as \"field\"\"_,_(select_1)_as_\"\"leak_count\"");
+            Assert.IsFalse(statement.Sql.Contains("as \"field\" , (select 1)", StringComparison.Ordinal));
+        }
+
+        [TestMethod]
         public void AggregateRows_RejectUnknownOperator()
         {
             var request = Request([], []);

@@ -10,6 +10,15 @@ namespace EIMSNext.Component
 {
     public class WfMetadataParser
     {
+        /// <summary>
+        /// 删除/更新节点一次最多处理的记录数。
+        /// </summary>
+        /// <remarks>
+        /// 这两个节点会把命中的整批数据加载进内存再逐条执行，不设上限时一条配置就能让
+        /// 单次流程运行拖垮服务；200 与请求侧公开查询的上限同一量级。
+        /// </remarks>
+        public const int DefaultEventFlowNodeTake = 200;
+
         #region 解析 Steps
         public (WfMetadata Metadata, EventSetting EventSetting) Parse(Wf_Definition def)
         {
@@ -326,7 +335,8 @@ namespace EIMSNext.Component
                                     new DynamicFilter{ Field="corpId", Op= FilterOp.Eq, Value=corpId },
                                     new DynamicFilter { Field="formId", Op= FilterOp.Eq, Value=flowNode.Metadata.DeleteMeta.FormId},
                                     flowNode.Metadata.DeleteMeta.Condition!.ToDynamicFilter() }
-                            }
+                            },
+                            Take = DefaultEventFlowNodeTake,
                         }.SerializeToJson() : null
                     };
                     otherFormIds.TryAdd(efNodeSetting.DeleteSetting.FormId);
@@ -349,7 +359,8 @@ namespace EIMSNext.Component
                                     new DynamicFilter{ Field="corpId", Op= FilterOp.Eq, Value=corpId },
                                     new DynamicFilter { Field="formId", Op= FilterOp.Eq, Value=flowNode.Metadata.UpdateMeta.FormId},
                                     flowNode.Metadata.UpdateMeta.Condition!.ToDynamicFilter() }
-                            }
+                            },
+                            Take = DefaultEventFlowNodeTake,
                         }.SerializeToJson() : null,
                         InsertIfNoData = flowNode.Metadata.UpdateMeta.InsertIfNoData,
                     };

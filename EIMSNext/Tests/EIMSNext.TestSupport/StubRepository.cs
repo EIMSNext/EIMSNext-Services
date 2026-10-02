@@ -30,51 +30,21 @@ namespace EIMSNext.TestSupport
 
         public virtual IQueryable<T> Find(QueryFindOptions<T> options) => throw new NotSupportedException();
 
-        public virtual IQueryable<T> Find(DynamicFindOptions<T> options) => throw new NotSupportedException();
-
         public virtual IQueryable<T> Find(Expression<Func<T, bool>> filter) => throw new NotSupportedException();
-
-        public virtual IQueryable<T> Find(DynamicFilter filter) => throw new NotSupportedException();
 
         public virtual Task<List<T>> FindAsync(QueryFindOptions<T> options, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        public virtual Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
         public virtual Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
-
-        public virtual Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public virtual List<T> FindList(DynamicFilter filter) => throw new NotSupportedException();
-
-        public virtual Task<List<object?>> DistinctFieldValuesAsync(
-            DynamicFilter? filter,
-            string fieldPath,
-            int limit = 0,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public virtual long Count(Expression<Func<T, bool>> predicate) => throw new NotSupportedException();
 
         public virtual Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        public virtual long Count(DynamicFilter filter) => throw new NotSupportedException();
-
-        public virtual Task<long> CountAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
         public virtual Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
-
-        public virtual Task<bool> AnyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public virtual IQueryable<TResult> Select<TResult>(Expression<Func<T, TResult>> selector) => throw new NotSupportedException();
-
-        public virtual IQueryable<T> Page<TKey>(Expression<Func<T, TKey>> orderBy, int skip, int take) => throw new NotSupportedException();
 
         #endregion
 
@@ -106,21 +76,8 @@ namespace EIMSNext.TestSupport
             Expression<Func<T, bool>> predicate,
             Action<UpdateSettersBuilder<T>> setters) => throw new NotSupportedException();
 
-        public virtual int UpdateMany(
-            DynamicFilter filter,
-            Action<UpdateSettersBuilder<T>> setters) => throw new NotSupportedException();
-
-        public virtual int Update(
-            string id,
-            Action<UpdateSettersBuilder<T>> setters) => throw new NotSupportedException();
-
         public virtual Task<int> UpdateManyAsync(
             Expression<Func<T, bool>> predicate,
-            Action<UpdateSettersBuilder<T>> setters,
-            CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
-        public virtual Task<int> UpdateManyAsync(
-            DynamicFilter filter,
             Action<UpdateSettersBuilder<T>> setters,
             CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
@@ -130,29 +87,19 @@ namespace EIMSNext.TestSupport
 
         public virtual int Delete(IEnumerable<string> ids) => throw new NotSupportedException();
 
-        public virtual int Delete(DynamicFilter filter) => throw new NotSupportedException();
-
         public virtual Task DeleteAsync(T entity, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public virtual Task<int> DeleteAsync(string id, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         public virtual Task<int> DeleteAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
-        public virtual Task<int> DeleteAsync(DynamicFilter filter, CancellationToken cancellationToken = default) => throw new NotSupportedException();
-
         public virtual Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public virtual Task<int> DeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public virtual Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         public virtual Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
-            => throw new NotSupportedException();
-
-        public virtual Task<int> SoftDeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         #endregion
@@ -178,8 +125,6 @@ namespace EIMSNext.TestSupport
         /// 又不会让内存桩假装拥有真实事务语义。
         /// </remarks>
         public virtual TransactionScope NewTransactionScope() => new(null!, enabled: false);
-
-        public virtual Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) => throw new NotSupportedException();
 
         #endregion
     }

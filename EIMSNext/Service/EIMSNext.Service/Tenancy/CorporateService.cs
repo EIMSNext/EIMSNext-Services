@@ -41,15 +41,7 @@ namespace EIMSNext.Service
 
         private void AddWithGate(IEnumerable<Corporate> entities)
         {
-            CreateGate.Wait();
-            try
-            {
-                base.Add(entities);
-            }
-            finally
-            {
-                CreateGate.Release();
-            }
+            AddWithGateAsync(entities).GetAwaiter().GetResult();
         }
 
         protected override async Task AddCoreAsync(IEnumerable<Corporate> entities)

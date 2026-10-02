@@ -43,6 +43,8 @@ create index if not exists "IX_Department_CorpId_DeleteFlag" on "Department" ("C
 
 create index if not exists "IX_Department_HeriarchyId" on "Department" ("HeriarchyId" citext_pattern_ops);
 
+create index if not exists "IX_EmployeeDepartment_HeriarchyId" on "EmployeeDepartment" ("HeriarchyId" citext_pattern_ops);
+
 create index if not exists "IX_EmployeeDepartment_CorpId_DepartmentId_EmployeeId" on "EmployeeDepartment" ("CorpId", "DepartmentId", "EmployeeId");
 
 create index if not exists "IX_EmployeeDepartment_CorpId_EmployeeId_SortValue" on "EmployeeDepartment" ("CorpId", "EmployeeId", "SortValue");

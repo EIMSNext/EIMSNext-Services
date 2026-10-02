@@ -17,7 +17,26 @@ namespace EIMSNext.Service
     {
         private IRepository<Employee> EmployeeRepository => Resolver.GetRepository<Employee>();
 
-        protected override Task BeforeAdd(IEnumerable<Department> entities)
+        private static readonly System.Reflection.MethodInfo StartsWithMethod =
+            typeof(string).GetMethod(nameof(string.StartsWith), [typeof(string)])!;
+
+        public override int Replace(Department entity)
+        {
+            using var scope = NewTransactionScope();
+            var result = base.Replace(entity);
+            scope.CommitTransaction();
+            return result;
+        }
+
+        public override async Task<int> ReplaceAsync(Department entity)
+        {
+            await using var scope = NewTransactionScope();
+            var result = await base.ReplaceAsync(entity).ConfigureAwait(false);
+            await scope.CommitTransactionAsync().ConfigureAwait(false);
+            return result;
+        }
+
+        protected override async Task BeforeAdd(IEnumerable<Department> entities)
         {
             foreach (var entity in entities)
             {
@@ -25,7 +44,7 @@ namespace EIMSNext.Service
 
                 if (!string.IsNullOrEmpty(entity.ParentId))
                 {
-                    var parent = Repository.Get(entity.ParentId);
+                    var parent = await Repository.GetAsync(entity.ParentId);
                     if (parent == null)
                     {
                         entity.ParentId = "";
@@ -49,59 +68,93 @@ namespace EIMSNext.Service
                 }
             }
 
-            return base.BeforeAdd(entities);
+            await base.BeforeAdd(entities);
         }
 
-        protected override Task BeforeReplace(Department entity)
+        protected override async Task BeforeReplace(Department entity)
         {
-            NormalizeHierarchy(entity);
-            return base.BeforeReplace(entity);
+            await NormalizeHierarchy(entity);
+            await base.BeforeReplace(entity);
         }
 
         protected override async Task AfterReplace(Department entity)
         {
             await base.AfterReplace(entity);
             // 本部门层级路径可能因换父级而变化，同步关系表上的层级快照。
-            SyncEmployeeDepartmentHeriarchy(entity.CorpId, entity.Id, entity.HeriarchyId);
+            await SyncEmployeeDepartmentHeriarchyAsync(entity.CorpId, entity.Id, entity.HeriarchyId);
             await RefreshDescendantHierarchy(entity);
         }
 
-        protected override Task BeforeDelete(Expression<Func<Department, bool>> filter)
+        protected override async Task BeforeDelete(Expression<Func<Department, bool>> filter)
         {
-            var deletingDepartments = Repository.Find(new QueryFindOptions<Department> { Filter = filter, Take = int.MaxValue })
-                .ToList();
+            var deletingDepartments = await Repository
+                .FindAsync(new QueryFindOptions<Department> { Filter = filter, Take = int.MaxValue })
+                .ConfigureAwait(false);
             if (deletingDepartments.Count == 0)
             {
-                return base.BeforeDelete(filter);
+                await base.BeforeDelete(filter).ConfigureAwait(false);
+                return;
             }
 
-            var roots = deletingDepartments.Select(x => x.Id).ToList();
-            var corpIds = deletingDepartments.Select(x => x.CorpId).Distinct().ToList();
-            var protectedDepartmentIds = Repository.Queryable
-                .Where(x => corpIds.Contains(x.CorpId))
-                .ToList()
-                .Where(x => roots.Contains(x.Id)
-                    || (x.HeriarchyId != null && roots.Any(root => x.HeriarchyId.Contains($"|{root}|", StringComparison.Ordinal))))
+            // 层级路径形如 |a|b|，被删节点及其整棵子树都以它的路径为前缀。
+            // 先由部门层级路径定位子树，再按 DepartmentId 检查关系表，避免依赖可能过期的关系快照。
+            if (deletingDepartments.Any(x => string.IsNullOrEmpty(x.HeriarchyId)))
+            {
+                throw new BadRequestException("部门层级数据异常，无法安全删除");
+            }
+
+            var prefixes = deletingDepartments
+                .Select(x => x.HeriarchyId)
+                .Where(x => !string.IsNullOrEmpty(x))
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+
+            var subTreeDepartmentIds = await Repository
+                .FindAsync(BuildSubTreeFilter(prefixes))
+                .ConfigureAwait(false);
+            var departmentIds = subTreeDepartmentIds
                 .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
-            var employeeIds = relationRepo.Queryable
-                .Where(x => protectedDepartmentIds.Contains(x.DepartmentId))
-                .Select(x => x.EmployeeId)
-                .Distinct()
-                .ToList();
-            var employeeRepo = Resolver.GetRepository<Employee>();
-            var hasEmployees = employeeRepo.Queryable.Any(x => employeeIds.Contains(x.Id) && !x.DeleteFlag);
+            var subTreeEmployeeIds = relationRepo.Queryable
+                .Where(ed => departmentIds.Contains(ed.DepartmentId))
+                .Where(ed => !ed.DeleteFlag)
+                .Select(ed => ed.EmployeeId);
+
+            var hasEmployees = await EmployeeRepository
+                .AnyAsync(e => !e.DeleteFlag && subTreeEmployeeIds.Contains(e.Id))
+                .ConfigureAwait(false);
             if (hasEmployees)
             {
                 throw new BadRequestException("当前部门或下级部门存在员工，不能删除");
             }
 
-            return base.BeforeDelete(filter);
+            await base.BeforeDelete(filter).ConfigureAwait(false);
         }
 
-        private void NormalizeHierarchy(Department entity)
+        /// <summary>
+        /// 拼「层级路径以给定前缀之一开头」的谓词：子树判定下推到 SQL（LIKE 'prefix%'），
+        /// 扫描量与关系总数无关。
+        /// </summary>
+        private static Expression<Func<Department, bool>> BuildSubTreeFilter(IReadOnlyList<string> hierarchies)
+        {
+            var parameter = Expression.Parameter(typeof(Department), "x");
+            var property = Expression.Property(parameter, nameof(Department.HeriarchyId));
+
+            Expression? body = null;
+            foreach (var hierarchy in hierarchies)
+            {
+                var startsWith = Expression.Call(property, StartsWithMethod, Expression.Constant(hierarchy, typeof(string)));
+                body = body == null ? startsWith : Expression.OrElse(body, startsWith);
+            }
+
+            return Expression.Lambda<Func<Department, bool>>(body ?? Expression.Constant(false), parameter);
+        }
+
+        private async Task NormalizeHierarchy(Department entity)
         {
             if (string.IsNullOrWhiteSpace(entity.ParentId))
             {
@@ -117,7 +170,7 @@ namespace EIMSNext.Service
                 throw new BadRequestException("部门不能设置自身为上级部门");
             }
 
-            var parent = Repository.Get(entity.ParentId);
+            var parent = await Repository.GetAsync(entity.ParentId);
             if (parent == null || parent.DeleteFlag)
             {
                 entity.ParentId = string.Empty;
@@ -142,20 +195,23 @@ namespace EIMSNext.Service
             entity.HeriarchyName = $"{entity.Name}/{parent.HeriarchyName}";
         }
 
-        private async Task RefreshDescendantHierarchy(Department parent)
+        private async Task RefreshDescendantHierarchy(Department parent, CancellationToken cancellationToken = default)
         {
-            var children = Repository.Queryable
-                .Where(x => x.CorpId == parent.CorpId && !x.DeleteFlag && x.ParentId == parent.Id)
-                .ToList();
+            var children = await Repository
+                .FindAsync(
+                    x => x.CorpId == parent.CorpId && !x.DeleteFlag && x.ParentId == parent.Id,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             foreach (var child in children)
             {
                 child.ParentName = parent.Name;
                 child.HeriarchyId = $"{parent.HeriarchyId}{child.Id}|";
                 child.HeriarchyName = $"{child.Name}/{parent.HeriarchyName}";
-                Repository.Replace(child);
-                SyncEmployeeDepartmentHeriarchy(child.CorpId, child.Id, child.HeriarchyId);
-                await RefreshDescendantHierarchy(child);
+                await Repository.ReplaceAsync(child, cancellationToken).ConfigureAwait(false);
+                await SyncEmployeeDepartmentHeriarchyAsync(child.CorpId, child.Id, child.HeriarchyId, cancellationToken)
+                    .ConfigureAwait(false);
+                await RefreshDescendantHierarchy(child, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -163,17 +219,28 @@ namespace EIMSNext.Service
         /// 部门层级路径变化时，同步刷新指向该部门的关系表行上的层级快照，
         /// 保证「按部门级联查员工」直接用 <c>EmployeeDepartment.HeriarchyId</c> 的 Contains 即可命中。
         /// </summary>
-        private void SyncEmployeeDepartmentHeriarchy(string corpId, string departmentId, string heriarchyId)
+        /// <remarks>
+        /// 逐个 Replace 而不合并成一条 UPDATE：层级快照要走仓储的写路径（审计/变更钩子都挂在
+        /// SaveChanges 上），ExecuteUpdate 会绕开它们。这里只把同步往返改成异步 ——
+        /// 同步阻塞会占住请求线程，部门树越深越容易在突发流量下演变成线程池饥饿。
+        /// </remarks>
+        private async Task SyncEmployeeDepartmentHeriarchyAsync(
+            string corpId,
+            string departmentId,
+            string heriarchyId,
+            CancellationToken cancellationToken = default)
         {
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
-            var relations = relationRepo.Queryable
-                .Where(x => x.CorpId == corpId && x.DepartmentId == departmentId)
-                .ToList();
+            var relations = await relationRepo
+                .FindAsync(
+                    x => x.CorpId == corpId && x.DepartmentId == departmentId,
+                    cancellationToken)
+                .ConfigureAwait(false);
 
             foreach (var relation in relations)
             {
                 relation.HeriarchyId = heriarchyId;
-                relationRepo.Replace(relation);
+                await relationRepo.ReplaceAsync(relation, cancellationToken).ConfigureAwait(false);
             }
         }
 

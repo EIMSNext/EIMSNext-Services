@@ -14,6 +14,7 @@ using HKH.Mef2.Integration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.EntityFrameworkCore.Query;
+using EIMSNext.Core;
 
 namespace EIMSNext.Service
 {
@@ -265,19 +266,19 @@ namespace EIMSNext.Service
             var updated = Context.ScopeCache.GetAll<FormDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
-                updated = FindCore(filter).ToList();
+                updated = await FindCoreAsync(filter).ConfigureAwait(false);
             }
             if (updated.Any())
             {
                 var appRepo = Resolver.GetRepository<AppDef>();
-                var app = appRepo.Get(updated.First().AppId)!;
+                var app = (await appRepo.GetAsync(updated.First().AppId).ConfigureAwait(false))!;
 
                 updated.ForEach(e =>
                 {
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
-                appRepo.Replace(app);
+                await appRepo.ReplaceAsync(app).ConfigureAwait(false);
             }
         }
 

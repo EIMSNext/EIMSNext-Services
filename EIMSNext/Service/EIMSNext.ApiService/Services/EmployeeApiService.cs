@@ -409,6 +409,10 @@ namespace EIMSNext.ApiService
                 throw new BadRequestException("员工部门不存在或不属于当前企业");
             }
 
+            // HeriarchyId 是部门层级路径快照，级联查询与部门删除校验都直接读它，创建关系时必须写入。
+            var departmentHierarchies = validDepartments.ToDictionary(
+                x => x.Id, x => x.HeriarchyId, StringComparer.OrdinalIgnoreCase);
+
             var relationRepo = Resolver.GetRepository<EmployeeDepartment>();
             return items.Select(x =>
             {
@@ -417,6 +421,7 @@ namespace EIMSNext.ApiService
                     CorpId = entity.CorpId,
                     EmployeeId = entity.Id,
                     DepartmentId = x.DepartmentId,
+                    HeriarchyId = departmentHierarchies[x.DepartmentId],
                     IsManager = x.IsManager,
                     SortValue = x.SortValue
                 };

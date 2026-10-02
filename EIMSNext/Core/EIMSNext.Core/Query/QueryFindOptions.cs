@@ -37,9 +37,13 @@ namespace EIMSNext.Core.Query
         public int Skip { get; set; }
 
         /// <summary>
-        /// 获取或设置返回的记录数。
+        /// 获取或设置返回的记录数。0（或负数）表示不限量，由调用方自行控制结果规模。
         /// </summary>
-        public int Take { get; set; } = 20;
+        /// <remarks>
+        /// 请求入口不得直接使用这个默认值 —— 客户端不传分页参数时会退化成整表拉取。
+        /// 来自请求的实例必须先过 <see cref="RequestPagingPolicy.Normalize"/>。
+        /// </remarks>
+        public int Take { get; set; }
 
         /// <summary>
         /// 是否包含逻辑删除数据。为 true 时跳过模型层挂的全局 <c>!DeleteFlag</c> 查询过滤，
@@ -50,10 +54,10 @@ namespace EIMSNext.Core.Query
         /// <summary>
         /// 获取有效的返回记录数。
         /// </summary>
-        /// <returns>有效的返回记录数。</returns>
+        /// <returns>负数归一化为 0；0 表示不限量，不会生成 LIMIT。</returns>
         public int GetEffectiveTake()
         {
-            return Take <= 0 ? DynamicFindOptions<T>.DefaultTakeWhenUnspecified : Take;
+            return Math.Max(0, Take);
         }
 
         /// <summary>

@@ -2,6 +2,7 @@
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 using HKH.Mef2.Integration;
 
 namespace EIMSNext.Core.Services

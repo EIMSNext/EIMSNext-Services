@@ -8,6 +8,7 @@ using EIMSNext.Common;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Entities;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
 
 namespace EIMSNext.Notification
 {
@@ -16,13 +17,19 @@ namespace EIMSNext.Notification
     /// </summary>
     /// <param name="Logger"></param>
     /// <param name="WebPushLogRepo"></param>
-    public class EventHub(ILogger<EventHub> Logger, IRepository<WebPushLog> WebPushLogRepo) : IEventHub
+    public class EventHub(ILogger<EventHub> Logger, IRepository<WebPushLog> WebPushLogRepo, IConfiguration Configuration) : IEventHub
     {
         private static string domain = "eimsnext.com";
 
         public async Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
+            var destination = await WebhookUrlSafety.ResolveAsync(webhook.Url, Configuration).ConfigureAwait(false);
+            if (destination is null)
+            {
+                throw new InvalidOperationException("Webhook 地址不能指向本机、内网或云元数据地址。");
+            }
+
             var cloudEvent = new CloudNative.CloudEvents.CloudEvent
             {
                 Id = eventId,
@@ -35,7 +42,10 @@ namespace EIMSNext.Notification
 
             var content = cloudEvent.ToHttpContent(ContentMode.Structured, new JsonEventFormatter(null, default));
 
-            using var httpClient = new HttpClient();
+            using var httpClient = new HttpClient(WebhookUrlSafety.CreatePinnedHandler(destination))
+            {
+                Timeout = TimeSpan.FromSeconds(10),
+            };
             string? result = null;
             int httpCode = 400;
             bool success = false;

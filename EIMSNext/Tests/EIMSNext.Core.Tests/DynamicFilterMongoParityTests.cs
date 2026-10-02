@@ -1,9 +1,10 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Globalization;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 
 namespace EIMSNext.Core.Tests
 {

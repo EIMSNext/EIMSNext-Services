@@ -4,6 +4,7 @@ using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Repositories;
 using Microsoft.EntityFrameworkCore;
 
 namespace EIMSNext.Core.Tests
@@ -161,7 +162,7 @@ namespace EIMSNext.Core.Tests
             var innerData = new Dictionary<string, object?>();
             innerData.TryAdd("f_1721094301870", "fff");
 
-            resp.Update(data.Id, setters => setters
+            resp.UpdateMany(x => x.Id == data.Id, setters => setters
                 .SetProperty(x => x.Data, innerData)
                 .SetProperty(x => x.CreateBy, new Operator("1", "001", "t1")));
 
@@ -170,7 +171,7 @@ namespace EIMSNext.Core.Tests
         }
 
         [TestMethod]
-        public void UpdateManyTest()
+        public async Task UpdateManyTest()
         {
             var resp = new FormDataRepository(_dbContext!);
 
@@ -191,7 +192,7 @@ namespace EIMSNext.Core.Tests
             var innerData = new Dictionary<string, object?>();
             innerData.TryAdd("f_1721094301870", "fff");
 
-            resp.UpdateMany(filter, setters => setters
+            await resp.UpdateManyAsync(filter, setters => setters
                 .SetProperty(x => x.Data, innerData)
                 .SetProperty(x => x.CreateBy, new Operator("1", "001", "t1")));
 
@@ -234,7 +235,7 @@ namespace EIMSNext.Core.Tests
         }
 
         [TestMethod]
-        public void DeleteManyTest()
+        public async Task DeleteManyTest()
         {
             var resp = new FormDataRepository(_dbContext!);
 
@@ -253,11 +254,11 @@ namespace EIMSNext.Core.Tests
             var result = resp.Find(new DynamicFindOptions<FormData>()).ToList();
             Assert.AreEqual(3, result.Count);
 
-            resp.Delete(new DynamicFilter { Field = "data.f_1721094301870", Op = FilterOp.In, Value = new List<object> { "bbb", "ccc" } });
+            await resp.DeleteManyAsync(new DynamicFilter { Field = "data.f_1721094301870", Op = FilterOp.In, Value = new List<object> { "bbb", "ccc" } });
             result = resp.Find(new DynamicFindOptions<FormData>()).ToList();
             Assert.AreEqual(1, result.Count);
 
-            resp.Delete(new DynamicFilter());
+            await resp.DeleteManyAsync(new DynamicFilter());
             result = resp.Find(new DynamicFindOptions<FormData>()).ToList();
             Assert.AreEqual(0, result.Count);
         }

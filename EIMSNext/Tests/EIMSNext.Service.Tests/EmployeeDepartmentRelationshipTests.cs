@@ -131,6 +131,8 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(deptA.Id, relations[0].DepartmentId);
             Assert.IsTrue(relations[0].IsManager);
             Assert.AreEqual(deptB.Id, relations[1].DepartmentId);
+            Assert.AreEqual(deptA.HeriarchyId, relations[0].HeriarchyId);
+            Assert.AreEqual(deptB.HeriarchyId, relations[1].HeriarchyId);
         }
 
         [TestMethod]
@@ -144,11 +146,28 @@ namespace EIMSNext.Service.Tests
             {
                 CorpId = CorpId,
                 EmployeeId = employee.Id,
-                DepartmentId = child.Id
+                DepartmentId = child.Id,
+                HeriarchyId = child.HeriarchyId
             });
 
             await AssertThrowsAsync<BadRequestException>(() =>
                 _departmentService.InvokeBeforeDeleteAsync(x => x.Id == parent.Id));
+        }
+
+        [TestMethod]
+        public async Task DeleteDepartment_WithMissingHierarchy_Throws()
+        {
+            var department = new Department
+            {
+                Id = "dept-missing-hierarchy",
+                CorpId = CorpId,
+                Name = "层级异常部门",
+                HeriarchyId = string.Empty,
+            };
+            _departmentRepo.Insert(department);
+
+            await AssertThrowsAsync<BadRequestException>(() =>
+                _departmentService.InvokeBeforeDeleteAsync(x => x.Id == department.Id));
         }
 
         [TestMethod]
@@ -373,6 +392,31 @@ namespace EIMSNext.Service.Tests
 
             var otherRelation = _employeeDepartmentRepo.Queryable.Single(x => x.EmployeeId == inOther.Id);
             Assert.AreEqual(otherRoot.HeriarchyId, otherRelation.HeriarchyId);
+        }
+
+        [TestMethod]
+        public async Task ReplaceDepartment_MoveSubtree_SyncsDescendantRelationSnapshots()
+        {
+            var rootA = SeedDepartment("dept-move-root-a", "Root A");
+            var rootB = SeedDepartment("dept-move-root-b", "Root B");
+            var parent = SeedDepartment("dept-move-parent", "Parent", rootA.Id);
+            var child = SeedDepartment("dept-move-child", "Child", parent.Id);
+            var grandChild = SeedDepartment("dept-move-grand", "Grand Child", child.Id);
+
+            var inParent = SeedEmployee("emp-move-parent", "In Parent", parent.Id);
+            var inGrandChild = SeedEmployee("emp-move-grand-child", "In Grand Child", grandChild.Id);
+
+            // 把整棵子树 parent(+child+grandChild) 从 rootA 换父级到 rootB 下。
+            parent.ParentId = rootB.Id;
+            await _departmentService.InvokeReplaceAsync(parent);
+
+            var parentPath = $"{rootB.HeriarchyId}{parent.Id}|";
+            var grandChildPath = $"{parentPath}{child.Id}|{grandChild.Id}|";
+
+            // 只有「创建时写入」还不够：层级调整后，被移动节点与全部下级部门的关系快照都必须跟随新路径。
+            Assert.AreEqual(parentPath, _employeeDepartmentRepo.Queryable.Single(x => x.EmployeeId == inParent.Id).HeriarchyId);
+            Assert.AreEqual(grandChildPath, _departmentRepo.Get(grandChild.Id)!.HeriarchyId);
+            Assert.AreEqual(grandChildPath, _employeeDepartmentRepo.Queryable.Single(x => x.EmployeeId == inGrandChild.Id).HeriarchyId);
         }
 
         private Department SeedDepartment(string id, string name, string? parentId = null)
@@ -627,27 +671,18 @@ namespace EIMSNext.Service.Tests
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
 
+            public override Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+                => Task.FromResult(Queryable.Any(predicate));
+
             public override Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
                 => Task.FromResult(Queryable.Where(filter).ToList());
 
             public override IQueryable<T> Find(Expression<Func<T, bool>> filter) => Queryable.Where(filter);
 
-            public override IQueryable<T> Find(DynamicFilter filter) => Find(filter.ToPredicate<T>());
-
-            public override IQueryable<T> Find(DynamicFindOptions<T> options) => Find(options.ToQueryFindOptions<T>());
-
             public override IQueryable<T> Find(QueryFindOptions<T> options) => Apply(options, Queryable);
-
-            public override Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
-                => Task.FromResult(Find(options).ToList());
 
             public override Task<List<T>> FindAsync(QueryFindOptions<T> options, CancellationToken cancellationToken = default)
                 => Task.FromResult(Apply(options, Queryable).ToList());
-
-            public override Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-                => Task.FromResult(Find(filter).ToList());
-
-            public override List<T> FindList(DynamicFilter filter) => Find(filter).ToList();
 
             /// <summary>
             /// 内存版 <see cref="QueryFindOptions{T}"/> 应用：过滤 + 分页。
@@ -673,7 +708,14 @@ namespace EIMSNext.Service.Tests
                     query = query.Skip(skip);
                 }
 
-                return query.Take(options.GetEffectiveTake());
+                var take = options.GetEffectiveTake();
+                // 与 DbRepository.Apply 一致：0 表示不限量，不能真的 Take(0)（那样会返回空）。
+                if (take > 0 && take < int.MaxValue)
+                {
+                    query = query.Take(take);
+                }
+
+                return query;
             }
 
             public override void Insert(T entity) => _items[EnsureId(entity).Id] = entity;

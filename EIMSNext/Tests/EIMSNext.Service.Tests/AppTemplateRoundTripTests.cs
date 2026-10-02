@@ -493,6 +493,9 @@ namespace EIMSNext.Service.Tests
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
 
+            public override Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+                => Task.FromResult(Queryable.Any(predicate));
+
             public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
                 => Task.FromResult(Count(predicate));
 

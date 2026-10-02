@@ -34,16 +34,8 @@ namespace EIMSNext.Core.Repositories
         }
 
         /// <inheritdoc />
-        public override IQueryable<T> Find(DynamicFindOptions<T> options)
-            => Find(options.ToQueryFindOptions<T>());
-
-        /// <inheritdoc />
         public override IQueryable<T> Find(Expression<Func<T, bool>> filter)
             => filter is null ? Queryable : Queryable.Where(filter);
-
-        /// <inheritdoc />
-        public override IQueryable<T> Find(DynamicFilter filter)
-            => Find(filter.ToPredicate<T>());
 
         /// <inheritdoc />
         public override Task<List<T>> FindAsync(QueryFindOptions<T> options, CancellationToken cancellationToken = default)
@@ -54,107 +46,8 @@ namespace EIMSNext.Core.Repositories
         }
 
         /// <inheritdoc />
-        public override Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default)
-            => FindAsync(options.ToQueryFindOptions<T>(), cancellationToken);
-
-        /// <inheritdoc />
         public override Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default)
             => Find(filter).ToListAsync(cancellationToken);
-
-        /// <inheritdoc />
-        public override Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => Find(new QueryFindOptions<T>(filter.ToPredicate<T>())).ToListAsync(cancellationToken);
-
-        /// <inheritdoc />
-        public override List<T> FindList(DynamicFilter filter)
-            => Find(new QueryFindOptions<T>(filter.ToPredicate<T>())).ToList();
-
-        /// <inheritdoc />
-        public override long Count(DynamicFilter filter) => Queryable.LongCount(filter.ToPredicate<T>());
-
-        /// <inheritdoc />
-        public override Task<long> CountAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => Queryable.LongCountAsync(filter.ToPredicate<T>(), cancellationToken);
-
-        /// <inheritdoc />
-        public override Task<bool> AnyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => Queryable.AnyAsync(filter.ToPredicate<T>(), cancellationToken);
-
-        /// <inheritdoc />
-        public override IQueryable<TResult> Select<TResult>(Expression<Func<T, TResult>> selector)
-            => Queryable.Select(selector);
-
-        /// <inheritdoc />
-        public override IQueryable<T> Page<TKey>(Expression<Func<T, TKey>> orderBy, int skip, int take)
-            => Queryable.OrderBy(orderBy).Skip(Math.Max(0, skip)).Take(take <= 0 ? 200 : take);
-
-        /// <summary>
-        /// 取某动态字段的去重值，供筛选选项下拉使用。
-        /// </summary>
-        /// <remarks>
-        /// PostgreSQL 下 <c>Data</c> 是 jsonb，无法用 <c>SELECT DISTINCT</c> 直接取内部键，
-        /// 因此这里在物化后于内存里去重。调用方（筛选选项）本身就带 limit，
-        /// 且表单数据量受企业维度约束，这个代价可接受；
-        /// 若后续成为瓶颈，应改为对 jsonb 键建表达式索引 + 原生 SQL <c>SELECT DISTINCT</c>。
-        /// </remarks>
-        public override async Task<List<object?>> DistinctFieldValuesAsync(
-            DynamicFilter? filter,
-            string fieldPath,
-            int limit = 0,
-            CancellationToken cancellationToken = default)
-        {
-            if (string.IsNullOrWhiteSpace(fieldPath)) return [];
-
-            var predicate = filter.ToPredicate<T>();
-            // 只取该字段所在的 jsonb 列，避免把整行（含大 jsonb）拉回来。
-            var rootSegment = DynamicPathAccessor.SplitPath(fieldPath).FirstOrDefault();
-            if (rootSegment is null) return [];
-
-            var rootProperty = DynamicPathAccessor.FindProperty(typeof(T), rootSegment);
-            if (rootProperty is null) return [];
-
-            if (!DynamicPathAccessor.IsDynamicContainer(rootProperty.PropertyType))
-            {
-                // 非 jsonb 路径：可用 EF 的 Distinct 走数据库去重。
-                var query = Queryable.Where(predicate);
-                // 通过反射拿到属性访问表达式后投影，保持强类型。
-                var selector = BuildProjection(rootProperty);
-                var values = await query.Select(selector).Distinct().ToListAsync(cancellationToken).ConfigureAwait(false);
-                var filtered = values.Where(x => x is not null).ToList();
-                return limit > 0 ? filtered.Take(limit).Cast<object?>().ToList() : filtered.Cast<object?>().ToList();
-            }
-
-            var rows = await Queryable.Where(predicate).ToListAsync(cancellationToken).ConfigureAwait(false);
-            var path = DynamicPathAccessor.SplitPath(fieldPath);
-
-            var result = new List<object?>();
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var row in rows)
-            {
-                var value = DynamicPathValueReader.Read(row, path);
-                foreach (var flattened in DynamicPathValueReader.Flatten(value))
-                {
-                    if (!seen.Add(DynamicPathValueReader.ToDedupKey(flattened))) continue;
-                    result.Add(flattened);
-                    if (limit > 0 && result.Count >= limit) return result;
-                }
-            }
-
-            return result;
-        }
-
-        /// <summary>
-        /// 构造从 <typeparamref name="T"/> 到指定属性值的投影表达式。
-        /// </summary>
-        private static Expression<Func<T, object?>> BuildProjection(System.Reflection.PropertyInfo property)
-        {
-            var parameter = Expression.Parameter(typeof(T), "x");
-            var access = Expression.Property(parameter, property);
-            var boxed = property.PropertyType.IsValueType
-                ? Expression.Convert(access, typeof(object))
-                : (Expression)access;
-            return Expression.Lambda<Func<T, object?>>(boxed, parameter);
-        }
 
         #endregion
 
@@ -262,25 +155,6 @@ namespace EIMSNext.Core.Repositories
             => InWriteScope(() => Context.Set<T>().Where(predicate).ExecuteUpdate(setters));
 
         /// <inheritdoc />
-        public override int UpdateMany(
-            DynamicFilter filter,
-            Action<UpdateSettersBuilder<T>> setters)
-            => UpdateMany(filter.ToPredicate<T>(), setters);
-
-        /// <inheritdoc />
-        public override int Update(
-            string id,
-            Action<UpdateSettersBuilder<T>> setters)
-            => UpdateMany(x => x.Id == id, setters);
-
-        /// <inheritdoc />
-        public override Task<int> UpdateManyAsync(
-            DynamicFilter filter,
-            Action<UpdateSettersBuilder<T>> setters,
-            CancellationToken cancellationToken = default)
-            => UpdateAsync(filter.ToPredicate<T>(), setters, cancellationToken);
-
-        /// <inheritdoc />
         public override void Delete(T entity)
         {
             Context.Set<T>().Remove(entity);
@@ -299,10 +173,6 @@ namespace EIMSNext.Core.Repositories
             => InWriteScopeAsync(() => Context.Set<T>().Where(predicate).ExecuteDeleteAsync(cancellationToken));
 
         /// <inheritdoc />
-        public override Task<int> DeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => DeleteManyAsync(filter.ToPredicate<T>(), cancellationToken);
-
-        /// <inheritdoc />
         public override int Delete(string id)
             => InWriteScope(() => Context.Set<T>().Where(x => x.Id == id).ExecuteDelete());
 
@@ -315,10 +185,6 @@ namespace EIMSNext.Core.Repositories
         }
 
         /// <inheritdoc />
-        public override int Delete(DynamicFilter filter)
-            => InWriteScope(() => Context.Set<T>().Where(filter.ToPredicate<T>()).ExecuteDelete());
-
-        /// <inheritdoc />
         public override Task<int> DeleteAsync(string id, CancellationToken cancellationToken = default)
             => InWriteScopeAsync(() => Context.Set<T>().Where(x => x.Id == id).ExecuteDeleteAsync(cancellationToken));
 
@@ -329,10 +195,6 @@ namespace EIMSNext.Core.Repositories
             if (idList.Count == 0) return Task.FromResult(0);
             return InWriteScopeAsync(() => Context.Set<T>().Where(x => idList.Contains(x.Id)).ExecuteDeleteAsync(cancellationToken));
         }
-
-        /// <inheritdoc />
-        public override Task<int> DeleteAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => DeleteManyAsync(filter.ToPredicate<T>(), cancellationToken);
 
         /// <inheritdoc />
         public override Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
@@ -351,10 +213,6 @@ namespace EIMSNext.Core.Repositories
                 setters => setters.SetProperty(entity => ((IDeleteFlag)entity).DeleteFlag, true),
                 cancellationToken));
         }
-
-        /// <inheritdoc />
-        public override Task<int> SoftDeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default)
-            => SoftDeleteManyAsync(filter.ToPredicate<T>(), cancellationToken);
 
         #endregion
 

@@ -244,8 +244,10 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
         {
-            query.Take = query.GetEffectiveTake();
-            query.Skip = query.GetEffectiveSkip();
+            // 请求侧分页必须显式收敛：客户端不传 Take 时仓储语义是不限量，
+            // 直接放行会让一次请求把整表拉进内存，因此这里统一按策略取默认值并截断到上限。
+            query.Take = RequestPagingPolicy.Normalize(query.Take);
+            query.Skip = Math.Max(0, query.Skip);
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 query.Filter.ClearValueExpressions();
@@ -290,8 +292,7 @@ namespace EIMSNext.Service.Host.Controllers
                     ? CreateNoMatchFilter()
                     : validator.ApplyFormDataScope(formId!, query.Filter);
                 query.Scope = null;
-                query.Take = Math.Clamp(query.GetEffectiveTake(), 1, 200);
-                query.Skip = Math.Max(0, query.Skip);
+                query.Take = RequestPagingPolicy.Normalize(query.Take, RequestPagingPolicy.PublicMaxTake);
                 return query;
             }
 

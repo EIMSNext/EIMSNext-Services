@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Controllers
 	{
 		protected override DynamicFindOptions<Wf_Task> FilterResult(DynamicFindOptions<Wf_Task> query)
 		{
-			return FilterByPermission(FilterByCorpId(query));
+			return FilterByPermission(FilterByCorpId(NormalizePaging(query)));
 		}
 	}
 }

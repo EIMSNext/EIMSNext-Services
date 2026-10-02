@@ -38,27 +38,10 @@ public interface IRepository<T> where T : class, IEntityKey
     IQueryable<T> Find(QueryFindOptions<T> options);
 
     /// <summary>
-    /// 内部把动态筛选/排序/分页翻译为 <see cref="QueryFindOptions{T}"/>。
-    /// </summary>
-    /// <returns>惰性查询，可继续链式操作。</returns>
-    IQueryable<T> Find(DynamicFindOptions<T> options);
-
-    /// <summary>
-    /// 按动态表单查询选项异步取列表。
-    /// </summary>
-    Task<List<T>> FindAsync(DynamicFindOptions<T> options, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// 按过滤谓词查询。
     /// </summary>
     /// <returns>惰性查询，可继续链式操作。</returns>
     IQueryable<T> Find(Expression<Func<T, bool>> filter);
-
-    /// <summary>
-    /// 按动态筛选条件查询。
-    /// </summary>
-    /// <returns>惰性查询，可继续链式操作。</returns>
-    IQueryable<T> Find(DynamicFilter filter);
 
     /// <summary>
     /// 按动态查询选项异步取列表。
@@ -71,16 +54,6 @@ public interface IRepository<T> where T : class, IEntityKey
     Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 按动态筛选条件异步取列表。保留此重载是为了让原
-    /// </summary>
-    Task<List<T>> FindAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 按动态筛选条件取列表（同步）。
-    /// </summary>
-    List<T> FindList(DynamicFilter filter);
-
-    /// <summary>
     /// 统计满足条件的实体数量。
     /// </summary>
     long Count(Expression<Func<T, bool>> predicate);
@@ -91,45 +64,10 @@ public interface IRepository<T> where T : class, IEntityKey
     Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 统计满足动态筛选条件的实体数量。
-    /// </summary>
-    long Count(DynamicFilter filter);
-
-    /// <summary>
-    /// <c>DistinctFieldValuesAsync(DynamicFilter, string field, session)</c> 的等价物。
-    /// </summary>
-    Task<List<object?>> DistinctFieldValuesAsync(
-        DynamicFilter? filter,
-        string fieldPath,
-        int limit = 0,
-        CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 异步统计满足动态筛选条件的实体数量。
-    /// </summary>
-    Task<long> CountAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
-
-    /// <summary>
     /// 是否存在满足条件的实体。命中即返回，比 Count 更省。
     /// </summary>
     /// <returns>存在时为 true。</returns>
     Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 是否存在满足动态筛选条件的实体。
-    /// </summary>
-    /// <returns>存在时为 true。</returns>
-    Task<bool> AnyAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 投影查询。只取需要的列，避免把 jsonb 大字段整行带出来。
-    /// </summary>
-    IQueryable<TResult> Select<TResult>(Expression<Func<T, TResult>> selector);
-
-    /// <summary>
-    /// 分页读取。PostgreSQL 下先 OrderBy 再 Skip/Take，否则顺序不稳定。
-    /// </summary>
-    IQueryable<T> Page<TKey>(Expression<Func<T, TKey>> orderBy, int skip, int take);
 
     #endregion
 
@@ -140,6 +78,9 @@ public interface IRepository<T> where T : class, IEntityKey
     /// </summary>
     void Insert(T entity);
 
+    /// <summary>
+    /// 批量新增实体。
+    /// </summary>
     void Insert(IEnumerable<T> entities);
 
     /// <summary>
@@ -161,8 +102,6 @@ public interface IRepository<T> where T : class, IEntityKey
     /// 异步替换（整行更新）单个实体。
     /// </summary>
     Task ReplaceAsync(T entity, CancellationToken cancellationToken = default);
-
-    int Update(string id, Action<UpdateSettersBuilder<T>> setters);
 
     /// <summary>
     /// 更新单个实体的指定字段。
@@ -196,43 +135,39 @@ public interface IRepository<T> where T : class, IEntityKey
         CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// <c>UpdateMany(DynamicFilter, UpdateDefinition)</c> 的等价入口。
-    /// </summary>
-    int UpdateMany(
-        DynamicFilter filter,
-        Action<UpdateSettersBuilder<T>> setters);
-
-    /// <summary>
     /// 删除单个实体（物理删除）。
     /// </summary>
     void Delete(T entity);
 
+    /// <summary>
+    /// 按主键 ID 删除单个实体（物理删除）。
+    /// </summary>
     int Delete(string id);
 
+    /// <summary>
+    /// 按主键 ID 集合批量物理删除。
+    /// </summary>
     int Delete(IEnumerable<string> ids);
-
-    int Delete(DynamicFilter filter);
 
     /// <summary>
     /// 异步删除单个实体（物理删除）。
     /// </summary>
     Task DeleteAsync(T entity, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 按主键 ID 异步删除单个实体（物理删除）。
+    /// </summary>
     Task<int> DeleteAsync(string id, CancellationToken cancellationToken = default);
 
+    /// <summary>
+    /// 按主键 ID 集合异步批量物理删除。
+    /// </summary>
     Task<int> DeleteAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
-
-    Task<int> DeleteAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 按过滤谓词批量物理删除。
     /// </summary>
     Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 按动态筛选条件批量物理删除。
-    /// </summary>
-    Task<int> DeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// 按主键 ID 集合批量软删除（置 DeleteFlag）。
@@ -243,20 +178,6 @@ public interface IRepository<T> where T : class, IEntityKey
     /// 按过滤谓词批量软删除（置 DeleteFlag）。
     /// </summary>
     Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 按动态筛选条件批量软删除（置 DeleteFlag）。
-    /// </summary>
-    Task<int> SoftDeleteManyAsync(DynamicFilter filter, CancellationToken cancellationToken = default);
-
-    /// <summary>
-    /// 按动态筛选条件批量更新。运算符与值由 <paramref name="setters"/> 表达，
-    /// 动态条件下的原地更新很少用，保留重载是为了兼容旧调用点。
-    /// </summary>
-    Task<int> UpdateManyAsync(
-        DynamicFilter filter,
-        Action<UpdateSettersBuilder<T>> setters,
-        CancellationToken cancellationToken = default);
 
     #endregion
 
@@ -278,6 +199,10 @@ public interface IRepository<T> where T : class, IEntityKey
     /// </summary>
     T EnsureId(T entity);
 
+    /// <summary>
+    /// 确保一批实体都已有主键，没有的按序生成。
+    /// </summary>
+    /// <returns>原实体序列（主键已就地补齐）。</returns>
     IEnumerable<T> EnsureId(IEnumerable<T> entities);
 
     /// <summary>
@@ -285,12 +210,6 @@ public interface IRepository<T> where T : class, IEntityKey
     /// </summary>
     /// <returns>事务作用域，<c>using</c> 结束时未显式提交则回滚。</returns>
     TransactionScope NewTransactionScope();
-
-    /// <summary>
-    /// 立即提交挂起的变更。绝大多数场景不需要手工调用——
-    /// 仓储的写方法内部已提交，事务作用域提交时也会统一 SaveChanges。
-    /// </summary>
-    Task<int> SaveChangesAsync(CancellationToken cancellationToken = default);
 
     #endregion
 }

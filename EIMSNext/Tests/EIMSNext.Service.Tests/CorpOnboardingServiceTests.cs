@@ -331,6 +331,9 @@ namespace EIMSNext.Service.Tests
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
 
+            public override Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+                => Task.FromResult(Queryable.Any(predicate));
+
             public override void Insert(T entity) => _items[EnsureId(entity).Id] = entity;
 
             public override void Insert(IEnumerable<T> entities)

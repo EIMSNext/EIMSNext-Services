@@ -415,18 +415,12 @@ namespace EIMSNext.Service.Tests
             // 需要源同时具备同步与异步可枚举能力，故用 InMemoryAsyncQueryable 包装。
             public override IQueryable<T> Queryable => new InMemoryAsyncQueryable<T>(_items);
 
-            public override IQueryable<T> Find(DynamicFilter filter) => Queryable;
-
-            public override List<T> FindList(DynamicFilter filter) => Queryable.ToList();
-
             public override T? Get(string id) => _items.FirstOrDefault(x => x.Id == id);
 
             public override Task<T?> GetAsync(string id, CancellationToken cancellationToken = default)
                 => Task.FromResult(Get(id));
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
-
-            public override long Count(DynamicFilter filter) => Queryable.LongCount();
 
             public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
                 => Task.FromResult(Count(predicate));

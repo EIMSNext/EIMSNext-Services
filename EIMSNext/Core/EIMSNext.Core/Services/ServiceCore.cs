@@ -154,9 +154,15 @@ namespace EIMSNext.Core.Services
             => TransactionScope.ExecuteWithRetryAsync(DbContext, operation, maxRetries ?? 3, cancellationToken);
 
         /// <summary>
-        /// 记录审计日志。
+        /// 记录审计日志（同步版，仅用于同步写路径，内部阻塞真实 DB 写入）。
         /// </summary>
         protected virtual void CreateAuditLog(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
+            => CreateAuditLogAsync(action, oldData, newData, dataFilter, update).GetAwaiter().GetResult();
+
+        /// <summary>
+        /// 记录审计日志（异步版，写路径应优先使用以释放请求线程）。
+        /// </summary>
+        protected virtual async Task CreateAuditLogAsync(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
         {
             if (!LogAudit) return;
 
@@ -193,7 +199,7 @@ namespace EIMSNext.Core.Services
             }
             else
             {
-                AuditLogRepository.InsertAsync(logList).GetAwaiter().GetResult();
+                await AuditLogRepository.InsertAsync(logList).ConfigureAwait(false);
             }
         }
 
@@ -411,7 +417,7 @@ namespace EIMSNext.Core.Services
         /// </summary>
         /// <param name="where">动态过滤条件。</param>
         /// <returns>存在时为 true，否则为 false。</returns>
-        protected virtual bool ExistsCore(DynamicFilter where) => Repository.FindList(where).Count > 0;
+        protected virtual bool ExistsCore(DynamicFilter where) => Repository.Find(where).Any();
 
         /// <summary>
         /// 批量新增实体。
@@ -609,7 +615,7 @@ namespace EIMSNext.Core.Services
             list.ForEach(entity => FillSystemField(entity, false));
             await BeforeAdd(list).ConfigureAwait(false);
             await Repository.InsertAsync(list).ConfigureAwait(false);
-            CreateAuditLog(DbAction.Insert, null, list);
+            await CreateAuditLogAsync(DbAction.Insert, null, list).ConfigureAwait(false);
             await AfterAdd(list).ConfigureAwait(false);
         }
 
@@ -623,7 +629,7 @@ namespace EIMSNext.Core.Services
             await BeforeReplace(entity).ConfigureAwait(false);
             var old = ScopeCache.Get<T>(entityId, DataVersion.Old) ?? await GetCoreAsync(entityId).ConfigureAwait(false);
             await Repository.ReplaceAsync(entity).ConfigureAwait(false);
-            CreateAuditLog(DbAction.Update, old == null ? null : [old], [entity]);
+            await CreateAuditLogAsync(DbAction.Update, old == null ? null : [old], [entity]).ConfigureAwait(false);
             await AfterReplace(entity).ConfigureAwait(false);
             return 1;
         }
@@ -637,7 +643,7 @@ namespace EIMSNext.Core.Services
         {
             await BeforeUpdate(filter, setters).ConfigureAwait(false);
             var result = await Repository.UpdateManyAsync(filter, setters).ConfigureAwait(false);
-            CreateAuditLog(DbAction.Update, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Update, null, null, filter.ToString());
             await AfterUpdate(filter, setters).ConfigureAwait(false);
             return result;
         }
@@ -658,7 +664,7 @@ namespace EIMSNext.Core.Services
                 result = await Repository.DeleteManyAsync(filter).ConfigureAwait(false);
             }
 
-            CreateAuditLog(DbAction.Delete, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Delete, null, null, filter.ToString());
             await AfterDelete(filter).ConfigureAwait(false);
             return result;
         }
@@ -680,7 +686,7 @@ namespace EIMSNext.Core.Services
                 result = await Repository.DeleteManyAsync(predicate).ConfigureAwait(false);
             }
 
-            CreateAuditLog(DbAction.Delete, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Delete, null, null, filter.ToString());
             await AfterDelete(predicate).ConfigureAwait(false);
             return result;
         }

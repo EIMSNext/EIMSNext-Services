@@ -75,60 +75,19 @@ namespace EIMSNext.Core.Repositories
         /// </remarks>
         public TransactionScope NewTransactionScope() => new(Context);
 
-        /// <inheritdoc />
-        public Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
-            => Context.SaveChangesAsync(cancellationToken);
-
         #region 由子类实现
 
         /// <inheritdoc />
         public abstract IQueryable<T> Find(Query.QueryFindOptions<T> options);
 
         /// <inheritdoc />
-        public abstract IQueryable<T> Find(Query.DynamicFindOptions<T> options);
-
-        /// <inheritdoc />
         public abstract IQueryable<T> Find(Expression<Func<T, bool>> filter);
-
-        /// <inheritdoc />
-        public abstract IQueryable<T> Find(Query.DynamicFilter filter);
 
         /// <inheritdoc />
         public abstract Task<List<T>> FindAsync(Query.QueryFindOptions<T> options, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
-        public abstract Task<List<T>> FindAsync(Query.DynamicFindOptions<T> options, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
         public abstract Task<List<T>> FindAsync(Expression<Func<T, bool>> filter, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<List<T>> FindAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract List<T> FindList(Query.DynamicFilter filter);
-
-        /// <inheritdoc />
-        public abstract long Count(Query.DynamicFilter filter);
-
-        /// <inheritdoc />
-        public abstract Task<long> CountAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<bool> AnyAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<List<object?>> DistinctFieldValuesAsync(
-            Query.DynamicFilter? filter,
-            string fieldPath,
-            int limit = 0,
-            CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract IQueryable<TResult> Select<TResult>(Expression<Func<T, TResult>> selector);
-
-        /// <inheritdoc />
-        public abstract IQueryable<T> Page<TKey>(Expression<Func<T, TKey>> orderBy, int skip, int take);
 
         /// <inheritdoc />
         public abstract void Insert(T entity);
@@ -166,24 +125,8 @@ namespace EIMSNext.Core.Repositories
             Action<UpdateSettersBuilder<T>> setters);
 
         /// <inheritdoc />
-        public abstract int UpdateMany(
-            Query.DynamicFilter filter,
-            Action<UpdateSettersBuilder<T>> setters);
-
-        /// <inheritdoc />
-        public abstract int Update(
-            string id,
-            Action<UpdateSettersBuilder<T>> setters);
-
-        /// <inheritdoc />
         public abstract Task<int> UpdateManyAsync(
             Expression<Func<T, bool>> predicate,
-            Action<UpdateSettersBuilder<T>> setters,
-            CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<int> UpdateManyAsync(
-            Query.DynamicFilter filter,
             Action<UpdateSettersBuilder<T>> setters,
             CancellationToken cancellationToken = default);
 
@@ -197,9 +140,6 @@ namespace EIMSNext.Core.Repositories
         public abstract int Delete(IEnumerable<string> ids);
 
         /// <inheritdoc />
-        public abstract int Delete(Query.DynamicFilter filter);
-
-        /// <inheritdoc />
         public abstract Task DeleteAsync(T entity, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
@@ -209,22 +149,13 @@ namespace EIMSNext.Core.Repositories
         public abstract Task<int> DeleteAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
-        public abstract Task<int> DeleteAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
         public abstract Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<int> DeleteManyAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
         public abstract Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
         public abstract Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
-
-        /// <inheritdoc />
-        public abstract Task<int> SoftDeleteManyAsync(Query.DynamicFilter filter, CancellationToken cancellationToken = default);
 
         #endregion
     }

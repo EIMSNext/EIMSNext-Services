@@ -13,26 +13,32 @@ namespace EIMSNext.Plugin.Runtime
 {
     public sealed class PluginRuntimeManager : IPluginRuntimeManager
     {
+        internal static readonly TimeSpan DefaultExecutionTimeout = TimeSpan.FromSeconds(30);
+        internal static readonly TimeSpan PluginCancellationGracePeriod = TimeSpan.FromSeconds(1);
+
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<PluginRuntimeManager> _logger;
         private readonly string _pluginRoot;
+        private readonly TimeSpan _executionTimeout;
         private ImmutableDictionary<string, PluginRuntime> _activeRuntimes = ImmutableDictionary<string, PluginRuntime>.Empty.WithComparers(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _reloadLock = new(1, 1);
         private readonly Func<PluginAssemblyCandidate, PluginRuntime> _runtimeFactory;
 
-        public PluginRuntimeManager(IServiceProvider serviceProvider, ILogger<PluginRuntimeManager> logger, string pluginRoot)
+        public PluginRuntimeManager(IServiceProvider serviceProvider, ILogger<PluginRuntimeManager> logger, string pluginRoot, TimeSpan? executionTimeout = null)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _pluginRoot = pluginRoot;
+            _executionTimeout = executionTimeout ?? DefaultExecutionTimeout;
             _runtimeFactory = CreateRuntime;
         }
 
-        internal PluginRuntimeManager(IServiceProvider serviceProvider, ILogger<PluginRuntimeManager> logger, string pluginRoot, Func<PluginAssemblyCandidate, PluginRuntime> runtimeFactory)
+        internal PluginRuntimeManager(IServiceProvider serviceProvider, ILogger<PluginRuntimeManager> logger, string pluginRoot, Func<PluginAssemblyCandidate, PluginRuntime> runtimeFactory, TimeSpan? executionTimeout = null)
         {
             _serviceProvider = serviceProvider;
             _logger = logger;
             _pluginRoot = pluginRoot;
+            _executionTimeout = executionTimeout ?? DefaultExecutionTimeout;
             _runtimeFactory = runtimeFactory;
         }
 
@@ -57,7 +63,7 @@ namespace EIMSNext.Plugin.Runtime
                 return new PluginExecResult { Code = -404, Message = $"Plugin [{pluginId}] not found." };
             }
 
-            return await runtime.ExecuteAsync(setting, args, context, cancellationToken);
+            return await runtime.ExecuteAsync(setting, args, context, cancellationToken, _executionTimeout);
         }
 
         public async Task<PluginReloadResult> ReloadAsync(CancellationToken cancellationToken = default)
@@ -299,7 +305,7 @@ namespace EIMSNext.Plugin.Runtime
                 Interlocked.Exchange(ref _retired, 1);
             }
 
-            public async Task<PluginExecResult> ExecuteAsync(PluginSetting setting, PluginExecArgs args, PluginInvocationContext? context, CancellationToken cancellationToken)
+            public async Task<PluginExecResult> ExecuteAsync(PluginSetting setting, PluginExecArgs args, PluginInvocationContext? context, CancellationToken cancellationToken, TimeSpan timeout)
             {
                 if (Volatile.Read(ref _retired) == 1)
                 {
@@ -312,20 +318,78 @@ namespace EIMSNext.Plugin.Runtime
                     return new PluginExecResult { Code = -409, Message = $"Plugin [{PluginId}] is unloading." };
                 }
 
+                // 同步插件无法被强制中止：超时只是停止等待，取消信号只给协作式插件一个退出机会。
+                var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                Task<PluginExecResult>? execution = null;
                 Interlocked.Increment(ref _activeCalls);
                 try
                 {
                     await Task.Yield();
                     cancellationToken.ThrowIfCancellationRequested();
-                    using var scope = _serviceProvider.CreateScope();
-                    context ??= new PluginInvocationContext();
-                    context.Resolver ??= scope.ServiceProvider.GetRequiredService<IResolver>();
-                    var plugin = (IPlugin)Activator.CreateInstance(pluginType)!;
-                    return plugin.Execute(setting, args, context);
+
+                    // 作用域必须建在任务内部：超时后调用方立即返回，建在外面的话 scope 会先被释放，
+                    // 而插件线程还在用它解析出来的服务。
+                    execution = Task.Run(() =>
+                    {
+                        using var scope = _serviceProvider.CreateScope();
+                        context ??= new PluginInvocationContext();
+                        context.Resolver ??= scope.ServiceProvider.GetRequiredService<IResolver>();
+                        context.CancellationToken = timeoutCts.Token;
+                        var plugin = (IPlugin)Activator.CreateInstance(pluginType)!;
+                        return plugin.Execute(setting, args, context);
+                    }, timeoutCts.Token);
+
+                    return await execution.WaitAsync(timeout, cancellationToken);
+                }
+                catch (TimeoutException) when (execution is { IsCompleted: false })
+                {
+                    // 先通知插件协作式退出，再给它一个短暂宽限期。无论插件是否响应，
+                    // 调用方都收到统一的 -408；未退出的插件由 active-call continuation 继续跟踪。
+                    timeoutCts.Cancel();
+                    try
+                    {
+                        await execution.WaitAsync(PluginCancellationGracePeriod, CancellationToken.None).ConfigureAwait(false);
+                    }
+                    catch (TimeoutException)
+                    {
+                        // 宽限期耗尽，finally 中的 continuation 会继续跟踪未结束的插件任务。
+                    }
+                    catch (OperationCanceledException)
+                    {
+                        // 插件响应取消，超时结果仍保持 -408。
+                    }
+                    catch (Exception ex)
+                    {
+                        // 插件在响应取消时自行失败；此处已观察异常，避免未观察异常丢失。
+                        _logger.LogError(ex, "Plugin [{PluginId}] faulted during cancellation grace period.", PluginId);
+                    }
+
+                    return new PluginExecResult
+                    {
+                        Code = -408,
+                        Message = $"Plugin [{PluginId}] execution timed out after {timeout.TotalSeconds:0.##}s.",
+                    };
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref _activeCalls);
+                    if (execution is { IsCompleted: false })
+                    {
+                        // 插件线程还在跑：等它真正结束再释放计数，否则热重载会在它运行期间卸载程序集。
+                        _ = execution.ContinueWith(task =>
+                        {
+                            Interlocked.Decrement(ref _activeCalls);
+                            timeoutCts.Dispose();
+                            if (task.Exception != null)
+                            {
+                                _logger.LogError(task.Exception, "Plugin [{PluginId}] faulted after the caller stopped waiting.", PluginId);
+                            }
+                        }, CancellationToken.None, TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
+                    }
+                    else
+                    {
+                        Interlocked.Decrement(ref _activeCalls);
+                        timeoutCts.Dispose();
+                    }
                 }
             }
 

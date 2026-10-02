@@ -8,13 +8,14 @@ using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
+using Microsoft.Extensions.Configuration;
 
 namespace EIMSNext.ApiService
 {
     /// <summary>
     /// 数据推送（Webhook）的 API 服务。
     /// </summary>
-    public class WebhookApiService(IResolver resolver) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
+    public class WebhookApiService(IResolver resolver, IConfiguration configuration) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
     {
         /// <summary>
         /// 获取按权限过滤后的数据推送视图查询。
@@ -42,10 +43,10 @@ namespace EIMSNext.ApiService
         /// 新增数据推送。
         /// </summary>
         /// <param name="entity">数据推送实体。</param>
-        protected override Task AddAsyncCore(Webhook entity)
+        protected override async Task AddAsyncCore(Webhook entity)
         {
-            EnsureCanManageWebhook(entity);
-            return base.AddAsyncCore(entity);
+            await EnsureCanManageWebhookAsync(entity);
+            await base.AddAsyncCore(entity);
         }
 
         /// <summary>
@@ -53,10 +54,10 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="entity">数据推送实体。</param>
         /// <returns>替换结果。</returns>
-        protected override Task<int> ReplaceAsyncCore(Webhook entity)
+        protected override async Task<int> ReplaceAsyncCore(Webhook entity)
         {
-            EnsureCanManageWebhook(entity);
-            return base.ReplaceAsyncCore(entity);
+            await EnsureCanManageWebhookAsync(entity);
+            return await base.ReplaceAsyncCore(entity);
         }
 
         /// <summary>
@@ -84,13 +85,13 @@ namespace EIMSNext.ApiService
             return await base.DeleteAsyncCore(idList);
         }
 
-        private void EnsureCanManageWebhook(Webhook entity)
+        private async Task EnsureCanManageWebhookAsync(Webhook entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
 
-            if (!IsAllowedWebhookUrl(entity.Url))
+            if (await WebhookUrlSafety.ResolveAsync(entity.Url, configuration).ConfigureAwait(false) is null)
             {
-                throw new BadRequestException("推送地址必须是有效的 HTTP 或 HTTPS 地址");
+                throw new BadRequestException("推送地址必须是可访问的公网 HTTP 或 HTTPS 地址");
             }
 
             if (string.IsNullOrWhiteSpace(entity.FormId))
@@ -105,11 +106,5 @@ namespace EIMSNext.ApiService
             }
         }
 
-        private static bool IsAllowedWebhookUrl(string? value)
-        {
-            return Uri.TryCreate(value, UriKind.Absolute, out var uri)
-                && !string.IsNullOrWhiteSpace(uri.Host)
-                && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
-        }
     }
 }

@@ -1088,7 +1088,7 @@ namespace EIMSNext.ApiService
                     _ => null,
                 };
                 if (expression == null) continue;
-                selects.Add($"{expression} as \"{alias}\"");
+                selects.Add($"{expression} as {QuoteIdentifier(alias)}");
             }
 
             _ = parameters;
@@ -1099,7 +1099,7 @@ namespace EIMSNext.ApiService
         {
             return (dimensions ?? [])
                 .Where(d => !string.IsNullOrEmpty(d.Id))
-                .Select(d => $"{FieldExpression(d.Id)} as \"{SanitizeAlias(d.Id)}\"")
+                .Select(d => $"{FieldExpression(d.Id)} as {QuoteIdentifier(SanitizeAlias(d.Id))}")
                 .ToList();
         }
 
@@ -1124,9 +1124,9 @@ namespace EIMSNext.ApiService
                     .Select(dimension => SanitizeAlias(dimension.Id))
                     .FirstOrDefault(alias => string.Equals(alias, SanitizeAlias(rule.Id), StringComparison.OrdinalIgnoreCase));
                 var orderExpression = metricAlias is not null
-                    ? $"\"{metricAlias}\""
+                    ? QuoteIdentifier(metricAlias)
                     : dimensionAlias is not null
-                        ? $"\"{dimensionAlias}\""
+                        ? QuoteIdentifier(dimensionAlias)
                         : FieldExpression(rule.Id);
                 parts.Add($"{orderExpression} {direction} nulls last");
             }
@@ -1219,9 +1219,7 @@ namespace EIMSNext.ApiService
 
         private static string NumericExpression(string field)
         {
-            var expression = field.StartsWith("elem_", StringComparison.Ordinal)
-                ? field
-                : FieldExpression(field);
+            var expression = FieldExpression(field);
             return $"case when {expression} ~ '^-?[0-9]+([.][0-9]+)?$' then {expression}::numeric end";
         }
 
@@ -1357,6 +1355,8 @@ namespace EIMSNext.ApiService
             var normalized = NormalizePath(field);
             return normalized.Replace(".", "_").Replace(">", "_").Replace(" ", "_");
         }
+
+        private static string QuoteIdentifier(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
 
         private static string EscapeLiteral(string value) => value.Replace("'", "''");
     }

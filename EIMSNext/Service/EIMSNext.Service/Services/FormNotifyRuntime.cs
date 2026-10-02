@@ -12,6 +12,7 @@ using EIMSNext.Scripting;
 using EIMSNext.Component;
 using EIMSNext.Entities;
 using HKH.Mef2.Integration;
+using EIMSNext.Core;
 
 namespace EIMSNext.Service
 {
