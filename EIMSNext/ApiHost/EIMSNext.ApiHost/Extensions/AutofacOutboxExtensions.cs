@@ -11,13 +11,15 @@ namespace EIMSNext.ApiHost.Extensions
         public static void RegisterOutboxPublisher(this ContainerBuilder builder)
         {
             builder.RegisterType<OutboxIdempotencyKeyFactory>().As<IOutboxIdempotencyKeyFactory>().SingleInstance();
-            builder.RegisterType<OutboxPublisher>().As<IOutboxPublisher>().SingleInstance();
+            // OutboxPublisher 持有 scoped IRepository/DbContext，不能注册为单例。
+            builder.RegisterType<OutboxPublisher>().As<IOutboxPublisher>().InstancePerLifetimeScope();
         }
 
         public static void RegisterOutboxConsumers(this ContainerBuilder builder)
         {
             builder.RegisterOutboxPublisher();
-            builder.RegisterType<MessageProcessingRepository>().As<IMessageProcessingRepository>().SingleInstance();
+            // MessageProcessingRepository 通过 IRepository 访问 DbContext，必须跟随消息 scope。
+            builder.RegisterType<MessageProcessingRepository>().As<IMessageProcessingRepository>().InstancePerLifetimeScope();
             builder.RegisterType<RabbitMqOutboxDeliveryPublisher>().As<IOutboxDeliveryPublisher>().SingleInstance();
         }
     }
