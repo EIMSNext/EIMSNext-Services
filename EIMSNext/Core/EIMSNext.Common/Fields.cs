@@ -181,6 +181,12 @@ namespace EIMSNext.Common
         public const string Select2 = "select2";
 
         /// <summary>
+        /// 地址（省/市/区/详细地址）。值为对象
+        /// <c>{"province":"..","city":"..","district":"..","detail":".."}</c>，存储于 jsonb。
+        /// </summary>
+        public const string Address = "address";
+
+        /// <summary>
         /// 图片上传。
         /// </summary>
         public const string ImageUpload = "imageupload";
@@ -233,7 +239,7 @@ namespace EIMSNext.Common
         /// <summary>
         /// 所有支持的字段类型列表。
         /// </summary>
-        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, ImageUpload, FileUpload, Signature, DataSelect, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
+        public static readonly string[] AllFieldTypes = [Input, Number, TimeStamp, TextArea, Radio, CheckBox, Select1, Select2, Address, ImageUpload, FileUpload, Signature, DataSelect, TableForm, Employee1, Employee2, Department1, Department2, SerialNo];
 
         /// <summary>
         /// 判断指定类型是否为有效的表单字段类型。

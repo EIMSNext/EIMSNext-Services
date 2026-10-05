@@ -206,6 +206,13 @@ namespace EIMSNext.Core.Query
             {
                 if (filter.Value is null)
                     return BuildJsonbNullPredicate(jsonbPath, operation);
+
+                // address（省市区数组）：按 "省/市/区" 前缀匹配，走 @? JSONPath 命中 GIN 索引。
+                if (string.Equals(filter.Type, FieldType.Address, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BuildAddressPredicate(jsonbPath, operation, values);
+                }
+
                 return BuildJsonbPredicate(jsonbPath, operation, values);
             }
 
@@ -221,6 +228,86 @@ namespace EIMSNext.Core.Query
                 return BuildNullComparison(body, staticType, operation);
 
             return BuildComparison(body, staticType, operation, values, staticType);
+        }
+
+        /// <summary>地址对象的层级字段名，与 "省/市/区" 过滤值顺序一致。</summary>
+        private static readonly string[] AddressLevelNames = ["province", "city", "district"];
+
+        /// <summary>
+        /// 构建 address（省市区）字段的过滤谓词。
+        /// </summary>
+        /// <remarks>
+        /// 地址值在 jsonb 中是对象，如 <c>{"province":"北京市","city":"北京市","district":"东城区","detail":".."}</c>；
+        /// 过滤值是 "省/市/区" 前缀字符串（如 <c>"北京市/北京市"</c>），语义为
+        /// 「逐级等值匹配」：第 1 段等 province、第 2 段等 city……
+        /// 每一级翻译成一条 <c>lax $.f_addr.province ? (@ == "北京市")</c> 的 @? 谓词，
+        /// 同一前缀的多级之间 AND、多个前缀之间 OR（GIN 可对 AND 做 Bitmap 组合，实测命中
+        /// <c>IX_FormData_Data_Gin</c>）。
+        /// 注意必须用 lax：lax 对结构性意外（值缺失/标量脏数据）静默返回不命中；
+        /// strict 会产生 SQL NULL，把 nin 语义（键存在 且 不命中）整体污染成 NULL。
+        /// </remarks>
+        private static Expression BuildAddressPredicate(
+            DynamicPathAccessor.JsonbPathResolution jsonb,
+            string op,
+            List<object> values)
+        {
+            var container = jsonb.Container;
+            var path = jsonb.Path;
+
+            Expression Match(string jsonPath) => Expression.Call(
+                typeof(PgJsonFunctions).GetMethod(nameof(PgJsonFunctions.JsonMatch))!,
+                container,
+                Expression.Constant(jsonPath, typeof(string)));
+
+            // 过滤值 "省/市/区" → [("province", "省"), ("city", "市"), ("district", "区")]，多余段忽略
+            var prefixes = values
+                .Select(value => value?.ToString())
+                .Where(text => !string.IsNullOrWhiteSpace(text))
+                .Select(text => text!.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                .Where(segments => segments.Length > 0)
+                .Select(segments => AddressLevelNames
+                    .Zip(segments, (name, segment) => (name, segment))
+                    .Where(pair => !string.IsNullOrWhiteSpace(pair.segment))
+                    .ToList())
+                .Where(levels => levels.Count > 0)
+                .ToList();
+
+            if (prefixes.Count == 0)
+            {
+                return op is FilterOp.In or FilterOp.Eq
+                    ? Expression.Constant(false, typeof(bool))
+                    : Expression.Constant(true, typeof(bool));
+            }
+
+            Expression PrefixMatch(List<(string Name, string Segment)> levels)
+            {
+                Expression? match = null;
+                foreach (var (name, segment) in levels)
+                {
+                    var levelMatch = Match(
+                        $"lax {path}.{name} ? (@ == {ToJsonPathStringLiteral(segment)})");
+                    match = match is null ? levelMatch : Expression.AndAlso(match, levelMatch);
+                }
+
+                return match!;
+            }
+
+            var any = prefixes
+                .Select(PrefixMatch)
+                .Aggregate(Expression.OrElse);
+
+            switch (op)
+            {
+                case FilterOp.In:
+                case FilterOp.Eq:
+                    return any;
+                case FilterOp.Ne:
+                case FilterOp.Nin:
+                    // 与 nin 语义保持一致：字段存在 且 不命中任何给定前缀。
+                    return Expression.AndAlso(Match(path), Expression.Not(any));
+                default:
+                    throw new BadRequestException($"地址字段不支持过滤运算符: {op}");
+            }
         }
 
         /// <summary>
