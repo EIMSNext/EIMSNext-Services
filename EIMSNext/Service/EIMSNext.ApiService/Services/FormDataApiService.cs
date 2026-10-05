@@ -976,6 +976,7 @@ namespace EIMSNext.ApiService
                     FieldType.Radio or FieldType.Select1 => ConvertImportSingleOption(ToImportCellText(raw), field),
                     FieldType.CheckBox or FieldType.Select2 => ConvertImportMultiOption(raw!, field),
                     FieldType.ImageUpload or FieldType.FileUpload => ConvertImportUrlList(raw!),
+                    FieldType.Address => ConvertImportAddress(ToImportCellText(raw)),
                     _ => raw is string text ? ConvertImportTextOrJson(text) : raw,
                 };
             }
@@ -1299,6 +1300,42 @@ namespace EIMSNext.ApiService
             }
 
             return text;
+        }
+
+        /// <summary>
+        /// 地址导入：支持 "省/市/区" 文本（兼容数组合法 JSON），统一转为 { province, city, district, detail } 对象。
+        /// 超过 3 段的部分并入详细地址。
+        /// </summary>
+        private static object ConvertImportAddress(string text)
+        {
+            if ((text.StartsWith('[') && text.EndsWith(']')))
+            {
+                try
+                {
+                    if (text.DeserializeFromJson<List<string>>() is { Count: > 0 } parsed)
+                    {
+                        return BuildImportAddressValue(parsed);
+                    }
+                }
+                catch
+                {
+                    // 落到下方的文本解析
+                }
+            }
+
+            var segments = text.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return BuildImportAddressValue(segments);
+        }
+
+        private static object BuildImportAddressValue(IList<string> segments)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["province"] = segments.Count > 0 ? segments[0] : string.Empty,
+                ["city"] = segments.Count > 1 ? segments[1] : string.Empty,
+                ["district"] = segments.Count > 2 ? segments[2] : string.Empty,
+                ["detail"] = string.Join("/", segments.Skip(3)),
+            };
         }
 
         private static object? GetImportValue(Dictionary<string, object?> data, string? field)

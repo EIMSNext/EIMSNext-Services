@@ -10,6 +10,9 @@ namespace EIMSNext.Component
 {
     public static class FormDataFormatter
     {
+        /// <summary>地址对象的字段名，拼接顺序即显示顺序（省 + 市 + 区 + 详细地址）。</summary>
+        private static readonly string[] AddressKeys = ["province", "city", "district", "detail"];
+
         public static Dictionary<string, object?> Format(FormData data, IList<FieldDef> fieldDefs)
         {
             var resultDict = new Dictionary<string, object?>();
@@ -72,6 +75,7 @@ namespace EIMSNext.Component
             {
                 FieldType.TimeStamp => FormatTimestampValue(value, fieldDef.Props.Format),
                 FieldType.Number => FormatNumberValue(value, fieldDef.Props.Format),
+                FieldType.Address => FormatAddressValue(value),
                 FieldType.TableForm => FormatTableFormValue(value, fieldDef.Columns),
                 _ => value,
             };
@@ -94,9 +98,37 @@ namespace EIMSNext.Component
                     => FormatLabelValue(value),
                 FieldType.ImageUpload or FieldType.FileUpload => FormatFileValue(value),
                 FieldType.DataSelect => FormatDataSelectValue(value),
+                FieldType.Address => FormatAddressValue(value),
                 FieldType.TableForm => FormatDisplayTableFormValue(value, fieldDef.Columns),
                 _ => value,
             };
+        }
+
+        /// <summary>
+        /// 地址 { province, city, district, detail } → "省市区详细地址"。
+        /// 与打印规则一致：province + city + district + detail 直接拼接，不加分隔符。
+        /// 兼容历史数组值 ["省","市","区"] → "省市区"。
+        /// </summary>
+        private static object? FormatAddressValue(object? value)
+        {
+            if (value == null)
+            {
+                return null;
+            }
+
+            if (value.AsDictionary() is { } dict)
+            {
+                return string.Concat(AddressKeys.Select(name =>
+                    dict.TryGetValue(name, out var item) ? item?.ToString()?.Trim() ?? string.Empty : string.Empty));
+            }
+
+            if (value is IEnumerable enumerable && value is not string)
+            {
+                return string.Concat(enumerable.Cast<object?>()
+                    .Select(item => item?.ToString()?.Trim() ?? string.Empty));
+            }
+
+            return value;
         }
 
         private static object? FormatDataSelectValue(object? value)

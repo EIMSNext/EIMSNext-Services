@@ -20,9 +20,39 @@ PostgreSQL Schema 迁移执行器。按版本号顺序、带 SHA256 台账地执
 
 ## 运行方式
 
+两种入口，共用同一套执行逻辑：
+
+| 用法 | 行为 |
+| --- | --- |
+| 不带任何参数（VS 里右键运行即此场景） | 进入**交互式菜单**，选 1/2/3/4 执行，执行完按 Enter 返回菜单，窗口不会自动关闭 |
+| 带参数（如 `--dry-run`） | 一次性执行后退出，适合脚本 / CI |
+| `-i` / `--interactive` | 即使带了参数也强制进入菜单 |
+
 ```powershell
 dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj
+# 带参数时用 `--` 分隔，否则会被 dotnet run 自己吃掉
+dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj -- --dry-run
 ```
+
+菜单顶部会打印**实际生效的目标库**（`用户名@主机:端口/库名`）与脚本目录，用来核对有没有连错库；
+发现连错时按 `C` 直接输入新连接串即可，无需改配置文件：
+
+```
+========== EIMSNext 数据库维护 ==========
+目标库    : postgres@localhost:5432/EIMS
+脚本目录  : ...\bin\Debug\net10.0\Sql
+----------------------------------------
+  [1] 预览将要执行的脚本      (--dry-run，不连库)
+  [2] 校验迁移链状态          (--verify，不改库)
+  [3] 执行迁移                (升级到最新版本)
+  [4] 执行到指定版本          (--target-version)
+  [C] 修改目标库连接串
+  [S] 允许已执行脚本内容变更  (--accept-checksum-change：关)
+  [Q] 退出
+```
+
+> 本工具**不负责建库**。连到不存在的库会直接报连接错误，请先用
+> `psql -U postgres -c 'CREATE DATABASE "EIMS";'`（或 pgAdmin）建好空库再跑迁移。
 
 切换目标库（例如指向测试库 `EIMSTest`）：
 
@@ -35,6 +65,7 @@ dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintena
 
 | 开关 | 作用 |
 | --- | --- |
+| `-i` / `--interactive` | 强制进入交互式菜单（忽略其它开关） |
 | `--dry-run` | 只列出将要执行的脚本，不落库 |
 | `--verify` | 只校验、不执行：磁盘缺文件 / checksum 变化 / **存在未应用的 pending 脚本**都会报错 |
 | `--target-version <版本>` | 执行到指定版本为止 |
@@ -113,7 +144,7 @@ dotnet test Tests/EIMSNext.Core.Tests --filter RegenerateBaselineScripts
   $env:PostgreSql__ConnectionString = "Host=localhost;Port=5432;Database=EIMSTest;Username=postgres;Password=sa123"
   dotnet run --project ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj
   ```
-  预期输出 `Applied 11 migration(s).`，全链一次通过。
+  预期输出 `Applied 12 migration(s).`，全链一次通过。
 
 ## 硬性约定
 
