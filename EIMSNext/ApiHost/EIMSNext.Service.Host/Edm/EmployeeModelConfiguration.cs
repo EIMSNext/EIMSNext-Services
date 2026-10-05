@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 
@@ -8,13 +10,13 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// 
     /// </summary>
-    public class EmployeeModelConfiguration : CorpModelConfigurationBase<EmployeeViewModel,EmployeeRequest>
+    public class EmployeeModelConfiguration : CorpModelConfigurationBase<Employee,EmployeeRequest>
     {
         /// <summary>
         /// 
         /// </summary>
         /// <param name="entityType"></param>
-        protected override void ConfigureCommon(EntityTypeConfiguration<EmployeeViewModel> entityType)
+        protected override void ConfigureCommon(EntityTypeConfiguration<Employee> entityType)
         {
             base.ConfigureCommon(entityType);
 

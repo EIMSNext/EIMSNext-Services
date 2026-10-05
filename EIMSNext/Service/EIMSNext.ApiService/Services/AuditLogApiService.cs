@@ -1,4 +1,4 @@
-﻿using System.Linq.Expressions;
+using System.Linq.Expressions;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -22,7 +22,7 @@ namespace EIMSNext.ApiService
 	/// 审计日志的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class AuditLogApiService(IResolver resolver) : ApiServiceBase<AuditLog, AuditLogViewModel,IAuditLogService>(resolver)
+	public class AuditLogApiService(IResolver resolver) : ApiServiceBase<AuditLog, IAuditLogService>(resolver)
 	{
 		private static readonly Dictionary<string, ExportColumnType> AuditLogColumnTypes = new(StringComparer.OrdinalIgnoreCase)
 		{

@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.CorpAdmin)]
-	public class TenantAdminGroupController(IResolver resolver) : ApiControllerBase<TenantAdminGroupApiService, TenantAdminGroup, TenantAdminGroupViewModel>(resolver)
+	public class TenantAdminGroupController(IResolver resolver) : ApiControllerBase<TenantAdminGroupApiService, TenantAdminGroup>(resolver)
 	{
         [HttpPost("Move")]
         [Permission(Operation = Operation.Edit)]

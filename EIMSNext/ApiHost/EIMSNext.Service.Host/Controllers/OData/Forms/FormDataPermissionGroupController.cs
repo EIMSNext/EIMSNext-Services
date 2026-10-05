@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 
 using HKH.Mef2.Integration;
 using EIMSNext.Service.Host.OData;
@@ -20,9 +20,9 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class FormDataPermissionGroupController(IResolver resolver) : ODataController<FormDataPermissionGroupApiService, FormDataPermissionGroup, FormDataPermissionGroupViewModel, FormDataPermissionGroupRequest>(resolver)
+	public class FormDataPermissionGroupController(IResolver resolver) : ODataController<FormDataPermissionGroupApiService, FormDataPermissionGroup, FormDataPermissionGroupRequest>(resolver)
 	{
-        protected override IQueryable<FormDataPermissionGroupViewModel> FilterByPermission(IQueryable<FormDataPermissionGroupViewModel> query, ODataQueryOptions<FormDataPermissionGroupViewModel> options)
+        protected override IQueryable<FormDataPermissionGroup> FilterByPermission(IQueryable<FormDataPermissionGroup> query, ODataQueryOptions<FormDataPermissionGroup> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

@@ -10,9 +10,9 @@ using Microsoft.AspNetCore.OData.Query;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
-    public class FormListViewController(IResolver resolver) : ODataController<FormListViewApiService, FormListView, FormListViewViewModel, FormListViewRequest>(resolver)
+    public class FormListViewController(IResolver resolver) : ODataController<FormListViewApiService, FormListView, FormListViewRequest>(resolver)
     {
-        protected override IQueryable<FormListViewViewModel> FilterByPermission(IQueryable<FormListViewViewModel> query, ODataQueryOptions<FormListViewViewModel> options)
+        protected override IQueryable<FormListView> FilterByPermission(IQueryable<FormListView> query, ODataQueryOptions<FormListView> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

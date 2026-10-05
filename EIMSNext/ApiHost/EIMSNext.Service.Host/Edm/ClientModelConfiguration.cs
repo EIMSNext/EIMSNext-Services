@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 
@@ -6,7 +8,7 @@ using Microsoft.OData.ModelBuilder;
 namespace EIMSNext.Service.Host.Edm
 {
     /// <summary>
-    /// <see cref="ClientViewModel"/> 的 OData 模型注册。
+    /// <see cref="Client"/> 的 OData 模型注册。
     ///
     /// 关键安全策略：
     /// <list type="bullet">
@@ -15,10 +17,10 @@ namespace EIMSNext.Service.Host.Edm
     /// 普通 PATCH 不会改写该字段。</item>
     /// </list>
     /// </summary>
-    public class ClientModelConfiguration : CorpModelConfigurationBase<ClientViewModel, ClientRequest>
+    public class ClientModelConfiguration : CorpModelConfigurationBase<Client, ClientRequest>
     {
         /// <inheritdoc />
-        protected override void ConfigureCommon(EntityTypeConfiguration<ClientViewModel> entityType)
+        protected override void ConfigureCommon(EntityTypeConfiguration<Client> entityType)
         {
             base.ConfigureCommon(entityType);
 

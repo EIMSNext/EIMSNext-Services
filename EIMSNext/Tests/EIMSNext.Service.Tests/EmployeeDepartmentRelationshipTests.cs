@@ -1,9 +1,11 @@
 ﻿using System.Composition.Hosting;
 using System.Linq.Expressions;
+using System.Text.Json;
 
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
+using EIMSNext.Component;
 using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
@@ -176,8 +178,8 @@ namespace EIMSNext.Service.Tests
             var parent = SeedDepartment("dept-filter-parent", "Parent");
             var child = SeedDepartment("dept-filter-child", "Child", parent.Id);
             var sibling = SeedDepartment("dept-filter-sibling", "Sibling");
-            var childEmployee = new EmployeeViewModel { Id = "emp-child", CorpId = CorpId, Code = "E004", EmpName = "Child Employee" };
-            var siblingEmployee = new EmployeeViewModel { Id = "emp-sibling", CorpId = CorpId, Code = "E005", EmpName = "Sibling Employee" };
+            var childEmployee = new Employee { Id = "emp-child", CorpId = CorpId, Code = "E004", EmpName = "Child Employee" };
+            var siblingEmployee = new Employee { Id = "emp-sibling", CorpId = CorpId, Code = "E005", EmpName = "Sibling Employee" };
             _employeeDepartmentRepo.Insert(new EmployeeDepartment { CorpId = CorpId, EmployeeId = childEmployee.Id, DepartmentId = child.Id, HeriarchyId = child.HeriarchyId });
             _employeeDepartmentRepo.Insert(new EmployeeDepartment { CorpId = CorpId, EmployeeId = siblingEmployee.Id, DepartmentId = sibling.Id, HeriarchyId = sibling.HeriarchyId });
 
@@ -295,6 +297,66 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(Fields.CreateById, selectedGroupScope.DataFilter?.Field);
             Assert.AreEqual(employee.Id, selectedGroupScope.DataFilter?.Value);
             Assert.IsFalse(unassignedGroupScope.CanRead);
+        }
+
+        [TestMethod]
+        public void FormDataPermissionFilter_ResolvesDynamicMemberByFieldType()
+        {
+            var department = SeedDepartment("dept-dynamic-filter", "研发部");
+            var employee = SeedEmployee("emp-dynamic-filter", "当前员工", department.Id);
+            _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
+            _identityContext.CurrentEmployeeValue = employee;
+            var employeeGroup = new FormDataPermissionGroup
+            {
+                Type = FormDataPermissionMode.Custom,
+                DataFilter = """
+                    {"Rel":"and","Items":[{"Field":{"Field":"owner","Type":"employee1"},"Op":"in","Value":{"Type":"custom","Value":[{"Id":"curuser","Type":4}]}}]}
+                    """
+            };
+            var departmentGroup = new FormDataPermissionGroup
+            {
+                Type = FormDataPermissionMode.Custom,
+                DataFilter = """
+                    {"Rel":"and","Items":[{"Field":{"Field":"department","Type":"department1"},"Op":"in","Value":{"Type":"custom","Value":[{"Id":"curdept","Type":4}]}}]}
+                    """
+            };
+
+            var employeeFilter = _readScopeResolver.ResolvePermissionGroupDataFilter(employeeGroup);
+            var departmentFilter = _readScopeResolver.ResolvePermissionGroupDataFilter(departmentGroup);
+
+            Assert.IsNotNull(employeeFilter, "employee filter should be created");
+            Assert.IsNotNull(departmentFilter, "department filter should be created");
+            Assert.IsNotNull(employeeFilter!.Items, "employee filter group should be created");
+            Assert.IsNotNull(departmentFilter!.Items, "department filter group should be created");
+            var employeeValue = employeeFilter.Items![0].Value;
+            var departmentValue = departmentFilter.Items![0].Value;
+            StringAssert.Contains(JsonSerializer.Serialize(employeeValue), employee.Id);
+            StringAssert.Contains(JsonSerializer.Serialize(departmentValue), department.Id);
+            Assert.IsFalse(JsonSerializer.Serialize(employeeValue).Contains("curdept", StringComparison.OrdinalIgnoreCase));
+            Assert.IsFalse(JsonSerializer.Serialize(departmentValue).Contains("curuser", StringComparison.OrdinalIgnoreCase));
+        }
+
+        [TestMethod]
+        public void FormDataPermissionFilter_DynamicResolutionFailure_IsFailClosedInsideNotGroup()
+        {
+            var department = SeedDepartment("dept-dynamic-not", "研发部");
+            var employee = SeedEmployee("emp-dynamic-not", "当前员工", department.Id);
+            _identityContext.IdentityTypeValue = IdentityType.AppAdmin;
+            _identityContext.CurrentEmployeeValue = employee;
+
+            var permissionGroup = new FormDataPermissionGroup
+            {
+                Type = FormDataPermissionMode.Custom,
+                DataFilter = """
+                    {"Rel":"not","Items":[{"Field":{"Field":"department","Type":"department1"},"Op":"in","Value":{"Type":"custom","Value":[{"Id":"curuser","Type":4}]}}]}
+                    """
+            };
+
+            var filter = _readScopeResolver.ResolvePermissionGroupDataFilter(permissionGroup);
+
+            Assert.IsNotNull(filter);
+            Assert.AreEqual(Fields.Id, filter!.Field);
+            Assert.AreEqual("__no_permission__", filter.Value);
         }
 
         [TestMethod]

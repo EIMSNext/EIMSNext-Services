@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using System.Diagnostics.CodeAnalysis;
 using System.Diagnostics.Contracts;
 using System.Reflection;

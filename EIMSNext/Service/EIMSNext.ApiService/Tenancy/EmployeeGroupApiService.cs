@@ -1,5 +1,4 @@
 ﻿using EIMSNext.ApiService.RequestModels;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
@@ -17,7 +16,7 @@ namespace EIMSNext.ApiService
     /// 员工组的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class EmployeeGroupApiService(IResolver resolver) : ApiServiceBase<EmployeeGroup, EmployeeGroupViewModel, IEmployeeGroupService>(resolver)
+    public class EmployeeGroupApiService(IResolver resolver) : ApiServiceBase<EmployeeGroup, IEmployeeGroupService>(resolver)
     {
         /// <summary>
         /// 新增EmployeesToEmployeeGroup。

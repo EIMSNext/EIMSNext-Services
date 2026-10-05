@@ -16,7 +16,7 @@ namespace EIMSNext.ApiService
 	/// 企业的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class CorporateApiService(IResolver resolver) : ApiServiceBase<Corporate, CorporateViewModel, ICorporateService>(resolver)
+	public class CorporateApiService(IResolver resolver) : ApiServiceBase<Corporate, ICorporateService>(resolver)
 	{
 		/// <summary>
 		/// 新增实体。

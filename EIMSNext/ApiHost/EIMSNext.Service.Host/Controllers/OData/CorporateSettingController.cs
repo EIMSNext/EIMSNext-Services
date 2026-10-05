@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers.OData;
 [ApiVersion(1.0)]
 [IdentityType(IdentityTypeDefaults.CorpAdmin)]
 public sealed class CorporateSettingController(IResolver resolver)
-    : ODataController<CorporateSettingApiService, CorporateSetting, CorporateSettingViewModel, CorporateSettingRequest>(resolver)
+    : ODataController<CorporateSettingApiService, CorporateSetting, CorporateSettingRequest>(resolver)
 {
 }
 

@@ -25,7 +25,7 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 表单数据的 API 服务。
     /// </summary>
-    public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
+    public class FormDataApiService : ApiServiceBase<FormData, IFormDataService>
     {
         private const int ImportMaxColumns = 500;
         private const int ImportPreviewRowLimit = 30;
@@ -682,34 +682,7 @@ namespace EIMSNext.ApiService
 
         private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (permissionGroup.Type)
-            {
-                case FormDataPermissionMode.ManageSelfData:
-                    if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
-                    {
-                        return CreateNoMatchFilter();
-                    }
-
-                    return new DynamicFilter
-                    {
-                        Field = Fields.CreateById,
-                        Op = FilterOp.Eq,
-                        Value = IdentityContext.CurrentEmployee.Id,
-                    };
-                case FormDataPermissionMode.ViewAllData:
-                case FormDataPermissionMode.ManageAllData:
-                    return null;
-                case FormDataPermissionMode.Custom:
-                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
-                    {
-                        return null;
-                    }
-
-                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
-                    return condList?.ToDynamicFilter();
-                default:
-                    return null;
-            }
+            return _readScopeResolver.ResolvePermissionGroupDataFilter(permissionGroup);
         }
 
         private static DynamicFilter CreateNoMatchFilter()

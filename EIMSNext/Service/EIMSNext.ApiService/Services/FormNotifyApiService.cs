@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
 	/// 表单通知的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class FormNotifyApiService(IResolver resolver) : ApiServiceBase<FormNotify, FormNotifyViewModel, IFormNotifyService>(resolver)
+	public class FormNotifyApiService(IResolver resolver) : ApiServiceBase<FormNotify, IFormNotifyService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

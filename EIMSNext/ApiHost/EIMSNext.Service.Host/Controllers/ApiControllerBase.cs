@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
@@ -10,10 +10,9 @@ using HKH.Mef2.Integration;
 namespace EIMSNext.Service.Host.Controllers
 {
     [ApiVersion(1.0)]
-    public class ApiControllerBase<S, T, Q> : MefControllerBase<S, T, Q>
-       where S : class, IApiService<T, Q>
+    public class ApiControllerBase<S, T> : MefControllerBase<S, T>
+       where S : class, IApiService<T>
         where T : class, IEntity
-        where Q : T, new()
     {
         public ApiControllerBase(IResolver resolver) : base(resolver)
         {

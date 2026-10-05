@@ -688,6 +688,7 @@ namespace EIMSNext.Flow.Core
                 CorpId = source.CorpId,
                 AppId = source.AppId,
                 FormId = source.FormId,
+                FormName = source.FormName,
                 DataId = source.DataId,
                 WfInstanceId = source.WfInstanceId,
                 ApproveNodeId = source.ApproveNodeId,

@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
 	/// 仪表盘定义的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class DashboardDefApiService(IResolver resolver) : ApiServiceBase<DashboardDef, DashboardDefViewModel, IDashboardDefService>(resolver)
+	public class DashboardDefApiService(IResolver resolver) : ApiServiceBase<DashboardDef, IDashboardDefService>(resolver)
 	{
         private const int MaxNameLength = 100;
 

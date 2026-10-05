@@ -36,10 +36,9 @@ namespace EIMSNext.Service.Host.OData
     /// <typeparam name="V"></typeparam>
     [Authorize]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-    public abstract class ReadOnlyODataController<S, T, V> : ODataController
-        where S : class, IApiService<T, V>
+    public abstract class ReadOnlyODataController<S, T> : ODataController
+        where S : class, IApiService<T>
         where T : class, IEntityKey
-        where V : class, T, new()
     {
         protected static readonly Type IDeleteFlagType = typeof(IDeleteFlag);
 
@@ -56,7 +55,7 @@ namespace EIMSNext.Service.Host.OData
         {
             this.Resolver = resolver;
             this.CacheClient = resolver.GetCacheClient();
-            this.ApiService = resolver.GetApiService<T, V>();
+            this.ApiService = resolver.GetApiService<T>();
             this.IdentityContext = resolver.GetIdentityContext();
         }
 
@@ -73,7 +72,7 @@ namespace EIMSNext.Service.Host.OData
         /// <summary>
         /// 服务接口
         /// </summary>
-        protected IApiService<T, V> ApiService { get; private set; }
+        protected IApiService<T> ApiService { get; private set; }
         /// <summary>
         /// 当前用户上下文
         /// </summary>
@@ -101,8 +100,8 @@ namespace EIMSNext.Service.Host.OData
         [HttpGet]
         [Permission(Operation = Operation.Read)]
         // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
-        [DefaultPageSizeEnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
-        public virtual IActionResult Get(ODataQueryOptions<V> options)
+        [EnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
+        public virtual IActionResult Get(ODataQueryOptions<T> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
             {
@@ -123,7 +122,7 @@ namespace EIMSNext.Service.Host.OData
         /// <param name="query"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        protected virtual IQueryable<V> Expand(IQueryable<V> query, ODataQueryOptions<V> options)
+        protected virtual IQueryable<T> Expand(IQueryable<T> query, ODataQueryOptions<T> options)
         {
             return query;
         }
@@ -132,19 +131,19 @@ namespace EIMSNext.Service.Host.OData
         /// </summary>
         /// <param name="query"></param>
         /// <returns></returns>
-        protected virtual IQueryable<V> FilterResult(IQueryable<V> query, ODataQueryOptions<V> options)
+        protected virtual IQueryable<T> FilterResult(IQueryable<T> query, ODataQueryOptions<T> options)
         {
             return FilterByPermission(FilterByDeleted(query), options);
         }
-        protected IQueryable<V> FilterByDeleted(IQueryable<V> query)
+        protected IQueryable<T> FilterByDeleted(IQueryable<T> query)
         {
-            if (IDeleteFlagType.IsAssignableFrom(typeof(V)))
+            if (IDeleteFlagType.IsAssignableFrom(typeof(T)))
                 return query.Where(x => !((x as IDeleteFlag)!.DeleteFlag));
             else
                 return query;
         }
-       
-        protected virtual IQueryable<V> FilterByPermission(IQueryable<V> query, ODataQueryOptions<V> options)
+
+        protected virtual IQueryable<T> FilterByPermission(IQueryable<T> query, ODataQueryOptions<T> options)
         {
             return query;
         }
@@ -159,11 +158,11 @@ namespace EIMSNext.Service.Host.OData
         [Permission(Operation = Operation.Read)]
         // 默认最多 2 层（根 + 直接导航），禁止导航的导航（A→B 允许，A→B→C 禁止，避免级联 $expand 越权）。
         [EnableQuery(MaxExpansionDepth = 1, MaxNodeCount = 200)]
-        public virtual SingleResult Get([FromODataUri] string key, ODataQueryOptions<V> options)
+        public virtual SingleResult Get([FromODataUri] string key, ODataQueryOptions<T> options)
         {
             if (ContainsConstantPredicate(options.Filter?.FilterClause.Expression))
             {
-                return SingleResult.Create(Enumerable.Empty<V>().AsQueryable());
+                return SingleResult.Create(Enumerable.Empty<T>().AsQueryable());
             }
 
             var query = ApiService.Query(x => x.Id == key);
@@ -246,10 +245,9 @@ namespace EIMSNext.Service.Host.OData
     /// <typeparam name="V"></typeparam>
     /// <typeparam name="R"></typeparam>
     [Authorize]
-    public abstract class ODataController<S, T, V, R> : ReadOnlyODataController<S, T, V>
-        where S : class, IApiService<T, V>
+    public abstract class ODataController<S, T, R> : ReadOnlyODataController<S, T>
+        where S : class, IApiService<T>
         where T : class, IEntity
-        where V : class, T, new()
         where R : class, IEntityKey
     {
         /// <summary>
@@ -284,7 +282,7 @@ namespace EIMSNext.Service.Host.OData
                 return BadRequest(fail?.Message);
 
             await ApiService.AddAsync(entity);
-            return Ok(entity.CastTo<T, V>());
+            return Ok(entity);
         }
 
         /// <summary>
@@ -313,7 +311,7 @@ namespace EIMSNext.Service.Host.OData
             model.CopyTo(entity);
 
             await ApiService.ReplaceAsync(entity);
-            return Ok(entity.CastTo<T, V>());
+            return Ok(entity);
         }
 
         /// <summary>
@@ -356,7 +354,7 @@ namespace EIMSNext.Service.Host.OData
 
             await ApiService.ReplaceAsync(entity);
 
-            return Ok(entity.CastTo<T, V>());
+            return Ok(entity);
         }
 
         /// <summary>

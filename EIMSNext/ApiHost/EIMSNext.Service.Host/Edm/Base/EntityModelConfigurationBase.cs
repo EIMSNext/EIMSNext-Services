@@ -1,4 +1,5 @@
-﻿using EIMSNext.ApiService.RequestModels;
+using EIMSNext.Entities;
+using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 

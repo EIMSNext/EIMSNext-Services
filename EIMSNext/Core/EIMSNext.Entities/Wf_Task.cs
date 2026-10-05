@@ -9,6 +9,10 @@ namespace EIMSNext.Entities
     public class Wf_Task : CorpEntityBase
     {
         /// <summary>
+        /// 表单名称快照。
+        /// </summary>
+        public string FormName { get; set; } = string.Empty;
+        /// <summary>
         /// 工作流实例ID
         /// </summary>
         public string WfInstanceId { get; set; } = string.Empty;

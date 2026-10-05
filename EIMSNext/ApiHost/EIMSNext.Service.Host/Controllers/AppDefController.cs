@@ -12,7 +12,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EIMSNext.Service.Host.Controllers
 {
     [ApiVersion(1.0)]
-    public class AppDefController(IResolver resolver) : ApiControllerBase<AppDefApiService, AppDef, AppDefViewModel>(resolver)
+    public class AppDefController(IResolver resolver) : ApiControllerBase<AppDefApiService, AppDef>(resolver)
     {
         [HttpPost("CreateGroup")]
         public async Task<ActionResult<AppDef>> CreateGroup([FromBody] CreateAppGroupRequest request)

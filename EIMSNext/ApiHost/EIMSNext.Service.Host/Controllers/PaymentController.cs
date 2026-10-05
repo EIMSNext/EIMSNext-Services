@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class PaymentController(IResolver resolver) : ApiControllerBase<PaymentApiService, Payment, PaymentViewModel>(resolver)
+	public class PaymentController(IResolver resolver) : ApiControllerBase<PaymentApiService, Payment>(resolver)
 	{
 		
 	}

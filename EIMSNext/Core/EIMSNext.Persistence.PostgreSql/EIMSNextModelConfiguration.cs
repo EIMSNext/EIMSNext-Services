@@ -256,7 +256,7 @@ public static class EIMSNextModelConfiguration
         Mapped<FormDef>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.AppId })
             .HasDatabaseName("IX_FormDef_CorpId_AppId");
 
-        // ------------------------------------------------------------ 关系（导航 + 外键）
+        // ------------------------------------------------------------ 关系（导航 + 必要外键）
         // 员工与部门 / 员工组是多对多中间表：Employee 通过 EmployeeId 外键导航到
         // EmployeeDepartment / EmployeeGroupMember，使 OData 的
         // Departments/any(...) / Groups/any(...) 可翻译为 SQL。
@@ -267,6 +267,9 @@ public static class EIMSNextModelConfiguration
             .HasMany(e => e.Departments).WithOne().HasForeignKey("EmployeeId");
         Mapped<Employee>(modelBuilder)?
             .HasMany(e => e.Groups).WithOne().HasForeignKey("EmployeeId");
+        // EmployeeGroupCategoryId 允许空字符串表示未分类员工组。
+        // EmployeeGroup.EmployeeGroupCategory 标记为 NotMapped，避免 EF 创建数据库 FK；
+        // OData EDM 单独声明该导航，查询时由 API 层按外键 Join。
 
         // ------------------------------------------------------------ 软删除过滤
         // DeleteFlag 是全局约定；把过滤下沉到模型层，避免每个查询都手写 where !DeleteFlag。

@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -23,7 +23,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WebhookController(IResolver resolver) : ApiControllerBase<WebhookApiService, Webhook, WebhookViewModel>(resolver)
+    public class WebhookController(IResolver resolver) : ApiControllerBase<WebhookApiService, Webhook>(resolver)
     {
         [HttpPost("Test")]
         public async Task<IActionResult> TestAsync([FromBody]WebhookRequest request, CancellationToken cancellationToken)

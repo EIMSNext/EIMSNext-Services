@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiClient.Flow;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
@@ -24,7 +24,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
+    public class WorkflowController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData>(resolver)
     {
         [HttpGet("ManageTasks")]
         [IdentityType(IdentityType.CorpAdmin)]

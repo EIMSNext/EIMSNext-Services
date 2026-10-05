@@ -15,7 +15,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace EIMSNext.Service.Host.Controllers
 {
     [ApiVersion(1.0)]
-    public class SystemMessageController(IResolver resolver) : ApiControllerBase<SystemMessageApiService, SystemMessage, SystemMessageViewModel>(resolver)
+    public class SystemMessageController(IResolver resolver) : ApiControllerBase<SystemMessageApiService, SystemMessage>(resolver)
     {
         [HttpGet("UnreadCount")]
         [Permission(Operation = Operation.Read)]

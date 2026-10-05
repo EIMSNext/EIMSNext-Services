@@ -1,4 +1,4 @@
-﻿using EIMSNext.ApiService.ViewModels;
+using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Cache;
 using EIMSNext.Common;
@@ -24,7 +24,7 @@ namespace EIMSNext.ApiService
     /// </list>
     /// </summary>
     public class ClientApiService(IResolver resolver)
-        : ApiServiceBase<Client, ClientViewModel, IClientService>(resolver), IClientApiService
+        : ApiServiceBase<Client, IClientService>(resolver), IClientApiService
     {
         private const string PlainCacheKeyPrefix = "clientSecret:plain:";
 

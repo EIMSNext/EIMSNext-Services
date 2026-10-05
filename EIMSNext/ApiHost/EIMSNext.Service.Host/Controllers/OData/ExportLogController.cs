@@ -9,7 +9,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
     public class ExportLogController(IResolver resolver)
-        : ReadOnlyODataController<ExportLogApiService, ExportLog, ExportLogViewModel>(resolver)
+        : ReadOnlyODataController<ExportLogApiService, ExportLog>(resolver)
     {
     }
 }

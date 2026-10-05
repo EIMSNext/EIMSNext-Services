@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
     /// 系统消息的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class SystemMessageApiService(IResolver resolver) : ApiServiceBase<SystemMessage, SystemMessageViewModel, ISystemMessageService>(resolver)
+    public class SystemMessageApiService(IResolver resolver) : ApiServiceBase<SystemMessage, ISystemMessageService>(resolver)
     {
         /// <summary>
         /// 获取未读消息数量。
@@ -39,7 +39,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 按当前身份权限过滤查询。
         /// </summary>
-        protected override IQueryable<SystemMessageViewModel> FilterByPermission()
+        protected override IQueryable<SystemMessage> FilterByPermission()
         {
             var empId = GetCurrentEmpId();
             return base.FilterByPermission().Where(x => x.ReceiverEmpId == empId);

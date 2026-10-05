@@ -6,6 +6,7 @@ using EIMSNext.Entities;
 
 using EIMSNext.Service.Contracts;
 using EIMSNext.Common;
+using EIMSNext.Core.Services.Extensions;
 
 namespace EIMSNext.ApiService
 {
@@ -13,12 +14,12 @@ namespace EIMSNext.ApiService
     /// 表单定义的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, FormDefViewModel, IFormDefService>(resolver)
+    public class FormDefApiService(IResolver resolver) : ApiServiceBase<FormDef, IFormDefService>(resolver)
 	{
         /// <summary>
         /// 获取FormsIncludeCross。
         /// </summary>
-        public List<FormDefViewModel> GetFormsIncludeCross(string appId)
+        public List<FormDef> GetFormsIncludeCross(string appId)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(appId);
 
@@ -84,6 +85,7 @@ namespace EIMSNext.ApiService
             ValidateName(entity.Name);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ValidateFieldIds(entity.Content.Items);
+            ValidateMemberSources(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
             return base.AddAsync(entity);
         }
@@ -99,6 +101,7 @@ namespace EIMSNext.ApiService
             ValidateName(entity.Name);
             entity.Content.Items = Resolver.Resolve<FormLayoutParser>().Parse(entity.Content.Layout);
             ValidateFieldIds(entity.Content.Items);
+            ValidateMemberSources(entity.Content.Items);
             PopulatePublicRelatedForms(entity);
             ServiceContext.ScopeCache.Set(entity.Id, entity, Cache.DataVersion.New);
 
@@ -181,6 +184,78 @@ namespace EIMSNext.ApiService
             }
         }
 
+        private void ValidateMemberSources(IEnumerable<FieldDef>? fields)
+        {
+            foreach (var field in fields ?? [])
+            {
+                var source = field.Props.MemberSource;
+                var items = source?.Items ?? [];
+                ValidateMemberSourceItemTypes(field.Type, items);
+                ValidateMemberSourceIds(field.Type, "department", items, ids =>
+                    Resolver.GetRepository<Department>().Queryable
+                        .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && ids.Contains(x.Id))
+                        .Select(x => x.Id)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+                ValidateMemberSourceIds(field.Type, "employeeGroup", items, ids =>
+                    Resolver.GetRepository<EmployeeGroup>().Queryable
+                        .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && ids.Contains(x.Id))
+                        .Select(x => x.Id)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+                ValidateMemberSourceIds(field.Type, "employee", items, ids =>
+                    Resolver.GetRepository<Employee>().Queryable
+                        .Where(x => x.CorpId == IdentityContext.CurrentCorpId && !x.DeleteFlag && ids.Contains(x.Id))
+                        .Select(x => x.Id)
+                        .ToHashSet(StringComparer.OrdinalIgnoreCase));
+
+                ValidateMemberSources(field.Columns);
+            }
+        }
+
+        private static void ValidateMemberSourceItemTypes(string fieldType, IEnumerable<MemberSourceItem> items)
+        {
+            var isDepartmentField = fieldType is FieldType.Department1 or FieldType.Department2;
+            foreach (var item in items)
+            {
+                var type = item.Type?.Trim().ToLowerInvariant();
+                var id = item.Id?.Trim();
+                var valid = type switch
+                {
+                    "department" => true,
+                    "employee" or "employeegroup" => !isDepartmentField,
+                    "dynamic" => string.Equals(id, "curdept", StringComparison.OrdinalIgnoreCase) ||
+                                  (!isDepartmentField && string.Equals(id, "curuser", StringComparison.OrdinalIgnoreCase)),
+                    _ => false,
+                };
+
+                if (!valid)
+                {
+                    throw new BadRequestException($"字段 {fieldType} 的成员数据源类型或动态参数无效");
+                }
+            }
+        }
+
+        private static void ValidateMemberSourceIds(
+            string fieldType,
+            string sourceType,
+            IEnumerable<MemberSourceItem> items,
+            Func<IReadOnlyCollection<string>, HashSet<string>> findExisting)
+        {
+            var ids = items
+                .Where(x => x.Type.Equals(sourceType, StringComparison.OrdinalIgnoreCase))
+                .Select(x => x.Id)
+                .Where(x => !string.IsNullOrWhiteSpace(x))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            HashSet<string> existing = ids.Length == 0 ? [] : findExisting(ids);
+            foreach (var id in ids)
+            {
+                if (!existing.Contains(id))
+                {
+                    throw new BadRequestException($"字段 {fieldType} 的成员数据源 ID 不属于当前租户: {id}");
+                }
+            }
+        }
+
         private void PopulatePublicRelatedForms(FormDef entity)
         {
             var relatedFormIds = FormRelatedSourceResolver.ResolveFormIds(entity.Content.Layout).ToList();
@@ -202,25 +277,10 @@ namespace EIMSNext.ApiService
             entity.PublicRelatedFormIds = relatedFormIds;
         }
 
-        private static FormDefViewModel BuildView(FormDef form, bool external)
+        private static FormDef BuildView(FormDef form, bool external)
         {
-            return new FormDefViewModel
-            {
-                Id = form.Id,
-                CorpId = form.CorpId,
-                CreateBy = form.CreateBy,
-                CreateTime = form.CreateTime,
-                UpdateBy = form.UpdateBy,
-                UpdateTime = form.UpdateTime,
-                DeleteFlag = form.DeleteFlag,
-                AppId = form.AppId,
-                TemplateId = form.TemplateId,
-                Name = form.Name,
-                Content = form.Content,
-                UsingWorkflow = form.UsingWorkflow,
-                FormSettings = form.FormSettings,
-                External = external,
-            };
+            form.External = external;
+            return form;
         }
     }
 }

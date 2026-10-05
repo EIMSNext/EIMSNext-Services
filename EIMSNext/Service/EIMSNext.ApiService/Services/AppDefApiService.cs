@@ -16,7 +16,7 @@ namespace EIMSNext.ApiService
     /// 应用定义的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, AppDefViewModel, IAppDefService>(resolver)
+    public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, IAppDefService>(resolver)
     {
         /// <summary>
         /// 创建Group。

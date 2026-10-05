@@ -58,22 +58,20 @@ namespace EIMSNext.ApiService
     }
 
     /// <summary>
-    /// 泛型 API 服务基类，为 <typeparamref name="T"/> 实体提供 <see cref="IApiService{T, V}"/> 的默认实现。
+    /// 泛型 API 服务基类，为 <typeparamref name="T"/> 实体提供基础 API 实现。
     /// </summary>
     /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
-    /// <typeparam name="V">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
     /// <typeparam name="S">服务类型，实现 <see cref="IService{T}"/>。</typeparam>
     /// <remarks>
     /// <c>IFindFluent&lt;T,T&gt;</c> 换为 <see cref="IQueryable{T}"/>，
     /// <c>ReplaceOneResult</c> 换为受影响行数 <see cref="int"/>。
     /// </remarks>
-    public abstract class ApiServiceBase<T, V, S> : ApiServiceBase, IApiService<T, V>
+    public abstract class ApiServiceBase<T,  S> : ApiServiceBase, IApiService<T>
         where T : class, IEntityKey
-        where V : T, new()
         where S : class, IService<T>
     {
         /// <summary>
-        /// 初始化 <see cref="ApiServiceBase{T, V, S}"/> 类的新实例。
+        /// 初始化 <see cref="ApiServiceBase{T,S}"/> 类的新实例。
         /// </summary>
         /// <param name="resolver">依赖解析器。</param>
         public ApiServiceBase(IResolver resolver) : base(resolver)
@@ -91,7 +89,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
         /// <returns>匹配的视图模型，未找到时为 null。</returns>
-        public V? Get(string id)
+        public T? Get(string id)
         {
             return FilterByPermission().FirstOrDefault(t => t.Id == id);
         }
@@ -100,7 +98,7 @@ namespace EIMSNext.ApiService
         /// 获取全部视图模型的可查询对象。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        public IQueryable<V> All()
+        public IQueryable<T> All()
         {
             return FilterByPermission();
         }
@@ -110,7 +108,7 @@ namespace EIMSNext.ApiService
         /// </summary>
         /// <param name="where">过滤条件表达式。</param>
         /// <returns>视图模型的可查询对象。</returns>
-        public IQueryable<V> Query(Expression<Func<V, bool>> where)
+        public IQueryable<T> Query(Expression<Func<T, bool>> where)
         {
             return FilterByPermission().Where(where);
         }
@@ -122,15 +120,6 @@ namespace EIMSNext.ApiService
         public IQueryable<T> Find(DynamicFindOptions<T> options)
         {
             return CoreService.Find(options);
-        }
-
-        /// <summary>
-        /// 根据表达式过滤条件查找实体。
-        /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        public IQueryable<T> Find(Expression<Func<T, bool>> filter)
-        {
-            return CoreService.Find(filter);
         }
 
         /// <summary>
@@ -297,15 +286,10 @@ namespace EIMSNext.ApiService
         /// 获取按权限过滤后的视图模型查询。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        protected virtual IQueryable<V> FilterByPermission()
+        protected virtual IQueryable<T> FilterByPermission()
         {
-            return CoreService.All().FilterByCorpId(IdentityContext.CurrentCorpId).Select(TVConvertor);
+            return CoreService.All().FilterByCorpId(IdentityContext.CurrentCorpId);
         }
-
-        /// <summary>
-        /// 获取实体到视图模型的转换表达式。
-        /// </summary>
-        protected virtual Expression<Func<T, V>> TVConvertor => ObjectConvert.CastExp<T, V>();
 
         /// <summary>
         /// 新增实体的核心实现。

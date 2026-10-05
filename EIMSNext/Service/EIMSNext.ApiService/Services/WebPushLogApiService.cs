@@ -1,4 +1,4 @@
-﻿using EIMSNext.Core.Abstractions;
+using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
@@ -14,12 +14,12 @@ namespace EIMSNext.ApiService
 	/// Web 推送日志的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, WebPushLogViewModel, IWebPushLogService>(resolver)
+	public class WebPushLogApiService(IResolver resolver) : ApiServiceBase<WebPushLog, IWebPushLogService>(resolver)
 	{
         /// <summary>
         /// 按当前身份权限过滤查询。
         /// </summary>
-        protected override IQueryable<WebPushLogViewModel> FilterByPermission()
+        protected override IQueryable<WebPushLog> FilterByPermission()
         {
             var query = base.FilterByPermission();
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();

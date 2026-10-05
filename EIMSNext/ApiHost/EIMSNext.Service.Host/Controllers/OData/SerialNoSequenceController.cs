@@ -14,7 +14,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class SerialNoSequenceController(IResolver resolver) : ODataController<SerialNoSequenceApiService, SerialNoSequence, SerialNoSequenceViewModel, SerialNoSequenceRequest>(resolver)
+	public class SerialNoSequenceController(IResolver resolver) : ODataController<SerialNoSequenceApiService, SerialNoSequence, SerialNoSequenceRequest>(resolver)
 	{
 		
 	}

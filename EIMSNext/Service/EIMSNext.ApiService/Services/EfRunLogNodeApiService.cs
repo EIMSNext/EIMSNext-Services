@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
 	/// 运行日志节点的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class EfRunLogNodeApiService(IResolver resolver) : ApiServiceBase<Ef_RunLogNode, EfRunLogNodeViewModel, IEfRunLogNodeService>(resolver)
+	public class EfRunLogNodeApiService(IResolver resolver) : ApiServiceBase<Ef_RunLogNode, IEfRunLogNodeService>(resolver)
 	{
         // 不再预过滤 AppId/RunLogId：
         // 1) Ef_RunLogNode 实际查询路径是通过 OData $filter=RunLogId eq 'xxx' 限定到单次运行，

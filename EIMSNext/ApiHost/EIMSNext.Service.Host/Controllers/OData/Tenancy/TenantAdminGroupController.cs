@@ -20,7 +20,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.CorpAdmin)]
-	public class TenantAdminGroupController(IResolver resolver) : ODataController<TenantAdminGroupApiService, TenantAdminGroup, TenantAdminGroupViewModel, TenantAdminGroupRequest>(resolver)
+	public class TenantAdminGroupController(IResolver resolver) : ODataController<TenantAdminGroupApiService, TenantAdminGroup, TenantAdminGroupRequest>(resolver)
 	{
         public override async Task<ActionResult> Post([FromBody] TenantAdminGroupRequest model)
         {

@@ -11,7 +11,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.Authenticated)]
     public class ECoinPriceController(IResolver resolver)
-        : ReadOnlyODataController<ECoinPriceApiService, ECoinPrice, ECoinPriceViewModel>(resolver)
+        : ReadOnlyODataController<ECoinPriceApiService, ECoinPrice>(resolver)
     {
     }
 }

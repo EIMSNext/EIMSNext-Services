@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
@@ -27,7 +27,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeViewModel, EmployeeRequest>(resolver)
+    public class EmployeeController(IResolver resolver) : ODataController<EmployeeApiService, Employee, EmployeeRequest>(resolver)
     {
         [HttpGet]
         [Permission(
@@ -35,8 +35,8 @@ namespace EIMSNext.Service.Host.Controllers.OData
             Operation = Operation.Read,
             AccessControlLevel = AccessControlLevel.Allow)]
         // 多对多例外：员工→员工部门关系表→部门（或员工→员工组关系表→员工组）允许多查一层（3 层），其余仍受基类 2 层限制。
-        [DefaultPageSizeEnableQuery(MaxExpansionDepth = 2, MaxNodeCount = 200)]
-        public override IActionResult Get(ODataQueryOptions<EmployeeViewModel> options)
+        [EnableQuery(MaxExpansionDepth = 2, MaxNodeCount = 200)]
+        public override IActionResult Get(ODataQueryOptions<Employee> options)
             => base.Get(options);
 
         [HttpGet]
@@ -46,7 +46,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
             AccessControlLevel = AccessControlLevel.Allow)]
         // 多对多例外：与集合查询一致，允许员工→关系表→目标的 3 层 $expand。
         [EnableQuery(MaxExpansionDepth = 2, MaxNodeCount = 200)]
-        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<EmployeeViewModel> options)
+        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<Employee> options)
         {
             return base.Get(key, options);
         }
@@ -69,7 +69,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
             var service = (EmployeeApiService)ApiService;
             await service.AddAsync(entity, model.Departments);
 
-            var result = entity.CastTo<Employee, EmployeeViewModel>();
+            var result = entity.CastTo<Employee, Employee>();
             return Ok(result);
         }
 
@@ -97,7 +97,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
             var service = (EmployeeApiService)ApiService;
             await service.ReplaceAsync(entity, model.Departments, syncDepartments: true);
 
-            var result = entity.CastTo<Employee, EmployeeViewModel>();
+            var result = entity.CastTo<Employee, Employee>();
             return Ok(result);
         }
 
@@ -140,49 +140,18 @@ namespace EIMSNext.Service.Host.Controllers.OData
             var service = (EmployeeApiService)ApiService;
             await service.ReplaceAsync(entity, model.Departments, syncDepartments);
 
-            var result = entity.CastTo<Employee, EmployeeViewModel>();
+            var result = entity.CastTo<Employee, Employee>();
             return Ok(result);
         }
 
-        protected override IQueryable<EmployeeViewModel> FilterResult(IQueryable<EmployeeViewModel> query, ODataQueryOptions<EmployeeViewModel> options)
+        protected override IQueryable<Employee> FilterResult(IQueryable<Employee> query, ODataQueryOptions<Employee> options)
         {
             query = base.FilterResult(query, options);
             query = query.Where(x => !x.IsDummy);
 
-            if (IsAdminScope())
-            {
-                var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
-                if (evaluator.ShouldApplyNormalAdminRules)
-                {
-                    var snapshot = evaluator.GetSnapshot();
-                    if (snapshot.ContactViewDepartmentScopeMode != AdminPermissionSnapshot.ToWireScopeMode(ScopeMode.All))
-                    {
-                        var ids = snapshot.ContactViewDepartmentIds;
-                        if (ids.Count == 0)
-                        {
-                            query = query.Where(x => false);
-                        }
-                        else
-                        {
-                            var empIds = Resolver.GetRepository<EmployeeDepartment>().Queryable
-                                .Where(x => x.CorpId == IdentityContext.CurrentCorpId && ids.Contains(x.DepartmentId))
-                                .Select(x => x.EmployeeId)
-                                .Distinct()
-                                .ToList();
-                            query = query.Where(x => empIds.Contains(x.Id));
-                        }
-                    }
-                }
-            }
-
-            return query;
+            return Resolver.Resolve<TenantAccessEvaluator>().FilterEmployeesForAdminScope(query);
         }
 
-        private bool IsAdminScope()
-        {
-            return Request.Query.TryGetValue("adminScope", out var value) &&
-                string.Equals(value.FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
-        }
     }
 }
 

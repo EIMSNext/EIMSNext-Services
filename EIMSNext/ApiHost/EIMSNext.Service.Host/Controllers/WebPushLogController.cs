@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WebPushLogController(IResolver resolver) : ApiControllerBase<WebPushLogApiService, WebPushLog, WebPushLogViewModel>(resolver)
+	public class WebPushLogController(IResolver resolver) : ApiControllerBase<WebPushLogApiService, WebPushLog>(resolver)
 	{
 		
 	}

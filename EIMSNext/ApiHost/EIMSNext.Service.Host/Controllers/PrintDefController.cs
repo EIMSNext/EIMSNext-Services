@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class PrintDefController(IResolver resolver) : ApiControllerBase<PrintDefApiService, PrintDef, PrintDefViewModel>(resolver)
+	public class PrintDefController(IResolver resolver) : ApiControllerBase<PrintDefApiService, PrintDef>(resolver)
 	{
 		
 	}

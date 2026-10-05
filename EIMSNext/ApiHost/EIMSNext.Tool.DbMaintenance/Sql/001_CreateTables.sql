@@ -1215,6 +1215,7 @@ CREATE TABLE "Wf_ExecLog" (
 
 CREATE TABLE "Wf_Task" (
     "Id" citext COLLATE "C" not null default '',
+    "FormName" citext not null default '',
     "WfInstanceId" citext COLLATE "C" not null default '',
     "ApproveNodeId" citext COLLATE "C" not null default '',
     "ApproveNodeName" citext not null default '',

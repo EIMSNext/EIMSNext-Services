@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class DashboardItemDefController(IResolver resolver) : ApiControllerBase<DashboardItemDefApiService, DashboardItemDef, DashboardItemDefViewModel>(resolver)
+	public class DashboardItemDefController(IResolver resolver) : ApiControllerBase<DashboardItemDefApiService, DashboardItemDef>(resolver)
 	{
 		
 	}

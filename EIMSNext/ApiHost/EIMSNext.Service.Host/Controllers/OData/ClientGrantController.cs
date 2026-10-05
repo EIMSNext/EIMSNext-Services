@@ -23,7 +23,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     public class ClientGrantController(IResolver resolver)
-        : ODataController<ClientGrantApiService, ClientGrant, ClientGrantViewModel, ClientGrantRequest>(resolver)
+        : ODataController<ClientGrantApiService, ClientGrant, ClientGrantRequest>(resolver)
     {
         private ClientApiService ClientApi => Resolver.Resolve<ClientApiService>();
         private ClientGrantApiService ClientGrantApi => Resolver.Resolve<ClientGrantApiService>();

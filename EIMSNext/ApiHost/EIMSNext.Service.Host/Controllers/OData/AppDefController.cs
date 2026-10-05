@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
@@ -15,9 +15,9 @@ using Microsoft.AspNetCore.OData.Query;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
-    public class AppDefController(IResolver resolver) : ODataController<AppDefApiService, AppDef, AppDefViewModel, AppRequest>(resolver)
+    public class AppDefController(IResolver resolver) : ODataController<AppDefApiService, AppDef, AppRequest>(resolver)
     {
-        protected override IQueryable<AppDefViewModel> FilterByPermission(IQueryable<AppDefViewModel> query, ODataQueryOptions<AppDefViewModel> options)
+        protected override IQueryable<AppDef> FilterByPermission(IQueryable<AppDef> query, ODataQueryOptions<AppDef> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

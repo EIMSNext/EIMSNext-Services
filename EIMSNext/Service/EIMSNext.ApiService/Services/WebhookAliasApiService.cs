@@ -1,4 +1,4 @@
-﻿using EIMSNext.ApiService.ViewModels;
+using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
@@ -15,12 +15,12 @@ namespace EIMSNext.ApiService
     /// Webhook 别名的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class WebhookAliasApiService(IResolver resolver) : ApiServiceBase<WebhookAlias, WebhookAliasViewModel, IWebhookAliasService>(resolver)
+    public class WebhookAliasApiService(IResolver resolver) : ApiServiceBase<WebhookAlias, IWebhookAliasService>(resolver)
     {
         /// <summary>
         /// 按当前身份权限过滤查询。
         /// </summary>
-        protected override IQueryable<WebhookAliasViewModel> FilterByPermission()
+        protected override IQueryable<WebhookAlias> FilterByPermission()
         {
             var query = base.FilterByPermission();
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();

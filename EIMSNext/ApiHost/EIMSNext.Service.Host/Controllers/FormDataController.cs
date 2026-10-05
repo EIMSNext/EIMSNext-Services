@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
@@ -33,12 +33,13 @@ namespace EIMSNext.Service.Host.Controllers
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
+    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData>(resolver)
     {
         private const int MaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly TenantAccessEvaluator _permissionEvaluator = resolver.Resolve<TenantAccessEvaluator>();
+        private readonly FormDataReadScopeResolver _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
         private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
         private readonly IFormDataService _formDataService = resolver.Resolve<IFormDataService>();
@@ -1353,34 +1354,7 @@ namespace EIMSNext.Service.Host.Controllers
 
         private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (permissionGroup.Type)
-            {
-                case FormDataPermissionMode.ManageSelfData:
-                    if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
-                    {
-                        return CreateNoMatchFilter();
-                    }
-
-                    return new DynamicFilter
-                    {
-                        Field = Fields.CreateById,
-                        Op = FilterOp.Eq,
-                        Value = IdentityContext.CurrentEmployee.Id,
-                    };
-                case FormDataPermissionMode.ViewAllData:
-                case FormDataPermissionMode.ManageAllData:
-                    return null;
-                case FormDataPermissionMode.Custom:
-                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
-                    {
-                        return null;
-                    }
-
-                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
-                    return condList?.ToDynamicFilter();
-                default:
-                    return null;
-            }
+            return _readScopeResolver.ResolvePermissionGroupDataFilter(permissionGroup);
         }
 
         private static FormDataPermissions GetEffectiveFormDataPermissions(FormDataPermissionGroup permissionGroup)

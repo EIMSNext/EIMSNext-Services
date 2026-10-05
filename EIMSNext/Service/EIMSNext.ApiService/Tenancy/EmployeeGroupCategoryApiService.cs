@@ -1,4 +1,4 @@
-﻿using HKH.Mef2.Integration;
+using HKH.Mef2.Integration;
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
@@ -7,7 +7,6 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.ApiService
@@ -16,7 +15,7 @@ namespace EIMSNext.ApiService
 	/// 员工组分类的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class EmployeeGroupCategoryApiService(IResolver resolver) : ApiServiceBase<EmployeeGroupCategory, EmployeeGroupCategoryViewModel, IEmployeeGroupCategoryService>(resolver)
+	public class EmployeeGroupCategoryApiService(IResolver resolver) : ApiServiceBase<EmployeeGroupCategory, IEmployeeGroupCategoryService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.ComponentModel.DataAnnotations.Schema;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
@@ -15,6 +16,8 @@ namespace EIMSNext.Entities
     /// </summary>
     public class FormDef : CorpEntityBase
     {
+        [NotMapped]
+        public bool External { get; set; }
         /// <summary>
         /// 应用ID
         /// </summary>
@@ -192,6 +195,11 @@ namespace EIMSNext.Entities
     public class FieldProp
     {
         /// <summary>
+        /// 员工/部门组件的数据源范围。该配置保存在 FormContent.Items 中，运行时由服务端解析。
+        /// </summary>
+        public MemberSource? MemberSource { get; set; }
+
+        /// <summary>
         /// Radio/Checkbox/Select/Select2预设的选项
         /// </summary>
         public List<ValueOption>? Options { get; set; }
@@ -207,6 +215,38 @@ namespace EIMSNext.Entities
         /// 值配置
         /// </summary>
         public ValueProp? ValueProp { get; set; }
+    }
+
+    /// <summary>
+    /// 员工/部门组件的数据源配置。
+    /// </summary>
+    public class MemberSource
+    {
+        /// <summary>范围模式：all 或 custom。</summary>
+        public string Mode { get; set; } = MemberSourceMode.All;
+
+        /// <summary>范围项之间为 OR 关系。</summary>
+        public IList<MemberSourceItem> Items { get; set; } = [];
+    }
+
+    /// <summary>成员数据源范围模式。</summary>
+    public static class MemberSourceMode
+    {
+        public const string All = "all";
+        public const string Custom = "custom";
+    }
+
+    /// <summary>成员数据源范围项。</summary>
+    public class MemberSourceItem
+    {
+        /// <summary>department、employeeGroup、employee 或 dynamic。</summary>
+        public string Type { get; set; } = string.Empty;
+
+        /// <summary>租户内实体 ID，或 dynamic 类型的 curuser/curdept。</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>部门项是否包含下级部门。</summary>
+        public bool Cascaded { get; set; }
     }
     /// <summary>
     /// 值选项

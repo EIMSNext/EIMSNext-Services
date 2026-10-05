@@ -8,6 +8,7 @@ using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
+using System.Collections;
 using System.Text.Json;
 
 namespace EIMSNext.ApiService
@@ -62,15 +63,18 @@ namespace EIMSNext.ApiService
                 return new FormDataReadScope(false, CreateNoMatchFilter(), []);
             }
 
-            return new FormDataReadScope(true, BuildDataScopeFilter(groups), MergeFormFieldPermissions(groups));
+            return new FormDataReadScope(true, BuildDataScopeFilter(groups, subjects), MergeFormFieldPermissions(groups));
         }
 
-        private DynamicFilter? BuildDataScopeFilter(IEnumerable<FormDataPermissionGroup> permissionGroups)
+        private DynamicFilter? BuildDataScopeFilter(
+            IEnumerable<FormDataPermissionGroup> permissionGroups,
+            EmployeeAccessSubjects subjects)
         {
             var rangeFilters = new List<DynamicFilter>();
+            DynamicMemberResolutionContext? dynamicContext = null;
             foreach (var permissionGroup in permissionGroups)
             {
-                var groupFilter = BuildFormDataPermissionGroupDataFilter(permissionGroup);
+                var groupFilter = BuildFormDataPermissionGroupDataFilter(permissionGroup, subjects, ref dynamicContext);
                 if (groupFilter == null || groupFilter.IsEmpty)
                 {
                     return null;
@@ -82,9 +86,13 @@ namespace EIMSNext.ApiService
             return OrFilters(rangeFilters) ?? CreateNoMatchFilter();
         }
 
-        private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
+        private DynamicFilter? BuildFormDataPermissionGroupDataFilter(
+            FormDataPermissionGroup permissionGroup,
+            EmployeeAccessSubjects subjects,
+            ref DynamicMemberResolutionContext? dynamicContext)
         {
-            return permissionGroup.Type switch
+            var dynamicResolutionFailed = false;
+            var filter = permissionGroup.Type switch
             {
                 FormDataPermissionMode.ManageSelfData => string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id)
                     ? CreateNoMatchFilter()
@@ -99,6 +107,164 @@ namespace EIMSNext.ApiService
                 FormDataPermissionMode.Custom => permissionGroup.DataFilter!.DeserializeFromJson<ConditionList>()?.ToDynamicFilter(),
                 _ => null,
             };
+
+            filter = ResolveDynamicMemberValues(filter, subjects, ref dynamicContext, ref dynamicResolutionFailed);
+            return dynamicResolutionFailed ? CreateNoMatchFilter() : filter;
+        }
+
+        /// <summary>
+        /// 将单个权限组的数据过滤条件转换为当前用户可执行的过滤条件。
+        /// 调用方负责先校验权限组归属和具体操作权限；此方法只负责条件解析。
+        /// </summary>
+        public DynamicFilter? ResolvePermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
+        {
+            var subjects = Resolver.Resolve<IEmployeeAccessSubjectResolver>().ResolveCurrent();
+            DynamicMemberResolutionContext? dynamicContext = null;
+            return BuildFormDataPermissionGroupDataFilter(permissionGroup, subjects, ref dynamicContext);
+        }
+
+        private DynamicFilter? ResolveDynamicMemberValues(
+            DynamicFilter? filter,
+            EmployeeAccessSubjects subjects,
+            ref DynamicMemberResolutionContext? dynamicContext,
+            ref bool dynamicResolutionFailed)
+        {
+            if (filter == null)
+            {
+                return null;
+            }
+
+            if (filter.IsGroup)
+            {
+                var items = filter.Items ?? [];
+                for (var index = 0; index < items.Count; index++)
+                {
+                    items[index] = ResolveDynamicMemberValues(items[index], subjects, ref dynamicContext, ref dynamicResolutionFailed)
+                        ?? CreateNoMatchFilter();
+                }
+
+                return filter;
+            }
+
+            if (!IsMemberField(filter.Type))
+            {
+                return filter;
+            }
+
+            var memberIds = ExtractMemberIds(filter.Value).ToList();
+            if (memberIds.Count == 0)
+            {
+                return filter;
+            }
+
+            var resolved = new List<string>();
+            var hadDynamicValue = false;
+            var resolvedDynamicValue = false;
+            foreach (var memberId in memberIds)
+            {
+                switch (memberId.ToLowerInvariant())
+                {
+                    case "curuser":
+                        hadDynamicValue = true;
+                        if (!string.IsNullOrWhiteSpace(subjects.EmployeeId) && IsEmployeeField(filter.Type))
+                        {
+                            resolved.Add(subjects.EmployeeId);
+                            resolvedDynamicValue = true;
+                        }
+                        break;
+                    case "curdept":
+                        hadDynamicValue = true;
+                        dynamicContext ??= LoadDynamicMemberResolutionContext(subjects);
+                        if (IsDepartmentField(filter.Type) && dynamicContext.MainDepartmentId != null)
+                        {
+                            resolved.Add(dynamicContext.MainDepartmentId);
+                            resolvedDynamicValue = true;
+                        }
+                        break;
+                    default:
+                        resolved.Add(memberId);
+                        break;
+                }
+            }
+
+            if (hadDynamicValue && !resolvedDynamicValue)
+            {
+                // Do not represent a failed dynamic value as a normal false leaf.
+                // A false leaf inside a `not` group would become true and could
+                // accidentally turn a permission filter into an unrestricted one.
+                dynamicResolutionFailed = true;
+                return CreateNoMatchFilter();
+            }
+
+            filter.Value = IsMultiValue(filter.Value)
+                ? resolved.Distinct(StringComparer.OrdinalIgnoreCase).ToList()
+                : resolved.FirstOrDefault();
+            return filter;
+        }
+
+        private DynamicMemberResolutionContext LoadDynamicMemberResolutionContext(EmployeeAccessSubjects subjects)
+        {
+            var mainDepartmentId = Resolver.GetRepository<EmployeeDepartment>().Queryable
+                .Where(x => x.CorpId == IdentityContext.CurrentCorpId &&
+                            !x.DeleteFlag &&
+                            x.EmployeeId == subjects.EmployeeId)
+                .OrderBy(x => x.SortValue)
+                .ThenBy(x => x.Id)
+                .Select(x => x.DepartmentId)
+                .FirstOrDefault();
+
+            return new DynamicMemberResolutionContext(mainDepartmentId);
+        }
+
+        private static bool IsMemberField(string? type) =>
+            IsEmployeeField(type) || IsDepartmentField(type);
+
+        private static bool IsEmployeeField(string? type) =>
+            string.Equals(type, FieldType.Employee1, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(type, FieldType.Employee2, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsDepartmentField(string? type) =>
+            string.Equals(type, FieldType.Department1, StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(type, FieldType.Department2, StringComparison.OrdinalIgnoreCase);
+
+        private static bool IsMultiValue(object? value) =>
+            value is IEnumerable && value is not string && value is not IDictionary;
+
+        private static IEnumerable<string> ExtractMemberIds(object? value)
+        {
+            if (value is null)
+            {
+                yield break;
+            }
+
+            if (value is string text)
+            {
+                if (!string.IsNullOrWhiteSpace(text)) yield return text;
+                yield break;
+            }
+
+            if (value is IDictionary dictionary)
+            {
+                foreach (DictionaryEntry entry in dictionary)
+                {
+                    if (string.Equals(entry.Key?.ToString(), "id", StringComparison.OrdinalIgnoreCase) &&
+                        !string.IsNullOrWhiteSpace(entry.Value?.ToString()))
+                    {
+                        yield return entry.Value!.ToString()!;
+                        yield break;
+                    }
+                }
+
+                yield break;
+            }
+
+            if (value is IEnumerable sequence)
+            {
+                foreach (var item in sequence)
+                {
+                    foreach (var id in ExtractMemberIds(item)) yield return id;
+                }
+            }
         }
 
         private static DynamicFilter CreateNoMatchFilter()
@@ -179,6 +345,8 @@ namespace EIMSNext.ApiService
                 _ => (FormDataPermissions)permissionGroup.FormDataPermissions,
             };
         }
+
+        private sealed record DynamicMemberResolutionContext(string? MainDepartmentId);
     }
 
     /// <summary>

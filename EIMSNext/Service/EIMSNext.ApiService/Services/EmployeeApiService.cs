@@ -1,4 +1,3 @@
-﻿using EIMSNext.ApiService.ViewModels;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Entities;
 using EIMSNext.Common;
@@ -17,7 +16,7 @@ namespace EIMSNext.ApiService
     /// 员工的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, EmployeeViewModel, IEmployeeService>(resolver)
+    public class EmployeeApiService(IResolver resolver) : ApiServiceBase<Employee, IEmployeeService>(resolver)
     {
         /// <summary>
         /// 执行 ReviewJoinCorporateAsync 操作。
@@ -73,7 +72,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 按部门过滤查询。级联时直接对关系表的层级路径快照做 Contains，省去 Department 展开/联表。
         /// </summary>
-        public IQueryable<EmployeeViewModel> FilterByDepartment(IQueryable<EmployeeViewModel> query, string? departmentId, bool cascaded)
+        public IQueryable<Employee> FilterByDepartment(IQueryable<Employee> query, string? departmentId, bool cascaded)
         {
             if (string.IsNullOrWhiteSpace(departmentId) || departmentId.Equals("all", StringComparison.OrdinalIgnoreCase))
             {

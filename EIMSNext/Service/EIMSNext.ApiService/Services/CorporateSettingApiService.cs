@@ -11,7 +11,7 @@ namespace EIMSNext.ApiService;
 /// </summary>
 /// <param name="resolver">服务解析器。</param>
 public sealed class CorporateSettingApiService(IResolver resolver)
-    : ApiServiceBase<CorporateSetting, CorporateSettingViewModel, ICorporateSettingService>(resolver)
+    : ApiServiceBase<CorporateSetting, ICorporateSettingService>(resolver)
 {
     /// <summary>
     /// 新增实体核心逻辑。

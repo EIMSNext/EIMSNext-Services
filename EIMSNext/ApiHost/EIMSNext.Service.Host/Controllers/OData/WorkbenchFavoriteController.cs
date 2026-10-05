@@ -11,7 +11,7 @@ using HKH.Mef2.Integration;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
-    public class WorkbenchFavoriteController(IResolver resolver) : ODataController<WorkbenchFavoriteApiService, WorkbenchFavorite, WorkbenchFavoriteViewModel, WorkbenchFavoriteRequest>(resolver)
+    public class WorkbenchFavoriteController(IResolver resolver) : ODataController<WorkbenchFavoriteApiService, WorkbenchFavorite, WorkbenchFavoriteRequest>(resolver)
     {
     }
 }

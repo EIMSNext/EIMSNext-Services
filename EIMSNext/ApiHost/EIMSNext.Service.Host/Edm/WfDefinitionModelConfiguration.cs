@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 
@@ -8,13 +10,13 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// 
     /// </summary>
-    public class WfDefinitionModelConfiguration : CorpModelConfigurationBase<WfDefinitionViewModel, WfDefinitionRequest>
+    public class WfDefinitionModelConfiguration : CorpModelConfigurationBase<Wf_Definition, WfDefinitionRequest>
     {
         /// <summary>
         /// 
         /// </summary>
         /// <param name="entityType"></param>
-        protected override void ConfigureCommon(EntityTypeConfiguration<WfDefinitionViewModel> entityType)
+        protected override void ConfigureCommon(EntityTypeConfiguration<Wf_Definition> entityType)
         {
             base.ConfigureCommon(entityType);
 

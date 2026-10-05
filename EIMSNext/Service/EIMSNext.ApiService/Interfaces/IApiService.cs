@@ -16,42 +16,34 @@ namespace EIMSNext.ApiService
     /// 泛型 API 服务接口，定义实体 <typeparamref name="T"/> 的基础查询与增删改操作。
     /// </summary>
     /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
-    /// <typeparam name="V">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
-    public interface IApiService<T, V> : IApiService
+    public interface IApiService<T> : IApiService
         where T : IEntityKey
-        where V : T, new()
     {
         /// <summary>
         /// 根据主键 ID 获取视图模型。
         /// </summary>
         /// <param name="id">实体主键 ID。</param>
         /// <returns>匹配的视图模型，未找到时为 null。</returns>
-        V? Get(string id);
+        T? Get(string id);
 
         /// <summary>
         /// 获取全部视图模型的可查询对象。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        IQueryable<V> All();
+        IQueryable<T> All();
 
         /// <summary>
         /// 根据表达式过滤条件查询视图模型。
         /// </summary>
         /// <param name="where">过滤条件表达式。</param>
         /// <returns>视图模型的可查询对象。</returns>
-        IQueryable<V> Query(Expression<Func<V, bool>> where);
+        IQueryable<T> Query(Expression<Func<T, bool>> where);
 
         /// <summary>
         /// 根据动态查询选项查找实体。
         /// </summary>
         /// <param name="options">动态查询选项。</param>
         IQueryable<T> Find(DynamicFindOptions<T> options);
-
-        /// <summary>
-        /// 根据表达式过滤条件查找实体。
-        /// </summary>
-        /// <param name="filter">过滤条件表达式。</param>
-        IQueryable<T> Find(Expression<Func<T, bool>> filter);
 
         /// <summary>
         /// 根据动态过滤条件查找实体。

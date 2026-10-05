@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfDefinitionController(IResolver resolver) : ApiControllerBase<WfDefinitionApiService, Wf_Definition, WfDefinitionViewModel>(resolver)
+	public class WfDefinitionController(IResolver resolver) : ApiControllerBase<WfDefinitionApiService, Wf_Definition>(resolver)
 	{
 	    [HttpPost("CreateVersion")]
 	    public async Task<IActionResult> CreateVersion([FromBody] WfDefinitionVersionActionRequest request)

@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 
 using HKH.Mef2.Integration;
 
@@ -23,7 +23,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class EfRunLogNodeController(IResolver resolver) : ReadOnlyODataController<EfRunLogNodeApiService, Ef_RunLogNode, EfRunLogNodeViewModel>(resolver)
+	public class EfRunLogNodeController(IResolver resolver) : ReadOnlyODataController<EfRunLogNodeApiService, Ef_RunLogNode>(resolver)
 	{
         // 业务侧通常通过 OData $filter=RunLogId eq 'xxx' 限定到单次运行；AppId 隔离由
         // EfRunLogApiService.GetRunDetailAsync 中 EnsureCanManageEventFlow / EnsureCanManageApp 守住。

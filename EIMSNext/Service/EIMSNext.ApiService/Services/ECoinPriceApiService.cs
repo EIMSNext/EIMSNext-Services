@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
     public class ECoinPriceApiService(IResolver resolver)
-        : ApiServiceBase<ECoinPrice, ECoinPriceViewModel, IECoinPriceService>(resolver)
+        : ApiServiceBase<ECoinPrice, IECoinPriceService>(resolver)
     {
         /// <summary>
         /// 执行 BatchUpsertAsync 操作。

@@ -32,8 +32,8 @@ public sealed class PostgreSqlDbContext(DbContextOptions<PostgreSqlDbContext> op
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<EmployeeDepartment> EmployeeDepartments => Set<EmployeeDepartment>();
     public DbSet<EmployeeGroupMember> EmployeeGroupMembers => Set<EmployeeGroupMember>();
-    public DbSet<EmployeeGroup> EmployeeGroups => Set<EmployeeGroup>();
     public DbSet<EmployeeGroupCategory> EmployeeGroupCategories => Set<EmployeeGroupCategory>();
+    public DbSet<EmployeeGroup> EmployeeGroups => Set<EmployeeGroup>();
     public DbSet<TenantAdminGroup> TenantAdminGroups => Set<TenantAdminGroup>();
     public DbSet<CorporateSetting> CorporateSettings => Set<CorporateSetting>();
     public DbSet<CrossBinding> CrossBindings => Set<CrossBinding>();

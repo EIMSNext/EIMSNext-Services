@@ -1,4 +1,4 @@
-﻿using EIMSNext.Common;
+using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
@@ -15,13 +15,13 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 数据推送（Webhook）的 API 服务。
     /// </summary>
-    public class WebhookApiService(IResolver resolver, IConfiguration configuration) : ApiServiceBase<Webhook, WebhookViewModel, IWebhookService>(resolver)
+    public class WebhookApiService(IResolver resolver, IConfiguration configuration) : ApiServiceBase<Webhook, IWebhookService>(resolver)
     {
         /// <summary>
         /// 获取按权限过滤后的数据推送视图查询。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        protected override IQueryable<WebhookViewModel> FilterByPermission()
+        protected override IQueryable<Webhook> FilterByPermission()
         {
             var query = base.FilterByPermission();
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();

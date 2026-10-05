@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.ViewModels;
 
 namespace EIMSNext.Service.Host.Edm
@@ -5,7 +7,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     ///
     /// </summary>
-    public class EfRunLogNodeModelConfiguration : CorpModelConfigurationBase<EfRunLogNodeViewModel>
+    public class EfRunLogNodeModelConfiguration : CorpModelConfigurationBase<Ef_RunLogNode>
     {
     }
 }

@@ -2,7 +2,6 @@ using Asp.Versioning;
 
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 using EIMSNext.Service.Host.Authorization;
 using EIMSNext.Service.Host.OData;
@@ -20,28 +19,28 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-    public class FormDefController(IResolver resolver) : ODataController<FormDefApiService, FormDef, FormDefViewModel, FormDefRequest>(resolver)
+    public class FormDefController(IResolver resolver) : ODataController<FormDefApiService, FormDef, FormDefRequest>(resolver)
     {
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink | PublicScope.FormLink | PublicScope.DataLink | PublicScope.QueryLink)]
-        public override IActionResult Get(ODataQueryOptions<FormDefViewModel> options)
+        public override IActionResult Get(ODataQueryOptions<FormDef> options)
         {
             return base.Get(options);
         }
 
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink | PublicScope.FormLink | PublicScope.DataLink | PublicScope.QueryLink)]
-        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<FormDefViewModel> options)
+        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<FormDef> options)
         {
             if (IdentityContext.IdentityType == IdentityType.Public && !Resolver.Resolve<IPublicAccessValidator>().CanReadFormDefinition(key))
             {
-                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<FormDefViewModel>().AsQueryable());
+                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<FormDef>().AsQueryable());
             }
 
             return base.Get(key, options);
         }
 
-        protected override IQueryable<FormDefViewModel> FilterByPermission(IQueryable<FormDefViewModel> query, ODataQueryOptions<FormDefViewModel> options)
+        protected override IQueryable<FormDef> FilterByPermission(IQueryable<FormDef> query, ODataQueryOptions<FormDef> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

@@ -23,12 +23,12 @@ namespace EIMSNext.Common
         /// <summary>
         /// 默认每页大小。
         /// </summary>
-        public const int DefaultPageSize = 20;
+        public const int DefaultPageSize = 50;
 
         /// <summary>
         /// 最大每页大小。
         /// </summary>
-        public const int MaxPageSize = 5000;
+        public const int MaxPageSize = 1000;
 
         /// <summary>
         /// 令牌默认有效期（秒）。

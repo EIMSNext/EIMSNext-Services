@@ -95,6 +95,11 @@ namespace EIMSNext.Component
                     fieldDef.Props.Required = requiredValue.GetValue<bool>();
                 }
 
+                if (fieldType is FieldType.Employee1 or FieldType.Employee2 or FieldType.Department1 or FieldType.Department2)
+                {
+                    fieldDef.Props.MemberSource = ParseMemberSource(props, fieldType);
+                }
+
                 switch (fieldType)
                 {
                     case FieldType.TableForm:
@@ -145,6 +150,151 @@ namespace EIMSNext.Component
             }
 
             return fieldDef;
+        }
+
+        private static MemberSource ParseMemberSource(JsonObject props, string fieldType)
+        {
+            var mode = GetStringValue(props, "limitType")?.ToLowerInvariant() == MemberSourceMode.Custom
+                ? MemberSourceMode.Custom
+                : MemberSourceMode.All;
+            var source = new MemberSource { Mode = mode };
+
+            if (props["memberSource"] is JsonObject memberSource)
+            {
+                var parsed = memberSource.SerializeToJson().DeserializeFromJson<MemberSource>();
+                if (parsed != null)
+                {
+                    source.Mode = string.Equals(parsed.Mode, MemberSourceMode.Custom, StringComparison.OrdinalIgnoreCase)
+                        ? MemberSourceMode.Custom
+                        : MemberSourceMode.All;
+                    source.Items = NormalizeMemberSourceItems(parsed.Items, fieldType);
+                    return source;
+                }
+            }
+
+            if (props["limitScope"] is not JsonArray scope)
+            {
+                return source;
+            }
+
+            var items = new List<MemberSourceItem>();
+            foreach (var node in scope)
+            {
+                if (node is not JsonObject item)
+                {
+                    continue;
+                }
+
+                var id = GetStringValue(item, "id");
+                if (string.IsNullOrWhiteSpace(id))
+                {
+                    continue;
+                }
+
+                var type = GetStringValue(item, "type")?.ToLowerInvariant();
+                if (string.IsNullOrWhiteSpace(type) || type is "1" or "2" or "3" or "4")
+                {
+                    type = GetMemberSourceType(item["type"]);
+                }
+                if (type is "dynamic" or "dynamicparam")
+                {
+                    items.Add(new MemberSourceItem { Type = "dynamic", Id = id.ToLowerInvariant() });
+                    continue;
+                }
+
+                var sourceType = type switch
+                {
+                    "department" => "department",
+                    "employeegroup" => "employeeGroup",
+                    "employee" => "employee",
+                    _ => fieldType is FieldType.Department1 or FieldType.Department2 ? "department" : null,
+                };
+                if (sourceType == null)
+                {
+                    continue;
+                }
+
+                items.Add(new MemberSourceItem
+                {
+                    Type = sourceType,
+                    Id = id,
+                    Cascaded = item["cascadedDept"]?.GetValue<bool>() ?? item["cascaded"]?.GetValue<bool>() ?? false,
+                });
+            }
+
+            source.Items = NormalizeMemberSourceItems(items, fieldType);
+            return source;
+        }
+
+        private static IList<MemberSourceItem> NormalizeMemberSourceItems(IEnumerable<MemberSourceItem>? items, string fieldType)
+        {
+            var isDepartmentField = fieldType is FieldType.Department1 or FieldType.Department2;
+            var result = new List<MemberSourceItem>();
+            foreach (var item in items ?? [])
+            {
+                var type = item.Type?.Trim().ToLowerInvariant() switch
+                {
+                    "department" => "department",
+                    "employeegroup" => "employeeGroup",
+                    "employee" => "employee",
+                    "dynamic" => "dynamic",
+                    _ => null,
+                };
+                var id = item.Id?.Trim();
+                if (type == null || string.IsNullOrWhiteSpace(id))
+                {
+                    continue;
+                }
+
+                if (type == "dynamic")
+                {
+                    id = id.ToLowerInvariant();
+                    if (id != "curuser" && id != "curdept")
+                    {
+                        continue;
+                    }
+
+                    if (id == "curuser" && isDepartmentField)
+                    {
+                        continue;
+                    }
+                }
+
+                if (type == "employeeGroup" && isDepartmentField)
+                {
+                    continue;
+                }
+
+                if (!result.Any(x => x.Type == type && x.Id.Equals(id, StringComparison.OrdinalIgnoreCase) && x.Cascaded == item.Cascaded))
+                {
+                    result.Add(new MemberSourceItem { Type = type, Id = id, Cascaded = item.Cascaded });
+                }
+            }
+
+            return result;
+        }
+
+        private static string? GetMemberSourceType(JsonNode? node)
+        {
+            if (node is not JsonValue)
+            {
+                return null;
+            }
+
+            var raw = node.ToJsonString().Trim('"');
+            if (!int.TryParse(raw, out var type))
+            {
+                return null;
+            }
+
+            return type switch
+            {
+                1 => "department",
+                2 => "employee",
+                3 => "employeeGroup",
+                4 => "dynamic",
+                _ => null,
+            };
         }
 
         private static string? GetStringValue(JsonObject field, string propertyName)

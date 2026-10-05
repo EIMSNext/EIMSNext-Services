@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// Webhook字段别名配置
     /// </summary>
     [ApiVersion(1.0)]
-    public class WebhookAliasController(IResolver resolver) : ODataController<WebhookAliasApiService, WebhookAlias, WebhookAliasViewModel, WebhookAliasRequest>(resolver)
+    public class WebhookAliasController(IResolver resolver) : ODataController<WebhookAliasApiService, WebhookAlias, WebhookAliasRequest>(resolver)
     {
     }
 }

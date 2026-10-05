@@ -1,4 +1,5 @@
-﻿using Asp.Versioning;
+using EIMSNext.Entities;
+using Asp.Versioning;
 using Asp.Versioning.OData;
 
 using EIMSNext.ApiService.RequestModels;

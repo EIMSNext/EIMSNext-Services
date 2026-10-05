@@ -20,7 +20,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class CorporateController(IResolver resolver) : ODataController<CorporateApiService, Corporate, CorporateViewModel, CorporateRequest>(resolver)
+    public class CorporateController(IResolver resolver) : ODataController<CorporateApiService, Corporate, CorporateRequest>(resolver)
     {
         [Permission(Operation = Common.Operation.NotSet)]
         [IdentityType(IdentityTypeDefaults.Authenticated)]
@@ -32,13 +32,13 @@ namespace EIMSNext.Service.Host.Controllers.OData
         // 无企业用户（NoCorp）需搜索企业后申请加入，故企业名录对全部已认证身份可读；
         // Corporate 只含 名称/简介/注册来源，不涉及企业内数据。
         [IdentityType(IdentityTypeDefaults.Authenticated)]
-        public override IActionResult Get(ODataQueryOptions<CorporateViewModel> options)
+        public override IActionResult Get(ODataQueryOptions<Corporate> options)
         {
             return base.Get(options);
         }
 
         [IdentityType(IdentityTypeDefaults.Authenticated)]
-        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<CorporateViewModel> options)
+        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([FromODataUri] string key, ODataQueryOptions<Corporate> options)
         {
             return base.Get(key, options);
         }

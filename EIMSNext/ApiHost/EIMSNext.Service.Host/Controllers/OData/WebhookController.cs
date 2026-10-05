@@ -14,7 +14,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WebhookController(IResolver resolver) : ODataController<WebhookApiService, Webhook, WebhookViewModel, WebhookRequest>(resolver)
+	public class WebhookController(IResolver resolver) : ODataController<WebhookApiService, Webhook, WebhookRequest>(resolver)
 	{
 		
 	}

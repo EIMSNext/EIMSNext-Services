@@ -1,4 +1,4 @@
-﻿using HKH.Mef2.Integration;
+using HKH.Mef2.Integration;
 
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 工作流定义的 API 服务。
     /// </summary>
-    public class WfDefinitionApiService : ApiServiceBase<Wf_Definition, WfDefinitionViewModel, IWfDefinitionService>
+    public class WfDefinitionApiService : ApiServiceBase<Wf_Definition, IWfDefinitionService>
     {
         private FlowApiClient _flowClient;
         /// <summary>
@@ -74,7 +74,7 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 按当前身份权限过滤查询。
         /// </summary>
-        protected override IQueryable<WfDefinitionViewModel> FilterByPermission()
+        protected override IQueryable<Wf_Definition> FilterByPermission()
         {
             var query = base.FilterByPermission();
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();

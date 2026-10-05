@@ -28,7 +28,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.CorpAdmin)]
     public class ClientController(IResolver resolver)
-        : ODataController<ClientApiService, Client, ClientViewModel, ClientRequest>(resolver)
+        : ODataController<ClientApiService, Client, ClientRequest>(resolver)
     {
         private ClientApiService ClientApi => Resolver.Resolve<ClientApiService>();
         private ClientGrantApiService ClientGrantApi => Resolver.Resolve<ClientGrantApiService>();

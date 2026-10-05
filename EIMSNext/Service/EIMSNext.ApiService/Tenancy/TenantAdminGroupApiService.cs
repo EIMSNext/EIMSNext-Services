@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
     /// 租户管理员组的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, TenantAdminGroupViewModel, ITenantAdminGroupService>(resolver)
+    public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, ITenantAdminGroupService>(resolver)
     {
         /// <summary>
         /// 移动节点。

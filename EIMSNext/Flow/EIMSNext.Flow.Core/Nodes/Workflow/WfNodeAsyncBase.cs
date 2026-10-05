@@ -165,6 +165,7 @@ namespace EIMSNext.Flow.Core.Nodes
                     CorpId = dataContext.CorpId,
                     AppId = dataContext.AppId,
                     FormId = dataContext.FormId,
+                    FormName = GetFormDef(dataContext.FormId)?.Name ?? string.Empty,
                     DataId = dataContext.DataId,
                     WfInstanceId = wfInst.Id,
                     ApproveNodeId = wfStep.Id,

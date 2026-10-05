@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using Microsoft.OData.ModelBuilder;
@@ -7,13 +9,13 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// 
     /// </summary>
-    public class FormNotifyModelConfiguration : CorpModelConfigurationBase<FormNotifyViewModel, FormNotifyRequest>
+    public class FormNotifyModelConfiguration : CorpModelConfigurationBase<FormNotify, FormNotifyRequest>
     {
         /// <summary>
         /// 
         /// </summary>
         /// <param name="entityType"></param>
-        protected override void ConfigureCommon(EntityTypeConfiguration<FormNotifyViewModel> entityType)
+        protected override void ConfigureCommon(EntityTypeConfiguration<FormNotify> entityType)
         {
             base.ConfigureCommon(entityType);
 

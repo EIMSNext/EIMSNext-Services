@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfDefinitionController(IResolver resolver) : ODataController<WfDefinitionApiService, Wf_Definition, WfDefinitionViewModel, WfDefinitionRequest>(resolver)
+	public class WfDefinitionController(IResolver resolver) : ODataController<WfDefinitionApiService, Wf_Definition, WfDefinitionRequest>(resolver)
 	{
 	    public override async Task<ActionResult> Delete([FromODataUri] string key, [FromBody] DeleteBatch? batch)
 	    {
