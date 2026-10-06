@@ -11,7 +11,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 表单名称快照。
         /// </summary>
-        public string FormName { get; set; } = string.Empty;
+        public string? FormName { get; set; }
         /// <summary>
         /// 工作流实例ID
         /// </summary>
@@ -51,7 +51,7 @@ namespace EIMSNext.Entities
         /// <summary>
         /// 审批节点开始时间（时间戳）
         /// </summary>
-        public long ApproveNodeStartTime{ get; set; }
+        public long ApproveNodeStartTime { get; set; }
         /// <summary>
         /// 数据摘要字段列表
         /// </summary>

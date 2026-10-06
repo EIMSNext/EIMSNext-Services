@@ -112,6 +112,8 @@ public sealed class FormSourceController(IResolver resolver) : EIMSNext.ApiHost.
         // 自定义范围的第一级就是范围内各部门本身（父部门不在范围内的那些），
         // 展开节点时再按 ParentId 取子级，子级能否选中仍由范围决定。
         var rootLevel = scopeRestricted && HasRootParentCondition(request.Filter);
+        // 注意：rootLevel 时 RemoveRootParentConditions 可能返回 null（整条 filter 就是根条件），
+        // 此时不能再回退到 request.Filter，否则根条件会把第一级过滤成空。
         query = ApplyDepartmentRequestFilter(
             scope,
             request,
@@ -408,9 +410,9 @@ public sealed class FormSourceController(IResolver resolver) : EIMSNext.ApiHost.
     private IQueryable<Department> ApplyDepartmentRequestFilter(
         IQueryable<Department> query,
         FormMemberSourceRequest request,
-        DynamicFilter? filter = null)
+        DynamicFilter? filter)
     {
-        filter = ValidateAndNormalizeFilter(filter ?? request.Filter, new HashSet<string>(["Id", "Code", "Name", "ParentId"], StringComparer.OrdinalIgnoreCase));
+        filter = ValidateAndNormalizeFilter(filter, new HashSet<string>(["Id", "Code", "Name", "ParentId"], StringComparer.OrdinalIgnoreCase));
         if (filter != null)
         {
             query = query.Where(filter.ToPredicate<Department>());

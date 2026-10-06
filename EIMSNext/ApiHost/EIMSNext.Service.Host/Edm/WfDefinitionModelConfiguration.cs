@@ -12,6 +12,11 @@ namespace EIMSNext.Service.Host.Edm
     /// </summary>
     public class WfDefinitionModelConfiguration : CorpModelConfigurationBase<Wf_Definition, WfDefinitionRequest>
     {
+        protected override void ConfigureEntitySet(ODataModelBuilder builder)
+        {
+            builder.EntitySet<Wf_Definition>("WfDefinition");
+        }
+
         /// <summary>
         /// 
         /// </summary>

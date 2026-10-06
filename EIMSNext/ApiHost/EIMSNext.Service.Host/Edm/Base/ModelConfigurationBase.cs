@@ -40,7 +40,7 @@ namespace EIMSNext.Service.Host.Edm
         /// <param name="routePrefix"></param>
         public override void Apply(ODataModelBuilder builder, ApiVersion apiVersion, string? routePrefix)
         {
-            builder.EntitySet<T>(typeof(T).Name.Replace("ViewModel", ""));
+            ConfigureEntitySet(builder);
 
             switch (apiVersion.MajorVersion)
             {
@@ -54,6 +54,17 @@ namespace EIMSNext.Service.Host.Edm
                     ConfigureBase(builder);
                     break;
             }
+        }
+
+        /// <summary>
+        /// Registers the OData entity set. Most entities use their CLR type name;
+        /// configurations whose CLR type contains a compatibility-sensitive name
+        /// can override this method and provide the public route explicitly.
+        /// </summary>
+        /// <param name="builder"></param>
+        protected virtual void ConfigureEntitySet(ODataModelBuilder builder)
+        {
+            builder.EntitySet<T>(typeof(T).Name.Replace("ViewModel", ""));
         }
 
         /// <summary>
