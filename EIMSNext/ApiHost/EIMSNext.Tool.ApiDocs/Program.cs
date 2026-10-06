@@ -13,8 +13,8 @@ var modelNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 };
 var ignored = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
 {
-    "UpdateBy", "UpdateTime", "DeleteFlag", "CorpId", "IsSystem", "IsAnonymous", "IsDummy", "Invite", "PublicRelatedFormIds",
-    "OldData", "NewData", "DataFilter", "UpdateExp", "ClientSecrets", "ApiKey", "RequireClientSecret", "AccessTokenLifetime", "IdentityTokenLifetime", "AllowedGrantTypes", "AllowedScopes"
+    "UpdateBy", "UpdateTime", "DeleteFlag", "DeleteBy", "DeleteTime", "CorpId", "IsSystem", "IsAnonymous", "IsDummy", "Invite", "PublicRelatedFormIds",
+    "OldData", "NewData", "DataFilter", "UpdateExp", "ClientSecret", "ApiKey", "RequireClientSecret", "AccessTokenLifetime", "IdentityTokenLifetime", "AllowedGrantTypes", "AllowedScopes"
 };
 var trees = Directory.EnumerateFiles(sourceRoot, "*.cs", SearchOption.AllDirectories)
     .Where(path => !path.Contains(Path.DirectorySeparatorChar + "bin" + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)

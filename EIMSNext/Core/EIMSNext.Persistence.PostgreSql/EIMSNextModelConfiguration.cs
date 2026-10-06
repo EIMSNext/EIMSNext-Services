@@ -128,13 +128,9 @@ public static class EIMSNextModelConfiguration
         Mapped<AppDef>(modelBuilder)?.Property(x => x.AppMenus).HasConversion(Jsonb<List<AppMenu>>()).HasColumnType("jsonb");
         Mapped<DashboardDef>(modelBuilder)?.Property(x => x.PublishMembers).HasConversion(Jsonb<List<Member>>()).HasColumnType("jsonb");
 
-        // 必须显式挂转换器，否则 EF 会把 ClientGrantType / ClientSecret / ClientScope
-        // 当成独立实体去要主键，模型校验阶段直接抛异常。
-        // 注意 ClientScope 是 { Scope } 值对象，与旧脚本里同名的那张 "ClientScope" 表不是一回事
-        //（C# 侧没有对应实体，该表已移除）。
-        Mapped<Client>(modelBuilder)?.Property(x => x.ClientSecrets).HasConversion(Jsonb<List<ClientSecret>>()).HasColumnType("jsonb");
-        Mapped<Client>(modelBuilder)?.Property(x => x.AllowedGrantTypes).HasConversion(Jsonb<List<ClientGrantType>>()).HasColumnType("jsonb");
-        Mapped<Client>(modelBuilder)?.Property(x => x.AllowedScopes).HasConversion(Jsonb<List<ClientScope>>()).HasColumnType("jsonb");
+        // Client 的凭证/授权字段已简化为原生类型：ClientSecret 是 string（走 citext），
+        // AllowedGrantTypes / AllowedScopes 是 string 集合（走 citext[]，见 IsCaseInsensitiveStringArray），
+        // 都不再需要 jsonb 转换器。
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.AppIds).HasConversion(Jsonb<List<string>>()).HasColumnType("jsonb");
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.ResourceActions).HasConversion(Jsonb<List<ResourceActionGrant>>()).HasColumnType("jsonb");
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.IpWhitelist).HasConversion(Jsonb<List<string>>()).HasColumnType("jsonb");
@@ -338,6 +334,7 @@ public static class EIMSNextModelConfiguration
     private static bool IsCaseInsensitiveStringArray(Type entityType, string propertyName)
     {
         if (entityType == typeof(FormListView) && propertyName == nameof(FormListView.PermissionGroupIds)) return true;
+        if (entityType == typeof(Client) && propertyName is nameof(Client.AllowedGrantTypes) or nameof(Client.AllowedScopes)) return true;
         return entityType == typeof(TenantAdminGroup) && propertyName is
             nameof(TenantAdminGroup.AppIds) or
             nameof(TenantAdminGroup.AppDepartmentIds) or

@@ -15,16 +15,11 @@ namespace EIMSNext.Identity.Host
                     RequireClientSecret = false,
                     AllowedGrantTypes =
                     [
-                        new ClientGrantType { GrantType = "password" },
-                        new ClientGrantType { GrantType = CustomGrantType.VerificationCode },
-                        new ClientGrantType { GrantType = CustomGrantType.SingleSignOn }
+                        "password",
+                        CustomGrantType.VerificationCode,
+                        CustomGrantType.SingleSignOn
                     ],
-                    AllowedScopes =
-                    [
-                        new ClientScope { Scope = "openid" },
-                        new ClientScope { Scope = "profile" },
-                        new ClientScope { Scope = "api.readwrite" }
-                    ],
+                    AllowedScopes = ["openid", "profile", "api.readwrite"],
                     AccessTokenLifetime=Constants.TokenLifetime_Default,
                     IdentityTokenLifetime=Constants.TokenLifetime_Default
                 },
@@ -33,16 +28,13 @@ namespace EIMSNext.Identity.Host
                     Id = InternalClients.PublicClientId,
                     Name = "EIMSNext.Public",
                     RequireClientSecret = false,
-                    AllowedGrantTypes =
-                    [
-                        new ClientGrantType { GrantType = CustomGrantType.Public }
-                    ],
+                    AllowedGrantTypes = [CustomGrantType.Public],
                     AllowedScopes =
                     [
-                        new ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DashLink) },
-                        new ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.FormLink) },
-                        new ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.DataLink) },
-                        new ClientScope { Scope = nameof(EIMSNext.ApiService.PublicScope.QueryLink) }
+                        nameof(EIMSNext.ApiService.PublicScope.DashLink),
+                        nameof(EIMSNext.ApiService.PublicScope.FormLink),
+                        nameof(EIMSNext.ApiService.PublicScope.DataLink),
+                        nameof(EIMSNext.ApiService.PublicScope.QueryLink)
                     ],
                     AccessTokenLifetime = Constants.TokenLifetime_Default,
                     IdentityTokenLifetime = Constants.TokenLifetime_Default
@@ -52,22 +44,9 @@ namespace EIMSNext.Identity.Host
                     Id = InternalClients.SystemClientId,
                     Name = "EIMSNext.System",
                     RequireClientSecret = true,
-                    ClientSecrets =
-                    [
-                        new ClientSecret
-                        {
-                            Type = "SharedSecret",
-                            Value = InternalClients.SystemClientSecret.Sha256()
-                        }
-                    ],
-                    AllowedGrantTypes =
-                    [
-                        new ClientGrantType { GrantType = CustomGrantType.System }
-                    ],
-                    AllowedScopes =
-                    [
-                        new ClientScope { Scope = "api.readwrite" }
-                    ],
+                    ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                    AllowedGrantTypes = [CustomGrantType.System],
+                    AllowedScopes = ["api.readwrite"],
                     AccessTokenLifetime = Constants.TokenLifetime_Default,
                     IdentityTokenLifetime = Constants.TokenLifetime_Default
                 }

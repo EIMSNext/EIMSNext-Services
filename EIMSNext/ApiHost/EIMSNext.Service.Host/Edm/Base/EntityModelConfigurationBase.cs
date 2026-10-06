@@ -24,6 +24,8 @@ namespace EIMSNext.Service.Host.Edm
             entityType.Ignore(x => x.UpdateBy);
             entityType.Ignore(x => x.UpdateTime);
             entityType.Ignore(x => x.DeleteFlag);
+            entityType.Ignore(x => x.DeleteBy);
+            entityType.Ignore(x => x.DeleteTime);
         }
     }
 
@@ -46,6 +48,8 @@ namespace EIMSNext.Service.Host.Edm
             entityType.Ignore(x => x.UpdateBy);
             entityType.Ignore(x => x.UpdateTime);
             entityType.Ignore(x => x.DeleteFlag);
+            entityType.Ignore(x => x.DeleteBy);
+            entityType.Ignore(x => x.DeleteTime);
         }
     }
 }

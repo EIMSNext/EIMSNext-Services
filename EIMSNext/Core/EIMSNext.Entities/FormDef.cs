@@ -16,6 +16,9 @@ namespace EIMSNext.Entities
     /// </summary>
     public class FormDef : CorpEntityBase
     {
+        /// <summary>
+        /// 是否为跨应用绑定进来的外部表单（仅查询结果填充，非持久化字段）。
+        /// </summary>
         [NotMapped]
         public bool External { get; set; }
         /// <summary>
@@ -59,17 +62,6 @@ namespace EIMSNext.Entities
     /// 表单设置。
     /// </summary>
     public class FormSettings
-    {
-        /// <summary>
-        /// 高级功能设置。
-        /// </summary>
-        public DataAdvancedSettings Advanced { get; set; } = new DataAdvancedSettings();
-    }
-
-    /// <summary>
-    /// 表单高级功能设置。
-    /// </summary>
-    public class DataAdvancedSettings
     {
         /// <summary>
         /// 数据标题设置。

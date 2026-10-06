@@ -425,8 +425,12 @@ namespace EIMSNext.Service.Tests
             public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
                 => Task.FromResult(Count(predicate));
 
-            public override Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
-                => Task.FromResult(SoftDeleteMany(ids));
+            public override Task<int> SoftDeleteManyAsync(
+                IEnumerable<string> ids,
+                Operator? deleteBy,
+                long? deleteTime,
+                CancellationToken cancellationToken = default)
+                => Task.FromResult(SoftDeleteMany(ids, deleteBy, deleteTime));
 
             public override Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
             {
@@ -435,13 +439,15 @@ namespace EIMSNext.Service.Tests
                 return Task.FromResult(removed.Count);
             }
 
-            private int SoftDeleteMany(IEnumerable<string> ids)
+            private int SoftDeleteMany(IEnumerable<string> ids, Operator? deleteBy, long? deleteTime)
             {
                 var idSet = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var affected = _items.Where(x => idSet.Contains(x.Id)).ToList();
                 foreach (var item in affected)
                 {
                     item.DeleteFlag = true;
+                    item.DeleteBy = deleteBy;
+                    item.DeleteTime = deleteTime;
                 }
 
                 return affected.Count;

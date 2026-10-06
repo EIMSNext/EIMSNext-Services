@@ -20,7 +20,7 @@ namespace EIMSNext.ApiService
     /// <list type="bullet">
     /// <item>明文 ClientSecret 只在 Create / GenerateSecret 时返回，存 DB 前 SHA-256 哈希。</item>
     /// <item>明文凭证额外缓存到 <c>IScopeCache</c> 5 分钟，<c>Reveal</c> 端点用它取回。</item>
-    /// <item><c>ReplaceAsyncCore</c> 用 read-modify-write 保护 ClientSecrets/Id/ApiKey 永不被请求体改写。</item>
+    /// <item><c>ReplaceAsyncCore</c> 用 read-modify-write 保护 ClientSecret/Id/ApiKey 永不被请求体改写。</item>
     /// </list>
     /// </summary>
     public class ClientApiService(IResolver resolver)
@@ -44,20 +44,11 @@ namespace EIMSNext.ApiService
             entity.CorpId = IdentityContext.CurrentCorpId;
             entity.Id = string.Empty;
             Resolver.GetRepository<Client>().EnsureId(entity);
-            entity.ClientSecrets =
-            [
-                new ClientSecret { Value = plainSecret.Sha256(), Type = "SharedSecret" }
-            ];
+            entity.ClientSecret = plainSecret.Sha256();
             entity.ApiKey = Nanoid.Generate(ApiKeyAlphabet, 36);
             entity.RequireClientSecret = true;
-            entity.AllowedGrantTypes =
-            [
-                new ClientGrantType { GrantType = "client_credentials" }
-            ];
-            entity.AllowedScopes =
-            [
-                new ClientScope { Scope = "api.readwrite" }
-            ];
+            entity.AllowedGrantTypes = ["client_credentials"];
+            entity.AllowedScopes = ["api.readwrite"];
             entity.IdentityTokenLifetime = 7200;
             entity.AccessTokenLifetime = 7200;
 
@@ -83,7 +74,7 @@ namespace EIMSNext.ApiService
 
             entity.CorpId = existing.CorpId;
             entity.Id = existing.Id;
-            entity.ClientSecrets = existing.ClientSecrets;
+            entity.ClientSecret = existing.ClientSecret;
             entity.ApiKey = existing.ApiKey;
             entity.RequireClientSecret = existing.RequireClientSecret;
             entity.AllowedGrantTypes = existing.AllowedGrantTypes;
@@ -147,10 +138,7 @@ namespace EIMSNext.ApiService
             }
 
             var plainSecret = GeneratePlainSecret();
-            existing.ClientSecrets = new List<ClientSecret>
-            {
-                new() { Value = plainSecret.Sha256(), Type = "SharedSecret" }
-            };
+            existing.ClientSecret = plainSecret.Sha256();
 
             await CoreService.ReplaceAsync(existing);
 

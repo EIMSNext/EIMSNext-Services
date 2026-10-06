@@ -331,10 +331,16 @@ namespace EIMSNext.Service
             {
                 // 恢复的是已逻辑删除的行（DeleteFlag=true），必须显式忽略全局 !DeleteFlag 过滤，
                 // 否则查询过滤会把目标行排除在外，UpdateMany 找不到任何行 → 恢复无效果。
+                // 恢复时一并清空删除人/删除时间，避免已恢复的行仍残留删除痕迹。
+                Operator? clearedBy = null;
+                long? clearedTime = null;
                 var updated = await Repository.Queryable
                     .IgnoreQueryFilters()
                     .Where(x => idList.Contains(x.Id) && x.DeleteFlag)
-                    .ExecuteUpdateAsync(setters => setters.SetProperty(x => x.DeleteFlag, false))
+                    .ExecuteUpdateAsync(setters => setters
+                        .SetProperty(x => x.DeleteFlag, false)
+                        .SetProperty(x => x.DeleteBy, clearedBy)
+                        .SetProperty(x => x.DeleteTime, clearedTime))
                     .ConfigureAwait(false);
                 if (updated > 0)
                 {
@@ -445,7 +451,7 @@ namespace EIMSNext.Service
 
             return physical
                 ? await Repository.Queryable.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ExecuteDeleteAsync().ConfigureAwait(false)
-                : await Repository.SoftDeleteManyAsync(ids).ConfigureAwait(false);
+                : await Repository.SoftDeleteManyAsync(ids, Context.Operator, DateTime.UtcNow.ToTimeStampMs()).ConfigureAwait(false);
         }
 
         protected virtual Task<WfResponse?> DeleteWorkflowInstancesByDataIdsAsync(IReadOnlyCollection<string> dataIds)

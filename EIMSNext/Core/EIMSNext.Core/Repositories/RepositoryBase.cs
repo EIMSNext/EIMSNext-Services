@@ -152,10 +152,18 @@ namespace EIMSNext.Core.Repositories
         public abstract Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
-        public abstract Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
+        public abstract Task<int> SoftDeleteManyAsync(
+            IEnumerable<string> ids,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default);
 
         /// <inheritdoc />
-        public abstract Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
+        public abstract Task<int> SoftDeleteManyAsync(
+            Expression<Func<T, bool>> predicate,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default);
 
         #endregion
     }

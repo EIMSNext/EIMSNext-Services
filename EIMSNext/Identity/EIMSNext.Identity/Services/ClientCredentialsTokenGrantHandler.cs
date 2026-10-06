@@ -47,7 +47,7 @@ namespace EIMSNext.Identity.Services
             // scope 必须是 AllowedScopes 的子集
             if (scopes.Count > 0 && client.AllowedScopes.Count > 0)
             {
-                var allowed = client.AllowedScopes.Select(s => s.Scope).ToHashSet();
+                var allowed = client.AllowedScopes.ToHashSet();
                 foreach (var s in scopes)
                 {
                     if (!allowed.Contains(s))

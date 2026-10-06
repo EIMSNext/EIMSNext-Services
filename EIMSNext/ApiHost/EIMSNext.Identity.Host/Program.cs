@@ -101,38 +101,30 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
             var changed = false;
 
             var currentGrantTypes = publicClient.AllowedGrantTypes
-                .Select(x => x.GrantType)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
             var seedGrantTypes = seedClient.AllowedGrantTypes
-                .Select(x => x.GrantType)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
             if (!currentGrantTypes.SequenceEqual(seedGrantTypes, StringComparer.Ordinal))
             {
-                publicClient.AllowedGrantTypes = seedClient.AllowedGrantTypes
-                    .Select(x => new EIMSNext.Entities.ClientGrantType { GrantType = x.GrantType })
-                    .ToList();
+                publicClient.AllowedGrantTypes = [.. seedClient.AllowedGrantTypes];
                 changed = true;
             }
 
             var currentScopes = publicClient.AllowedScopes
-                .Select(x => x.Scope)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
             var seedScopes = seedClient.AllowedScopes
-                .Select(x => x.Scope)
                 .Where(x => !string.IsNullOrWhiteSpace(x))
                 .OrderBy(x => x, StringComparer.Ordinal)
                 .ToArray();
             if (!currentScopes.SequenceEqual(seedScopes, StringComparer.Ordinal))
             {
-                publicClient.AllowedScopes = seedClient.AllowedScopes
-                    .Select(x => new EIMSNext.Entities.ClientScope { Scope = x.Scope })
-                    .ToList();
+                publicClient.AllowedScopes = [.. seedClient.AllowedScopes];
                 changed = true;
             }
 

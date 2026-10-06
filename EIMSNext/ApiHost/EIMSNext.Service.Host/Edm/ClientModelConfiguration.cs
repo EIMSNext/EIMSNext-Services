@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Edm
     ///
     /// 关键安全策略：
     /// <list type="bullet">
-    /// <item><c>ClientSecrets</c> 用 <c>Ignore()</c> 整体从 OData 实体中移除（响应/请求都不含）。</item>
+    /// <item><c>ClientSecret</c> 用 <c>Ignore()</c> 整体从 OData 实体中移除（响应/请求都不含）。</item>
     /// <item><c>ApiKey</c> 由 <c>ClientApiService</c> 的 read-modify-write 保护，
     /// 普通 PATCH 不会改写该字段。</item>
     /// </list>
@@ -24,8 +24,8 @@ namespace EIMSNext.Service.Host.Edm
         {
             base.ConfigureCommon(entityType);
 
-            // ClientSecrets 完全从 OData 实体中移除（响应/请求都不含）
-            entityType.Ignore(x => x.ClientSecrets);
+            // ClientSecret 完全从 OData 实体中移除（响应/请求都不含）
+            entityType.Ignore(x => x.ClientSecret);
             entityType.Ignore(x => x.ApiKey);
             entityType.Ignore(x => x.RequireClientSecret);
             entityType.Ignore(x => x.AccessTokenLifetime);

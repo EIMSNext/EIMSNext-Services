@@ -32,9 +32,7 @@ namespace EIMSNext.Identity.Services
             if (scopes.Length == 0)
             {
                 scopes = client.AllowedScopes
-                    .Select(x => x.Scope)
                     .Where(x => !string.IsNullOrWhiteSpace(x))
-                    .Cast<string>()
                     .ToArray();
             }
 
@@ -80,12 +78,12 @@ namespace EIMSNext.Identity.Services
             }
 
             var hashed = clientSecret.Sha256();
-            return client.ClientSecrets.Any(x => x.Value == hashed) ? client : null;
+            return string.Equals(client.ClientSecret, hashed, StringComparison.Ordinal) ? client : null;
         }
 
         private static bool IsGrantTypeAllowed(Client client, string? grantType)
         {
-            return !string.IsNullOrWhiteSpace(grantType) && client.AllowedGrantTypes.Any(x => x.GrantType == grantType);
+            return !string.IsNullOrWhiteSpace(grantType) && client.AllowedGrantTypes.Contains(grantType);
         }
 
         private static bool AreScopesAllowed(Client client, IReadOnlyCollection<string> scopes)
@@ -95,7 +93,7 @@ namespace EIMSNext.Identity.Services
                 return false;
             }
 
-            var allowed = client.AllowedScopes.Select(x => x.Scope).Where(x => !string.IsNullOrWhiteSpace(x)).ToHashSet(StringComparer.Ordinal);
+            var allowed = client.AllowedScopes.Where(x => !string.IsNullOrWhiteSpace(x)).ToHashSet(StringComparer.Ordinal);
             return scopes.All(scope => allowed.Contains(scope));
         }
     }

@@ -96,10 +96,18 @@ namespace EIMSNext.TestSupport
         public virtual Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        public virtual Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
+        public virtual Task<int> SoftDeleteManyAsync(
+            IEnumerable<string> ids,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
-        public virtual Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+        public virtual Task<int> SoftDeleteManyAsync(
+            Expression<Func<T, bool>> predicate,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default)
             => throw new NotSupportedException();
 
         #endregion

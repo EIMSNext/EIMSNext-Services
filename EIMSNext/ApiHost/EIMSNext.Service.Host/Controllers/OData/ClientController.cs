@@ -21,7 +21,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// OAuth 客户端的 OData CRUD 控制器。
     ///
     /// 实体集：<c>Client</c>。仅 <c>IdentityTypeDefaults.CorpAdmin</c> 身份可访问。
-    /// <c>ClientSecrets</c> 在 EDM 中被 <c>Ignore()</c>，永远不出现在 OData 响应/请求中；
+    /// <c>ClientSecret</c> 在 EDM 中被 <c>Ignore()</c>，永远不出现在 OData 响应/请求中；
     /// 改密需走 <c>ClientController.GenerateSecret</c> 端点。
     /// </summary>
     /// <param name="resolver"></param>

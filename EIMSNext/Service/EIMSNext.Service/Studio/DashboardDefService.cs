@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
@@ -101,11 +102,14 @@ namespace EIMSNext.Service
                 return;
             }
 
+            // 级联逻辑删除统一记录删除人与删除时间。
+            var deleteBy = Context.Operator;
+            var deleteTime = DateTime.UtcNow.ToTimeStampMs();
+
             var dashboardIds = deletedDashboards.Select(x => x.Id).ToList();
             var dashboardItemRepo = Resolver.GetRepository<DashboardItemDef>();
-            await dashboardItemRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && dashboardIds.Contains(x.DashboardId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await dashboardItemRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && dashboardIds.Contains(x.DashboardId), deleteBy, deleteTime);
 
             var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();

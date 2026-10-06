@@ -25,7 +25,7 @@ public class ClientCredentialsTokenGrantHandlerTests
             Name = "Partner",
             CorpId = "corp-001",
             Enabled = true,
-            AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+            AllowedScopes = ["api.readwrite"]
         };
 
         var result = await handler.HandleAsync(

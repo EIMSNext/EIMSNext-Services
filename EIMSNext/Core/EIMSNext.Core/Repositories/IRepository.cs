@@ -170,14 +170,30 @@ public interface IRepository<T> where T : class, IEntityKey
     Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 按主键 ID 集合批量软删除（置 DeleteFlag）。
+    /// 按主键 ID 集合批量软删除（置 DeleteFlag，并记录删除人/删除时间）。
     /// </summary>
-    Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default);
+    /// <param name="ids">主键 ID 集合。</param>
+    /// <param name="deleteBy">删除人；无操作者上下文时传 null。</param>
+    /// <param name="deleteTime">删除时间（Unix 毫秒）。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    Task<int> SoftDeleteManyAsync(
+        IEnumerable<string> ids,
+        Operator? deleteBy,
+        long? deleteTime,
+        CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// 按过滤谓词批量软删除（置 DeleteFlag）。
+    /// 按过滤谓词批量软删除（置 DeleteFlag，并记录删除人/删除时间）。
     /// </summary>
-    Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default);
+    /// <param name="predicate">过滤谓词。</param>
+    /// <param name="deleteBy">删除人；无操作者上下文时传 null。</param>
+    /// <param name="deleteTime">删除时间（Unix 毫秒）。</param>
+    /// <param name="cancellationToken">取消令牌。</param>
+    Task<int> SoftDeleteManyAsync(
+        Expression<Func<T, bool>> predicate,
+        Operator? deleteBy,
+        long? deleteTime,
+        CancellationToken cancellationToken = default);
 
     #endregion
 

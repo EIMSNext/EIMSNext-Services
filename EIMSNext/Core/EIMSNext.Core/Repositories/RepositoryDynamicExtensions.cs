@@ -130,16 +130,6 @@ public static class RepositoryDynamicExtensions
         => repository.DeleteManyAsync(filter.ToPredicate<T>(), cancellationToken);
 
     /// <summary>
-    /// 按动态筛选条件批量软删除（置 DeleteFlag）。
-    /// </summary>
-    public static Task<int> SoftDeleteManyAsync<T>(
-        this IRepository<T> repository,
-        DynamicFilter filter,
-        CancellationToken cancellationToken = default)
-        where T : class, IEntityKey
-        => repository.SoftDeleteManyAsync(filter.ToPredicate<T>(), cancellationToken);
-
-    /// <summary>
     /// 取某动态字段的去重值，供筛选选项下拉使用。
     /// </summary>
     /// <remarks>

@@ -197,20 +197,31 @@ namespace EIMSNext.Core.Repositories
         }
 
         /// <inheritdoc />
-        public override Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
+        public override Task<int> SoftDeleteManyAsync(
+            IEnumerable<string> ids,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default)
         {
             var idList = ids.Distinct().ToList();
             if (idList.Count == 0) return Task.FromResult(0);
-            return SoftDeleteManyAsync(x => idList.Contains(x.Id), cancellationToken);
+            return SoftDeleteManyAsync(x => idList.Contains(x.Id), deleteBy, deleteTime, cancellationToken);
         }
 
         /// <inheritdoc />
-        public override Task<int> SoftDeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+        public override Task<int> SoftDeleteManyAsync(
+            Expression<Func<T, bool>> predicate,
+            Operator? deleteBy,
+            long? deleteTime,
+            CancellationToken cancellationToken = default)
         {
             EnsureSoftDeletable();
             return InWriteScopeAsync(() => BatchUpdateAsync(
                 predicate,
-                setters => setters.SetProperty(entity => ((IDeleteFlag)entity).DeleteFlag, true),
+                setters => setters
+                    .SetProperty(entity => ((IDeleteFlag)entity).DeleteFlag, true)
+                    .SetProperty(entity => ((IDeleteFlag)entity).DeleteBy, deleteBy)
+                    .SetProperty(entity => ((IDeleteFlag)entity).DeleteTime, deleteTime),
                 cancellationToken));
         }
 

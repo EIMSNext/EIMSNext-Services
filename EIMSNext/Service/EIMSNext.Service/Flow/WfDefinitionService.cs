@@ -1,6 +1,7 @@
 ﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
 
+using EIMSNext.Common.Extensions;
 using EIMSNext.Component;
 using EIMSNext.Core.Query;
 using EIMSNext.Core.Repositories;
@@ -162,7 +163,8 @@ namespace EIMSNext.Service
                 return 0;
             }
 
-            return await Repository.SoftDeleteManyAsync(x => idList.Contains(x.Id));
+            return await Repository.SoftDeleteManyAsync(
+                x => idList.Contains(x.Id), Context.Operator, DateTime.UtcNow.ToTimeStampMs());
         }
 
         /// <summary>

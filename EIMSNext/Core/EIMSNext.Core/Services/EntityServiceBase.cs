@@ -34,6 +34,13 @@ namespace EIMSNext.Core.Services
             {
                 entity.UpdateBy = Context.Operator;
                 entity.UpdateTime = DateTime.UtcNow.ToTimeStampMs();
+
+                // 逻辑删除：首次被标记删除时落删除人与删除时间（恢复时会清空，见 FormDataService）。
+                if (entity.DeleteFlag && entity.DeleteTime is null)
+                {
+                    entity.DeleteBy = Context.Operator;
+                    entity.DeleteTime = entity.UpdateTime;
+                }
             }
             else
             {

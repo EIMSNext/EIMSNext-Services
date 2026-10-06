@@ -48,6 +48,16 @@ namespace EIMSNext.Common
         public const string DeleteFlag = "deleteFlag";
 
         /// <summary>
+        /// 删除人字段名。
+        /// </summary>
+        public const string DeleteBy = "deleteBy";
+
+        /// <summary>
+        /// 删除时间字段名。
+        /// </summary>
+        public const string DeleteTime = "deleteTime";
+
+        /// <summary>
         /// 数据字段名。
         /// </summary>
         public const string Data = "data";
@@ -75,7 +85,7 @@ namespace EIMSNext.Common
         /// <summary>
         /// 所有系统字段名列表。
         /// </summary>
-        public static readonly string[] SystemFields = { Id, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, CorpId, AppId, FormId, FlowStatus };
+        public static readonly string[] SystemFields = { Id, DataTitle, CreateBy, CreateTime, UpdateBy, UpdateTime, DeleteFlag, DeleteBy, DeleteTime, CorpId, AppId, FormId, FlowStatus };
 
         /// <summary>
         /// 判断指定字段名是否为系统字段。

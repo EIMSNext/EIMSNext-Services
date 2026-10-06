@@ -16,7 +16,7 @@ namespace EIMSNext.Component
 
         public string ResolveDataTitle(FormData data, FormDef formDef)
         {
-            var settings = formDef.FormSettings?.Advanced?.DataTitle;
+            var settings = formDef.FormSettings?.DataTitle;
             if (settings == null || string.Equals(settings.Mode, "default", StringComparison.OrdinalIgnoreCase))
             {
                 return ResolveDefaultTitle(data, formDef);

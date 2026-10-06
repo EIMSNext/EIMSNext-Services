@@ -296,6 +296,10 @@ namespace EIMSNext.Service
             if (deletedForms.Count == 0)
                 return;
 
+            // 级联逻辑删除统一记录删除人与删除时间。
+            var deleteBy = Context.Operator;
+            var deleteTime = DateTime.UtcNow.ToTimeStampMs();
+
             var appRepo = Resolver.GetRepository<AppDef>();
 
             // 按 AppId 分组，批量处理
@@ -324,9 +328,8 @@ namespace EIMSNext.Service
             var formIds = deletedForms.Select(x => x.Id).ToList();
             //更新所有相关数据为已删除
             var formDataRepo = Resolver.GetRepository<FormData>();
-            await formDataRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && formIds.Contains(x.FormId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await formDataRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && formIds.Contains(x.FormId), deleteBy, deleteTime);
 
             var flowFormIds = deletedForms.Where(x => x.UsingWorkflow).Select(x => x.Id);
             if (flowFormIds.Any())
@@ -341,19 +344,16 @@ namespace EIMSNext.Service
 
             // 表单删除后，所有直接引用和嵌入引用都必须失效，避免孤儿配置继续被读取。
             var printRepo = Resolver.GetRepository<PrintDef>();
-            await printRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && formIds.Contains(x.FormId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await printRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && formIds.Contains(x.FormId), deleteBy, deleteTime);
 
             var bindingRepo = Resolver.GetRepository<CrossBinding>();
-            await bindingRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && formIds.Contains(x.SourceFormId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await bindingRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && formIds.Contains(x.SourceFormId), deleteBy, deleteTime);
 
             var permissionGroupRepo = Resolver.GetRepository<FormDataPermissionGroup>();
-            await permissionGroupRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && formIds.Contains(x.FormId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await permissionGroupRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && formIds.Contains(x.FormId), deleteBy, deleteTime);
 
             // DashboardItemDef.Details 内嵌引用了表单 ID。
             var itemRepo = Resolver.GetRepository<DashboardItemDef>();
@@ -365,9 +365,8 @@ namespace EIMSNext.Service
                 .ToList();
             if (detailsCandidates.Count > 0)
             {
-                await itemRepo.UpdateManyAsync(
-                    x => detailsCandidates.Contains(x.Id),
-                    setters => setters.SetProperty(x => x.DeleteFlag, true));
+                await itemRepo.SoftDeleteManyAsync(
+                    x => detailsCandidates.Contains(x.Id), deleteBy, deleteTime);
             }
         }
 

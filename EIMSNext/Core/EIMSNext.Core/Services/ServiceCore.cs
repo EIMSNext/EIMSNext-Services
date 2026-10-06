@@ -471,7 +471,8 @@ namespace EIMSNext.Core.Services
             int result;
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                result = Repository.SoftDeleteManyAsync(filter).GetAwaiter().GetResult();
+                result = Repository.SoftDeleteManyAsync(filter, Context.Operator, DateTime.UtcNow.ToTimeStampMs())
+                    .GetAwaiter().GetResult();
             }
             else
             {
@@ -493,7 +494,8 @@ namespace EIMSNext.Core.Services
             int result;
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                result = Repository.SoftDeleteManyAsync(predicate).GetAwaiter().GetResult();
+                result = Repository.SoftDeleteManyAsync(predicate, Context.Operator, DateTime.UtcNow.ToTimeStampMs())
+                    .GetAwaiter().GetResult();
             }
             else
             {
@@ -657,7 +659,8 @@ namespace EIMSNext.Core.Services
             int result;
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                result = await Repository.SoftDeleteManyAsync(filter).ConfigureAwait(false);
+                result = await Repository.SoftDeleteManyAsync(filter, Context.Operator, DateTime.UtcNow.ToTimeStampMs())
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -679,7 +682,8 @@ namespace EIMSNext.Core.Services
             int result;
             if (LogicDelete && IDeleteFlagType.IsAssignableFrom(typeof(T)))
             {
-                result = await Repository.SoftDeleteManyAsync(predicate).ConfigureAwait(false);
+                result = await Repository.SoftDeleteManyAsync(predicate, Context.Operator, DateTime.UtcNow.ToTimeStampMs())
+                    .ConfigureAwait(false);
             }
             else
             {

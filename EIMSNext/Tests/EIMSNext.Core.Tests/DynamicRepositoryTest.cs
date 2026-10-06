@@ -262,5 +262,77 @@ namespace EIMSNext.Core.Tests
             result = resp.Find(new DynamicFindOptions<FormData>()).ToList();
             Assert.AreEqual(0, result.Count);
         }
+
+        /// <summary>
+        /// 软删除必须落 DeleteFlag 与删除人/删除时间，且这些值能从 jsonb 列正确往返。
+        /// </summary>
+        /// <remarks>
+        /// 这条用例同时守两件事：
+        /// 1) <c>ExecuteUpdateAsync</c> 能把带值转换器的 <see cref="Operator"/>（jsonb）写进库；
+        /// 2) 软删除后的行在带全局 <c>!DeleteFlag</c> 过滤的正常查询里读不到。
+        /// </remarks>
+        [TestMethod]
+        public void SoftDeleteFillsDeleteAuditFields()
+        {
+            var resp = new FormDataRepository(_dbContext!);
+
+            var data = new FormData("{\"f_1721094301870\":\"fff\"}");
+            resp.Insert(data);
+
+            var deleteBy = new Operator("emp-1", "E001", "张三");
+            const long deleteTime = 1735689600000L;
+
+            resp.SoftDeleteManyAsync([data.Id], deleteBy, deleteTime).GetAwaiter().GetResult();
+
+            var row = resp.Find(new DynamicFindOptions<FormData> { IncludeDeleted = true })
+                .Single(x => x.Id == data.Id);
+
+            Assert.IsTrue(row.DeleteFlag);
+            Assert.IsNotNull(row.DeleteBy);
+            Assert.AreEqual("emp-1", row.DeleteBy!.Id);
+            Assert.AreEqual("E001", row.DeleteBy.Value);
+            Assert.AreEqual("张三", row.DeleteBy.Label);
+            Assert.AreEqual(deleteTime, row.DeleteTime!.Value);
+
+            // 带全局软删除过滤的常规查询不再返回该行。
+            Assert.AreEqual(0, resp.Find(new DynamicFindOptions<FormData>()).Count());
+        }
+
+        /// <summary>
+        /// 恢复（DeleteFlag=false）时必须把删除人/删除时间清空，避免已恢复的行仍残留删除痕迹。
+        /// </summary>
+        /// <remarks>
+        /// 这里刻意复刻 <c>FormDataService.RestoreAsync</c> 的写法：全局软删除过滤会把已删行排除，
+        /// 所以必须先 <c>IgnoreQueryFilters()</c>；同时验证 <c>null</c> 常量能被写进带值转换器的
+        /// jsonb 列（<see cref="Operator"/>）。
+        /// </remarks>
+        [TestMethod]
+        public void RestoreClearsDeleteAuditFields()
+        {
+            var resp = new FormDataRepository(_dbContext!);
+
+            var data = new FormData("{\"f_1721094301870\":\"fff\"}");
+            resp.Insert(data);
+
+            resp.SoftDeleteManyAsync([data.Id], new Operator("emp-1", "E001", "张三"), 1735689600000L)
+                .GetAwaiter().GetResult();
+
+            Operator? clearedBy = null;
+            long? clearedTime = null;
+            var updated = resp.Queryable
+                .IgnoreQueryFilters()
+                .Where(x => x.Id == data.Id && x.DeleteFlag)
+                .ExecuteUpdate(setters => setters
+                    .SetProperty(x => x.DeleteFlag, false)
+                    .SetProperty(x => x.DeleteBy, clearedBy)
+                    .SetProperty(x => x.DeleteTime, clearedTime));
+
+            Assert.AreEqual(1, updated);
+
+            var row = resp.Find(new DynamicFindOptions<FormData>()).Single(x => x.Id == data.Id);
+            Assert.IsFalse(row.DeleteFlag);
+            Assert.IsNull(row.DeleteBy);
+            Assert.IsNull(row.DeleteTime);
+        }
     }
 }

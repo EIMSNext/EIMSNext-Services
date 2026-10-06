@@ -190,7 +190,7 @@ namespace EIMSNext.Service.Host.Controllers
             var client = await ClientApiService.GetAsync(req.ClientId);
             if (client != null && client.CorpId == IdentityContext.CurrentCorpId)
             {
-                client.ClientSecrets = new List<ClientSecret> { new ClientSecret { Value = req.Secret.Sha256() } };
+                client.ClientSecret = req.Secret.Sha256();
                 await ClientApiService.ReplaceAsync(client);
                 return ApiResult.Success(req.ClientId).ToActionResult();
             }
