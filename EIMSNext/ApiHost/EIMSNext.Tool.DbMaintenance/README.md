@@ -66,6 +66,7 @@ dotnet run --project EIMSNext-Services/EIMSNext/ApiHost/EIMSNext.Tool.DbMaintena
 | 开关 | 作用 |
 | --- | --- |
 | `-i` / `--interactive` | 强制进入交互式菜单（忽略其它开关） |
+| `--apply` | 命令行模式下执行迁移（等价于菜单的 `[3]`；不带任何参数会进菜单，所以脚本里要用它） |
 | `--dry-run` | 只列出将要执行的脚本，不落库 |
 | `--verify` | 只校验、不执行：磁盘缺文件 / checksum 变化 / **存在未应用的 pending 脚本**都会报错 |
 | `--target-version <版本>` | 执行到指定版本为止 |
@@ -144,7 +145,7 @@ dotnet test Tests/EIMSNext.Core.Tests --filter RegenerateBaselineScripts
   $env:PostgreSql__ConnectionString = "Host=localhost;Port=5432;Database=EIMSTest;Username=postgres;Password=sa123"
   dotnet run --project ApiHost/EIMSNext.Tool.DbMaintenance/EIMSNext.Tool.DbMaintenance.csproj
   ```
-  预期输出 `Applied 12 migration(s).`，全链一次通过。
+  预期输出 `Applied N migration(s).`（N = `Sql/` 下脚本数，当前 13），全链一次通过。
 
 ## 硬性约定
 

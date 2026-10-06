@@ -53,10 +53,13 @@ public static class MaintenanceRunner
         var verifyOnly = arguments.Contains("--verify", StringComparer.Ordinal);
         var acceptChecksumChange = arguments.Contains("--accept-checksum-change", StringComparer.Ordinal);
         var targetVersion = ReadOption(arguments, "--target-version");
+        // --apply 本身不改变行为（默认就是应用迁移），它只是命令行模式下"我要执行"的显式意图：
+        // 不带任何参数会进入菜单，所以脚本/CI 想执行迁移时必须带上它。
         var configurationArgs = arguments.Where(x =>
             x is not "--dry-run"
               and not "--verify"
               and not "--accept-checksum-change"
+              and not "--apply"
               and not "--target-version").ToArray();
         return new(configurationArgs, dryRun, verifyOnly, targetVersion, acceptChecksumChange);
     }
