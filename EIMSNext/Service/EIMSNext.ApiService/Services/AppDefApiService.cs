@@ -181,6 +181,23 @@ namespace EIMSNext.ApiService
         }
 
         /// <summary>
+        /// 按权限过滤应用查询。
+        /// </summary>
+        /// <remarks>
+        /// 平台管理员需要跨企业检索应用（平台管理台的发布/模板选择等场景），故不附加企业隔离条件。
+        /// 其余身份沿用基类的企业隔离。
+        /// </remarks>
+        protected override IQueryable<AppDef> FilterByPermission()
+        {
+            if (IdentityContext.IdentityType == IdentityType.PlatAdmin)
+            {
+                return CoreService.All();
+            }
+
+            return base.FilterByPermission();
+        }
+
+        /// <summary>
         /// 新增实体核心逻辑。
         /// </summary>
         protected override async Task AddAsyncCore(AppDef entity)

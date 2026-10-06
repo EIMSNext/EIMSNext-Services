@@ -111,12 +111,12 @@ namespace EIMSNext.Service
                 AppTemplateId = appTemplateId,
                 Name = wfDef.Name,
                 FlowType = wfDef.FlowType,
-                ExternalTemplateId = formMap.TryGetValue(wfDef.ExternalId, out var formTemplateId) ? formTemplateId : wfDef.ExternalId,
+                ExternalTemplateId = MapEntityReferenceToTemplate(wfDef.ExternalId, formMap, dashboardMap, wfMap, wfDef.Name),
                 Description = wfDef.Description,
                 Content = RewriteJsonToTemplate(wfDef.Content, formMap, dashboardMap, wfMap, printMap),
                 Metadata = RewriteWorkflowMetadataToTemplate(wfDef.Metadata, formMap, dashboardMap, wfMap, printMap),
                 EventSource = wfDef.EventSource,
-                SourceTemplateId = MapEntityReferenceToTemplate(wfDef.SourceId, formMap, dashboardMap, wfMap),
+                SourceTemplateId = MapEntityReferenceToTemplate(wfDef.SourceId, formMap, dashboardMap, wfMap, wfDef.Name),
                 EventSetting = RewriteEventSettingToTemplate(wfDef.EventSetting, formMap, dashboardMap, wfMap),
                 Disabled = wfDef.Disabled
             });
@@ -423,7 +423,7 @@ namespace EIMSNext.Service
                 printMap);
         }
 
-        private static string? MapEntityReferenceToTemplate(string? entityId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap)
+        private static string? MapEntityReferenceToTemplate(string? entityId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, string? ownerName)
         {
             if (string.IsNullOrWhiteSpace(entityId))
             {
@@ -445,7 +445,9 @@ namespace EIMSNext.Service
                 return workflowTemplateId;
             }
 
-            return entityId;
+            // 映射表只覆盖当前应用且未删除的资源，映射失败说明该引用无法解析到应用内的模板。
+            // 原先原样保留会把无效 ID 写进模板字段，污染模板数据并导致导出校验失败，故直接中止发布。
+            throw new BadRequestException($"{(string.IsNullOrWhiteSpace(ownerName) ? "工作流" : ownerName)} 引用了不存在或不属于当前应用的资源: {entityId}");
         }
 
         private static string SerializeTemplateMenus(List<AppMenu> menus, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
