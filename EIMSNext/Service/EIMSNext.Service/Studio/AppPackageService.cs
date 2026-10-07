@@ -594,7 +594,7 @@ namespace EIMSNext.Service
         {
             var invalidChars = Path.GetInvalidFileNameChars();
             var safeName = string.Concat((name ?? string.Empty).Select(c => invalidChars.Contains(c) ? '_' : c)).Trim();
-            return string.IsNullOrWhiteSpace(safeName) ? "app-package" : safeName;
+            return string.IsNullOrWhiteSpace(safeName) ? "app" : safeName;
         }
 
         private sealed class ImportPlan
