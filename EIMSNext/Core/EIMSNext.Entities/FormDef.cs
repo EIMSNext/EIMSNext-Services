@@ -200,6 +200,11 @@ namespace EIMSNext.Entities
         /// </summary>
         public string? Format { get; set; }
         /// <summary>
+        /// 地址字段的层级：1=省 2=省-市 3=省-市-区 4=省-市-区-详细地址。
+        /// 服务端只做搬运，供前端筛选/查询条件按字段类型截断级联层级。
+        /// </summary>
+        public int? Level { get; set; }
+        /// <summary>
         /// 兼容部分子表单列把必填配置存放在 props.required 的情况。
         /// </summary>
         public bool? Required { get; set; }

@@ -127,6 +127,11 @@ namespace EIMSNext.Component
                     case FieldType.TimeStamp:
                         fieldDef.Props.Format = props["format"]?.GetValue<string>();
                         break;
+                    case FieldType.Address:
+                        // 地址层级：1=省 2=省-市 3=省-市-区 4=省-市-区-详细地址。
+                        // 原样搬进 Items，前端筛选/查询条件据此截断级联层级（服务端不做业务解析）。
+                        fieldDef.Props.Level = props["level"]?.GetValue<int>();
+                        break;
                 }
             }
 
