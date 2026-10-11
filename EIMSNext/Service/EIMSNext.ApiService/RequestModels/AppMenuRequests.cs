@@ -48,6 +48,9 @@ namespace EIMSNext.ApiService.RequestModels
 
         /// <summary>分组名称。</summary>
         public string Name { get; set; } = string.Empty;
+
+        /// <summary>上级分组 ID。为空时创建在菜单根层。</summary>
+        public string? ParentMenuId { get; set; }
     }
 
     /// <summary>

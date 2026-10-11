@@ -38,7 +38,28 @@ namespace EIMSNext.ApiService
                 SubMenus = []
             };
 
-            app.AppMenus.Add(menu);
+            if (string.IsNullOrWhiteSpace(request.ParentMenuId))
+            {
+                app.AppMenus.Add(menu);
+            }
+            else
+            {
+                var parent = AppMenuHelper.FindMenu(app.AppMenus, request.ParentMenuId);
+                if (parent == null || parent.MenuType != FormType.Group)
+                {
+                    throw new BadRequestException("上级分组不存在");
+                }
+
+                if (AppMenuHelper.GetDepth(app.AppMenus, parent.MenuId) >= AppMenuHelper.MaxDepth)
+                {
+                    throw new BadRequestException($"菜单最多嵌套 {AppMenuHelper.MaxDepth} 层");
+                }
+
+                parent.SubMenus ??= [];
+                menu.SortIndex = (parent.SubMenus.Count + 1) * 100;
+                parent.SubMenus.Add(menu);
+            }
+
             AppMenuHelper.Normalize(app.AppMenus);
             await CoreService.ReplaceAsync(app);
             return app;
@@ -171,7 +192,7 @@ namespace EIMSNext.ApiService
 
             if (!AppMenuHelper.ValidateTree(request.AppMenus ?? []))
             {
-                throw new BadRequestException("分组内不能再包含分组");
+                throw new BadRequestException($"菜单层级不合法，最多嵌套 {AppMenuHelper.MaxDepth} 层");
             }
 
             var app = await GetManageableAppAsync(request.AppId);
