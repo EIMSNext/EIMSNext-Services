@@ -19,7 +19,7 @@ public sealed class SystemTokenGrantHandler : TokenGrantHandlerBase, ITokenGrant
 
     public Task<TokenRequestResult> HandleAsync(Client client, OpenIddictRequest request, IReadOnlyList<string> scopes, CancellationToken cancellationToken = default)
     {
-        if (!string.Equals(client.Id, InternalClients.SystemClientId, StringComparison.Ordinal))
+        if (client.Id != InternalClients.SystemClientId)
         {
             return Task.FromResult(TokenRequestResult.Failure(OpenIddictConstants.Errors.UnauthorizedClient, "The client application is not allowed to use this grant type."));
         }

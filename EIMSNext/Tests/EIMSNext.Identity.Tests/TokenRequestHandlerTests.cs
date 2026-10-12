@@ -32,16 +32,8 @@ namespace EIMSNext.Identity.Tests
                 Id = InternalClients.WebClientId,
                 Enabled = true,
                 RequireClientSecret = false,
-                AllowedGrantTypes =
-                [
-                    new ClientGrantType { GrantType = GrantTypes.Password }
-                ],
-                AllowedScopes =
-                [
-                    new ClientScope { Scope = "openid" },
-                    new ClientScope { Scope = "profile" },
-                    new ClientScope { Scope = "api.readwrite" }
-                ]
+                AllowedGrantTypes = [GrantTypes.Password],
+                AllowedScopes = ["openid", "profile", "api.readwrite"]
             };
 
             var handler = new TokenRequestHandler(
@@ -82,8 +74,8 @@ namespace EIMSNext.Identity.Tests
                 Id = InternalClients.WebClientId,
                 Enabled = true,
                 RequireClientSecret = false,
-                AllowedGrantTypes = [new ClientGrantType { GrantType = GrantTypes.Password }],
-                AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+                AllowedGrantTypes = [GrantTypes.Password],
+                AllowedScopes = ["api.readwrite"]
             };
 
             var handler = new TokenRequestHandler(
@@ -113,12 +105,9 @@ namespace EIMSNext.Identity.Tests
                 Id = InternalClients.SystemClientId,
                 Enabled = true,
                 RequireClientSecret = true,
-                ClientSecrets =
-                [
-                    new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
-                ],
-                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.System }],
-                AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+                ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                AllowedGrantTypes = [CustomGrantType.System],
+                AllowedScopes = ["api.readwrite"]
             };
 
             var auditLoginService = new FakeIdentityLoginAuditService();
@@ -155,12 +144,9 @@ namespace EIMSNext.Identity.Tests
                 Id = InternalClients.SystemClientId,
                 Enabled = true,
                 RequireClientSecret = true,
-                ClientSecrets =
-                [
-                    new ClientSecret { Type = "SharedSecret", Value = InternalClients.SystemClientSecret.Sha256() }
-                ],
-                AllowedGrantTypes = [new ClientGrantType { GrantType = CustomGrantType.System }],
-                AllowedScopes = [new ClientScope { Scope = "api.readwrite" }]
+                ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                AllowedGrantTypes = [CustomGrantType.System],
+                AllowedScopes = ["api.readwrite"]
             };
 
             var handler = new TokenRequestHandler(

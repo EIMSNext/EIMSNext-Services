@@ -792,6 +792,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                         FieldType.Radio or FieldType.Select1 => ImportCellConverters.ConvertSingleOption(text, field),
                         FieldType.CheckBox or FieldType.Select2 => ImportCellConverters.ConvertMultiOption(text, field),
                         FieldType.ImageUpload or FieldType.FileUpload => ImportCellConverters.ConvertUrlList(text),
+                        FieldType.Address => ImportCellConverters.ConvertAddress(text),
                         _ => ImportCellConverters.ConvertTextOrJson(text),
                     };
                 }
@@ -820,6 +821,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                         FieldType.Radio or FieldType.Select1 => ImportCellConverters.ConvertSingleOption(ImportCellConverters.ToCellText(value), field),
                         FieldType.CheckBox or FieldType.Select2 => ImportCellConverters.ConvertEditableMultiOption(value, field),
                         FieldType.ImageUpload or FieldType.FileUpload => ImportCellConverters.ConvertEditableUrlList(value),
+                        FieldType.Address => ImportCellConverters.ConvertEditableAddress(value),
                         _ => value is string text ? ImportCellConverters.ConvertTextOrJson(text) : value,
                     };
                 }

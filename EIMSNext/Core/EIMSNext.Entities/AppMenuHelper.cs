@@ -7,6 +7,11 @@ namespace EIMSNext.Entities
     public static class AppMenuHelper
     {
         /// <summary>
+        /// 菜单树允许的最大层级（根层为第 1 层）。防止前端拖拽或接口调用构造出过深的嵌套。
+        /// </summary>
+        public const int MaxDepth = 3;
+
+        /// <summary>
         /// 在菜单树中按 <see cref="Entities.AppMenu.MenuId"/> 递归查找第一个匹配项。
         /// </summary>
         /// <param name="menus">待搜索的菜单列表（可为 null，视为空）。</param>
@@ -109,27 +114,60 @@ namespace EIMSNext.Entities
         }
 
         /// <summary>
-        /// 校验菜单树结构合法性：分组节点必须包含子菜单且子菜单不能再是分组；叶子节点不能有子菜单。
+        /// 计算菜单所在层级（根层为 1）。未找到返回 0。
+        /// </summary>
+        /// <param name="menus">待搜索的菜单树。</param>
+        /// <param name="menuId">要查找的菜单 ID。</param>
+        /// <returns>菜单层级；未找到返回 0。</returns>
+        public static int GetDepth(List<Entities.AppMenu> menus, string menuId)
+        {
+            return GetDepthCore(menus, menuId, 1);
+        }
+
+        /// <summary>
+        /// 校验菜单树结构合法性：分组节点可再嵌分组，但整体不超过 <see cref="MaxDepth"/> 层；叶子节点不能有子菜单。
         /// </summary>
         /// <param name="menus">待校验的菜单树。</param>
         /// <returns>合法返回 true；任意一处违规返回 false。</returns>
         public static bool ValidateTree(IEnumerable<Entities.AppMenu> menus)
         {
+            return ValidateTreeCore(menus, 1);
+        }
+
+        private static int GetDepthCore(IEnumerable<Entities.AppMenu> menus, string menuId, int depth)
+        {
+            foreach (var menu in menus)
+            {
+                if (menu.MenuId == menuId)
+                {
+                    return depth;
+                }
+
+                if (menu.SubMenus?.Count > 0)
+                {
+                    var matched = GetDepthCore(menu.SubMenus, menuId, depth + 1);
+                    if (matched > 0)
+                    {
+                        return matched;
+                    }
+                }
+            }
+
+            return 0;
+        }
+
+        private static bool ValidateTreeCore(IEnumerable<Entities.AppMenu> menus, int depth)
+        {
+            if (depth > MaxDepth)
+            {
+                return false;
+            }
+
             foreach (var menu in menus)
             {
                 if (menu.MenuType == Entities.FormType.Group)
                 {
-                    if (menu.SubMenus == null)
-                    {
-                        continue;
-                    }
-
-                    if (menu.SubMenus.Any(x => x.MenuType == Entities.FormType.Group))
-                    {
-                        return false;
-                    }
-
-                    if (!ValidateTree(menu.SubMenus))
+                    if (menu.SubMenus != null && !ValidateTreeCore(menu.SubMenus, depth + 1))
                     {
                         return false;
                     }

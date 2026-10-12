@@ -6,16 +6,27 @@ namespace EIMSNext.Core.Tests
     public class DynamicFindOptionsBehaviorTests
     {
         [TestMethod]
-        public void GetEffectiveTake_UsesDefaultForNonPositiveTake()
+        public void GetEffectiveTake_LeavesNonPositiveTakeAsUnlimited()
         {
             var zero = new DynamicFindOptions<object> { Take = 0 };
             var negative = new DynamicFindOptions<object> { Take = -1 };
 
-            Assert.AreEqual(200, zero.GetEffectiveTake());
-            Assert.AreEqual(200, negative.GetEffectiveTake());
+            // 仓储层 0/负数 = 不限量（不生成 LIMIT）；请求入口的默认值与上限由 RequestPagingPolicy 负责。
+            Assert.AreEqual(0, zero.GetEffectiveTake());
+            Assert.AreEqual(0, negative.GetEffectiveTake());
             Assert.AreEqual(25, new DynamicFindOptions<object> { Take = 25 }.GetEffectiveTake());
             // 其 EF Core 等价物是 QueryFindOptions<T>（同一套 Take 语义）。
-            Assert.AreEqual(200, new QueryFindOptions<object> { Take = 0 }.GetEffectiveTake());
+            Assert.AreEqual(0, new QueryFindOptions<object> { Take = 0 }.GetEffectiveTake());
+        }
+
+        [TestMethod]
+        public void RequestPagingPolicy_NormalizesTakeIntoRange()
+        {
+            Assert.AreEqual(RequestPagingPolicy.DefaultTake, RequestPagingPolicy.Normalize(0));
+            Assert.AreEqual(RequestPagingPolicy.DefaultTake, RequestPagingPolicy.Normalize(-5));
+            Assert.AreEqual(50, RequestPagingPolicy.Normalize(50));
+            Assert.AreEqual(RequestPagingPolicy.MaxTake, RequestPagingPolicy.Normalize(int.MaxValue));
+            Assert.AreEqual(RequestPagingPolicy.PublicMaxTake, RequestPagingPolicy.Normalize(int.MaxValue, RequestPagingPolicy.PublicMaxTake));
         }
 
         [TestMethod]

@@ -1,5 +1,6 @@
 ﻿using System.Linq.Expressions;
 using HKH.Mef2.Integration;
+using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Services;
 using EIMSNext.Entities;
 using EIMSNext.Service.Contracts;
@@ -37,29 +38,27 @@ namespace EIMSNext.Service
         {
             await base.AfterAdd(entities);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entities.First().AppId)!;
+            var app = (await appRepo.GetAsync(entities.First().AppId).ConfigureAwait(false))!;
             var maxIndex = app.AppMenus.Count == 0 ? 0 : app.AppMenus.Max(x => x.SortIndex);
             entities.ForEach(e =>
             {
                 maxIndex = maxIndex + 100;
                 app.AppMenus.Add(new AppMenu { MenuId = e.Id, Icon = "", IconColor = "", MenuType = FormType.Dashboard, Title = e.Name, SortIndex = maxIndex });
             });
-            appRepo.Replace(app);
-
-            return;
+            await appRepo.ReplaceAsync(app).ConfigureAwait(false);
         }
 
         protected override async Task AfterReplace(DashboardDef entity)
         {
             await base.AfterReplace(entity);
             var appRepo = Resolver.GetRepository<AppDef>();
-            var app = appRepo.Get(entity.AppId)!;
+            var app = (await appRepo.GetAsync(entity.AppId).ConfigureAwait(false))!;
 
             var menu = AppMenuHelper.FindMenu(app.AppMenus, entity.Id);
             if (menu != null)
             {
                 menu.Title = entity.Name;
-                appRepo.Replace(app);
+                await appRepo.ReplaceAsync(app).ConfigureAwait(false);
             }
         }
 
@@ -71,13 +70,13 @@ namespace EIMSNext.Service
             var updated = Context.ScopeCache.GetAll<DashboardDef>(Cache.DataVersion.New);
             if (!updated.Any())
             {
-                updated = FindCore(filter).ToList();
+                updated = await FindCoreAsync(filter).ConfigureAwait(false);
             }
 
             if (updated.Any())
             {
                 var appRepo = Resolver.GetRepository<AppDef>();
-                var app = appRepo.Get(updated.First().AppId)!;
+                var app = (await appRepo.GetAsync(updated.First().AppId).ConfigureAwait(false))!;
 
                 updated.ForEach(e =>
                 {
@@ -85,7 +84,7 @@ namespace EIMSNext.Service
                     var menu = AppMenuHelper.FindMenu(app.AppMenus, e.Id);
                     if (menu != null) menu.Title = e.Name;
                 });
-                appRepo.Replace(app);
+                await appRepo.ReplaceAsync(app).ConfigureAwait(false);
             }
         }
 
@@ -103,11 +102,14 @@ namespace EIMSNext.Service
                 return;
             }
 
+            // 级联逻辑删除统一记录删除人与删除时间。
+            var deleteBy = Context.Operator;
+            var deleteTime = DateTime.UtcNow.ToTimeStampMs();
+
             var dashboardIds = deletedDashboards.Select(x => x.Id).ToList();
             var dashboardItemRepo = Resolver.GetRepository<DashboardItemDef>();
-            await dashboardItemRepo.UpdateManyAsync(
-                x => !x.DeleteFlag && dashboardIds.Contains(x.DashboardId),
-                setters => setters.SetProperty(x => x.DeleteFlag, true));
+            await dashboardItemRepo.SoftDeleteManyAsync(
+                x => !x.DeleteFlag && dashboardIds.Contains(x.DashboardId), deleteBy, deleteTime);
 
             var appRepo = Resolver.GetRepository<AppDef>();
             var appIds = deletedDashboards.Select(x => x.AppId).Distinct();

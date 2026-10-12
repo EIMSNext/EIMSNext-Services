@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
 	/// 表单数据权限组的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class FormDataPermissionGroupApiService(IResolver resolver) : ApiServiceBase<FormDataPermissionGroup, FormDataPermissionGroupViewModel, IFormDataPermissionGroupService>(resolver)
+	public class FormDataPermissionGroupApiService(IResolver resolver) : ApiServiceBase<FormDataPermissionGroup, IFormDataPermissionGroupService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

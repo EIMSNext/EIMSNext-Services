@@ -125,12 +125,12 @@ namespace EIMSNext.Service
                 TemplateId = wfTemplate.Id,
                 Name = wfTemplate.Name,
                 FlowType = wfTemplate.FlowType,
-                ExternalId = formMap.TryGetValue(wfTemplate.ExternalTemplateId, out var mappedFormId) ? mappedFormId : wfTemplate.ExternalTemplateId,
+                ExternalId = RequireTemplateReference(wfTemplate.ExternalTemplateId, formMap, dashboardMap, wfMap, wfTemplate.Name, "表单"),
                 Description = wfTemplate.Description,
                 Content = AppTemplateReferenceRewriter.RewriteJsonReferences(wfTemplate.Content, newAppId, formMap, dashboardMap, wfMap, printMap),
                 Metadata = AppTemplateReferenceRewriter.RewriteWorkflowMetadata(wfTemplate.Metadata, formMap, dashboardMap, wfMap, printMap),
                 EventSource = wfTemplate.EventSource,
-                SourceId = AppTemplateReferenceRewriter.MapTemplateReference(wfTemplate.SourceTemplateId, formMap, dashboardMap, wfMap),
+                SourceId = RequireTemplateReference(wfTemplate.SourceTemplateId, formMap, dashboardMap, wfMap, wfTemplate.Name, "事件来源"),
                 EventSetting = AppTemplateReferenceRewriter.RewriteEventSetting(wfTemplate.EventSetting, formMap, dashboardMap, wfMap),
                 Disabled = wfTemplate.Disabled,
                 IsCurrent = true,
@@ -180,6 +180,38 @@ namespace EIMSNext.Service
             scope.CommitTransaction();
 
             return newAppId;
+        }
+
+        /// <summary>
+        /// 将模板引用映射为安装后的实体 ID；映射不到时中止安装。
+        /// </summary>
+        /// <remarks>
+        /// 映射表只包含本次安装包内的资源，映射失败说明模板引用了包外的 ID。
+        /// 原先的实现会原样保留该 ID，装出指向无效实体的工作流，故改为直接报错。
+        /// </remarks>
+        private static string? RequireTemplateReference(string? templateId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, string? ownerName, string fieldLabel)
+        {
+            if (string.IsNullOrWhiteSpace(templateId))
+            {
+                return templateId;
+            }
+
+            if (formMap.TryGetValue(templateId, out var formId))
+            {
+                return formId;
+            }
+
+            if (dashboardMap.TryGetValue(templateId, out var dashboardId))
+            {
+                return dashboardId;
+            }
+
+            if (workflowMap.TryGetValue(templateId, out var workflowId))
+            {
+                return workflowId;
+            }
+
+            throw new BadRequestException($"工作流 {ownerName} 的{fieldLabel}引用了不存在于安装包中的模板: {templateId}");
         }
 
         private static T InitializeInstalledEntity<T>(T entity, IServiceContext context, long now) where T : CorpEntityBase

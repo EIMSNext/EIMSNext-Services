@@ -18,28 +18,28 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-	public class DashboardDefController(IResolver resolver) : ODataController<DashboardDefApiService, DashboardDef, DashboardDefViewModel, DashboardDefRequest>(resolver)
+	public class DashboardDefController(IResolver resolver) : ODataController<DashboardDefApiService, DashboardDef, DashboardDefRequest>(resolver)
 	{
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink)]
-        public override IActionResult Get(ODataQueryOptions<DashboardDefViewModel> options)
+        public override IActionResult Get(ODataQueryOptions<DashboardDef> options)
         {
             return base.Get(options);
         }
 
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink)]
-        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<DashboardDefViewModel> options)
+        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<DashboardDef> options)
         {
             if (IdentityContext.IdentityType == IdentityType.Public && !Resolver.Resolve<IPublicAccessValidator>().CanReadDashboard(key))
             {
-                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<DashboardDefViewModel>().AsQueryable());
+                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<DashboardDef>().AsQueryable());
             }
 
             return base.Get(key, options);
         }
 
-        protected override IQueryable<DashboardDefViewModel> FilterByPermission(IQueryable<DashboardDefViewModel> query, ODataQueryOptions<DashboardDefViewModel> options)
+        protected override IQueryable<DashboardDef> FilterByPermission(IQueryable<DashboardDef> query, ODataQueryOptions<DashboardDef> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

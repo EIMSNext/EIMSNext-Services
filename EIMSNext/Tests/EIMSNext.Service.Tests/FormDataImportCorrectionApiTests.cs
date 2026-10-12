@@ -371,6 +371,7 @@ namespace EIMSNext.Service.Tests
             }
 
             public override FormData? Get(string id) => Items.GetValueOrDefault(id);
+            public FormData? GetIncludingDeleted(string id) => Items.GetValueOrDefault(id);
             public override IQueryable<FormData> All() => Items.Values.AsQueryable();
 
             /// <summary>
@@ -453,7 +454,7 @@ namespace EIMSNext.Service.Tests
             {
                 return field switch
                 {
-                    Fields.Id or Fields.BsonId or "_id" => item.Id,
+                    Fields.Id => item.Id,
                     Fields.CorpId => item.CorpId,
                     Fields.FormId => item.FormId,
                     Fields.DeleteFlag => item.DeleteFlag,

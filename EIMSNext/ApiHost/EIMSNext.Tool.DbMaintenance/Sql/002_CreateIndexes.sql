@@ -43,6 +43,8 @@ create index if not exists "IX_Department_CorpId_DeleteFlag" on "Department" ("C
 
 create index if not exists "IX_Department_HeriarchyId" on "Department" ("HeriarchyId" citext_pattern_ops);
 
+create index if not exists "IX_EmployeeDepartment_HeriarchyId" on "EmployeeDepartment" ("HeriarchyId" citext_pattern_ops);
+
 create index if not exists "IX_EmployeeDepartment_CorpId_DepartmentId_EmployeeId" on "EmployeeDepartment" ("CorpId", "DepartmentId", "EmployeeId");
 
 create index if not exists "IX_EmployeeDepartment_CorpId_EmployeeId_SortValue" on "EmployeeDepartment" ("CorpId", "EmployeeId", "SortValue");
@@ -58,6 +60,7 @@ create index if not exists "IX_EmployeeGroupMember_CorpId_EmployeeId" on "Employ
 create unique index if not exists "UX_EmployeeGroupMember_CorpId_EmployeeId_EmployeeGroupId" on "EmployeeGroupMember" ("CorpId", "EmployeeId", "EmployeeGroupId");
 
 create index if not exists "IX_TenantAdminGroup_CorpId_ParentId" on "TenantAdminGroup" ("CorpId", "ParentId");
+create index if not exists "IX_TenantAdminGroup_EmployeeIds_Gin" on "TenantAdminGroup" using gin ("EmployeeIds" jsonb_path_ops);
 
 create index if not exists "IX_CorporateSetting_CorpId_Name" on "CorporateSetting" ("CorpId", "Name");
 

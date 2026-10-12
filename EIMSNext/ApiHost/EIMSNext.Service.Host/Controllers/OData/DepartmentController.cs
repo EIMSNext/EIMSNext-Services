@@ -20,16 +20,11 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class DepartmentController(IResolver resolver) : ODataController<DepartmentApiService, Department, DepartmentViewModel, DepartmentRequest>(resolver)
+    public class DepartmentController(IResolver resolver) : ODataController<DepartmentApiService, Department, DepartmentRequest>(resolver)
     {
-        protected override IQueryable<DepartmentViewModel> FilterByPermission(IQueryable<DepartmentViewModel> query, ODataQueryOptions<DepartmentViewModel> options)
+        protected override IQueryable<Department> FilterByPermission(IQueryable<Department> query, ODataQueryOptions<Department> options)
         {
             query = base.FilterByPermission(query, options);
-            if (!IsAdminScope())
-            {
-                return query;
-            }
-
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (!evaluator.ShouldApplyNormalAdminRules)
             {
@@ -76,11 +71,6 @@ namespace EIMSNext.Service.Host.Controllers.OData
             return base.Delete(key, batch);
         }
 
-        private bool IsAdminScope()
-        {
-            return Request.Query.TryGetValue("adminScope", out var value) &&
-                string.Equals(value.FirstOrDefault(), "true", StringComparison.OrdinalIgnoreCase);
-        }
     }
 }
 

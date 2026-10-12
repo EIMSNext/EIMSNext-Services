@@ -16,7 +16,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class EmployeeController(IResolver resolver) : ApiControllerBase<EmployeeApiService, Employee, EmployeeViewModel>(resolver)
+	public class EmployeeController(IResolver resolver) : ApiControllerBase<EmployeeApiService, Employee>(resolver)
 	{
 	    [HttpPost("ReviewJoinCorporate")]
         [Permission(Operation = Operation.Edit)]

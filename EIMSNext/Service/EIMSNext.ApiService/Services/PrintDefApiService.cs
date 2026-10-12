@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
 	/// 打印定义的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class PrintDefApiService(IResolver resolver) : ApiServiceBase<PrintDef, PrintDefViewModel, IPrintDefService>(resolver)
+	public class PrintDefApiService(IResolver resolver) : ApiServiceBase<PrintDef, IPrintDefService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

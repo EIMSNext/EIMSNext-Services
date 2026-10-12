@@ -17,7 +17,7 @@ namespace EIMSNext.ApiService
     /// 租户管理员组的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, TenantAdminGroupViewModel, ITenantAdminGroupService>(resolver)
+    public class TenantAdminGroupApiService(IResolver resolver) : ApiServiceBase<TenantAdminGroup, ITenantAdminGroupService>(resolver)
     {
         /// <summary>
         /// 移动节点。
@@ -376,14 +376,16 @@ namespace EIMSNext.ApiService
                 return;
             }
 
-            var conflict = CoreService.All().Any(x =>
-                x.CorpId == IdentityContext.CurrentCorpId &&
-                !x.DeleteFlag &&
-                x.Id != currentGroupId &&
-                x.Type == TenantAdminGroupType.System &&
-                x.EmployeeIds.Any(id => idSet.Contains(id)));
+            var conflictGroups = CoreService.All()
+                .Where(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.Id != currentGroupId &&
+                    x.Type == TenantAdminGroupType.System)
+                .Select(x => x.EmployeeIds)
+                .ToList();
 
-            if (conflict)
+            if (conflictGroups.Any(ids => ids.Any(id => idSet.Contains(id))))
             {
                 throw new ArgumentException("员工不能同时加入系统管理员组和普通管理组");
             }
@@ -397,14 +399,16 @@ namespace EIMSNext.ApiService
                 return;
             }
 
-            var conflict = CoreService.All().Any(x =>
-                x.CorpId == IdentityContext.CurrentCorpId &&
-                !x.DeleteFlag &&
-                x.Id != currentGroupId &&
-                x.Type == TenantAdminGroupType.Normal &&
-                x.EmployeeIds.Any(id => idSet.Contains(id)));
+            var conflictGroups = CoreService.All()
+                .Where(x =>
+                    x.CorpId == IdentityContext.CurrentCorpId &&
+                    !x.DeleteFlag &&
+                    x.Id != currentGroupId &&
+                    x.Type == TenantAdminGroupType.Normal)
+                .Select(x => x.EmployeeIds)
+                .ToList();
 
-            if (conflict)
+            if (conflictGroups.Any(ids => ids.Any(id => idSet.Contains(id))))
             {
                 throw new ArgumentException("员工不能同时加入系统管理员组和普通管理组");
             }

@@ -17,16 +17,13 @@ namespace EIMSNext.Plugin.Contracts
         protected ILogger Logger => Log.ForContext(GetType());
         public TSetting Setting { get; set; } = new TSetting();
         protected PluginInvocationContext? Context { get; private set; }
+        protected CancellationToken CancellationToken => Context?.CancellationToken ?? default;
 
         public PluginDesc Description => BuildPluginDesc();
              
         public virtual PluginExecResult Execute(PluginSetting pluginP, PluginExecArgs execArgs, PluginInvocationContext? context = null)
         {
             Context = context;
-            if (TryParse(pluginP.Settings, out var setting) && setting != null)
-            {
-                Setting = setting.DeserializeFromJson<TSetting>()!;
-            }
 
             var result = new PluginExecResult();
 
@@ -61,9 +58,17 @@ namespace EIMSNext.Plugin.Contracts
             var call = Expression.Call(instanceParam, methodInfo, dataParam);
             var funDelegate = Expression.Lambda(delegateType, call, instanceParam, dataParam).Compile();
 
-            var data = PluginValueBinder.Deserialize(funArgs!, parameterType);
             try
             {
+                // 参数与配置的绑定失败同样属于执行失败：放在 try 外会一路抛到流程节点，
+                // 调用方拿不到约定的 -3，只能看到节点异常。
+                if (TryParse(pluginP.Settings, out var setting) && setting != null)
+                {
+                    Setting = setting.DeserializeFromJson<TSetting>()!;
+                }
+
+                var data = PluginValueBinder.Deserialize(funArgs!, parameterType);
+
                 if (methodInfo.ReturnType == typeof(void))
                 {
                     funDelegate.DynamicInvoke(this, data);
@@ -76,9 +81,14 @@ namespace EIMSNext.Plugin.Contracts
             }
             catch (Exception ex)
             {
+                // DynamicInvoke 会把插件真实异常包成 TargetInvocationException，
+                // 不拆开的话流程日志里只剩反射的套话，看不出插件自己报了什么。
+                var inner = (ex as TargetInvocationException)?.InnerException;
+                var error = inner ?? ex;
+
                 result.Code = -3;
-                result.Message = ex.Message;
-                Logger.Error(ex, "Plugin execution failed. Function={FunctionName}, Args={FunctionArgs}", execArgs.FunName, execArgs.FunArgs);
+                result.Message = error.Message;
+                Logger.Error(error, "Plugin execution failed. Function={FunctionName}, Args={FunctionArgs}", execArgs.FunName, execArgs.FunArgs);
             }
             finally
             {

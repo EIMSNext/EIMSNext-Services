@@ -9,7 +9,7 @@ namespace EIMSNext.ApiService
     /// 用户的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class UserApiService(IResolver resolver) : ApiServiceBase<User, User, IUserService>(resolver)
+    public class UserApiService(IResolver resolver) : ApiServiceBase<User, IUserService>(resolver)
     {
     }
 }

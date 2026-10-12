@@ -57,7 +57,7 @@ namespace EIMSNext.Service
 
         protected override async Task BeforeDelete(Expression<Func<FormNotify, bool>> filter)
         {
-            var deletingNotifyIds = FindCore(filter)
+            var deletingNotifyIds = (await FindCoreAsync(filter).ConfigureAwait(false))
                 .Select(x => x.Id)
                 .ToList();
 

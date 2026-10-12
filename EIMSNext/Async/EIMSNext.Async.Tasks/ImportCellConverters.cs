@@ -178,6 +178,62 @@ namespace EIMSNext.Async.Tasks
             return text;
         }
 
+        /// <summary>
+        /// 地址导入：支持 "省/市/区" 文本（兼容数组合法 JSON），统一转为 { province, city, district, detail } 对象。
+        /// 超过 3 段的部分并入详细地址。
+        /// </summary>
+        public static object ConvertAddress(string text)
+        {
+            if (text.StartsWith('[') && text.EndsWith(']'))
+            {
+                try
+                {
+                    if (text.DeserializeFromJson<List<string>>() is { Count: > 0 } parsed)
+                    {
+                        return BuildAddressValue(parsed);
+                    }
+                }
+                catch
+                {
+                    // 落到下方的文本解析
+                }
+            }
+
+            var segments = text.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return BuildAddressValue(segments);
+        }
+
+        public static object ConvertEditableAddress(object raw)
+        {
+            raw = UnwrapJsonValue(raw);
+            if (raw is IEnumerable enumerable && raw is not string)
+            {
+                var parts = enumerable
+                    .Cast<object?>()
+                    .Select(ToCellText)
+                    .Where(x => !string.IsNullOrWhiteSpace(x))
+                    .ToList();
+                if (parts.Count > 0)
+                {
+                    return BuildAddressValue(parts);
+                }
+            }
+
+            return ConvertAddress(ToCellText(raw));
+        }
+
+        private static object BuildAddressValue(IList<string> segments)
+        {
+            var detail = string.Join("/", segments.Skip(3));
+            return new Dictionary<string, object?>
+            {
+                ["province"] = segments.Count > 0 ? segments[0] : string.Empty,
+                ["city"] = segments.Count > 1 ? segments[1] : string.Empty,
+                ["district"] = segments.Count > 2 ? segments[2] : string.Empty,
+                ["detail"] = detail,
+            };
+        }
+
         public static List<string> SplitMultiValue(string text)
         {
             return text

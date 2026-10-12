@@ -28,7 +28,7 @@ namespace EIMSNext.ApiCore
         public async Task Invoke(HttpContext context)
         {
             var corsApplied = _corsPolicy.Apply(context);
-            if (corsApplied && context.Request.Method.Equals(HttpMethod.Options.ToString()))
+            if (corsApplied && context.Request.Method.Equals(HttpMethod.Options.ToString(), StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status200OK;
                 return;

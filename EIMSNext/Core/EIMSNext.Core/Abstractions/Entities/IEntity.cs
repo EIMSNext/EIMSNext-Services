@@ -31,6 +31,16 @@
         /// 获取或设置一个值，指示是否已逻辑删除。
         /// </summary>
         bool DeleteFlag { get; set; }
+
+        /// <summary>
+        /// 获取或设置删除人（逻辑删除时填充）。
+        /// </summary>
+        Operator? DeleteBy { get; set; }
+
+        /// <summary>
+        /// 获取或设置删除时间（Unix 毫秒，逻辑删除时填充）。
+        /// </summary>
+        long? DeleteTime { get; set; }
     }
 
     /// <summary>

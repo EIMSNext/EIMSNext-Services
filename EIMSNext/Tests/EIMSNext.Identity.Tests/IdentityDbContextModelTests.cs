@@ -8,11 +8,11 @@ namespace EIMSNext.Identity.Tests;
 /// <summary>
 /// 身份宿主上下文的模型契约。
 /// <para>
-/// 这里刻意不连数据库：模型校验（内嵌集合/对象是否都挂了值转换器、表名是否正确）
+/// 这里刻意不连数据库：模型校验（列类型、内嵌对象是否都挂了值转换器、表名是否正确）
 /// 在构建模型阶段就能判定，而它正是最容易漏、且一旦漏掉就会让整个宿主一启动就崩的地方——
 /// <c>IdentityDbContext</c> 原先只写了 <c>ToTable</c>，没有 jsonb 转换器，
-/// <c>Client.ClientSecrets</c> 等属性会被 EF 当成独立实体去要主键，
-/// 抛 <c>The entity type 'ClientSecret' requires a primary key to be defined</c>。
+/// 内嵌对象属性会被 EF 当成独立实体去要主键，抛
+/// <c>The entity type 'X' requires a primary key to be defined</c>。
 /// 触碰 <c>db.Model</c> 即可复现该失败。
 /// </para>
 /// </summary>
@@ -54,23 +54,11 @@ public sealed class IdentityDbContextModelTests
     }
 
     [TestMethod]
-    public void NestedCollectionsAreMappedAsJsonbNotEntities()
+    public void ClientCredentialColumnsAreMappedAsScalarTypes()
     {
         using var db = CreateContext();
 
-        // 这些类型必须作为 jsonb 值转换器存在于宿主属性上，而不是作为实体类型。
-        // 一旦变成实体类型，说明对应的值转换器没挂上（EF 会给它们加影子主键而不报错，
-        // 于是同一份数据被理解成额外的表）。
-        foreach (var nested in new[]
-                 {
-                     typeof(ClientSecret), typeof(ClientGrantType), typeof(ClientScope)
-                 })
-        {
-            Assert.IsNull(db.Model.FindEntityType(nested),
-                $"{nested.Name} 不应被映射为实体类型；请检查其值转换器是否已挂到宿主属性上。");
-        }
-
-        // UserCorp 相反：它是用户与企业归属的关系表，身份宿主签发 token 时需要读取它，
+        // UserCorp 是用户与企业归属的关系表，身份宿主签发 token 时需要读取它，
         // 因此必须显式映射为实体类型（原 jsonb 投影 User.Crops 已删除）。
         Assert.IsNotNull(db.Model.FindEntityType(typeof(UserCorp)),
             "UserCorp 应作为关系表实体类型映射到身份宿主的模型中。");
@@ -78,12 +66,17 @@ public sealed class IdentityDbContextModelTests
         var client = db.Model.FindEntityType(typeof(Client));
         Assert.IsNotNull(client);
 
-        foreach (var column in new[] { "ClientSecrets", "AllowedGrantTypes", "AllowedScopes" })
+        // ClientSecret 是 SHA-256 哈希单值，落 citext 列。
+        var secret = client.FindProperty(nameof(Client.ClientSecret));
+        Assert.IsNotNull(secret, "Client 缺少属性 ClientSecret。");
+        Assert.AreEqual("citext", secret.GetColumnType(), "Client.ClientSecret 的列类型应为 citext。");
+
+        // AllowedGrantTypes / AllowedScopes 是字符串数组，落 citext[] 列。
+        foreach (var column in new[] { nameof(Client.AllowedGrantTypes), nameof(Client.AllowedScopes) })
         {
             var property = client.FindProperty(column);
             Assert.IsNotNull(property, $"Client 缺少属性 {column}。");
-            Assert.AreEqual("jsonb", property.GetColumnType(), $"Client.{column} 的列类型应为 jsonb。");
-            Assert.IsNotNull(property.GetValueConverter(), $"Client.{column} 缺少值转换器。");
+            Assert.AreEqual("citext[]", property.GetColumnType(), $"Client.{column} 的列类型应为 citext[]。");
         }
     }
 }

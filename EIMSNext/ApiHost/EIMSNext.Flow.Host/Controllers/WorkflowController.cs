@@ -18,6 +18,8 @@ using HKH.Mef2.Integration;
 
 using Microsoft.AspNetCore.Mvc;
 
+using Microsoft.EntityFrameworkCore;
+
 using System.Dynamic;
 
 using WorkflowCore.Interface;
@@ -79,23 +81,53 @@ namespace EIMSNext.Flow.Host.Controllers
             if (formData != null)
             {
                 var cascade = request.EfCascade == CascadeMode.NotSet ? CascadeMode.All : request.EfCascade;
-                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, request.DataId, IdentityContext.CurrentEmployee.ToOperator(), cascade, request.EventIds);
+                // FormData.Id 来自 citext 主键，是该数据 ID 的规范大小写；工作流 Reference
+                // 是 text，后续锁、唯一索引和查询都以此值统一，避免大小写变体产生多个实例。
+                var dataId = formData.Id;
+                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, dataId, IdentityContext.CurrentEmployee.ToOperator(), cascade, request.EventIds);
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
 
-                var existingInstance = ResolveReusableWorkflowInstance(request.DataId);
+                // WorkflowCore 对未注册的流程定义会在 StartWorkflow 内抛异常，最终表现为 500。
+                // 定义不存在/已禁用属调用方问题，提前判定并返回 400。
+                var definition = _defservice.Find(request.WfDefinitionId, version);
+                if (definition == null || definition.Disabled || definition.FlowType != FlowType.Workflow)
+                {
+                    return BadRequest($"审批流程定义({request.WfDefinitionId})不存在或未启用");
+                }
+
                 string wfinstId;
                 string errMsg;
-                if (existingInstance != null)
+
+                // 同一条数据只允许存在一个在途实例。并发提交时两个请求都会查不到实例而各建一个，
+                // 因此用 PG 咨询锁把「查询可复用实例 + 启动/重启」整段串行化。
+                await _workflowDb.Database.OpenConnectionAsync();
+                try
                 {
-                    wfinstId = existingInstance.Id;
-                    errMsg = await RestartWorkflowInstanceAsync(existingInstance, data);
+                    await _workflowDb.Database.ExecuteSqlInterpolatedAsync($"select pg_advisory_lock(hashtextextended(lower({dataId}), 0::bigint))");
+                    try
+                    {
+                        var existingInstance = ResolveReusableWorkflowInstance(dataId);
+                        if (existingInstance != null)
+                        {
+                            wfinstId = existingInstance.Id;
+                            errMsg = await RestartWorkflowInstanceAsync(existingInstance, data);
+                        }
+                        else
+                        {
+                            wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando(), dataId);
+                            errMsg = WaitForComplete(wfinstId);
+                        }
+                    }
+                    finally
+                    {
+                        await _workflowDb.Database.ExecuteSqlInterpolatedAsync($"select pg_advisory_unlock(hashtextextended(lower({dataId}), 0::bigint))");
+                    }
                 }
-                else
+                finally
                 {
-                    wfinstId = await _wfHost.StartWorkflow(request.WfDefinitionId, version, data.ToExpando(), request.DataId);
-                    errMsg = WaitForComplete(wfinstId);
+                    _workflowDb.Database.CloseConnection();
                 }
 
                 if (!string.IsNullOrEmpty(errMsg))
@@ -277,7 +309,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var task = ResolveCurrentTask(request.DataId, string.Empty);
-            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("当前流程无可操作待办");
             }
@@ -337,7 +369,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var task = ResolveCurrentTask(request.DataId, string.Empty);
-            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("当前流程无可操作待办");
             }
@@ -381,7 +413,7 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             var task = ResolveCurrentTask(request.DataId, string.Empty);
-            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return Ok(new WorkflowActionStatusResponse());
             }
@@ -405,7 +437,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
             var task = ResolveCurrentTask(request.DataId, string.Empty);
             var wfInst = ResolveWorkflowInstance(request.WfInstanceId, request.DataId);
-            if (task == null || wfInst == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.Ordinal))
+            if (task == null || wfInst == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return Ok(new List<NodeActionResponse>());
             }
@@ -479,14 +511,21 @@ namespace EIMSNext.Flow.Host.Controllers
 
             if (IdentityContext.IdentityType != ApiService.IdentityType.CorpAdmin)
             {
-                return BadRequest($"该员工({IdentityContext.CurrentEmployee.EmpName})没有中止权限");
+                return Forbid();
             }
 
             WorkflowInstance? wfInst;
             if (!string.IsNullOrEmpty(request.WfInstanceId))
+            {
                 wfInst = _workflowDb.WorkflowInstances.Where(x => x.Id == request.WfInstanceId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+            }
             else
-                wfInst = _workflowDb.WorkflowInstances.Where(x => x.Reference == request.DataId && x.Status == WorkflowStatus.Runnable).FirstOrDefault();
+            {
+                var normalizedDataId = request.DataId.ToLowerInvariant();
+                wfInst = _workflowDb.WorkflowInstances
+                    .Where(x => x.Reference.ToLower() == normalizedDataId && x.Status == WorkflowStatus.Runnable)
+                    .FirstOrDefault();
+            }
 
             if (wfInst != null)
             {
@@ -625,7 +664,8 @@ namespace EIMSNext.Flow.Host.Controllers
                 return _workflowDb.WorkflowInstances.FirstOrDefault(x => x.Id == wfInstanceId && x.Status == WorkflowStatus.Runnable);
             }
 
-            return _workflowDb.WorkflowInstances.FirstOrDefault(x => x.Reference == dataId && x.Status == WorkflowStatus.Runnable);
+            var normalizedDataId = dataId.ToLowerInvariant();
+            return _workflowDb.WorkflowInstances.FirstOrDefault(x => x.Reference.ToLower() == normalizedDataId && x.Status == WorkflowStatus.Runnable);
         }
 
         private Wf_Task? ResolveCurrentTask(string dataId, string? wfNodeId)
@@ -642,8 +682,12 @@ namespace EIMSNext.Flow.Host.Controllers
 
         private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)
         {
+            // 在途（Runnable）与挂起（Suspended）都算可复用：重新提交时重置同一实例，
+            // 而不是再建一个实例（同一条数据只允许一个活跃实例）。
+            var normalizedDataId = dataId.ToLowerInvariant();
             return _workflowDb.WorkflowInstances
-                .Where(x => x.Reference == dataId && x.Status == WorkflowStatus.Suspended)
+                .Where(x => x.Reference.ToLower() == normalizedDataId
+                            && (x.Status == WorkflowStatus.Suspended || x.Status == WorkflowStatus.Runnable))
                 .OrderByDescending(x => x.CreateTime)
                 .FirstOrDefault();
         }
@@ -666,6 +710,18 @@ namespace EIMSNext.Flow.Host.Controllers
             };
 
             wfInst.Data = restartData.ToExpando();
+
+            // 指针重置后节点会重新生成待办，在途的旧待办必须先清掉，否则同一节点会留下两份待办。
+            _taskService.Delete(new DynamicFilter
+            {
+                Rel = "and",
+                Items = [new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = wfInst.Id }]
+            });
+
+            // 指针必须先重置到发起节点：持久化时按传入的指针集合差量同步，而
+            // ExecutionPointers 导航在 EF 里被 Ignore（重载后为空），空集合会把旧指针
+            // 全部删除，实例变成「Runnable 但无待执行指针」并被引擎直接判为 Complete。
+            _workflowActionService.ResetToStart(wfInst);
             wfInst.Status = WorkflowStatus.Runnable;
             wfInst.NextExecution = 0;
             wfInst.CompleteTime = null;
@@ -678,15 +734,18 @@ namespace EIMSNext.Flow.Host.Controllers
         [HttpPost, Route("Definition/Delete")]
         public async Task<IActionResult> DeleteDef(DeleteRequest request)
         {
-            List<string>? defIds = null;
-            if (!string.IsNullOrEmpty(request.AppId))
-                defIds = _defservice.Query(x => x.AppId == request.AppId && !x.DeleteFlag).Select(x => x.Id).ToList();
-            else
-                defIds = _defservice.Query(x => x.FlowType == FlowType.Workflow && request.FormIds!.Contains(x.SourceId!) && !x.DeleteFlag).Select(x => x.Id).ToList();
+            var defs = (string.IsNullOrEmpty(request.AppId)
+                ? _defservice.Query(x => x.FlowType == FlowType.Workflow && request.FormIds!.Contains(x.SourceId!) && !x.DeleteFlag)
+                : _defservice.Query(x => x.AppId == request.AppId && !x.DeleteFlag))
+                .Select(x => new { x.Id, x.ExternalId })
+                .ToList();
+            var defIds = defs.Select(x => x.Id).ToList();
 
-            if (defIds?.Count > 0)
+            if (defIds.Count > 0)
             {
-                var wfInstIds = _workflowDb.WorkflowInstances.Where(x => defIds.Contains(x.WorkflowDefinitionId) && x.Status == WorkflowStatus.Runnable).Select(x => x.Id).ToList();
+                // WorkflowInstance.WorkflowDefinitionId 存的是 ExternalId，不是定义内部 Id。
+                var externalIds = defs.Select(x => x.ExternalId).Distinct().ToList();
+                var wfInstIds = _workflowDb.WorkflowInstances.Where(x => externalIds.Contains(x.WorkflowDefinitionId) && x.Status == WorkflowStatus.Runnable).Select(x => x.Id).ToList();
                 var terminateResults = await Task.WhenAll(wfInstIds.Select(async id => new
                 {
                     Id = id,
@@ -698,14 +757,24 @@ namespace EIMSNext.Flow.Host.Controllers
                 {
                     return ApiResult.Fail(-1, "审批流程实例中止失败", new { ids = failedIds }).ToActionResult();
                 }
+
+                // 与 Terminate 端点一致：实例终止后待办必须一并清掉，否则会留在「我的待办」里
+                // 指向一个已经不存在的流程定义。
+                foreach (var id in wfInstIds)
+                {
+                    _taskService.Delete(new DynamicFilter
+                    {
+                        Rel = "and",
+                        Items = [new DynamicFilter { Field = "WfInstanceId", Op = FilterOp.Eq, Value = id }]
+                    });
+                }
             }
 
-            if (request.DeleteDef.HasValue && request.DeleteDef.Value)
+            if (request.DeleteDef.HasValue && request.DeleteDef.Value && defIds?.Count > 0)
             {
-                if (!string.IsNullOrEmpty(request.AppId))
-                    _defservice.Delete(new DynamicFilter() { Rel = "and", Items = [new DynamicFilter { Field = "deleteFlag", Op = FilterOp.Eq, Value = false }, new DynamicFilter { Field = "appId", Op = FilterOp.Eq, Value = request.AppId }] });
-                else if (defIds?.Count > 0)
-                    _defservice.Delete(defIds);
+                // 走到这里说明应用/表单已被删除，其下定义（含已发布版本）必须一并清理，
+                // 否则会残留永远删不掉的孤儿定义。
+                await _defservice.DeleteForceAsync(defIds);
             }
 
             return Ok();
@@ -913,4 +982,3 @@ namespace EIMSNext.Flow.Host.Controllers
         public WfExpireActionType ActionType { get; set; }
     }
 }
-

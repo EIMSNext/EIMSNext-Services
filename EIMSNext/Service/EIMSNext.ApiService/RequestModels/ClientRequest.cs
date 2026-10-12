@@ -5,9 +5,9 @@ namespace EIMSNext.ApiService.RequestModels
     /// <summary>
     /// OAuth Client 的 OData POST/PUT/PATCH 输入模型。
     ///
-    /// 故意省略 <c>ClientSecrets</c>、<c>ApiKey</c>：
+    /// 故意省略 <c>ClientSecret</c>、<c>ApiKey</c>：
     /// <list type="bullet">
-    /// <item><c>ClientSecrets</c> 由 OData 创建和 Regenerate 端点控制（<c>ClientRequestModelConfiguration</c> 同样 Ignore）。</item>
+    /// <item><c>ClientSecret</c> 由 OData 创建和 Regenerate 端点控制（<c>ClientRequestModelConfiguration</c> 同样 Ignore）。</item>
     /// <item><c>ApiKey</c> 由系统生成，OData 上为只读。</item>
     /// </list>
     /// </summary>

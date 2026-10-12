@@ -91,6 +91,15 @@ public static class EIMSNextModelConfiguration
             .HasTranslation(args => new JsonPathExistsExpression(args[0], args[1]))
             .HasParameter("json").HasStoreType("jsonb");
 
+        // JsonbArrayContains 翻译成 `jsonb @> jsonb_build_array(element)` 运算符：
+        // 与 JsonMatch 同理，必须生成运算符而非函数调用才能命中 jsonb_path_ops GIN 索引
+        // （jsonb_path_ops 只服务 @>，不服务 ?/@?/@@）。用于 jsonb 数组列「包含某元素」的判定。
+        modelBuilder.HasDbFunction(() => PgJsonFunctions.JsonbArrayContains(default!, default!))
+            .HasName("eims_json_array_contains")
+            .HasSchema("public")
+            .HasTranslation(args => new JsonbArrayContainsExpression(args[0], args[1]))
+            .HasParameter("jsonbColumn").HasStoreType("jsonb");
+
         // 排序专用：返回 jsonb 而不是 text，避免数字退化成字典序（"10" < "9"）。
         // CLR 侧声明为 string 只是表达式树的载体；该调用只出现在 ORDER BY 里，
         // 不会投影回客户端，因此不涉及 jsonb → string 的反序列化。
@@ -119,13 +128,9 @@ public static class EIMSNextModelConfiguration
         Mapped<AppDef>(modelBuilder)?.Property(x => x.AppMenus).HasConversion(Jsonb<List<AppMenu>>()).HasColumnType("jsonb");
         Mapped<DashboardDef>(modelBuilder)?.Property(x => x.PublishMembers).HasConversion(Jsonb<List<Member>>()).HasColumnType("jsonb");
 
-        // 必须显式挂转换器，否则 EF 会把 ClientGrantType / ClientSecret / ClientScope
-        // 当成独立实体去要主键，模型校验阶段直接抛异常。
-        // 注意 ClientScope 是 { Scope } 值对象，与旧脚本里同名的那张 "ClientScope" 表不是一回事
-        //（C# 侧没有对应实体，该表已移除）。
-        Mapped<Client>(modelBuilder)?.Property(x => x.ClientSecrets).HasConversion(Jsonb<List<ClientSecret>>()).HasColumnType("jsonb");
-        Mapped<Client>(modelBuilder)?.Property(x => x.AllowedGrantTypes).HasConversion(Jsonb<List<ClientGrantType>>()).HasColumnType("jsonb");
-        Mapped<Client>(modelBuilder)?.Property(x => x.AllowedScopes).HasConversion(Jsonb<List<ClientScope>>()).HasColumnType("jsonb");
+        // Client 的凭证/授权字段已简化为原生类型：ClientSecret 是 string（走 citext），
+        // AllowedGrantTypes / AllowedScopes 是 string 集合（走 citext[]，见 IsCaseInsensitiveStringArray），
+        // 都不再需要 jsonb 转换器。
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.AppIds).HasConversion(Jsonb<List<string>>()).HasColumnType("jsonb");
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.ResourceActions).HasConversion(Jsonb<List<ResourceActionGrant>>()).HasColumnType("jsonb");
         Mapped<ClientGrant>(modelBuilder)?.Property(x => x.IpWhitelist).HasConversion(Jsonb<List<string>>()).HasColumnType("jsonb");
@@ -199,6 +204,7 @@ public static class EIMSNextModelConfiguration
             {
                 if (property.ClrType != typeof(string)) continue;
                 if (!IsCharacterColumn(property.GetColumnType())) continue;
+                if (IsCaseSensitiveText(entity.ClrType, property.Name)) continue;
 
                 property.SetColumnType(CaseInsensitiveType);
 
@@ -208,6 +214,13 @@ public static class EIMSNextModelConfiguration
                 // 而 GetForeignKeys() 拿不全纯标量外键，漏掉任一引用方只会等真实查询落到那张表时才炸。
                 if (IsIdentifierName(property.Name)) property.SetCollation(IdentifierCollation);
             }
+
+            foreach (var property in entity.GetProperties())
+            {
+                if (property.ClrType == typeof(List<string>) && IsCaseInsensitiveStringArray(entity.ClrType, property.Name))
+                    property.SetColumnType("citext[]");
+            }
+
         }
 
         // ------------------------------------------------------------ 运算符值对象
@@ -239,7 +252,7 @@ public static class EIMSNextModelConfiguration
         Mapped<FormDef>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.AppId })
             .HasDatabaseName("IX_FormDef_CorpId_AppId");
 
-        // ------------------------------------------------------------ 关系（导航 + 外键）
+        // ------------------------------------------------------------ 关系（导航 + 必要外键）
         // 员工与部门 / 员工组是多对多中间表：Employee 通过 EmployeeId 外键导航到
         // EmployeeDepartment / EmployeeGroupMember，使 OData 的
         // Departments/any(...) / Groups/any(...) 可翻译为 SQL。
@@ -250,6 +263,9 @@ public static class EIMSNextModelConfiguration
             .HasMany(e => e.Departments).WithOne().HasForeignKey("EmployeeId");
         Mapped<Employee>(modelBuilder)?
             .HasMany(e => e.Groups).WithOne().HasForeignKey("EmployeeId");
+        // EmployeeGroupCategoryId 允许空字符串表示未分类员工组。
+        // EmployeeGroup.EmployeeGroupCategory 标记为 NotMapped，避免 EF 创建数据库 FK；
+        // OData EDM 单独声明该导航，查询时由 API 层按外键 Join。
 
         // ------------------------------------------------------------ 软删除过滤
         // DeleteFlag 是全局约定；把过滤下沉到模型层，避免每个查询都手写 where !DeleteFlag。
@@ -265,7 +281,6 @@ public static class EIMSNextModelConfiguration
     }
 
     /// <summary>仅当实体已在本上下文的模型中时返回其构建器，否则返回 <c>null</c>。</summary>
-    /// <returns>实体构建器或 <c>null</c>。</returns>
     private static EntityTypeBuilder<TEntity>? Mapped<TEntity>(ModelBuilder modelBuilder) where TEntity : class
         => modelBuilder.Model.FindEntityType(typeof(TEntity)) is null ? null : modelBuilder.Entity<TEntity>();
 
@@ -277,7 +292,7 @@ public static class EIMSNextModelConfiguration
     /// <c>Identifier</c> 这类同首字母的词——它们不是本模型的列，此处仍要求以 <c>Id</c> 收尾。
     /// </remarks>
     private static bool IsIdentifierName(string name)
-        => string.Equals(name, "Id", StringComparison.Ordinal)
+        => string.Equals(name, "Id", StringComparison.OrdinalIgnoreCase)
            || (name.EndsWith("Id", StringComparison.Ordinal) && name.Length > 2);
 
     /// <summary>
@@ -295,6 +310,37 @@ public static class EIMSNextModelConfiguration
                || columnType.StartsWith("character", StringComparison.OrdinalIgnoreCase)
                || columnType.StartsWith("varchar", StringComparison.OrdinalIgnoreCase)
                || columnType.StartsWith("citext", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 保持需要精确匹配的文本列为 text。密码、凭证和 JSON/模板正文不能因为 citext
+    /// 改变比较语义；这些列在上面的通用字符列约定中必须显式排除。
+    /// </summary>
+    private static bool IsCaseSensitiveText(Type entityType, string propertyName)
+    {
+        if (entityType == typeof(User) && propertyName == nameof(User.Password)) return true;
+        if (entityType == typeof(Webhook) && propertyName == nameof(Webhook.Secret)) return true;
+        if (entityType == typeof(Client) && propertyName == nameof(Client.ApiKey)) return true;
+
+        return entityType == typeof(CorporateSetting) && propertyName == nameof(CorporateSetting.Value)
+            || entityType == typeof(WorkbenchConfig) && propertyName == nameof(WorkbenchConfig.Layout)
+            || entityType == typeof(DashboardItemDef) && propertyName == nameof(DashboardItemDef.Details)
+            || entityType == typeof(PrintDef) && propertyName == nameof(PrintDef.Content)
+            || entityType == typeof(Wf_Definition) && propertyName == nameof(Wf_Definition.Content)
+            || entityType == typeof(EventFlowNodeExecution) && propertyName == nameof(EventFlowNodeExecution.ResultSnapshot)
+            || entityType == typeof(WorkflowTransitionExecution) && propertyName == nameof(WorkflowTransitionExecution.Error);
+    }
+
+    private static bool IsCaseInsensitiveStringArray(Type entityType, string propertyName)
+    {
+        if (entityType == typeof(FormListView) && propertyName == nameof(FormListView.PermissionGroupIds)) return true;
+        if (entityType == typeof(Client) && propertyName is nameof(Client.AllowedGrantTypes) or nameof(Client.AllowedScopes)) return true;
+        return entityType == typeof(TenantAdminGroup) && propertyName is
+            nameof(TenantAdminGroup.AppIds) or
+            nameof(TenantAdminGroup.AppDepartmentIds) or
+            nameof(TenantAdminGroup.AppEmployeeGroupIds) or
+            nameof(TenantAdminGroup.ContactDepartmentIds) or
+            nameof(TenantAdminGroup.ContactEmployeeGroupIds);
     }
 
     /// <summary>生成 jsonb 值转换器，见 <see cref="JsonbValueConverter.Create{TValue}"/>。</summary>

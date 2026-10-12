@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class FormDataPermissionGroupController(IResolver resolver) : ApiControllerBase<FormDataPermissionGroupApiService, FormDataPermissionGroup, FormDataPermissionGroupViewModel>(resolver)
+	public class FormDataPermissionGroupController(IResolver resolver) : ApiControllerBase<FormDataPermissionGroupApiService, FormDataPermissionGroup>(resolver)
 	{
 	}
 }

@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiService;
@@ -33,12 +33,13 @@ namespace EIMSNext.Service.Host.Controllers
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData, FormData>(resolver)
+    public class FormDataController(IResolver resolver) : MefControllerBase<FormDataApiService, FormData>(resolver)
     {
         private const int MaxDocumentBytes = 16 * 1024 * 1024;
         private readonly IFormDefService _formDefService = resolver.Resolve<IFormDefService>();
         private readonly DataTitleResolver _dataTitleResolver = resolver.Resolve<DataTitleResolver>();
         private readonly TenantAccessEvaluator _permissionEvaluator = resolver.Resolve<TenantAccessEvaluator>();
+        private readonly FormDataReadScopeResolver _readScopeResolver = resolver.Resolve<FormDataReadScopeResolver>();
         private readonly PublicFormLinkGuard _publicFormLinkGuard = resolver.Resolve<PublicFormLinkGuard>();
         private readonly PublicRateLimiter _publicRateLimiter = resolver.Resolve<PublicRateLimiter>();
         private readonly IFormDataService _formDataService = resolver.Resolve<IFormDataService>();
@@ -96,7 +97,12 @@ namespace EIMSNext.Service.Host.Controllers
                 Scope = options.Scope,
                 IncludeDeleted = options.IncludeDeleted,
             });
-            return Ok(ApiService.Count(filtered.Filter ?? DynamicFilter.Empty));
+            // Count 必须复用完整的 DynamicFindOptions：IncludeDeleted=true 时，
+            // ApiService.Find(options) 会让仓储跳过全局软删除过滤，保证总数与列表一致。
+            filtered.Skip = 0;
+            filtered.Take = int.MaxValue;
+            filtered.Sort = null;
+            return Ok(ApiService.Find(filtered).LongCount());
         }
 
         /// <summary>
@@ -239,8 +245,10 @@ namespace EIMSNext.Service.Host.Controllers
         /// <returns></returns>
         protected virtual DynamicFindOptions<FormData> FilterResult(DynamicFindOptions<FormData> query)
         {
-            query.Take = query.GetEffectiveTake();
-            query.Skip = query.GetEffectiveSkip();
+            // 请求侧分页必须显式收敛：客户端不传 Take 时仓储语义是不限量，
+            // 直接放行会让一次请求把整表拉进内存，因此这里统一按策略取默认值并截断到上限。
+            query.Take = RequestPagingPolicy.Normalize(query.Take);
+            query.Skip = Math.Max(0, query.Skip);
             if (IdentityContext.IdentityType == IdentityType.Public)
             {
                 query.Filter.ClearValueExpressions();
@@ -285,8 +293,7 @@ namespace EIMSNext.Service.Host.Controllers
                     ? CreateNoMatchFilter()
                     : validator.ApplyFormDataScope(formId!, query.Filter);
                 query.Scope = null;
-                query.Take = Math.Clamp(query.GetEffectiveTake(), 1, 200);
-                query.Skip = Math.Max(0, query.Skip);
+                query.Take = RequestPagingPolicy.Normalize(query.Take, RequestPagingPolicy.PublicMaxTake);
                 return query;
             }
 
@@ -445,7 +452,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             var options = new DynamicFindOptions<FormData>
             {
-                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                 Take = 1,
                 Scope = string.IsNullOrWhiteSpace(permissionGroupId) ? null : new DataScope { PermissionGroupId = permissionGroupId }
             };
@@ -464,7 +471,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             var data = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
             {
-                Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                 Take = 1,
             })).FirstOrDefault();
             if (data == null)
@@ -552,13 +559,13 @@ namespace EIMSNext.Service.Host.Controllers
 
             var queryOptions = new DynamicFindOptions<FormData>()
             {
-                Filter = new DynamicFilter { Field = "_id", Op = FilterOp.Eq, Value = key }
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key }
             };
             if (IdentityContext.IdentityType != IdentityType.Public)
             {
                 var accessProbe = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
                 {
-                    Filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = key },
+                    Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = key },
                     Take = 1,
                 })).FirstOrDefault();
                 if (accessProbe == null)
@@ -841,7 +848,15 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 if (batch?.Keys?.Count > 0)
                 {
-                    await ApiService.DeleteAsync(batch.Keys);
+                    // 越权主键必须在进入服务层之前被过滤掉：服务层删除不做企业校验，
+                    // 直接透传会让调用方删掉其他企业的数据。
+                    var ownedKeys = FilterManageableIds(batch.Keys);
+                    if (ownedKeys.Count == 0)
+                    {
+                        return NotFound();
+                    }
+
+                    await ApiService.DeleteAsync(ownedKeys);
                 }
                 else
                 {
@@ -850,7 +865,13 @@ namespace EIMSNext.Service.Host.Controllers
             }
             else
             {
-                await ApiService.DeleteAsync(key);
+                var owned = FilterManageableIds([key]);
+                if (owned.Count == 0)
+                {
+                    return NotFound();
+                }
+
+                await ApiService.DeleteAsync(owned);
             }
             return NoContent();
         }
@@ -884,7 +905,7 @@ namespace EIMSNext.Service.Host.Controllers
         {
             return new DynamicFilter
             {
-                Field = Fields.BsonId,
+                Field = Fields.Id,
                 Op = FilterOp.Eq,
                 Value = "__no_permission__",
             };
@@ -1072,7 +1093,6 @@ namespace EIMSNext.Service.Host.Controllers
             if (field.Equals(Fields.FormId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.CorpId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.DeleteFlag, StringComparison.OrdinalIgnoreCase) ||
-                field.Equals(Fields.BsonId, StringComparison.OrdinalIgnoreCase) ||
                 field.Equals(Fields.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return true;
@@ -1170,7 +1190,7 @@ namespace EIMSNext.Service.Host.Controllers
                 IncludeDeleted = true,
                 Filter = new DynamicFilter
                 {
-                    Field = Fields.BsonId,
+                    Field = Fields.Id,
                     Op = FilterOp.In,
                     Value = requested.Cast<object>().ToList(),
                 },
@@ -1334,34 +1354,7 @@ namespace EIMSNext.Service.Host.Controllers
 
         private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (permissionGroup.Type)
-            {
-                case FormDataPermissionMode.ManageSelfData:
-                    if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
-                    {
-                        return CreateNoMatchFilter();
-                    }
-
-                    return new DynamicFilter
-                    {
-                        Field = Fields.CreateById,
-                        Op = FilterOp.Eq,
-                        Value = IdentityContext.CurrentEmployee.Id,
-                    };
-                case FormDataPermissionMode.ViewAllData:
-                case FormDataPermissionMode.ManageAllData:
-                    return null;
-                case FormDataPermissionMode.Custom:
-                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
-                    {
-                        return null;
-                    }
-
-                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
-                    return condList?.ToDynamicFilter();
-                default:
-                    return null;
-            }
+            return _readScopeResolver.ResolvePermissionGroupDataFilter(permissionGroup);
         }
 
         private static FormDataPermissions GetEffectiveFormDataPermissions(FormDataPermissionGroup permissionGroup)
@@ -1388,7 +1381,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return true;
             }
 
-            var filter = new DynamicFilter { Field = Fields.BsonId, Op = FilterOp.Eq, Value = dataId }.And(
+            var filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = dataId }.And(
                 rangeFilter);
 
             var result = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
@@ -1452,4 +1445,3 @@ namespace EIMSNext.Service.Host.Controllers
 
     }
 }
-

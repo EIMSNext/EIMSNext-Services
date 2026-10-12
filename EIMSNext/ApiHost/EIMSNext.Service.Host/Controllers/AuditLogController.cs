@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
@@ -16,7 +16,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class AuditLogController(IResolver resolver) : ApiControllerBase<AuditLogApiService, AuditLog, AuditLogViewModel>(resolver)
+	public class AuditLogController(IResolver resolver) : ApiControllerBase<AuditLogApiService, AuditLog>(resolver)
 	{
 		[HttpPost("Export")]
 		[Permission(Operation = Operation.Read)]

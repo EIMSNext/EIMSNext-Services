@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
 	/// 仪表盘项定义的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class DashboardItemDefApiService(IResolver resolver) : ApiServiceBase<DashboardItemDef, DashboardItemDefViewModel, IDashboardItemDefService>(resolver)
+	public class DashboardItemDefApiService(IResolver resolver) : ApiServiceBase<DashboardItemDef, IDashboardItemDefService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

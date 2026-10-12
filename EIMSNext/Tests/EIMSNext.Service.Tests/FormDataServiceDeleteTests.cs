@@ -399,7 +399,6 @@ namespace EIMSNext.Service.Tests
 
         private sealed class FakeSerialNoSequenceService : StubEntityService<SerialNoSequence>, ISerialNoSequenceService
         {
-            public string NextCorpCode(PlatformType platform) => throw new NotSupportedException();
             public int NextFormSerialNo(string corpId, string appId, string formId, string key, SerialNoResetCycle cycle) => throw new NotSupportedException();
         }
 
@@ -416,10 +415,6 @@ namespace EIMSNext.Service.Tests
             // 需要源同时具备同步与异步可枚举能力，故用 InMemoryAsyncQueryable 包装。
             public override IQueryable<T> Queryable => new InMemoryAsyncQueryable<T>(_items);
 
-            public override IQueryable<T> Find(DynamicFilter filter) => Queryable;
-
-            public override List<T> FindList(DynamicFilter filter) => Queryable.ToList();
-
             public override T? Get(string id) => _items.FirstOrDefault(x => x.Id == id);
 
             public override Task<T?> GetAsync(string id, CancellationToken cancellationToken = default)
@@ -427,13 +422,15 @@ namespace EIMSNext.Service.Tests
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
 
-            public override long Count(DynamicFilter filter) => Queryable.LongCount();
-
             public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
                 => Task.FromResult(Count(predicate));
 
-            public override Task<int> SoftDeleteManyAsync(IEnumerable<string> ids, CancellationToken cancellationToken = default)
-                => Task.FromResult(SoftDeleteMany(ids));
+            public override Task<int> SoftDeleteManyAsync(
+                IEnumerable<string> ids,
+                Operator? deleteBy,
+                long? deleteTime,
+                CancellationToken cancellationToken = default)
+                => Task.FromResult(SoftDeleteMany(ids, deleteBy, deleteTime));
 
             public override Task<int> DeleteManyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
             {
@@ -442,13 +439,15 @@ namespace EIMSNext.Service.Tests
                 return Task.FromResult(removed.Count);
             }
 
-            private int SoftDeleteMany(IEnumerable<string> ids)
+            private int SoftDeleteMany(IEnumerable<string> ids, Operator? deleteBy, long? deleteTime)
             {
                 var idSet = ids.ToHashSet(StringComparer.OrdinalIgnoreCase);
                 var affected = _items.Where(x => idSet.Contains(x.Id)).ToList();
                 foreach (var item in affected)
                 {
                     item.DeleteFlag = true;
+                    item.DeleteBy = deleteBy;
+                    item.DeleteTime = deleteTime;
                 }
 
                 return affected.Count;

@@ -10,14 +10,17 @@ namespace EIMSNext.ApiService
 	/// 仪表盘定义的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class DashboardDefApiService(IResolver resolver) : ApiServiceBase<DashboardDef, DashboardDefViewModel, IDashboardDefService>(resolver)
+	public class DashboardDefApiService(IResolver resolver) : ApiServiceBase<DashboardDef, IDashboardDefService>(resolver)
 	{
+        private const int MaxNameLength = 100;
+
         /// <summary>
         /// 新增实体核心逻辑。
         /// </summary>
         protected override Task AddAsyncCore(DashboardDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
+            ValidateName(entity.Name);
             return base.AddAsyncCore(entity);
         }
 
@@ -27,7 +30,16 @@ namespace EIMSNext.ApiService
         protected override Task<int> ReplaceAsyncCore(DashboardDef entity)
         {
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(entity.AppId);
+            ValidateName(entity.Name);
             return base.ReplaceAsyncCore(entity);
+        }
+
+        private static void ValidateName(string name)
+        {
+            if (!string.IsNullOrEmpty(name) && name.Length > MaxNameLength)
+            {
+                throw new BadRequestException($"仪表盘名称长度不能超过 {MaxNameLength} 个字符");
+            }
         }
 
         /// <summary>

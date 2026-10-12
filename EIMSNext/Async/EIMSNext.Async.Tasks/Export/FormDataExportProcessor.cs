@@ -297,7 +297,7 @@ namespace EIMSNext.Async.Tasks.Export
 
             return binding.Key switch
             {
-                "id" or "_id" => data.Id,
+                "id" => data.Id,
                 "createBy" => data.CreateBy?.Label ?? string.Empty,
                 "createTime" => ExportFileBuilder.ToLocalDateTime(data.CreateTime),
                 "updateBy" => data.UpdateBy?.Label ?? string.Empty,

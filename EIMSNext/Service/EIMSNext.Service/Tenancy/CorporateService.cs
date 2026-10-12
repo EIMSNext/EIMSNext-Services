@@ -41,15 +41,7 @@ namespace EIMSNext.Service
 
         private void AddWithGate(IEnumerable<Corporate> entities)
         {
-            CreateGate.Wait();
-            try
-            {
-                base.Add(entities);
-            }
-            finally
-            {
-                CreateGate.Release();
-            }
+            AddWithGateAsync(entities).GetAwaiter().GetResult();
         }
 
         protected override async Task AddCoreAsync(IEnumerable<Corporate> entities)
@@ -63,8 +55,6 @@ namespace EIMSNext.Service
             var user = Context.User as User;
 
             entity.Platform = Context.User?.Platform ?? PlatformType.Public;
-            if (string.IsNullOrEmpty(entity.Code))
-                entity.Code = (Resolver.GetService<SerialNoSequence>() as ISerialNoSequenceService)!.NextCorpCode(entity.Platform);
 
             Repository.EnsureId(entity);
 

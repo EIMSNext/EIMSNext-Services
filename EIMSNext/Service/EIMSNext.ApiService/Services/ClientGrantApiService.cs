@@ -12,7 +12,7 @@ namespace EIMSNext.ApiService
     /// 提供标准的 CRUD + <c>GetActiveByClientIdAsync</c>（给 <c>ClientPermissionCache</c> 用）。
     /// </summary>
     public class ClientGrantApiService(IResolver resolver)
-        : ApiServiceBase<ClientGrant, ClientGrantViewModel, IClientGrantService>(resolver), IClientGrantApiService
+        : ApiServiceBase<ClientGrant, IClientGrantService>(resolver), IClientGrantApiService
     {
         /// <summary>
         /// 新增实体核心逻辑。

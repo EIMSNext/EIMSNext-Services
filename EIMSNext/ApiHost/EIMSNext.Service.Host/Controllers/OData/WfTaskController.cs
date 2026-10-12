@@ -4,7 +4,6 @@ using HKH.Mef2.Integration;
 
 using EIMSNext.Service.Host.OData;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
@@ -22,9 +21,9 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-        public class WfTaskController(IResolver resolver) : ODataController<WfTaskApiService, Wf_Task, WfTaskViewModel, WfTaskRequest>(resolver)
+        public class WfTaskController(IResolver resolver) : ODataController<WfTaskApiService, Wf_Task, WfTaskRequest>(resolver)
     {
-        protected override IQueryable<WfTaskViewModel> FilterResult(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
+        protected override IQueryable<Wf_Task> FilterResult(IQueryable<Wf_Task> query, ODataQueryOptions<Wf_Task> options)
         {
             return FilterByPermission(query, options);
         }
@@ -35,42 +34,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
         /// <param name="query"></param>
         /// <param name="options"></param>
         /// <returns></returns>
-        protected override IQueryable<WfTaskViewModel> Expand(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
-        {
-            var formDefs = Resolver.GetService<FormDef>().All();
-            query = query.Join(formDefs, x => x.FormId, y => y.Id,
-                   //ObjectConvert.ProjExp<WfTaskViewModel, FormDef, string>(x => x.FormName, y => y.Name)
-                   (x, y) =>
-                      new WfTaskViewModel
-                      {
-                          Id = x.Id,
-                          WfInstanceId = x.WfInstanceId,
-                          CorpId = x.CorpId,
-                          AppId = x.AppId,
-                          FormId = x.FormId,
-                          DataId = x.DataId,
-                          EmployeeId = x.EmployeeId,
-                          ApproveNodeId = x.ApproveNodeId,
-                          ApproveNodeName = x.ApproveNodeName,
-                          FormType = x.FormType,
-                          CreateBy = x.CreateBy,
-                          CreateTime = x.CreateTime,
-                          UpdateBy = x.UpdateBy,
-                          UpdateTime = x.UpdateTime,
-                           FormName = y.Name,
-                          Starter = x.Starter,
-                          DataBrief = x.DataBrief,
-                          ApproveNodeStartTime = x.ApproveNodeStartTime,
-                          ExpireTime = x.ExpireTime,
-                          ExpireHandled = x.ExpireHandled,
-                        }
-
-                   );
-
-            return base.Expand(query, options);
-        }
-
-        protected override IQueryable<WfTaskViewModel> FilterByPermission(IQueryable<WfTaskViewModel> query, ODataQueryOptions<WfTaskViewModel> options)
+        protected override IQueryable<Wf_Task> FilterByPermission(IQueryable<Wf_Task> query, ODataQueryOptions<Wf_Task> options)
         {
             if (IdentityContext.CurrentEmployee != null)
             {

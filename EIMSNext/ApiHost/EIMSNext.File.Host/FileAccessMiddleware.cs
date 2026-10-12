@@ -23,7 +23,7 @@ public sealed class FileAccessMiddleware(RequestDelegate next)
         if (authorization.StartsWith("Bearer ", StringComparison.OrdinalIgnoreCase) &&
             !string.IsNullOrWhiteSpace(identityContext.CurrentCorpId))
         {
-            if (!string.Equals(identityContext.CurrentCorpId, pathCorpId, StringComparison.Ordinal))
+            if (!string.Equals(identityContext.CurrentCorpId, pathCorpId, StringComparison.OrdinalIgnoreCase))
             {
                 context.Response.StatusCode = StatusCodes.Status403Forbidden;
                 return;

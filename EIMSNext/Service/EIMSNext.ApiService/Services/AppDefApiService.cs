@@ -16,7 +16,7 @@ namespace EIMSNext.ApiService
     /// 应用定义的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, AppDefViewModel, IAppDefService>(resolver)
+    public class AppDefApiService(IResolver resolver) : ApiServiceBase<AppDef, IAppDefService>(resolver)
     {
         /// <summary>
         /// 创建Group。
@@ -38,7 +38,28 @@ namespace EIMSNext.ApiService
                 SubMenus = []
             };
 
-            app.AppMenus.Add(menu);
+            if (string.IsNullOrWhiteSpace(request.ParentMenuId))
+            {
+                app.AppMenus.Add(menu);
+            }
+            else
+            {
+                var parent = AppMenuHelper.FindMenu(app.AppMenus, request.ParentMenuId);
+                if (parent == null || parent.MenuType != FormType.Group)
+                {
+                    throw new BadRequestException("上级分组不存在");
+                }
+
+                if (AppMenuHelper.GetDepth(app.AppMenus, parent.MenuId) >= AppMenuHelper.MaxDepth)
+                {
+                    throw new BadRequestException($"菜单最多嵌套 {AppMenuHelper.MaxDepth} 层");
+                }
+
+                parent.SubMenus ??= [];
+                menu.SortIndex = (parent.SubMenus.Count + 1) * 100;
+                parent.SubMenus.Add(menu);
+            }
+
             AppMenuHelper.Normalize(app.AppMenus);
             await CoreService.ReplaceAsync(app);
             return app;
@@ -171,13 +192,30 @@ namespace EIMSNext.ApiService
 
             if (!AppMenuHelper.ValidateTree(request.AppMenus ?? []))
             {
-                throw new BadRequestException("分组内不能再包含分组");
+                throw new BadRequestException($"菜单层级不合法，最多嵌套 {AppMenuHelper.MaxDepth} 层");
             }
 
             var app = await GetManageableAppAsync(request.AppId);
             app.AppMenus = RebuildSortableMenuTree(request.AppMenus ?? [], app.AppMenus ?? []);
             await CoreService.ReplaceAsync(app);
             return app;
+        }
+
+        /// <summary>
+        /// 按权限过滤应用查询。
+        /// </summary>
+        /// <remarks>
+        /// 平台管理员需要跨企业检索应用（平台管理台的发布/模板选择等场景），故不附加企业隔离条件。
+        /// 其余身份沿用基类的企业隔离。
+        /// </remarks>
+        protected override IQueryable<AppDef> FilterByPermission()
+        {
+            if (IdentityContext.IdentityType == IdentityType.PlatAdmin)
+            {
+                return CoreService.All();
+            }
+
+            return base.FilterByPermission();
         }
 
         /// <summary>

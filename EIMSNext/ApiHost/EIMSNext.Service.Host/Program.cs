@@ -162,7 +162,6 @@ async Task EnsureSeedData(IResolver resolver)
     serviceContext.User = adminUser;
     await corpService.AddAsync(new Corporate
     {
-        Code = "2008080800008",
         Name = "EIMS Team",
         Description = "EIMS Team",
     });

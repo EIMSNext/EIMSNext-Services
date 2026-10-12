@@ -25,7 +25,7 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 表单数据的 API 服务。
     /// </summary>
-    public class FormDataApiService : ApiServiceBase<FormData, FormData, IFormDataService>
+    public class FormDataApiService : ApiServiceBase<FormData, IFormDataService>
     {
         private const int ImportMaxColumns = 500;
         private const int ImportPreviewRowLimit = 30;
@@ -604,12 +604,12 @@ namespace EIMSNext.ApiService
         {
             if (string.IsNullOrWhiteSpace(request.FormId))
             {
-                throw new ArgumentException("表单ID不能为空");
+                throw new BadRequestException("表单ID不能为空");
             }
 
             if (request.Columns == null || request.Columns.Count == 0)
             {
-                throw new ArgumentException("导出列不能为空");
+                throw new BadRequestException("导出列不能为空");
             }
 
             request.Columns = request.Columns
@@ -620,10 +620,10 @@ namespace EIMSNext.ApiService
 
             if (request.Columns.Count == 0)
             {
-                throw new ArgumentException("导出列不能为空");
+                throw new BadRequestException("导出列不能为空");
             }
 
-            var formDef = _formDefService.Get(request.FormId) ?? throw new ArgumentException("表单不存在或已被删除");
+            var formDef = _formDefService.Get(request.FormId) ?? throw new BadRequestException("表单不存在或已被删除");
             var fields = formDef.Content?.Items ?? [];
             request.Columns = request.Columns
                 .Where(column => !IsDataSelectFieldPath(column.Key, fields))
@@ -682,41 +682,14 @@ namespace EIMSNext.ApiService
 
         private DynamicFilter? BuildFormDataPermissionGroupDataFilter(FormDataPermissionGroup permissionGroup)
         {
-            switch (permissionGroup.Type)
-            {
-                case FormDataPermissionMode.ManageSelfData:
-                    if (string.IsNullOrWhiteSpace(IdentityContext.CurrentEmployee?.Id))
-                    {
-                        return CreateNoMatchFilter();
-                    }
-
-                    return new DynamicFilter
-                    {
-                        Field = Fields.CreateById,
-                        Op = FilterOp.Eq,
-                        Value = IdentityContext.CurrentEmployee.Id,
-                    };
-                case FormDataPermissionMode.ViewAllData:
-                case FormDataPermissionMode.ManageAllData:
-                    return null;
-                case FormDataPermissionMode.Custom:
-                    if (string.IsNullOrWhiteSpace(permissionGroup.DataFilter))
-                    {
-                        return null;
-                    }
-
-                    var condList = permissionGroup.DataFilter.DeserializeFromJson<ConditionList>();
-                    return condList?.ToDynamicFilter();
-                default:
-                    return null;
-            }
+            return _readScopeResolver.ResolvePermissionGroupDataFilter(permissionGroup);
         }
 
         private static DynamicFilter CreateNoMatchFilter()
         {
             return new DynamicFilter
             {
-                Field = Fields.BsonId,
+                Field = Fields.Id,
                 Op = FilterOp.Eq,
                 Value = "__no_permission__",
             };
@@ -817,14 +790,16 @@ namespace EIMSNext.ApiService
         {
             if (string.IsNullOrWhiteSpace(id))
             {
-                throw new ArgumentException("导入任务ID不能为空");
+                throw new BadRequestException("导入任务ID不能为空");
             }
 
+            // 任务不存在、跨企业或非本人创建，统一返回 404 而不泄露任务是否存在；
+            // 之前抛 ArgumentException 会被兜底成 500（N28）。
             var importLog = Resolver.Resolve<IFormDataImportLogService>().Get(id);
             if (importLog == null ||
                 !string.Equals(importLog.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase))
             {
-                throw new ArgumentException("导入任务不存在或无权访问");
+                throw new NotFoundException("导入任务不存在");
             }
             if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
             {
@@ -842,7 +817,7 @@ namespace EIMSNext.ApiService
                 return importLog;
             }
 
-            throw new ArgumentException("导入任务不存在或无权访问");
+            throw new NotFoundException("导入任务不存在");
         }
 
         private List<FormDataImportEditableErrorRow> ReadEditableErrorRows(FormDataImportLog importLog)
@@ -1001,6 +976,7 @@ namespace EIMSNext.ApiService
                     FieldType.Radio or FieldType.Select1 => ConvertImportSingleOption(ToImportCellText(raw), field),
                     FieldType.CheckBox or FieldType.Select2 => ConvertImportMultiOption(raw!, field),
                     FieldType.ImageUpload or FieldType.FileUpload => ConvertImportUrlList(raw!),
+                    FieldType.Address => ConvertImportAddress(ToImportCellText(raw)),
                     _ => raw is string text ? ConvertImportTextOrJson(text) : raw,
                 };
             }
@@ -1324,6 +1300,42 @@ namespace EIMSNext.ApiService
             }
 
             return text;
+        }
+
+        /// <summary>
+        /// 地址导入：支持 "省/市/区" 文本（兼容数组合法 JSON），统一转为 { province, city, district, detail } 对象。
+        /// 超过 3 段的部分并入详细地址。
+        /// </summary>
+        private static object ConvertImportAddress(string text)
+        {
+            if ((text.StartsWith('[') && text.EndsWith(']')))
+            {
+                try
+                {
+                    if (text.DeserializeFromJson<List<string>>() is { Count: > 0 } parsed)
+                    {
+                        return BuildImportAddressValue(parsed);
+                    }
+                }
+                catch
+                {
+                    // 落到下方的文本解析
+                }
+            }
+
+            var segments = text.Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            return BuildImportAddressValue(segments);
+        }
+
+        private static object BuildImportAddressValue(IList<string> segments)
+        {
+            return new Dictionary<string, object?>
+            {
+                ["province"] = segments.Count > 0 ? segments[0] : string.Empty,
+                ["city"] = segments.Count > 1 ? segments[1] : string.Empty,
+                ["district"] = segments.Count > 2 ? segments[2] : string.Empty,
+                ["detail"] = string.Join("/", segments.Skip(3)),
+            };
         }
 
         private static object? GetImportValue(Dictionary<string, object?> data, string? field)

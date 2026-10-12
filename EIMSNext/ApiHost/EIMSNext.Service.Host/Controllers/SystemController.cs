@@ -93,7 +93,7 @@ namespace EIMSNext.Service.Host.Controllers
             var extension = Path.GetExtension(avatar ?? string.Empty).ToLowerInvariant();
             var expectedAvatar = $"Avatar/{user.Id}{extension}";
             if (!AvatarFileExtensions.Contains(extension)
-                || !string.Equals(avatar, expectedAvatar, StringComparison.Ordinal))
+                || !string.Equals(avatar, expectedAvatar, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("头像路径无效");
             }
@@ -137,13 +137,13 @@ namespace EIMSNext.Service.Host.Controllers
                 .ToList();
 
             var targetCorp = userCorps.FirstOrDefault(x =>
-                string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.Ordinal));
+                string.Equals(x.CorpId, req.CorpId.Trim(), StringComparison.OrdinalIgnoreCase));
             if (targetCorp == null)
                 return Forbid();
 
             foreach (var corp in userCorps)
             {
-                var isDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.Ordinal);
+                var isDefault = string.Equals(corp.CorpId, targetCorp.CorpId, StringComparison.OrdinalIgnoreCase);
                 if (corp.IsDefault == isDefault)
                 {
                     continue;
@@ -190,7 +190,7 @@ namespace EIMSNext.Service.Host.Controllers
             var client = await ClientApiService.GetAsync(req.ClientId);
             if (client != null && client.CorpId == IdentityContext.CurrentCorpId)
             {
-                client.ClientSecrets = new List<ClientSecret> { new ClientSecret { Value = req.Secret.Sha256() } };
+                client.ClientSecret = req.Secret.Sha256();
                 await ClientApiService.ReplaceAsync(client);
                 return ApiResult.Success(req.ClientId).ToActionResult();
             }

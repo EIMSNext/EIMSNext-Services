@@ -1,5 +1,6 @@
 ﻿using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace EIMSNext.Entities
 {
@@ -20,6 +21,11 @@ namespace EIMSNext.Entities
         /// 所属员工组分类 ID
         /// </summary>
         public string EmployeeGroupCategoryId { get; set; } = "";
+        /// <summary>
+        /// 所属员工组分类。
+        /// </summary>
+        [NotMapped]
+        public EmployeeGroupCategory? EmployeeGroupCategory { get; set; }
         /// <summary>
         /// 员工组排序值
         /// </summary>

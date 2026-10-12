@@ -10,7 +10,7 @@ using EIMSNext.Entities;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
-    public class SystemMessageController(IResolver resolver) : ReadOnlyODataController<SystemMessageApiService, SystemMessage, SystemMessageViewModel>(resolver)
+    public class SystemMessageController(IResolver resolver) : ReadOnlyODataController<SystemMessageApiService, SystemMessage>(resolver)
     {
     }
 }

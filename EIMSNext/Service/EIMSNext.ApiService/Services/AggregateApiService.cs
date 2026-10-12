@@ -1012,12 +1012,12 @@ namespace EIMSNext.ApiService
                         return $"\"Data\" @? {Add(jsonPath)}::jsonpath";
                     }
                     return values.Count == 1
-                        ? $"{column} = {Add(ToSqlText(values[0]))}"
-                        : $"{column} = any({Add(values.Select(ToSqlText).ToList())})";
+                        ? $"{column} = {Add(ToSqlValue(filter.Field, values[0]))}"
+                        : $"{column} = any({Add(ToSqlArray(filter.Field, values))})";
                 case FilterOp.Ne:
                     return values.Count == 1
-                        ? $"({column} is null or {column} <> {Add(ToSqlText(values[0]))})"
-                        : $"({column} is null or {column} <> all({Add(values.Select(ToSqlText).ToList())}))";
+                        ? $"({column} is null or {column} <> {Add(ToSqlValue(filter.Field, values[0]))})"
+                        : $"({column} is null or {column} <> all({Add(ToSqlArray(filter.Field, values))}))";
                 case FilterOp.Gt:
                 case FilterOp.Gte:
                 case FilterOp.Lt:
@@ -1043,7 +1043,7 @@ namespace EIMSNext.ApiService
                         return BuildJsonPathMatch(filter.Field, values, Add, negate: false);
                     return values.Count == 0
                         ? "false"
-                        : $"{column} = any({Add(values.Select(ToSqlText).ToList())})";
+                        : $"{column} = any({Add(ToSqlArray(filter.Field, values))})";
                 case FilterOp.AllIn:
                     return values.Count == 0
                         ? "false"
@@ -1053,11 +1053,15 @@ namespace EIMSNext.ApiService
                         return BuildJsonPathMatch(filter.Field, values, Add, negate: true);
                     return values.Count == 0
                         ? "true"
-                        : $"({column} is null or {column} <> all({Add(values.Select(ToSqlText).ToList())}))";
+                        : $"({column} is null or {column} <> all({Add(ToSqlArray(filter.Field, values))}))";
                 case FilterOp.Empty:
-                    return $"({column} is null or {column} = '')";
+                    return IsIntegerSystemField(filter.Field)
+                        ? $"{column} is null"
+                        : $"({column} is null or {column} = '')";
                 case FilterOp.NotEmpty:
-                    return $"({column} is not null and {column} <> '')";
+                    return IsIntegerSystemField(filter.Field)
+                        ? $"{column} is not null"
+                        : $"({column} is not null and {column} <> '')";
                 case FilterOp.Exists:
                     return $"{column} is not null";
                 case FilterOp.Text:
@@ -1084,7 +1088,7 @@ namespace EIMSNext.ApiService
                     _ => null,
                 };
                 if (expression == null) continue;
-                selects.Add($"{expression} as \"{alias}\"");
+                selects.Add($"{expression} as {QuoteIdentifier(alias)}");
             }
 
             _ = parameters;
@@ -1095,7 +1099,7 @@ namespace EIMSNext.ApiService
         {
             return (dimensions ?? [])
                 .Where(d => !string.IsNullOrEmpty(d.Id))
-                .Select(d => $"{FieldExpression(d.Id)} as \"{SanitizeAlias(d.Id)}\"")
+                .Select(d => $"{FieldExpression(d.Id)} as {QuoteIdentifier(SanitizeAlias(d.Id))}")
                 .ToList();
         }
 
@@ -1120,9 +1124,9 @@ namespace EIMSNext.ApiService
                     .Select(dimension => SanitizeAlias(dimension.Id))
                     .FirstOrDefault(alias => string.Equals(alias, SanitizeAlias(rule.Id), StringComparison.OrdinalIgnoreCase));
                 var orderExpression = metricAlias is not null
-                    ? $"\"{metricAlias}\""
+                    ? QuoteIdentifier(metricAlias)
                     : dimensionAlias is not null
-                        ? $"\"{dimensionAlias}\""
+                        ? QuoteIdentifier(dimensionAlias)
                         : FieldExpression(rule.Id);
                 parts.Add($"{orderExpression} {direction} nulls last");
             }
@@ -1215,9 +1219,7 @@ namespace EIMSNext.ApiService
 
         private static string NumericExpression(string field)
         {
-            var expression = field.StartsWith("elem_", StringComparison.Ordinal)
-                ? field
-                : FieldExpression(field);
+            var expression = FieldExpression(field);
             return $"case when {expression} ~ '^-?[0-9]+([.][0-9]+)?$' then {expression}::numeric end";
         }
 
@@ -1251,21 +1253,23 @@ namespace EIMSNext.ApiService
         {
             column = field.ToLowerInvariant() switch
             {
-                Fields.Id => "Id",
-                Fields.BsonId => "Id",
-                Fields.AppId => "AppId",
-                Fields.FormId => "FormId",
-                Fields.CorpId => "CorpId",
-                Fields.CreateBy => "CreateBy",
-                Fields.CreateTime => "CreateTime",
-                Fields.UpdateBy => "UpdateBy",
-                Fields.UpdateTime => "UpdateTime",
-                Fields.DeleteFlag => "DeleteFlag",
-                Fields.FlowStatus => "FlowStatus",
+                "id" => "Id",
+                "appid" => "AppId",
+                "formid" => "FormId",
+                "corpid" => "CorpId",
+                "createby" => "CreateBy",
+                "createtime" => "CreateTime",
+                "updateby" => "UpdateBy",
+                "updatetime" => "UpdateTime",
+                "deleteflag" => "DeleteFlag",
+                "flowstatus" => "FlowStatus",
                 _ => string.Empty,
             };
             return column.Length > 0;
         }
+
+        private static bool IsIntegerSystemField(string? field)
+            => string.Equals(field, Fields.FlowStatus, StringComparison.OrdinalIgnoreCase);
 
         private static bool IsDynamicField(string field)
         {
@@ -1326,11 +1330,33 @@ namespace EIMSNext.ApiService
             };
         }
 
+        private static object? ToSqlValue(string? field, object? value)
+            => IsIntegerSystemField(field) ? ToInt32(value) : ToSqlText(value);
+
+        private static object ToSqlArray(string? field, IReadOnlyCollection<object?> values)
+            => IsIntegerSystemField(field)
+                ? values.Select(ToInt32).ToArray()
+                : values.Select(value => ToSqlText(value)?.ToString() ?? string.Empty).ToArray();
+
+        private static int ToInt32(object? value)
+        {
+            if (value is JsonElement element)
+            {
+                if (element.ValueKind == JsonValueKind.Number && element.TryGetInt32(out var number)) return number;
+                value = element.ToString();
+            }
+
+            if (value is string text && int.TryParse(text, out var parsed)) return parsed;
+            return Convert.ToInt32(value, System.Globalization.CultureInfo.InvariantCulture);
+        }
+
         private static string SanitizeAlias(string field)
         {
             var normalized = NormalizePath(field);
             return normalized.Replace(".", "_").Replace(">", "_").Replace(" ", "_");
         }
+
+        private static string QuoteIdentifier(string identifier) => $"\"{identifier.Replace("\"", "\"\"")}\"";
 
         private static string EscapeLiteral(string value) => value.Replace("'", "''");
     }

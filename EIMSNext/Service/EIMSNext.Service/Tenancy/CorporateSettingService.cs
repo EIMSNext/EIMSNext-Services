@@ -1,3 +1,5 @@
+using System.Text.RegularExpressions;
+
 using EIMSNext.Common;
 using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
@@ -10,6 +12,11 @@ namespace EIMSNext.Service;
 public sealed class CorporateSettingService(IResolver resolver)
     : EntityServiceBase<CorporateSetting>(resolver), ICorporateSettingService
 {
+    /// <summary>合法的十六进制颜色（#RGB / #RRGGBB）。</summary>
+    private static readonly Regex HexColorRegex = new(
+        "^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$",
+        RegexOptions.Compiled);
+
     protected override Task BeforeAdd(IEnumerable<CorporateSetting> entities)
     {
         var settings = entities.ToList();
@@ -72,6 +79,20 @@ public sealed class CorporateSettingService(IResolver resolver)
         {
             throw new BadRequestException("企业配置名称不能为空");
         }
+
+        // 企业主题色只校验颜色格式（#RGB / #RRGGBB），不限制具体取值
+        if (string.Equals(setting.Name, CorporateSettingNames.ThemeColor, StringComparison.OrdinalIgnoreCase)
+            && !HexColorRegex.IsMatch(setting.Value))
+        {
+            throw new BadRequestException("企业主题色格式无效，应为 #RRGGBB");
+        }
+
+        // 企业风格开关只接受布尔字面量
+        if (string.Equals(setting.Name, CorporateSettingNames.StyleEnabled, StringComparison.OrdinalIgnoreCase)
+            && !bool.TryParse(setting.Value, out _))
+        {
+            throw new BadRequestException("企业风格开关取值无效");
+        }
     }
 
     private sealed class StringTupleComparer : IEqualityComparer<(string? CorpId, string Name)>
@@ -80,13 +101,17 @@ public sealed class CorporateSettingService(IResolver resolver)
 
         public bool Equals((string? CorpId, string Name) x, (string? CorpId, string Name) y)
         {
-            return string.Equals(x.CorpId, y.CorpId, StringComparison.Ordinal)
-                && string.Equals(x.Name, y.Name, StringComparison.Ordinal);
+            return string.Equals(x.CorpId, y.CorpId, StringComparison.OrdinalIgnoreCase)
+                && string.Equals(x.Name, y.Name, StringComparison.OrdinalIgnoreCase);
         }
 
         public int GetHashCode((string? CorpId, string Name) obj)
         {
-            return HashCode.Combine(obj.CorpId, obj.Name);
+            // 必须与上面 Equals 的 IgnoreCase 语义一致，否则 Distinct/HashSet 会先按哈希分流、
+            // 根本走不到 Equals，去重结果不确定。
+            return HashCode.Combine(
+                obj.CorpId is null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(obj.CorpId),
+                StringComparer.OrdinalIgnoreCase.GetHashCode(obj.Name));
         }
     }
 }

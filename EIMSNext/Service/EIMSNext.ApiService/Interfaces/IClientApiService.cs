@@ -6,7 +6,7 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// OAuth 客户端的 API 服务接口。
     /// </summary>
-    public interface IClientApiService : IApiService<Client, ClientViewModel>
+    public interface IClientApiService : IApiService<Client>
     {
         /// <summary>生成新的 ClientSecret：返回明文，旧 Secret 失效。</summary>
         Task<ClientCredentials> GenerateSecretAsync(string id);

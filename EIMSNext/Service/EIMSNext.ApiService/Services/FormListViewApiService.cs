@@ -10,7 +10,7 @@ namespace EIMSNext.ApiService
     /// 表单列表视图的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class FormListViewApiService(IResolver resolver) : ApiServiceBase<FormListView, FormListViewViewModel, IFormListViewService>(resolver)
+    public class FormListViewApiService(IResolver resolver) : ApiServiceBase<FormListView, IFormListViewService>(resolver)
     {
         /// <summary>
         /// 新增实体核心逻辑。

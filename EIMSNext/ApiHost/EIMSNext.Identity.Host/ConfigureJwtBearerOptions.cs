@@ -17,7 +17,7 @@ internal sealed class ConfigureJwtBearerOptions(IConfiguration configuration, IW
 
     public void Configure(string? name, JwtBearerOptions options)
     {
-        if (!string.Equals(name, JwtBearerDefaults.AuthenticationScheme, StringComparison.Ordinal))
+        if (!string.Equals(name, JwtBearerDefaults.AuthenticationScheme, StringComparison.OrdinalIgnoreCase))
         {
             return;
         }

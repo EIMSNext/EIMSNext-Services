@@ -5,17 +5,21 @@ namespace EIMSNext.Core.Query
     /// </summary>
     public class DynamicFindOptions<T>
     {
-        /// <summary>未指定时默认返回的记录数。</summary>
-        public const int DefaultTakeWhenUnspecified = 200;
-
         /// <summary>动态筛选条件或条件组。</summary>
         public DynamicFilter? Filter { get; set; }
         /// <summary>排序字段列表。</summary>
         public DynamicSortList? Sort { get; set; }
         /// <summary>查询偏移量，负数归一化为 0。</summary>
         public int Skip { get; set; }
-        /// <summary>单页数量，默认 20；小于等于 0 时使用服务端默认 200。</summary>
-        public int Take { get; set; } = 20;
+
+        /// <summary>
+        /// 单页数量。0（或负数）表示不限量，由调用方自行控制结果规模。
+        /// </summary>
+        /// <remarks>
+        /// 请求入口不得直接使用这个默认值 —— 客户端不传分页参数时会退化成整表拉取。
+        /// 来自请求的实例必须先过 <see cref="RequestPagingPolicy.Normalize"/>。
+        /// </remarks>
+        public int Take { get; set; }
 
         /// <summary>数据权限作用域。</summary>
         public DataScope? Scope { get; set; }
@@ -30,12 +34,12 @@ namespace EIMSNext.Core.Query
         public bool IncludeDeleted { get; set; }
 
         /// <summary>
-        /// MongoDB treats a limit of zero as unlimited. Dynamic callers use zero to
-        /// mean "use the server default", so normalize it before executing a query.
+        /// 获取有效的返回记录数。
         /// </summary>
+        /// <returns>负数归一化为 0；0 表示不限量，不会生成 LIMIT。</returns>
         public int GetEffectiveTake()
         {
-            return Take <= 0 ? DefaultTakeWhenUnspecified : Take;
+            return Math.Max(0, Take);
         }
 
         /// <summary>

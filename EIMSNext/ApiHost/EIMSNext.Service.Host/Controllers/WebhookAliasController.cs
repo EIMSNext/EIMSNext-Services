@@ -10,7 +10,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// Webhook字段别名配置
     /// </summary>
     [ApiVersion(1.0)]
-    public class WebhookAliasController(IResolver resolver) : ApiControllerBase<WebhookAliasApiService, WebhookAlias, WebhookAliasViewModel>(resolver)
+    public class WebhookAliasController(IResolver resolver) : ApiControllerBase<WebhookAliasApiService, WebhookAlias>(resolver)
     {
     }
 }

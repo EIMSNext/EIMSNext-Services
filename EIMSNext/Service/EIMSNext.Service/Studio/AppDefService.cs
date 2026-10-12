@@ -11,6 +11,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Services.Extensions;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using EIMSNext.Core;
 
 namespace EIMSNext.Service
 {

@@ -1,4 +1,4 @@
-﻿using EIMSNext.ApiService.ViewModels;
+using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
@@ -154,18 +154,18 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 工作台配置服务。
     /// </summary>
-    public class WorkbenchConfigApiService(IResolver resolver) : ApiServiceBase<WorkbenchConfig, WorkbenchConfigViewModel, IWorkbenchConfigService>(resolver)
+    public class WorkbenchConfigApiService(IResolver resolver) : ApiServiceBase<WorkbenchConfig, IWorkbenchConfigService>(resolver)
     {
         /// <summary>
         /// 获取按权限过滤后的工作台配置视图查询。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        protected override IQueryable<WorkbenchConfigViewModel> FilterByPermission()
+        protected override IQueryable<WorkbenchConfig> FilterByPermission()
         {
             var employeeId = CurrentEmployeeId;
             return CoreService.All()
                 .Where(x => x.CorpId == IdentityContext.CurrentCorpId && x.EmployeeId == employeeId && !x.DeleteFlag)
-                .Select(TVConvertor);
+                .Select(x => x);
         }
 
         /// <summary>
@@ -238,13 +238,13 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 工作台收藏服务。
     /// </summary>
-    public class WorkbenchFavoriteApiService(IResolver resolver) : ApiServiceBase<WorkbenchFavorite, WorkbenchFavoriteViewModel, IWorkbenchFavoriteService>(resolver)
+    public class WorkbenchFavoriteApiService(IResolver resolver) : ApiServiceBase<WorkbenchFavorite, IWorkbenchFavoriteService>(resolver)
     {
         /// <summary>
         /// 获取按权限过滤后的工作台收藏视图查询。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        protected override IQueryable<WorkbenchFavoriteViewModel> FilterByPermission()
+        protected override IQueryable<WorkbenchFavorite> FilterByPermission()
         {
             var corpId = IdentityContext.CurrentCorpId;
             var employeeId = CurrentEmployeeId;
@@ -260,7 +260,7 @@ namespace EIMSNext.ApiService
                     ((x.TargetType == WorkbenchTargetType.App && appIds.Contains(x.TargetId)) ||
                      (x.TargetType == WorkbenchTargetType.Form && formIds.Contains(x.TargetId)) ||
                      (x.TargetType == WorkbenchTargetType.Dashboard && dashboardIds.Contains(x.TargetId))))
-                .Select(TVConvertor);
+                .Select(x => x);
         }
 
         /// <summary>
@@ -372,13 +372,13 @@ namespace EIMSNext.ApiService
     /// <summary>
     /// 工作台最近访问服务。
     /// </summary>
-    public class WorkbenchRecentVisitApiService(IResolver resolver) : ApiServiceBase<WorkbenchRecentVisit, WorkbenchRecentVisitViewModel, IWorkbenchRecentVisitService>(resolver)
+    public class WorkbenchRecentVisitApiService(IResolver resolver) : ApiServiceBase<WorkbenchRecentVisit, IWorkbenchRecentVisitService>(resolver)
     {
         /// <summary>
         /// 获取按权限过滤后的工作台最近访问视图查询。
         /// </summary>
         /// <returns>视图模型的可查询对象。</returns>
-        protected override IQueryable<WorkbenchRecentVisitViewModel> FilterByPermission()
+        protected override IQueryable<WorkbenchRecentVisit> FilterByPermission()
         {
             var corpId = IdentityContext.CurrentCorpId;
             var employeeId = CurrentEmployeeId;
@@ -392,7 +392,7 @@ namespace EIMSNext.ApiService
                     !x.DeleteFlag &&
                     ((x.TargetType == WorkbenchTargetType.Form && formIds.Contains(x.TargetId)) ||
                      (x.TargetType == WorkbenchTargetType.Dashboard && dashboardIds.Contains(x.TargetId))))
-                .Select(TVConvertor);
+                .Select(x => x);
         }
 
         /// <summary>

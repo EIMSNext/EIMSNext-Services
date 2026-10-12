@@ -39,6 +39,8 @@ CREATE TABLE "AppDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_AppDef" PRIMARY KEY ("Id")
 );
@@ -71,6 +73,8 @@ CREATE TABLE "AppProfile" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_AppProfile" PRIMARY KEY ("Id")
 );
 
@@ -86,6 +90,8 @@ CREATE TABLE "AppTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_AppTemplate" PRIMARY KEY ("Id")
 );
 
@@ -106,6 +112,8 @@ CREATE TABLE "AuditLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_AuditLog" PRIMARY KEY ("Id")
 );
@@ -114,19 +122,21 @@ CREATE TABLE "AuditLog" (
 CREATE TABLE "Client" (
     "Id" citext COLLATE "C" not null default '',
     "Enabled" boolean not null default false,
-    "ClientSecrets" jsonb not null,
+    "ClientSecret" citext,
     "RequireClientSecret" boolean not null default false,
     "Name" citext,
-    "AllowedGrantTypes" jsonb not null,
-    "AllowedScopes" jsonb not null,
+    "AllowedGrantTypes" citext[] not null,
+    "AllowedScopes" citext[] not null,
     "IdentityTokenLifetime" integer not null default 0,
     "AccessTokenLifetime" integer not null default 0,
-    "ApiKey" citext not null default '',
+    "ApiKey" text not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Client" PRIMARY KEY ("Id")
 );
@@ -147,6 +157,8 @@ CREATE TABLE "ClientGrant" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_ClientGrant" PRIMARY KEY ("Id")
 );
@@ -168,6 +180,8 @@ CREATE TABLE "CorpOnboardingRequest" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_CorpOnboardingRequest" PRIMARY KEY ("Id")
 );
 
@@ -176,13 +190,14 @@ CREATE TABLE "Corporate" (
     "Id" citext COLLATE "C" not null default '',
     "Name" citext not null default '',
     "Description" citext not null default '',
-    "Code" citext not null default '',
     "Platform" integer not null default 0,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_Corporate" PRIMARY KEY ("Id")
 );
 
@@ -190,13 +205,15 @@ CREATE TABLE "Corporate" (
 CREATE TABLE "CorporateSetting" (
     "Id" citext COLLATE "C" not null default '',
     "Name" citext not null default '',
-    "Value" citext not null default '',
+    "Value" text not null default '',
     "Desc" citext not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_CorporateSetting" PRIMARY KEY ("Id")
 );
@@ -212,6 +229,8 @@ CREATE TABLE "CrossBinding" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_CrossBinding" PRIMARY KEY ("Id")
 );
@@ -232,6 +251,8 @@ CREATE TABLE "DashboardDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_DashboardDef" PRIMARY KEY ("Id")
 );
@@ -245,12 +266,14 @@ CREATE TABLE "DashboardItemDef" (
     "ItemType" citext not null default '',
     "LayoutId" citext COLLATE "C" not null default '',
     "Name" citext not null default '',
-    "Details" citext not null default '',
+    "Details" text not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_DashboardItemDef" PRIMARY KEY ("Id")
 );
@@ -269,6 +292,8 @@ CREATE TABLE "DashboardItemTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_DashboardItemTemplate" PRIMARY KEY ("Id")
 );
 
@@ -283,6 +308,8 @@ CREATE TABLE "DashboardTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_DashboardTemplate" PRIMARY KEY ("Id")
 );
 
@@ -301,6 +328,8 @@ CREATE TABLE "Department" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Department" PRIMARY KEY ("Id")
 );
@@ -339,6 +368,8 @@ CREATE TABLE "Ef_RunLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Ef_RunLog" PRIMARY KEY ("Id")
 );
@@ -366,6 +397,8 @@ CREATE TABLE "Ef_RunLogNode" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Ef_RunLogNode" PRIMARY KEY ("Id")
 );
@@ -388,6 +421,8 @@ CREATE TABLE "Employee" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Employee" PRIMARY KEY ("Id")
 );
@@ -405,6 +440,8 @@ CREATE TABLE "EmployeeDepartment" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EmployeeDepartment" PRIMARY KEY ("Id"),
     CONSTRAINT "FK_EmployeeDepartment_Department_DepartmentId" FOREIGN KEY ("DepartmentId") REFERENCES "Department" ("Id") ON DELETE CASCADE,
@@ -423,6 +460,8 @@ CREATE TABLE "EmployeeGroup" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EmployeeGroup" PRIMARY KEY ("Id")
 );
@@ -438,6 +477,8 @@ CREATE TABLE "EmployeeGroupCategory" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EmployeeGroupCategory" PRIMARY KEY ("Id")
 );
@@ -454,6 +495,8 @@ CREATE TABLE "EmployeeGroupMember" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EmployeeGroupMember" PRIMARY KEY ("Id"),
     CONSTRAINT "FK_EmployeeGroupMember_Employee_EmployeeId" FOREIGN KEY ("EmployeeId") REFERENCES "Employee" ("Id") ON DELETE CASCADE
@@ -473,6 +516,8 @@ CREATE TABLE "EventFlowHookSample" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EventFlowHookSample" PRIMARY KEY ("Id")
 );
@@ -497,7 +542,7 @@ CREATE TABLE "EventFlowNodeExecution" (
     "ProcessingStartedTime" bigint not null default 0,
     "LeaseUntil" bigint not null default 0,
     "AttemptCount" integer not null default 0,
-    "ResultSnapshot" citext not null default '',
+    "ResultSnapshot" text not null default '',
     "CompletedTime" bigint not null default 0,
     CONSTRAINT "PK_EventFlowNodeExecution" PRIMARY KEY ("Id")
 );
@@ -518,6 +563,8 @@ CREATE TABLE "EventFlowScheduleItem" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_EventFlowScheduleItem" PRIMARY KEY ("Id")
 );
@@ -542,6 +589,8 @@ CREATE TABLE "ExportLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_ExportLog" PRIMARY KEY ("Id")
 );
@@ -557,6 +606,8 @@ CREATE TABLE "FormData" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     "Data" jsonb not null,
     CONSTRAINT "PK_FormData" PRIMARY KEY ("Id")
@@ -576,6 +627,8 @@ CREATE TABLE "FormDataChangeLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormDataChangeLog" PRIMARY KEY ("Id")
 );
@@ -623,6 +676,8 @@ CREATE TABLE "FormDataImportLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormDataImportLog" PRIMARY KEY ("Id")
 );
@@ -646,6 +701,8 @@ CREATE TABLE "FormDataPermissionGroup" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormDataPermissionGroup" PRIMARY KEY ("Id")
 );
@@ -667,6 +724,8 @@ CREATE TABLE "FormDataPermissionGroupTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_FormDataPermissionGroupTemplate" PRIMARY KEY ("Id")
 );
 
@@ -685,6 +744,8 @@ CREATE TABLE "FormDef" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormDef" PRIMARY KEY ("Id")
 );
@@ -698,7 +759,7 @@ CREATE TABLE "FormListView" (
     "PcType" integer not null default 0,
     "MobileType" integer not null default 0,
     "SortIndex" integer not null default 0,
-    "PermissionGroupIds" text[] not null,
+    "PermissionGroupIds" citext[] not null,
     "Settings" citext not null default '',
     "DefaultFilter" citext,
     "DefaultSort" citext,
@@ -708,6 +769,8 @@ CREATE TABLE "FormListView" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormListView" PRIMARY KEY ("Id")
 );
@@ -745,6 +808,8 @@ CREATE TABLE "FormNotify" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormNotify" PRIMARY KEY ("Id")
 );
@@ -760,6 +825,8 @@ CREATE TABLE "FormNotifyDispatchLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormNotifyDispatchLog" PRIMARY KEY ("Id")
 );
@@ -782,6 +849,8 @@ CREATE TABLE "FormNotifyScheduleItem" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_FormNotifyScheduleItem" PRIMARY KEY ("Id")
 );
@@ -801,6 +870,8 @@ CREATE TABLE "FormTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_FormTemplate" PRIMARY KEY ("Id")
 );
 
@@ -819,6 +890,8 @@ CREATE TABLE "IdentityLoginAudit" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_IdentityLoginAudit" PRIMARY KEY ("Id")
 );
@@ -848,6 +921,8 @@ CREATE TABLE "Payment" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Payment" PRIMARY KEY ("Id")
 );
@@ -875,6 +950,8 @@ CREATE TABLE "PluginInstall" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_PluginInstall" PRIMARY KEY ("Id")
 );
@@ -910,6 +987,8 @@ CREATE TABLE "PluginProfile" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_PluginProfile" PRIMARY KEY ("Id")
 );
 
@@ -920,13 +999,15 @@ CREATE TABLE "PrintDef" (
     "AppId" citext COLLATE "C" not null default '',
     "FormId" citext COLLATE "C" not null default '',
     "Name" citext not null default '',
-    "Content" citext not null default '',
+    "Content" text not null default '',
     "PrintType" integer not null default 0,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_PrintDef" PRIMARY KEY ("Id")
 );
@@ -944,6 +1025,8 @@ CREATE TABLE "PrintDefTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_PrintDefTemplate" PRIMARY KEY ("Id")
 );
 
@@ -973,6 +1056,8 @@ CREATE TABLE "PublicSetting" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_PublicSetting" PRIMARY KEY ("Id")
 );
@@ -991,6 +1076,8 @@ CREATE TABLE "SerialNoSequence" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_SerialNoSequence" PRIMARY KEY ("Id")
 );
@@ -1014,6 +1101,8 @@ CREATE TABLE "SystemMessage" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_SystemMessage" PRIMARY KEY ("Id")
 );
@@ -1027,23 +1116,25 @@ CREATE TABLE "TenantAdminGroup" (
     "ParentId" citext COLLATE "C" not null default '',
     "SortValue" integer not null default 0,
     "EmployeeIds" jsonb not null,
-    "AppIds" text[] not null,
+    "AppIds" citext[] not null,
     "CanCreateOrDeleteApp" boolean not null default false,
     "AppDepartmentScopeMode" integer not null default 0,
-    "AppDepartmentIds" text[] not null,
+    "AppDepartmentIds" citext[] not null,
     "AppEmployeeGroupScopeMode" integer not null default 0,
-    "AppEmployeeGroupIds" text[] not null,
+    "AppEmployeeGroupIds" citext[] not null,
     "ContactDepartmentPermission" integer not null default 0,
     "ContactDepartmentScopeMode" integer not null default 0,
-    "ContactDepartmentIds" text[] not null,
+    "ContactDepartmentIds" citext[] not null,
     "ContactEmployeeGroupPermission" integer not null default 0,
     "ContactEmployeeGroupScopeMode" integer not null default 0,
-    "ContactEmployeeGroupIds" text[] not null,
+    "ContactEmployeeGroupIds" citext[] not null,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_TenantAdminGroup" PRIMARY KEY ("Id")
 );
@@ -1062,6 +1153,8 @@ CREATE TABLE "UploadedFile" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_UploadedFile" PRIMARY KEY ("Id")
 );
@@ -1073,7 +1166,7 @@ CREATE TABLE "User" (
     "Name" citext not null default '',
     "Email" citext not null default '',
     "Phone" citext not null default '',
-    "Password" citext not null default '',
+    "Password" text not null default '',
     "Platform" integer not null default 0,
     "Disabled" boolean not null default false,
     "Avatar" citext,
@@ -1111,6 +1204,8 @@ CREATE TABLE "WebPushLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WebPushLog" PRIMARY KEY ("Id")
 );
@@ -1123,7 +1218,7 @@ CREATE TABLE "Webhook" (
     "Name" citext,
     "SourceType" integer not null default 0,
     "Url" citext not null default '',
-    "Secret" citext not null default '',
+    "Secret" text not null default '',
     "Remark" citext,
     "Triggers" bigint not null default 0,
     "Disabled" boolean not null default false,
@@ -1132,6 +1227,8 @@ CREATE TABLE "Webhook" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Webhook" PRIMARY KEY ("Id")
 );
@@ -1147,6 +1244,8 @@ CREATE TABLE "WebhookAlias" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WebhookAlias" PRIMARY KEY ("Id")
 );
@@ -1170,6 +1269,8 @@ CREATE TABLE "WfDefinitionTemplate" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     CONSTRAINT "PK_WfDefinitionTemplate" PRIMARY KEY ("Id")
 );
 
@@ -1185,7 +1286,7 @@ CREATE TABLE "Wf_Definition" (
     "Version" integer not null default 0,
     "IsCurrent" boolean not null default false,
     "Released" boolean not null default false,
-    "Content" citext not null default '',
+    "Content" text not null default '',
     "Metadata" jsonb not null,
     "EventSource" integer not null default 0,
     "SourceId" citext COLLATE "C",
@@ -1196,6 +1297,8 @@ CREATE TABLE "Wf_Definition" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Wf_Definition" PRIMARY KEY ("Id")
 );
@@ -1216,6 +1319,7 @@ CREATE TABLE "Wf_ExecLog" (
 
 CREATE TABLE "Wf_Task" (
     "Id" citext COLLATE "C" not null default '',
+    "FormName" citext,
     "WfInstanceId" citext COLLATE "C" not null default '',
     "ApproveNodeId" citext COLLATE "C" not null default '',
     "ApproveNodeName" citext not null default '',
@@ -1234,6 +1338,8 @@ CREATE TABLE "Wf_Task" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Wf_Task" PRIMARY KEY ("Id")
 );
@@ -1245,6 +1351,7 @@ CREATE TABLE "Wf_TaskLog" (
     "FormId" citext COLLATE "C" not null default '',
     "FormName" citext not null default '',
     "DataId" citext COLLATE "C" not null default '',
+    "WfInstanceId" citext COLLATE "C" not null default '',
     "WfVersion" integer not null default 0,
     "NodeId" citext COLLATE "C" not null default '',
     "NodeName" citext not null default '',
@@ -1261,6 +1368,8 @@ CREATE TABLE "Wf_TaskLog" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Wf_TaskLog" PRIMARY KEY ("Id")
 );
@@ -1269,13 +1378,15 @@ CREATE TABLE "Wf_TaskLog" (
 CREATE TABLE "WorkbenchConfig" (
     "Id" citext COLLATE "C" not null default '',
     "EmployeeId" citext COLLATE "C" not null default '',
-    "Layout" citext not null default '',
+    "Layout" text not null default '',
     "PageStyle" citext not null default '',
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WorkbenchConfig" PRIMARY KEY ("Id")
 );
@@ -1296,6 +1407,8 @@ CREATE TABLE "WorkbenchFavorite" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WorkbenchFavorite" PRIMARY KEY ("Id")
 );
@@ -1317,6 +1430,8 @@ CREATE TABLE "WorkbenchRecentVisit" (
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
+    "DeleteBy" jsonb,
+    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WorkbenchRecentVisit" PRIMARY KEY ("Id")
 );
@@ -1330,7 +1445,7 @@ CREATE TABLE "WorkflowTransitionExecution" (
     "WfNodeId" citext COLLATE "C" not null default '',
     "NodeAction" citext not null default '',
     "Status" integer not null default 0,
-    "Error" citext not null default '',
+    "Error" text not null default '',
     "CreateTime" bigint not null default 0,
     "UpdateTime" bigint not null default 0,
     CONSTRAINT "PK_WorkflowTransitionExecution" PRIMARY KEY ("Id")

@@ -147,6 +147,155 @@ namespace EIMSNext.Service.Tests
             }));
         }
 
+        [TestMethod]
+        public async Task SaveMenus_AllowsNestedGroups()
+        {
+            _appDefService.Add(NestedSeed());
+
+            var result = await _apiService.SaveMenus(new SaveAppMenusRequest
+            {
+                AppId = "nested-app",
+                AppMenus =
+                [
+                    new AppMenu
+                    {
+                        MenuId = "root-group",
+                        Title = "Root",
+                        MenuType = FormType.Group,
+                        SubMenus =
+                        [
+                            new AppMenu
+                            {
+                                MenuId = "sub-group",
+                                Title = "Sub",
+                                MenuType = FormType.Group,
+                                SubMenus =
+                                [
+                                    Submitted("leaf-form", FormType.Form),
+                                    Submitted("leaf-dash", FormType.Dashboard),
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            });
+
+            var rootGroup = result.AppMenus.Single(x => x.MenuId == "root-group");
+            Assert.AreEqual(FormType.Group, rootGroup.MenuType);
+            var subGroup = rootGroup.SubMenus!.Single(x => x.MenuId == "sub-group");
+            Assert.AreEqual(FormType.Group, subGroup.MenuType);
+            Assert.IsNotNull(subGroup.SubMenus);
+            Assert.AreEqual(2, subGroup.SubMenus.Count);
+            Assert.AreEqual("leaf-form", subGroup.SubMenus[0].MenuId);
+            Assert.AreEqual(100, subGroup.SubMenus[0].SortIndex);
+        }
+
+        [TestMethod]
+        public async Task SaveMenus_RejectsExcessiveDepth()
+        {
+            _appDefService.Add(DeepSeed());
+
+            await AssertThrowsAsync<BadRequestException>(() => _apiService.SaveMenus(new SaveAppMenusRequest
+            {
+                AppId = "deep-app",
+                AppMenus = DeepSubmitted(),
+            }));
+        }
+
+        [TestMethod]
+        public async Task SaveMenus_RejectsLeafWithChildren()
+        {
+            await AssertThrowsAsync<BadRequestException>(() => _apiService.SaveMenus(new SaveAppMenusRequest
+            {
+                AppId = AppId,
+                AppMenus =
+                [
+                    new AppMenu
+                    {
+                        MenuId = "form-1",
+                        MenuType = FormType.Form,
+                        SubMenus = [Submitted("dashboard-1", FormType.Dashboard)],
+                    },
+                    Submitted("dashboard-1", FormType.Dashboard),
+                    Submitted("group-1", FormType.Group),
+                ],
+            }));
+        }
+
+        private static AppDef NestedSeed()
+        {
+            return new AppDef
+            {
+                Id = "nested-app",
+                CorpId = CorpId,
+                Name = "App",
+                AppMenus =
+                [
+                    new AppMenu
+                    {
+                        MenuId = "root-group",
+                        Title = "Root",
+                        MenuType = FormType.Group,
+                        SubMenus =
+                        [
+                            new AppMenu
+                            {
+                                MenuId = "sub-group",
+                                Title = "Sub",
+                                MenuType = FormType.Group,
+                                SubMenus =
+                                [
+                                    new AppMenu { MenuId = "leaf-form", Title = "Leaf", MenuType = FormType.Form },
+                                    new AppMenu { MenuId = "leaf-dash", Title = "LeafD", MenuType = FormType.Dashboard },
+                                ],
+                            },
+                        ],
+                    },
+                ],
+            };
+        }
+
+        private static AppDef DeepSeed()
+        {
+            const int depth = AppMenuHelper.MaxDepth + 1;
+            var menu = new AppMenu { MenuId = $"g{depth}", Title = "leaf", MenuType = FormType.Form };
+            for (var level = depth - 1; level >= 1; level--)
+            {
+                menu = new AppMenu
+                {
+                    MenuId = $"g{level}",
+                    Title = $"g{level}",
+                    MenuType = FormType.Group,
+                    SubMenus = [menu],
+                };
+            }
+
+            return new AppDef
+            {
+                Id = "deep-app",
+                CorpId = CorpId,
+                Name = "App",
+                AppMenus = [menu],
+            };
+        }
+
+        private static List<AppMenu> DeepSubmitted()
+        {
+            const int depth = AppMenuHelper.MaxDepth + 1;
+            var menu = new AppMenu { MenuId = $"g{depth}", MenuType = FormType.Form, SubMenus = null };
+            for (var level = depth - 1; level >= 1; level--)
+            {
+                menu = new AppMenu
+                {
+                    MenuId = $"g{level}",
+                    MenuType = FormType.Group,
+                    SubMenus = [menu],
+                };
+            }
+
+            return [menu];
+        }
+
         private static AppDef SeedApp()
         {
             return new AppDef

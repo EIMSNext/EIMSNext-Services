@@ -41,7 +41,7 @@ namespace EIMSNext.Core.Tests
             if (!string.Equals(
                     Environment.GetEnvironmentVariable("EIMS_REGENERATE_BASELINE"),
                     "1",
-                    StringComparison.Ordinal))
+                    StringComparison.OrdinalIgnoreCase))
             {
                 Assert.Inconclusive(
                     "生成入口默认不执行；置 EIMS_REGENERATE_BASELINE=1 后重跑本用例才会写盘。");

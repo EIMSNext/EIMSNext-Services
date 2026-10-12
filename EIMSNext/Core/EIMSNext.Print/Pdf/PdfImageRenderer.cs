@@ -392,7 +392,7 @@ namespace EIMSNext.Print.Pdf
             if (node is JsonObject jsonObject)
             {
                 if (TryGetImageIdAndSource(jsonObject, out var currentImageId, out var currentSource)
-                    && string.Equals(currentImageId, imageId, StringComparison.Ordinal)
+                    && string.Equals(currentImageId, imageId, StringComparison.OrdinalIgnoreCase)
                     && !string.IsNullOrWhiteSpace(currentSource))
                 {
                     source = currentSource;

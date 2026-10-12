@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfExecLogController(IResolver resolver) : ReadOnlyODataController<WfExecLogApiService, Wf_ExecLog, WfExecLogViewModel>(resolver)
+	public class WfExecLogController(IResolver resolver) : ReadOnlyODataController<WfExecLogApiService, Wf_ExecLog>(resolver)
 	{
 		
 	}

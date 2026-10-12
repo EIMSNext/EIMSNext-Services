@@ -1,4 +1,5 @@
 using EIMSNext.Component;
+using EIMSNext.Entities;
 
 namespace EIMSNext.Flow.Tests
 {
@@ -91,6 +92,59 @@ namespace EIMSNext.Flow.Tests
             var manualField = fields.Single(x => x.Field == "manual_field");
 
             Assert.AreEqual("jlegacyfield001,manual_field", manualField.Props.ValueProp?.Depends);
+        }
+
+        [TestMethod]
+        public void Parse_Should_NormalizeMemberSource_WithNumericMemberTags()
+        {
+            var parser = new FormLayoutParser();
+            var layout = """
+            [
+              {
+                "type": "employee1",
+                "field": "owner",
+                "props": {
+                  "limitType": "custom",
+                  "limitScope": [
+                    { "id": "dept-1", "type": 1, "cascadedDept": true },
+                    { "id": "curdept", "type": 4 },
+                    { "id": "curuser", "type": 4 }
+                  ]
+                }
+              }
+            ]
+            """;
+
+            var field = parser.Parse(layout).Single();
+            var source = field.Props.MemberSource!;
+
+            Assert.AreEqual(MemberSourceMode.Custom, source.Mode);
+            CollectionAssert.AreEquivalent(
+                new[] { "department:dept-1:True", "dynamic:curdept:False", "dynamic:curuser:False" },
+                source.Items.Select(x => $"{x.Type}:{x.Id}:{x.Cascaded}").ToArray());
+        }
+
+        [TestMethod]
+        public void Parse_Should_RejectCurrentUserForDepartmentSource()
+        {
+            var parser = new FormLayoutParser();
+            var layout = """
+            [
+              {
+                "type": "department1",
+                "field": "dept",
+                "props": {
+                  "limitType": "custom",
+                  "limitScope": [{ "id": "curuser", "type": 4 }]
+                }
+              }
+            ]
+            """;
+
+            var field = parser.Parse(layout).Single();
+
+            Assert.AreEqual(MemberSourceMode.Custom, field.Props.MemberSource?.Mode);
+            Assert.AreEqual(0, field.Props.MemberSource?.Items.Count);
         }
     }
 }

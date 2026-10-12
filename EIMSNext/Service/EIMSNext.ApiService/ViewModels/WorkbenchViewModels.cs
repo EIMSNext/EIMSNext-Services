@@ -3,27 +3,6 @@ using EIMSNext.Entities;
 namespace EIMSNext.ApiService.ViewModels
 {
     /// <summary>
-    /// 工作台配置视图模型。
-    /// </summary>
-    public class WorkbenchConfigViewModel : WorkbenchConfig
-    {
-    }
-
-    /// <summary>
-    /// 工作台收藏视图模型。
-    /// </summary>
-    public class WorkbenchFavoriteViewModel : WorkbenchFavorite
-    {
-    }
-
-    /// <summary>
-    /// 工作台最近访问视图模型。
-    /// </summary>
-    public class WorkbenchRecentVisitViewModel : WorkbenchRecentVisit
-    {
-    }
-
-    /// <summary>
     /// 工作台目录应用视图模型。
     /// </summary>
     public class WorkbenchCatalogAppViewModel

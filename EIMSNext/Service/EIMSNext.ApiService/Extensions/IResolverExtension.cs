@@ -14,14 +14,12 @@ namespace EIMSNext.ApiService.Extensions
         /// 解析指定实体类型的 API 服务。
         /// </summary>
         /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
-        /// <typeparam name="Q">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
         /// <param name="resolver">依赖解析器。</param>
         /// <returns>API 服务。</returns>
-        public static IApiService<T, Q> GetApiService<T, Q>(this IResolver resolver)
+        public static IApiService<T> GetApiService<T>(this IResolver resolver)
             where T : IEntityKey
-            where Q : T, new()
         {
-            return resolver.Resolve<IApiService<T, Q>>();
+            return resolver.Resolve<IApiService<T>>();
         }
 
         /// <summary>
@@ -29,13 +27,11 @@ namespace EIMSNext.ApiService.Extensions
         /// </summary>
         /// <typeparam name="S">API 服务实现类型。</typeparam>
         /// <typeparam name="T">实现 <see cref="IEntityKey"/> 的实体类型。</typeparam>
-        /// <typeparam name="Q">视图模型类型，继承自 <typeparamref name="T"/>。</typeparam>
         /// <param name="resolver">依赖解析器。</param>
         /// <returns>自定义 API 服务。</returns>
-        public static S GetApiService<S, T, Q>(this IResolver resolver)
-            where S : class, IApiService<T, Q>
+        public static S GetApiService<S, T>(this IResolver resolver)
+            where S : class, IApiService<T>
            where T : IEntityKey
-           where Q : T, new()
         {
             return resolver.Resolve<S>();
         }

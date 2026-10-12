@@ -130,7 +130,7 @@ namespace EIMSNext.Flow.Tests
         }
 
         [TestMethod]
-        public void Execute_Rejects_Unannotated_And_CaseVariant_Functions()
+        public void Execute_Rejects_Unannotated_Functions_But_Accepts_CaseVariants()
         {
             using var plugin = new AttributePlugin();
 
@@ -141,8 +141,41 @@ namespace EIMSNext.Flow.Tests
                 new PluginSetting(),
                 new PluginExecArgs { FunName = "ECHO", FunArgs = "{}" });
 
+            // 未标注 [PluginFunction] 的方法必须拒绝；函数名匹配按 OrdinalIgnoreCase，
+            // 因此大小写变体应当命中。
             Assert.AreEqual(-1, unannotated.Code);
-            Assert.AreEqual(-1, caseVariant.Code);
+            Assert.AreEqual(0, caseVariant.Code);
+        }
+
+        [TestMethod]
+        public void Execute_Returns_Minus3_When_Argument_Binding_Fails()
+        {
+            TestJsonOptions.UseProjectDefaults();
+            using var plugin = new AttributePlugin();
+            var args = new JsonObject
+            {
+                ["status"] = new JsonObject { ["nested"] = "paid" },
+            };
+
+            var result = plugin.Execute(
+                new PluginSetting(),
+                new PluginExecArgs { FunName = "Echo", FunArgs = args.ToJsonString() });
+
+            Assert.AreEqual(-3, result.Code);
+        }
+
+        [TestMethod]
+        public void Execute_Reports_Plugin_Exception_Instead_Of_Reflection_Wrapper()
+        {
+            TestJsonOptions.UseProjectDefaults();
+            using var plugin = new ThrowingPlugin();
+
+            var result = plugin.Execute(
+                new PluginSetting(),
+                new PluginExecArgs { FunName = "Boom", FunArgs = "{}" });
+
+            Assert.AreEqual(-3, result.Code);
+            StringAssert.Contains(result.Message, "plugin-boom");
         }
 
         [Plugin("attribute-plugin", "Attribute Plugin", Version = "1.2")]
@@ -163,6 +196,13 @@ namespace EIMSNext.Flow.Tests
             }
 
             private EchoResult Internal(EchoArgs args) => new();
+        }
+
+        [Plugin("throwing-plugin", "Throwing Plugin", Version = "1.0")]
+        private sealed class ThrowingPlugin : PluginBase<AttributePluginSetting>
+        {
+            [PluginFunction("Boom", "Boom")]
+            private EchoResult Boom(EchoArgs args) => throw new InvalidOperationException("plugin-boom");
         }
 
         private sealed class AttributePluginSetting

@@ -20,7 +20,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-	public class PublicSettingController(IResolver resolver) : ApiControllerBase<PublicSettingApiService, PublicSetting, PublicSettingViewModel>(resolver)
+	public class PublicSettingController(IResolver resolver) : ApiControllerBase<PublicSettingApiService, PublicSetting>(resolver)
 	{
         [HttpGet("current")]
         [Permission(Operation = Operation.Read)]

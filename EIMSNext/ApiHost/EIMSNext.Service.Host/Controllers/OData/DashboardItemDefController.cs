@@ -18,28 +18,28 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-	public class DashboardItemDefController(IResolver resolver) : ODataController<DashboardItemDefApiService, DashboardItemDef, DashboardItemDefViewModel, DashboardItemDefRequest>(resolver)
+	public class DashboardItemDefController(IResolver resolver) : ODataController<DashboardItemDefApiService, DashboardItemDef, DashboardItemDefRequest>(resolver)
 	{
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink)]
-        public override IActionResult Get(ODataQueryOptions<DashboardItemDefViewModel> options)
+        public override IActionResult Get(ODataQueryOptions<DashboardItemDef> options)
         {
             return base.Get(options);
         }
 
         [IdentityType(IdentityTypeDefaults.PublicBusinessUser)]
         [PublicScope(PublicScope.DashLink)]
-        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<DashboardItemDefViewModel> options)
+        public override Microsoft.AspNetCore.OData.Results.SingleResult Get([Microsoft.AspNetCore.OData.Formatter.FromODataUri] string key, ODataQueryOptions<DashboardItemDef> options)
         {
             if (IdentityContext.IdentityType == IdentityType.Public && !Resolver.Resolve<IPublicAccessValidator>().CanReadDashboardItem(key))
             {
-                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<DashboardItemDefViewModel>().AsQueryable());
+                return Microsoft.AspNetCore.OData.Results.SingleResult.Create(Enumerable.Empty<DashboardItemDef>().AsQueryable());
             }
 
             return base.Get(key, options);
         }
 
-        protected override IQueryable<DashboardItemDefViewModel> FilterByPermission(IQueryable<DashboardItemDefViewModel> query, ODataQueryOptions<DashboardItemDefViewModel> options)
+        protected override IQueryable<DashboardItemDef> FilterByPermission(IQueryable<DashboardItemDef> query, ODataQueryOptions<DashboardItemDef> options)
         {
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();
             if (evaluator.HasUnrestrictedManagementIdentity)

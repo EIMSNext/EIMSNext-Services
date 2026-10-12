@@ -135,6 +135,19 @@ namespace EIMSNext.Service.Tests
         }
 
         [TestMethod]
+        public void AggregateRows_FlowStatusFilterUsesIntegerParameter()
+        {
+            var request = Request([], []);
+            request.Filter = new DynamicFilter { Field = Fields.FlowStatus, Op = FilterOp.Eq, Value = "3" };
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "\"FlowStatus\" = @p0");
+            Assert.AreEqual(3, statement.Parameters[0]);
+            Assert.IsInstanceOfType<int>(statement.Parameters[0]);
+        }
+
+        [TestMethod]
         public void AggregateRows_UseJsonbTopLevelPathAndFormDataContract()
         {
             var request = Request([], []);
@@ -160,6 +173,17 @@ namespace EIMSNext.Service.Tests
 
             StringAssert.Contains(statement.Sql, "\"amount_sum\" desc");
             StringAssert.Contains(statement.Sql, "as \"category\"");
+        }
+
+        [TestMethod]
+        public void AggregateRows_QuotesDynamicAliases()
+        {
+            var request = Request([], [new Metric { Id = "field\" , (select 1) as \"leak", AggFun = "count" }]);
+
+            var statement = AggregateSqlBuilder.BuildRows(request);
+
+            StringAssert.Contains(statement.Sql, "as \"field\"\"_,_(select_1)_as_\"\"leak_count\"");
+            Assert.IsFalse(statement.Sql.Contains("as \"field\" , (select 1)", StringComparison.Ordinal));
         }
 
         [TestMethod]

@@ -13,7 +13,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WebPushLogController(IResolver resolver) : ReadOnlyODataController<WebPushLogApiService, WebPushLog, WebPushLogViewModel>(resolver)
+	public class WebPushLogController(IResolver resolver) : ReadOnlyODataController<WebPushLogApiService, WebPushLog>(resolver)
 	{
 		
 	}

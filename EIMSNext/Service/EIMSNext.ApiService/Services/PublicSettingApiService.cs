@@ -11,7 +11,7 @@ namespace EIMSNext.ApiService
 	/// 公开设置的 API 服务。
 	/// </summary>
 	/// <param name="resolver">服务解析器。</param>
-	public class PublicSettingApiService(IResolver resolver) : ApiServiceBase<PublicSetting, PublicSettingViewModel, IPublicSettingService>(resolver)
+	public class PublicSettingApiService(IResolver resolver) : ApiServiceBase<PublicSetting, IPublicSettingService>(resolver)
 	{
         /// <summary>
         /// 新增实体核心逻辑。

@@ -15,12 +15,12 @@ namespace EIMSNext.ApiService
     /// 跨应用绑定的 API 服务。
     /// </summary>
     /// <param name="resolver">服务解析器。</param>
-    public class CrossBindingApiService(IResolver resolver) : ApiServiceBase<CrossBinding, CrossBindingViewModel, ICrossBindingService>(resolver)
+    public class CrossBindingApiService(IResolver resolver) : ApiServiceBase<CrossBinding, ICrossBindingService>(resolver)
     {
         /// <summary>
         /// 按当前身份权限过滤查询。
         /// </summary>
-        protected override IQueryable<CrossBindingViewModel> FilterByPermission()
+        protected override IQueryable<CrossBinding> FilterByPermission()
         {
             var query = base.FilterByPermission();
             var evaluator = Resolver.Resolve<TenantAccessEvaluator>();

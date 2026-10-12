@@ -86,10 +86,7 @@ namespace EIMSNext.Service.Tests
                 UsingWorkflow = true,
                 FormSettings = new FormSettings
                 {
-                    Advanced = new DataAdvancedSettings
-                    {
-                        DataTitle = new DataTitleSettings { Mode = "custom", Content = "Test Title" }
-                    }
+                    DataTitle = new DataTitleSettings { Mode = "custom", Content = "Test Title" }
                 }
             });
 
@@ -492,6 +489,9 @@ namespace EIMSNext.Service.Tests
                 => Task.FromResult(Get(id));
 
             public override long Count(Expression<Func<T, bool>> predicate) => Queryable.LongCount(predicate);
+
+            public override Task<bool> AnyAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
+                => Task.FromResult(Queryable.Any(predicate));
 
             public override Task<long> CountAsync(Expression<Func<T, bool>> predicate, CancellationToken cancellationToken = default)
                 => Task.FromResult(Count(predicate));

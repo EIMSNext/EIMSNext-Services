@@ -18,7 +18,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class EmployeeGroupController(IResolver resolver) : ApiControllerBase<EmployeeGroupApiService, EmployeeGroup, EmployeeGroupViewModel>(resolver)
+    public class EmployeeGroupController(IResolver resolver) : ApiControllerBase<EmployeeGroupApiService, EmployeeGroup>(resolver)
     {
         [HttpPost("AddEmps")]
         [Permission(ResourceCode = Resources.EmployeeGroup, Operation = Operation.Add)]

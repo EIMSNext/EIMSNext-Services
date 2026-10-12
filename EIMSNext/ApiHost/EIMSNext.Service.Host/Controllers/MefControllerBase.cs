@@ -30,10 +30,9 @@ namespace EIMSNext.Service.Host.Controllers
     /// <typeparam name="T"></typeparam>
     /// <typeparam name="Q"></typeparam>
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
-    public abstract class MefControllerBase<S, T, Q> : MefControllerBase
-        where S : class, IApiService<T, Q>
+    public abstract class MefControllerBase<S, T> : MefControllerBase
+        where S : class, IApiService<T>
         where T : class, IEntity
-        where Q : T, new()
     {
         /// <summary>
         /// 
@@ -41,7 +40,7 @@ namespace EIMSNext.Service.Host.Controllers
         /// <param name="resolver"></param>
         protected MefControllerBase(IResolver resolver) : base(resolver)
         {
-            ApiService = resolver.GetApiService<S, T, Q>();
+            ApiService = resolver.GetApiService<S, T>();
         }
 
         /// <summary>

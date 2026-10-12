@@ -79,6 +79,30 @@ namespace EIMSNext.Core.Tests
         }
 
         [TestMethod]
+        public void DisabledRootScopeStillCommitsChanges()
+        {
+            // 无事务模式只是不起事务，单位工作仍必须落库：
+            // 落库发生在提交阶段，若提交时因为「没有自己的事务」直接返回，
+            // 调用方会拿到成功响应而库里一条记录都没有。
+            var today = DateTime.Today.ToTimeStampMs();
+            using (var scope = new TransactionScope(_dbContext!, enabled: false))
+            {
+                Assert.IsFalse(TransactionScope.IsInTransaction);
+                _dbContext!.FormDatas.Add(new EIMSNext.Entities.FormData
+                {
+                    Id = Guid.NewGuid().ToString("N"),
+                    AppId = "111",
+                    FormId = "form_1",
+                    CorpId = "corp_1",
+                    CreateTime = today,
+                });
+                scope.CommitTransaction();
+            }
+
+            Assert.AreEqual(1, _dbContext!.FormDatas.Count(x => x.CreateTime >= today));
+        }
+
+        [TestMethod]
         public void NestedScopeInheritsEnabledRootTransaction()
         {
             using (var root = new TransactionScope(_dbContext!, enabled: true))

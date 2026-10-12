@@ -14,7 +14,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class PublicSettingController(IResolver resolver) : ODataController<PublicSettingApiService, PublicSetting, PublicSettingViewModel, PublicSettingRequest>(resolver)
+	public class PublicSettingController(IResolver resolver) : ODataController<PublicSettingApiService, PublicSetting, PublicSettingRequest>(resolver)
 	{
 		
 	}

@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class CorporateController(IResolver resolver) : ApiControllerBase<CorporateApiService, Corporate, CorporateViewModel>(resolver)
+	public class CorporateController(IResolver resolver) : ApiControllerBase<CorporateApiService, Corporate>(resolver)
 	{
 		
 	}

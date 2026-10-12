@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class DepartmentController(IResolver resolver) : ApiControllerBase<DepartmentApiService, Department, DepartmentViewModel>(resolver)
+	public class DepartmentController(IResolver resolver) : ApiControllerBase<DepartmentApiService, Department>(resolver)
 	{
 		
 	}

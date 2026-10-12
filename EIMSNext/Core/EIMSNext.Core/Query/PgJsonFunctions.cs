@@ -62,4 +62,24 @@ public static class PgJsonFunctions
     public static string? JsonSort(object json, string jsonPath)
         => throw new NotSupportedException(
             "PgJsonFunctions.JsonSort 只用于 EF Core 查询翻译，不能在内存中直接调用。");
+
+    /// <summary>
+    /// 判断 jsonb 数组列是否包含指定元素，下推为 <c>jsonb @&gt; jsonb_build_array(element)</c>。
+    /// </summary>
+    /// <remarks>
+    /// 映射到中缀运算符而非函数调用，以命中 jsonb_path_ops GIN 索引
+    /// （jsonb_path_ops 只服务 <c>@&gt;</c>，不服务 <c>?</c>/<c>@?</c>/<c>@@</c>）。
+    /// 关系型提供程序由 <c>HasTranslation</c> 翻译成 SQL，不会执行此方法体；
+    /// 当 LINQ 提供程序不做翻译时（如单元测试的 InMemoryRepository），才会执行此处做内存求值。
+    /// </remarks>
+    public static bool JsonbArrayContains(object? jsonbColumn, string? element)
+    {
+        // 仅当 LINQ 提供程序不做翻译时（单元测试的 InMemoryRepository）才执行此方法体；
+        // 关系型提供程序走 HasTranslation 翻译为 `col @> jsonb_build_array(elem)`，不会走到这里。
+        if (element is null)
+        {
+            return false;
+        }
+        return jsonbColumn is IEnumerable<string> list && list.Contains(element);
+    }
 }

@@ -1,5 +1,5 @@
+using EIMSNext.Core.Entities;
 using EIMSNext.ApiService.RequestModels;
-using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
 
 namespace EIMSNext.Service.Host.Edm
@@ -7,7 +7,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// 
     /// </summary>
-    public class FormDataPermissionGroupModelConfiguration : CorpModelConfigurationBase<FormDataPermissionGroupViewModel, FormDataPermissionGroupRequest>
+    public class FormDataPermissionGroupModelConfiguration : CorpModelConfigurationBase<FormDataPermissionGroup, FormDataPermissionGroupRequest>
     {
     }
 }

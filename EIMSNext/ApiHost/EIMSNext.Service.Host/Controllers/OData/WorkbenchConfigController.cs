@@ -11,7 +11,7 @@ using HKH.Mef2.Integration;
 namespace EIMSNext.Service.Host.Controllers.OData
 {
     [ApiVersion(1.0)]
-    public class WorkbenchConfigController(IResolver resolver) : ODataController<WorkbenchConfigApiService, WorkbenchConfig, WorkbenchConfigViewModel, WorkbenchConfigRequest>(resolver)
+    public class WorkbenchConfigController(IResolver resolver) : ODataController<WorkbenchConfigApiService, WorkbenchConfig, WorkbenchConfigRequest>(resolver)
     {
     }
 }

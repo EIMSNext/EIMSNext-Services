@@ -1,4 +1,4 @@
-﻿using Asp.Versioning;
+using Asp.Versioning;
 using EIMSNext.ApiService;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Core.Abstractions;
@@ -13,7 +13,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class AuditLogController(IResolver resolver) : ReadOnlyODataController<AuditLogApiService, AuditLog, AuditLogViewModel>(resolver)
+	public class AuditLogController(IResolver resolver) : ReadOnlyODataController<AuditLogApiService, AuditLog>(resolver)
 	{		
 	}
 }

@@ -31,6 +31,12 @@ namespace EIMSNext.Core.Entities
 
         /// <summary>是否已逻辑删除。</summary>
         public bool DeleteFlag { get; set; }= false;
+
+        /// <summary>删除人（逻辑删除时填充）。</summary>
+        public Operator? DeleteBy { get; set; }
+
+        /// <summary>删除时间（Unix 毫秒，逻辑删除时填充）。</summary>
+        public long? DeleteTime { get; set; }
     }
 
     /// <summary>

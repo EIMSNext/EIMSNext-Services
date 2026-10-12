@@ -1,4 +1,5 @@
-﻿using System.Dynamic;
+﻿using System;
+using System.Dynamic;
 using System.Text.Json;
 using System.Collections;
 
@@ -24,11 +25,11 @@ namespace EIMSNext.Flow.Core.Nodes
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            // 而 WorkflowCore 的 Run 契约是同步的，因此在此处统一同步等待。
-            return RunAsync(context).GetAwaiter().GetResult();
+            // EventFlow 节点按 IStepBody.Run 同步派发，这里阻塞等待插件异步执行结果。
+            return ExecuteAsync(context).GetAwaiter().GetResult();
         }
 
-        private async Task<ExecutionResult> RunAsync(IStepExecutionContext context)
+        private async Task<ExecutionResult> ExecuteAsync(IStepExecutionContext context)
         {
             var dataContext = GetDataContext(context);
             var startTime = DateTime.UtcNow.ToTimeStampMs();
@@ -43,8 +44,9 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 if (!IsPluginEnabled(dataContext.CorpId, setting.PluginId))
                 {
-                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, "插件未安装、已禁用或授权已过期", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
-                    return ExecutionResult.Next();
+                    // 插件未安装/已禁用/授权过期属于配置错误：必须让流程显式失败（而非静默继续），
+                    // 使运维可从节点执行日志中的 Code=-4 立即定位，避免下游节点继续跑出错误数据。
+                    throw new InvalidOperationException("插件执行被拒绝(Code=-4)：插件未启用、已禁用或授权已过期。");
                 }
 
                 var runtimeManager = Resolver.Resolve<IPluginRuntimeManager>();
@@ -71,7 +73,14 @@ namespace EIMSNext.Flow.Core.Nodes
 
                 if (result.Code != 0)
                 {
-                    await CreateFailureExecLogAsync(context.Workflow, dataContext, Metadata!, result.Message ?? "插件执行失败", startTime, DateTime.UtcNow.ToTimeStampMs(), true);
+                    var errorMessage = result.Message ?? "插件执行失败";
+                    if (result.Code == -408)
+                    {
+                        // 超时后插件线程可能仍在运行，不能继续执行后续节点，否则会并发产生副作用。
+                        throw new TimeoutException(errorMessage);
+                    }
+
+                    throw new InvalidOperationException($"插件执行失败(Code={result.Code})：{errorMessage}");
                 }
                 else
                 {

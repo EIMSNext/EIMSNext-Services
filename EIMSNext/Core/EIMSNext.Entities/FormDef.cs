@@ -2,6 +2,7 @@
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using System.ComponentModel.DataAnnotations.Schema;
 
 using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
@@ -15,6 +16,11 @@ namespace EIMSNext.Entities
     /// </summary>
     public class FormDef : CorpEntityBase
     {
+        /// <summary>
+        /// 是否为跨应用绑定进来的外部表单（仅查询结果填充，非持久化字段）。
+        /// </summary>
+        [NotMapped]
+        public bool External { get; set; }
         /// <summary>
         /// 应用ID
         /// </summary>
@@ -56,17 +62,6 @@ namespace EIMSNext.Entities
     /// 表单设置。
     /// </summary>
     public class FormSettings
-    {
-        /// <summary>
-        /// 高级功能设置。
-        /// </summary>
-        public DataAdvancedSettings Advanced { get; set; } = new DataAdvancedSettings();
-    }
-
-    /// <summary>
-    /// 表单高级功能设置。
-    /// </summary>
-    public class DataAdvancedSettings
     {
         /// <summary>
         /// 数据标题设置。
@@ -192,6 +187,11 @@ namespace EIMSNext.Entities
     public class FieldProp
     {
         /// <summary>
+        /// 员工/部门组件的数据源范围。该配置保存在 FormContent.Items 中，运行时由服务端解析。
+        /// </summary>
+        public MemberSource? MemberSource { get; set; }
+
+        /// <summary>
         /// Radio/Checkbox/Select/Select2预设的选项
         /// </summary>
         public List<ValueOption>? Options { get; set; }
@@ -200,6 +200,11 @@ namespace EIMSNext.Entities
         /// </summary>
         public string? Format { get; set; }
         /// <summary>
+        /// 地址字段的层级：1=省 2=省-市 3=省-市-区 4=省-市-区-详细地址。
+        /// 服务端只做搬运，供前端筛选/查询条件按字段类型截断级联层级。
+        /// </summary>
+        public int? Level { get; set; }
+        /// <summary>
         /// 兼容部分子表单列把必填配置存放在 props.required 的情况。
         /// </summary>
         public bool? Required { get; set; }
@@ -207,6 +212,38 @@ namespace EIMSNext.Entities
         /// 值配置
         /// </summary>
         public ValueProp? ValueProp { get; set; }
+    }
+
+    /// <summary>
+    /// 员工/部门组件的数据源配置。
+    /// </summary>
+    public class MemberSource
+    {
+        /// <summary>范围模式：all 或 custom。</summary>
+        public string Mode { get; set; } = MemberSourceMode.All;
+
+        /// <summary>范围项之间为 OR 关系。</summary>
+        public IList<MemberSourceItem> Items { get; set; } = [];
+    }
+
+    /// <summary>成员数据源范围模式。</summary>
+    public static class MemberSourceMode
+    {
+        public const string All = "all";
+        public const string Custom = "custom";
+    }
+
+    /// <summary>成员数据源范围项。</summary>
+    public class MemberSourceItem
+    {
+        /// <summary>department、employeeGroup、employee 或 dynamic。</summary>
+        public string Type { get; set; } = string.Empty;
+
+        /// <summary>租户内实体 ID，或 dynamic 类型的 curuser/curdept。</summary>
+        public string Id { get; set; } = string.Empty;
+
+        /// <summary>部门项是否包含下级部门。</summary>
+        public bool Cascaded { get; set; }
     }
     /// <summary>
     /// 值选项

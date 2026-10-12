@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class EmployeeGroupCategoryController(IResolver resolver) : ApiControllerBase<EmployeeGroupCategoryApiService, EmployeeGroupCategory, EmployeeGroupCategoryViewModel>(resolver)
+	public class EmployeeGroupCategoryController(IResolver resolver) : ApiControllerBase<EmployeeGroupCategoryApiService, EmployeeGroupCategory>(resolver)
 	{
 		
 	}

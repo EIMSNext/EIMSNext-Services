@@ -58,9 +58,9 @@ namespace EIMSNext.Service.Host.Authorization
         public const IdentityType PublicBusinessUser = BusinessUser | IdentityType.Public;
 
         /// <summary>
-        /// 所有已认证用户（包括 NoCorp）
+        /// 所有已认证用户（包括 NoCorp 与平台管理员）
         /// </summary>
-        public const IdentityType Authenticated = BusinessUser | IdentityType.NoCorp;
+        public const IdentityType Authenticated = BusinessUser | IdentityType.NoCorp | IdentityType.PlatAdmin;
     }
 }
 

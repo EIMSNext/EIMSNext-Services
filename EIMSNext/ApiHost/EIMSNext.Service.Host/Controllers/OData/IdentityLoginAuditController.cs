@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers.OData
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-    public class IdentityLoginAuditController(IResolver resolver) : ReadOnlyODataController<IdentityLoginAuditApiService, IdentityLoginAudit, IdentityLoginAuditViewModel>(resolver)
+    public class IdentityLoginAuditController(IResolver resolver) : ReadOnlyODataController<IdentityLoginAuditApiService, IdentityLoginAudit>(resolver)
     {
 
     }

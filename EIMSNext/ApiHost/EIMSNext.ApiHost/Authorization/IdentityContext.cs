@@ -76,7 +76,10 @@ namespace EIMSNext.ApiHost.Authorization
                 _retrieved = true;
             }
 
-            if (idClaim == null && corpClaim == null)
+            // client_credentials 令牌没有 user 上下文：id claim 是占位值 "client"，
+            // 按 User 解析必然落空，必须改由 client_id 反查 Client 才能定出企业归属与身份类型。
+            var isClientIdentity = string.Equals(identityTypeClaim?.Value, IdentityType.Client.ToString(), StringComparison.OrdinalIgnoreCase);
+            if (isClientIdentity || (idClaim == null && corpClaim == null))
             {
                 var client_idClaim = httpContextAccessor.HttpContext?.User.FindFirst("client_id");
                 var clientId = client_idClaim?.Value ?? string.Empty;
@@ -85,7 +88,10 @@ namespace EIMSNext.ApiHost.Authorization
                     var client = resolver.GetService<EIMSNext.Entities.Client>().Get(clientId);
                     if (client != null)
                     {
-                        CurrentCorpId = client.CorpId ?? string.Empty;
+                        if (string.IsNullOrWhiteSpace(CurrentCorpId))
+                        {
+                            CurrentCorpId = client.CorpId ?? string.Empty;
+                        }
                         CurrentUserID = "system";
                         _type = IdentityType.Client;
                         _retrieved = true;
@@ -95,9 +101,13 @@ namespace EIMSNext.ApiHost.Authorization
 
             var serviceContext = resolver.GetServiceContext();
             serviceContext.AccessToken = AccessToken;
-            serviceContext.CorpId = CurrentCorpId;
+            // 先取用户与员工：这两个 getter 会触发 Retrieve()，把 CurrentCorpId 由 token 里的 corp claim
+            // 纠正为 UserCorp 中的默认企业。CorpId 必须在之后赋值，否则写入的 CorpId 取的是
+            // 未解析的 claim（为空或与默认企业不一致），造成新建实体与审计日志的 CorpId 落错企业。
             serviceContext.User = CurrentUser;
             serviceContext.Employee = CurrentEmployee;
+            serviceContext.CorpId = CurrentCorpId;
+            serviceContext.UserId = CurrentUserID;
             serviceContext.Operator = _type == IdentityType.System
                 ? new Operator("system", _systemObjectName, "System")
                 : CurrentEmployee?.ToOperator() ?? Operator.Empty;
@@ -212,13 +222,14 @@ namespace EIMSNext.ApiHost.Authorization
                         {
                             if (_employee != null)
                             {
-                                var adminGroupTypes = _resolver.GetService<TenantAdminGroup>().All()
-                                    .Where(x =>
-                                        x.CorpId == CurrentCorpId &&
-                                        !x.DeleteFlag &&
-                                        x.EmployeeIds.Contains(_employee.Id))
-                                    .Select(x => x.Type)
-                                    .ToList();
+                        // EmployeeIds 是 jsonb 数组列：通过 JsonbArrayContains 把「包含某员工」
+                        // 下推为 `jsonb @> jsonb_build_array(...)` 运算符，命中 EmployeeIds 上的
+                        // jsonb_path_ops GIN 索引，避免先拉全量再内存判定。
+                        var adminGroupTypes = _resolver.GetService<TenantAdminGroup>().All()
+                            .Where(x => x.CorpId == CurrentCorpId && !x.DeleteFlag
+                                && PgJsonFunctions.JsonbArrayContains(x.EmployeeIds, _employee.Id))
+                            .Select(x => x.Type)
+                            .ToList();
 
                                 if (adminGroupTypes.Contains(TenantAdminGroupType.System))
                                 {

@@ -1,3 +1,5 @@
+using EIMSNext.Core.Entities;
+using EIMSNext.Entities;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 
@@ -6,7 +8,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     /// Webhook字段别名模型配置
     /// </summary>
-    public class WebhookAliasModelConfiguration : CorpModelConfigurationBase<WebhookAliasViewModel, WebhookAliasRequest>
+    public class WebhookAliasModelConfiguration : CorpModelConfigurationBase<WebhookAlias, WebhookAliasRequest>
     {
     }
 }

@@ -101,7 +101,9 @@ namespace EIMSNext.Common
                 && IPAddress.TryParse(cidr[0], out var network)
                 && network.AddressFamily == AddressFamily.InterNetwork
                 && int.TryParse(cidr[1], out var prefix)
-                && prefix is >= 0 and <= 32;
+                // 前缀 0（0.0.0.0/0）覆盖全部 IPv4，等价于已被拒绝的通配符 *，
+                // 放行它就等于白名单形同虚设，因此与其他通配写法一并不予接受。
+                && prefix is >= 1 and <= 32;
         }
 
         private static bool MatchWildcard(string rule, string clientIp)

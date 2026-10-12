@@ -17,7 +17,7 @@ namespace EIMSNext.Service.Host.Controllers
     /// </summary>
     /// <param name="resolver"></param>
     [ApiVersion(1.0)]
-	public class WfDefinitionController(IResolver resolver) : ApiControllerBase<WfDefinitionApiService, Wf_Definition, WfDefinitionViewModel>(resolver)
+	public class WfDefinitionController(IResolver resolver) : ApiControllerBase<WfDefinitionApiService, Wf_Definition>(resolver)
 	{
 	    [HttpPost("CreateVersion")]
 	    public async Task<IActionResult> CreateVersion([FromBody] WfDefinitionVersionActionRequest request)
@@ -46,7 +46,7 @@ namespace EIMSNext.Service.Host.Controllers
         if (def == null ||
             def.FlowType != FlowType.EventFlow ||
             def.DeleteFlag ||
-            !string.Equals(def.CorpId, corpId, StringComparison.Ordinal))
+            !string.Equals(def.CorpId, corpId, StringComparison.OrdinalIgnoreCase))
 	        {
 	            return NotFound("智能助手不存在");
 	        }
