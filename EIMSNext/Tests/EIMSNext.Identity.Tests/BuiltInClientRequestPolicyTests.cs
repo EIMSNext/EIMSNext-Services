@@ -206,13 +206,13 @@ namespace EIMSNext.Identity.Tests
         }
 
         [TestMethod]
-        public async Task Login_RejectsPublicClientBeforeTokenHandlerRuns()
+        public async Task WebToken_RejectsPublicClientBeforeTokenHandlerRuns()
         {
             var handler = new RecordingTokenRequestHandler();
             var controller = CreateController(handler);
             controller.ControllerContext = new ControllerContext { HttpContext = CreateHttpContext("https://admin.eimsnext.com") };
 
-            var result = await controller.Login(CreateEncryptedBody(new Dictionary<string, string>
+            var result = await controller.WebToken(CreateEncryptedBody(new Dictionary<string, string>
             {
                 ["username"] = "admin@eimsnext.com",
                 ["password"] = "123456",
@@ -280,7 +280,7 @@ namespace EIMSNext.Identity.Tests
             var controller = CreateController(handler);
             controller.ControllerContext = new ControllerContext { HttpContext = CreateHttpContext("https://mobile.eimsnext.com") };
 
-            var result = await controller.Login(CreateEncryptedBody(new Dictionary<string, string>
+            var result = await controller.WebToken(CreateEncryptedBody(new Dictionary<string, string>
             {
                 ["username"] = "admin@eimsnext.com",
                 ["password"] = "123456",
@@ -318,7 +318,7 @@ namespace EIMSNext.Identity.Tests
 
         private static AuthorizationController CreateController(RecordingTokenRequestHandler handler)
         {
-            return new AuthorizationController(handler, CreatePolicy());
+            return new AuthorizationController(handler, CreatePolicy(), new FakeHostEnvironment(isDevelopment: true));
         }
 
         private static HttpRequest CreateRequest(string? origin = null)

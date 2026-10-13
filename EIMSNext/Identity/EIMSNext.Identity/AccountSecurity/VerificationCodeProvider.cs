@@ -11,6 +11,7 @@ public static class VerificationCodePurpose
     public const string Login = "login";
     public const string VerifyIdentity = "verify";
     public const string Bind = "bind";
+    public const string ResetPassword = "resetPassword";
 }
 
 public sealed record VerificationCodeSendResult(DateTimeOffset ExpiresAt, string? MockCode);

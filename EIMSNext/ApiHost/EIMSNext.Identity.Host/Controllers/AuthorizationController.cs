@@ -23,15 +23,18 @@ namespace EIMSNext.Identity.Host.Controllers
     {
         private readonly ITokenRequestHandler _tokenRequestHandler;
         private readonly IBuiltInClientRequestPolicy _builtInClientRequestPolicy;
+        private readonly IHostEnvironment _environment;
         private readonly PublicRateLimiter? _rateLimiter;
 
         public AuthorizationController(
             ITokenRequestHandler tokenRequestHandler,
             IBuiltInClientRequestPolicy builtInClientRequestPolicy,
+            IHostEnvironment environment,
             PublicRateLimiter? rateLimiter = null)
         {
             _tokenRequestHandler = tokenRequestHandler;
             _builtInClientRequestPolicy = builtInClientRequestPolicy;
+            _environment = environment;
             _rateLimiter = rateLimiter;
         }
 
@@ -68,10 +71,10 @@ namespace EIMSNext.Identity.Host.Controllers
             return await HandleTokenRequestAsync(request, cancellationToken);
         }
 
-        [Route("~/identity/login"), HttpPost]
+        [Route("~/web/token"), HttpPost]
         [Consumes("application/x-www-form-urlencoded")]
         [Produces("application/json")]
-        public async Task<IActionResult> Login([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
+        public async Task<IActionResult> WebToken([FromForm] EncryptedLoginRequest body, CancellationToken cancellationToken)
         {
             var fieldsResult = TokenRequestHelper.ParseEncryptedFields(body?.Encrypted);
             if (!fieldsResult.Succeeded)
@@ -80,7 +83,23 @@ namespace EIMSNext.Identity.Host.Controllers
             }
 
             var fields = fieldsResult.Fields!;
-            if (!fields.TryGetValue("username", out var username) || string.IsNullOrWhiteSpace(username) ||
+            var grantType = fields.TryGetValue("grant_type", out var grantTypeValue) && !string.IsNullOrWhiteSpace(grantTypeValue)
+                ? grantTypeValue
+                : GrantTypes.Password;
+
+            if (string.Equals(grantType, CustomGrantType.AuthorizationCode, StringComparison.Ordinal))
+            {
+                // 授权码换 token：只要求 code，不携带用户名密码
+                if (!fields.TryGetValue("code", out var codeValue) || string.IsNullOrWhiteSpace(codeValue))
+                {
+                    return BadRequest(new OpenIddictResponse
+                    {
+                        Error = Errors.InvalidRequest,
+                        ErrorDescription = "The code field is required."
+                    });
+                }
+            }
+            else if (!fields.TryGetValue("username", out var username) || string.IsNullOrWhiteSpace(username) ||
                 !fields.TryGetValue("password", out var password))
             {
                 return BadRequest(new OpenIddictResponse
@@ -98,13 +117,41 @@ namespace EIMSNext.Identity.Host.Controllers
             }
 
             var request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value)));
-            request.GrantType = fields.TryGetValue("grant_type", out var grantType) && !string.IsNullOrWhiteSpace(grantType) ? grantType : GrantTypes.Password;
-            request.Username = username;
-            request.Password = password;
+            request.GrantType = grantType;
+            fields.TryGetValue("username", out var usernameValue);
+            fields.TryGetValue("password", out var passwordValue);
+            request.Username = usernameValue;
+            request.Password = passwordValue;
             request.ClientId = clientId;
             request.Scope = fields.TryGetValue("scope", out var scope) ? scope : null;
 
-            return await HandleTokenRequestAsync(request, cancellationToken, username);
+            return await HandleTokenRequestAsync(request, cancellationToken, grantType == GrantTypes.Password ? usernameValue : null);
+        }
+
+        /// <summary>
+        /// 开发环境专用明文登录：免加密、免 client_id，直接换 access_token，
+        /// 简化 API 单独调试时的 token 获取流程。不进 swagger，非 Development 环境返回 404。
+        /// 用法：POST /dev/token -d "username=..&password=.."（grant_type 忽略，服务端强制 password）
+        /// </summary>
+        [HttpPost("~/dev/token")]
+        [Consumes("application/x-www-form-urlencoded")]
+        [Produces("application/json")]
+        [ApiExplorerSettings(IgnoreApi = true)]
+        public async Task<IActionResult> DevToken(CancellationToken cancellationToken)
+        {
+            if (!_environment.IsDevelopment())
+            {
+                return NotFound();
+            }
+
+            var request = HttpContext.GetOpenIddictServerRequest();
+            if (request == null || string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password))
+            {
+                return CreateErrorResult(Errors.InvalidRequest, "username and password are required.");
+            }
+
+            request.ClientId = InternalClients.WebClientId;
+            return await HandleTokenRequestAsync(request, cancellationToken, request.Username);
         }
 
         [Route("~/public/token"), HttpPost]

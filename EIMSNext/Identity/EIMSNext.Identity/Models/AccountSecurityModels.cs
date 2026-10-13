@@ -52,6 +52,15 @@ namespace EIMSNext.Identity.AccountSecurity
         public string ConfirmPassword { get; set; } = "";
     }
 
+    public class ResetPasswordRequest
+    {
+        public string Type { get; set; } = "";
+        public string Target { get; set; } = "";
+        public string Code { get; set; } = "";
+        public string NewPassword { get; set; } = "";
+        public string ConfirmPassword { get; set; } = "";
+    }
+
     public class RegisterRequest
     {
         public string Type { get; set; } = "";

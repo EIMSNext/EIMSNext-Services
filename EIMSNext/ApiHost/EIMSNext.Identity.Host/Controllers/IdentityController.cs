@@ -1,6 +1,7 @@
 using EIMSNext.Identity.AccountSecurity;
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
+using EIMSNext.Identity.Utilities;
 using EIMSNext.ApiCore;
 using EIMSNext.ApiCore.RateLimiting;
 using Microsoft.AspNetCore.Authorization;
@@ -14,21 +15,108 @@ namespace EIMSNext.Identity.Host.Controllers
     [ApiController]
     public class IdentityController : ControllerBase
     {
+        /// <summary>门户登录授权码有效期（秒）</summary>
+        private const int LoginCodeTtlSeconds = 60;
+
         private readonly IAccountSecurityService _accountSecurityService;
         private readonly ILogoutTokenStore _logoutTokenStore;
         private readonly ILogger<IdentityController> _logger;
         private readonly VerificationCodeRateLimiter _verificationCodeRateLimiter;
+        private readonly IUserService _userService;
+        private readonly IAuthorizationCodeStore _authorizationCodeStore;
+        private readonly IBuiltInClientRequestPolicy _builtInClientRequestPolicy;
+        private readonly PublicRateLimiter? _rateLimiter;
 
         public IdentityController(
             IAccountSecurityService accountSecurityService,
             ILogoutTokenStore logoutTokenStore,
             ILogger<IdentityController> logger,
-            VerificationCodeRateLimiter verificationCodeRateLimiter)
+            VerificationCodeRateLimiter verificationCodeRateLimiter,
+            IUserService userService,
+            IAuthorizationCodeStore authorizationCodeStore,
+            IBuiltInClientRequestPolicy builtInClientRequestPolicy,
+            PublicRateLimiter? rateLimiter = null)
         {
             _accountSecurityService = accountSecurityService;
             _logoutTokenStore = logoutTokenStore;
             _logger = logger;
             _verificationCodeRateLimiter = verificationCodeRateLimiter;
+            _userService = userService;
+            _authorizationCodeStore = authorizationCodeStore;
+            _builtInClientRequestPolicy = builtInClientRequestPolicy;
+            _rateLimiter = rateLimiter;
+        }
+
+        /// <summary>
+        /// 门户密码登录签发一次性授权码（code 换 token 的凭证，60 秒有效、单次使用）。
+        /// </summary>
+        [Route("identity/authorizeCode"), HttpPost]
+        [Consumes("application/x-www-form-urlencoded")]
+        public async Task<IActionResult> AuthorizeCode([FromForm] EncryptedLoginRequest body)
+        {
+            var fieldsResult = TokenRequestHelper.ParseEncryptedFields(TokenRequestHelper.UnscrambleEncrypted(body?.Encrypted));
+            if (!fieldsResult.Succeeded)
+            {
+                return BadRequest(new { message = fieldsResult.ErrorDescription });
+            }
+
+            var fields = fieldsResult.Fields!;
+            if (!fields.TryGetValue("username", out var username) || string.IsNullOrWhiteSpace(username) ||
+                !fields.TryGetValue("password", out var password) || string.IsNullOrWhiteSpace(password))
+            {
+                return BadRequest(new { message = "用户名和密码不能为空。" });
+            }
+
+            var clientId = fields.TryGetValue("client_id", out var clientIdValue) ? clientIdValue : null;
+            var validation = _builtInClientRequestPolicy.ValidateLogin(clientId, Request);
+            if (!validation.Succeeded)
+            {
+                return BadRequest(new { message = validation.ErrorDescription });
+            }
+
+            var user = _userService.Validate(username, password);
+            if (user == null)
+            {
+                return await RejectLoginFailureAsync(username);
+            }
+
+            var code = await _authorizationCodeStore.IssueAsync(user.Id, username, clientId, TimeSpan.FromSeconds(LoginCodeTtlSeconds));
+            return Ok(new { code, expires_in = LoginCodeTtlSeconds });
+        }
+
+        /// <summary>
+        /// 已登录会话换取授权码：三方登录回调页持有 access_token 时，用它换 code 回传调用方，
+        /// 避免 access_token 出现在跨源回跳 URL 上。
+        /// </summary>
+        [Authorize]
+        [Route("identity/authorizeCodeSession"), HttpPost]
+        public async Task<IActionResult> AuthorizeCodeSession()
+        {
+            var userId = GetCurrentUserId();
+            var user = _userService.FindById(userId);
+            if (user == null)
+            {
+                return Unauthorized();
+            }
+
+            var code = await _authorizationCodeStore.IssueAsync(user.Id, user.Name, InternalClients.WebClientId, TimeSpan.FromSeconds(LoginCodeTtlSeconds));
+            return Ok(new { code, expires_in = LoginCodeTtlSeconds });
+        }
+
+        /// <summary>密码登录失败：按登录限流口径计数，超限返回 429。</summary>
+        private async Task<IActionResult> RejectLoginFailureAsync(string username)
+        {
+            if (_rateLimiter != null)
+            {
+                var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
+                var rate = await _rateLimiter.CheckAsync("login", username, ip);
+                if (!rate.Allowed)
+                {
+                    return StatusCode(StatusCodes.Status429TooManyRequests, new { message = "登录失败次数过多，请稍后再试。" });
+                }
+            }
+
+            return BadRequest(new { message = "用户不存在或密码错误" });
         }
 
         /// <summary>
@@ -157,6 +245,44 @@ namespace EIMSNext.Identity.Host.Controllers
             }
 
             return Ok();
+        }
+
+        /// <summary>
+        /// 忘记密码：向已注册的手机/邮箱发送重置验证码（目标不存在时静默返回，防账号探测）。
+        /// </summary>
+        [Route("identity/sendResetCode"), HttpPost]
+        public async Task<IActionResult> SendResetCode([FromBody] SendRegCodeRequest request)
+        {
+            try
+            {
+                if (request != null && (await IsCodeSendAllowedAsync("resetPassword", request.Target)).Allowed)
+                {
+                    await _accountSecurityService.SendResetCodeAsync(request);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Reset password verification code request rejected");
+            }
+
+            return Ok();
+        }
+
+        /// <summary>
+        /// 忘记密码：凭重置验证码免登录重置密码。
+        /// </summary>
+        [Route("identity/resetPassword"), HttpPost]
+        public async Task<IActionResult> ResetPassword([FromBody] ResetPasswordRequest request)
+        {
+            try
+            {
+                await _accountSecurityService.ResetPasswordAsync(request);
+                return Ok(new { success = true });
+            }
+            catch (InvalidOperationException ex)
+            {
+                return BadRequest(new { message = ex.Message });
+            }
         }
 
         private Task<VerificationCodeRateLimitResult> IsCodeSendAllowedAsync(string? purpose, string? target)

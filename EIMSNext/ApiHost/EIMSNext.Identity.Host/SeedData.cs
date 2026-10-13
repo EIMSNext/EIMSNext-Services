@@ -16,17 +16,13 @@ namespace EIMSNext.Identity.Host
                     RequireClientSecret = false,
                     AllowedGrantTypes =
                     [
-                        new ClientGrantType { GrantType = "password" },
-                        new ClientGrantType { GrantType = CustomGrantType.VerificationCode },
-                        new ClientGrantType { GrantType = CustomGrantType.SingleSignOn },
-                        new ClientGrantType { GrantType = CustomGrantType.Integration }
+                        "password",
+                        CustomGrantType.VerificationCode,
+                        CustomGrantType.SingleSignOn,
+                        CustomGrantType.Integration,
+                        CustomGrantType.AuthorizationCode
                     ],
-                    AllowedScopes =
-                    [
-                        new ClientScope { Scope = "openid" },
-                        new ClientScope { Scope = "profile" },
-                        new ClientScope { Scope = "api.readwrite" }
-                    ],
+                    AllowedScopes = ["openid", "profile", "api.readwrite"],
                     AccessTokenLifetime = Constants.TokenLifetime_Default,
                     IdentityTokenLifetime = Constants.TokenLifetime_Default
                 },

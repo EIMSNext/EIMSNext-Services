@@ -65,6 +65,7 @@ namespace EIMSNext.Identity.Extensions
             services.AddScoped<IIntegrationAuthService, IntegrationAuthService>();
             services.AddScoped<IIntegrationProviderResolver, IntegrationProviderResolver>();
             services.AddScoped<IIdentityLoginAuditService, IdentityLoginAuditService>();
+            services.AddSingleton<IAuthorizationCodeStore, AuthorizationCodeStore>();
             services.AddSingleton<WeChatOpenClient>();
             services.AddSingleton<WxWorkClient>();
             services.AddSingleton<DingTalkClient>();
@@ -76,6 +77,7 @@ namespace EIMSNext.Identity.Extensions
             services.AddScoped<ITokenGrantHandler, PublicTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, SystemTokenGrantHandler>();
             services.AddScoped<ITokenGrantHandler, ClientCredentialsTokenGrantHandler>();
+            services.AddScoped<ITokenGrantHandler, AuthorizationCodeTokenGrantHandler>();
             services.AddScoped<ITokenRequestHandler, TokenRequestHandler>();
 
             var certificatePath = Path.Combine(contentRootPath, configuration.GetSection("Certificates:CerPath").Value!);
@@ -91,7 +93,7 @@ namespace EIMSNext.Identity.Extensions
                     var issuerValue = configuration.GetSection("IdentityHost:Issuer").Value
                         ?? "https://identity.eimsnext.com/issuer";
                     options.SetIssuer(issuerValue);
-                    options.SetTokenEndpointUris("connect/token", "identity/login", "public/token", "system/token");
+                    options.SetTokenEndpointUris("connect/token", "web/token", "dev/token", "public/token", "system/token");
                     options.RegisterScopes(
                         Scopes.OpenId,
                         Scopes.Profile,
@@ -108,6 +110,7 @@ namespace EIMSNext.Identity.Extensions
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.Integration);
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.Public);
                     options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.System);
+                    options.AllowCustomFlow(EIMSNext.Entities.CustomGrantType.AuthorizationCodeAlias);
 
                     options.EnableDegradedMode();
                     options.AcceptAnonymousClients();
@@ -131,7 +134,17 @@ namespace EIMSNext.Identity.Extensions
                         builder.UseInlineHandler(context =>
                         {
                             var path = context.RequestUri?.AbsolutePath;
-                            if (!string.Equals(path, "/identity/login", StringComparison.OrdinalIgnoreCase) &&
+                            if (string.Equals(path, "/dev/token", StringComparison.OrdinalIgnoreCase))
+                            {
+                                // /dev/token 忽略表单 grant_type，与 client_id 一样由服务端强制为 password
+                                var loginFields = context.Request!.GetParameters()
+                                    .ToDictionary(p => p.Key, p => (string?)p.Value.ToString());
+                                loginFields["grant_type"] = GrantTypes.Password;
+                                context.Request = TokenRequestHelper.CreateRequest(loginFields);
+                                return default;
+                            }
+
+                            if (!string.Equals(path, "/web/token", StringComparison.OrdinalIgnoreCase) &&
                                 !string.Equals(path, "/public/token", StringComparison.OrdinalIgnoreCase))
                             {
                                 return default;
@@ -146,11 +159,19 @@ namespace EIMSNext.Identity.Extensions
                             }
 
                             var fields = parsed.Fields!;
-                            if (string.Equals(path, "/identity/login", StringComparison.OrdinalIgnoreCase))
+                            if (string.Equals(path, "/web/token", StringComparison.OrdinalIgnoreCase))
                             {
                                 if (!fields.TryGetValue("grant_type", out var grantType) || string.IsNullOrWhiteSpace(grantType))
                                 {
                                     fields["grant_type"] = GrantTypes.Password;
+                                }
+
+                                // authorization_code 是 OAuth2 标准名，OpenIddict 校验管线按标准流处理会失败；
+                                // 改写为内部别名仅供管线校验，真实 grant_type 由 web/token MVC 端点
+                                // 从 encrypted 载荷重新解析后按前缀分发（见 CustomGrantType.AuthorizationCodeAlias）
+                                if (string.Equals(fields["grant_type"], EIMSNext.Entities.CustomGrantType.AuthorizationCode, StringComparison.Ordinal))
+                                {
+                                    fields["grant_type"] = EIMSNext.Entities.CustomGrantType.AuthorizationCodeAlias;
                                 }
                             }
                             else

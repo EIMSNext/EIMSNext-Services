@@ -14,6 +14,33 @@ namespace EIMSNext.Identity.Utilities
 
     public static class TokenRequestHelper
     {
+        /// <summary>
+        /// authorizeCode 请求 encrypted 的混淆变体还原：前端把 base64 真实前缀
+        /// <c>eyJ</c>（即 <c>{"</c> 的编码）替换为 3 位随机数，并去掉末尾 = 补位。
+        /// 还原规则：前 3 位是数字则换回 eyJ；按长度重新补齐 =（长度 %4==1 属非法输入，
+        /// 原样返回交由 ParseEncryptedFields 报错）。
+        /// </summary>
+        public static string? UnscrambleEncrypted(string? encrypted)
+        {
+            if (string.IsNullOrWhiteSpace(encrypted))
+            {
+                return encrypted;
+            }
+
+            var value = encrypted.Trim();
+            if (value.Length >= 3 && char.IsAsciiDigit(value[0]) && char.IsAsciiDigit(value[1]) && char.IsAsciiDigit(value[2]))
+            {
+                value = "eyJ" + value[3..];
+            }
+
+            switch (value.Length % 4)
+            {
+                case 2: return value + "==";
+                case 3: return value + "=";
+                default: return value;
+            }
+        }
+
         public static EncryptedFieldsParseResult ParseEncryptedFields(string? encrypted)
         {
             if (string.IsNullOrWhiteSpace(encrypted))

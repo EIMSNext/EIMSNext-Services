@@ -194,6 +194,179 @@ namespace EIMSNext.Identity.Tests
             Assert.AreEqual("新密码需包含大写字母、小写字母、数字、特殊字符中的至少三种", ex.Message);
         }
 
+        [TestMethod]
+        public async Task ResetPasswordAsync_ResetsPassword_WithValidPhoneCode()
+        {
+            using var dbContext = new FakeIdentityDbContext(
+            [
+                new User { Id = "user-1", Phone = "13800138000", Password = HKH.Common.Security.BCrypt.HashPassword("Old123!!") }
+            ]);
+            var service = CreateService(dbContext);
+            var code = (await service.SendResetCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000"
+            })).MockCode!;
+
+            await service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = code,
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123!"
+            });
+
+            var user = dbContext.Users.Single();
+            Assert.IsTrue(HKH.Common.Security.BCrypt.Verify("Strong123!", user.Password));
+            Assert.IsFalse(HKH.Common.Security.BCrypt.Verify("Old123!!", user.Password));
+        }
+
+        [TestMethod]
+        public async Task ResetPasswordAsync_ResetsPassword_WithValidEmailCode()
+        {
+            using var dbContext = new FakeIdentityDbContext(
+            [
+                new User { Id = "user-1", Email = "tester@example.com", Password = HKH.Common.Security.BCrypt.HashPassword("Old123!!") }
+            ]);
+            var service = CreateService(dbContext);
+            var code = (await service.SendResetCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Email,
+                Target = "tester@example.com"
+            })).MockCode!;
+
+            await service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Email,
+                Target = "tester@example.com",
+                Code = code,
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123!"
+            });
+
+            Assert.IsTrue(HKH.Common.Security.BCrypt.Verify("Strong123!", dbContext.Users.Single().Password));
+        }
+
+        [TestMethod]
+        public async Task ResetPasswordAsync_Throws_WhenCodeIsWrong()
+        {
+            using var dbContext = new FakeIdentityDbContext(
+            [
+                new User { Id = "user-1", Phone = "13800138000", Password = HKH.Common.Security.BCrypt.HashPassword("Old123!!") }
+            ]);
+            var service = CreateService(dbContext);
+            await service.SendResetCodeAsync(new SendRegCodeRequest { Type = PinCodeTargetType.Phone, Target = "13800138000" });
+
+            var ex = await AssertThrowsAsync<InvalidOperationException>(() => service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = "000000",
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123!"
+            }));
+
+            Assert.AreEqual("验证码错误", ex.Message);
+            Assert.IsTrue(HKH.Common.Security.BCrypt.Verify("Old123!!", dbContext.Users.Single().Password));
+        }
+
+        [TestMethod]
+        public async Task ResetPasswordAsync_DoesNotConsumeCode_WhenPasswordInvalid()
+        {
+            using var dbContext = new FakeIdentityDbContext(
+            [
+                new User { Id = "user-1", Phone = "13800138000", Password = HKH.Common.Security.BCrypt.HashPassword("Old123!!") }
+            ]);
+            var service = CreateService(dbContext);
+            var code = (await service.SendResetCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000"
+            })).MockCode!;
+
+            await AssertThrowsAsync<InvalidOperationException>(() => service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = code,
+                NewPassword = "weak",
+                ConfirmPassword = "weak"
+            }));
+
+            // 密码修正后同一验证码仍可用
+            await service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = code,
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123!"
+            });
+            Assert.IsTrue(HKH.Common.Security.BCrypt.Verify("Strong123!", dbContext.Users.Single().Password));
+        }
+
+        [TestMethod]
+        public async Task ResetPasswordAsync_Throws_WhenConfirmPasswordMismatch()
+        {
+            using var dbContext = new FakeIdentityDbContext(
+            [
+                new User { Id = "user-1", Phone = "13800138000", Password = HKH.Common.Security.BCrypt.HashPassword("Old123!!") }
+            ]);
+            var service = CreateService(dbContext);
+            var code = (await service.SendResetCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000"
+            })).MockCode!;
+
+            var ex = await AssertThrowsAsync<InvalidOperationException>(() => service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = code,
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123@"
+            }));
+
+            Assert.AreEqual("两次输入的新密码不一致", ex.Message);
+        }
+
+        [TestMethod]
+        public async Task SendResetCodeAsync_DoesNotSend_WhenUserMissing()
+        {
+            using var dbContext = new FakeIdentityDbContext();
+            var service = CreateService(dbContext);
+
+            var result = await service.SendResetCodeAsync(new SendRegCodeRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000"
+            });
+
+            Assert.IsNull(result.MockCode);
+        }
+
+        [TestMethod]
+        public async Task ResetPasswordAsync_Throws_WhenUserMissing()
+        {
+            using var dbContext = new FakeIdentityDbContext();
+            var provider = new MockVerificationCodeProvider();
+            var service = new AccountSecurityService(dbContext, new MemoryCache(new MemoryCacheOptions()), provider);
+            var code = provider.Send(VerificationCodePurpose.ResetPassword, "13800138000").MockCode!;
+
+            var ex = await AssertThrowsAsync<InvalidOperationException>(() => service.ResetPasswordAsync(new ResetPasswordRequest
+            {
+                Type = PinCodeTargetType.Phone,
+                Target = "13800138000",
+                Code = code,
+                NewPassword = "Strong123!",
+                ConfirmPassword = "Strong123!"
+            }));
+
+            Assert.AreEqual("账号不存在", ex.Message);
+        }
+
         private static AccountSecurityService CreateService(FakeIdentityDbContext dbContext)
         {
             return new AccountSecurityService(dbContext, new MemoryCache(new MemoryCacheOptions()));

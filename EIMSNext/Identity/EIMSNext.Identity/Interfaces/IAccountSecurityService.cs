@@ -6,6 +6,8 @@ namespace EIMSNext.Identity.Interfaces
     {
         Task<VerificationCodeSendResult> SendRegCodeAsync(SendRegCodeRequest request);
         Task<VerificationCodeSendResult> SendLoginCodeAsync(SendRegCodeRequest request);
+        Task<VerificationCodeSendResult> SendResetCodeAsync(SendRegCodeRequest request);
+        Task ResetPasswordAsync(ResetPasswordRequest request);
         Task RegisterAsync(RegisterRequest request);
         Task<VerificationCodeSendResult> SendPinCodeAsync(string userId, SendPinCodeRequest request);
         Task<VerifyIdentityResponse> VerifyIdentityAsync(string userId, VerifyIdentityRequest request);

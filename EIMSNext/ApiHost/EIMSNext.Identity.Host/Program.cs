@@ -150,7 +150,7 @@ void EnsureSeedData(IIdentityDbContext context, IConfiguration configuration)
     {
         foreach (var setting in SeedData.GetIntegrationLoginSettings())
         {
-            context.AddIntegrationLoginSetting(setting);
+            context.AddIntegrationLoginSetting(setting).GetAwaiter().GetResult();
         }
     }
 }

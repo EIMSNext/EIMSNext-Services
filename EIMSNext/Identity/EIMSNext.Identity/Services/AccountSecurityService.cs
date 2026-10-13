@@ -53,6 +53,63 @@ namespace EIMSNext.Identity.Services
                 : new VerificationCodeSendResult(DateTimeOffset.UtcNow.AddMinutes(5), null));
         }
 
+        public Task<VerificationCodeSendResult> SendResetCodeAsync(SendRegCodeRequest request)
+        {
+            if (!IsTargetType(request.Type))
+            {
+                throw new InvalidOperationException("验证码类型无效");
+            }
+
+            var target = NormalizeAndValidateTarget(request.Type, request.Target);
+            var userExists = request.Type == PinCodeTargetType.Phone
+                ? dbContext.Users.Any(x => !x.Disabled && x.Phone == target)
+                : dbContext.Users.Any(x => !x.Disabled && x.Email == target);
+
+            // 目标账号不存在时静默不发码，避免被用来探测账号是否注册
+            return Task.FromResult(userExists
+                ? verificationCodeProvider.Send(VerificationCodePurpose.ResetPassword, target)
+                : new VerificationCodeSendResult(DateTimeOffset.UtcNow.AddMinutes(5), null));
+        }
+
+        public async Task ResetPasswordAsync(ResetPasswordRequest request)
+        {
+            if (!IsTargetType(request.Type))
+            {
+                throw new InvalidOperationException("验证码类型无效");
+            }
+
+            var target = NormalizeAndValidateTarget(request.Type, request.Target);
+
+            if (string.IsNullOrWhiteSpace(request.NewPassword))
+            {
+                throw new InvalidOperationException("新密码不能为空");
+            }
+
+            if (request.NewPassword != request.ConfirmPassword)
+            {
+                throw new InvalidOperationException("两次输入的新密码不一致");
+            }
+
+            // 先校验密码规则再消费验证码，密码不合法时不烧掉一次性码
+            ValidatePasswordStrength(request.NewPassword, "新密码");
+
+            if (!verificationCodeProvider.TryConsume(VerificationCodePurpose.ResetPassword, target, request.Code))
+            {
+                throw new InvalidOperationException("验证码错误");
+            }
+
+            var user = request.Type == PinCodeTargetType.Phone
+                ? dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Phone == target)
+                : dbContext.Users.FirstOrDefault(x => !x.Disabled && x.Email == target);
+            if (user == null)
+            {
+                throw new InvalidOperationException("账号不存在");
+            }
+
+            user.Password = HKH.Common.Security.BCrypt.HashPassword(request.NewPassword);
+            await dbContext.UpdateUser(user);
+        }
+
         public async Task RegisterAsync(RegisterRequest request)
         {
             if (!IsTargetType(request.Type))
