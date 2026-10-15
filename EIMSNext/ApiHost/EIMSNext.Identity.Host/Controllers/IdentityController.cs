@@ -15,8 +15,10 @@ namespace EIMSNext.Identity.Host.Controllers
     [ApiController]
     public class IdentityController : ControllerBase
     {
-        /// <summary>门户登录授权码有效期（秒）</summary>
-        private const int LoginCodeTtlSeconds = 60;
+        /// <summary>授权码有效期（秒）：门户登录签发与已登录会话回传调用方共用。放行后调用方需等
+        /// 前端 bundle 加载完、守卫跑起来后才消费，冷启动/大 bundle 下可能跨数十秒，故放宽到 300 秒，
+        /// 避免码过期触发多跳自愈甚至落到手登。</summary>
+        private const int LoginCodeTtlSeconds = 300;
 
         private readonly IAccountSecurityService _accountSecurityService;
         private readonly ILogoutTokenStore _logoutTokenStore;
@@ -48,7 +50,7 @@ namespace EIMSNext.Identity.Host.Controllers
         }
 
         /// <summary>
-        /// 门户密码登录签发一次性授权码（code 换 token 的凭证，60 秒有效、单次使用）。
+        /// 门户密码登录签发一次性授权码（code 换 token 的凭证，300 秒有效、单次使用）。
         /// </summary>
         [Route("identity/authorizeCode"), HttpPost]
         [Consumes("application/x-www-form-urlencoded")]
