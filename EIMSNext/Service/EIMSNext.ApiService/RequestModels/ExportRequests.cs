@@ -92,6 +92,9 @@ namespace EIMSNext.ApiService.RequestModels
         /// <summary>参与搜索的字段列表。</summary>
         public List<string>? SearchFields { get; set; }
 
+        /// <summary>搜索模式：0=模糊（默认），非 0=精确（等值）。</summary>
+        public int SearchMode { get; set; }
+
         /// <summary>是否包含逻辑删除数据。</summary>
         public bool IncludeDeleted { get; set; }
     }

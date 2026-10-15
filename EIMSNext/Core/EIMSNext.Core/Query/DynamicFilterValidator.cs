@@ -21,6 +21,7 @@ public static class DynamicFilterValidator
         FilterOp.Ne,
         FilterOp.Nin,
         FilterOp.Text,
+        FilterOp.Exact,
         FilterOp.Empty,
         FilterOp.NotEmpty,
     };

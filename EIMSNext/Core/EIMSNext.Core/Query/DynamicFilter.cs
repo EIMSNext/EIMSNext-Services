@@ -85,6 +85,8 @@ namespace EIMSNext.Core.Query
         public const string Nin = "nin";
         /// <summary>文本搜索。</summary>
         public const string Text = "text";
+        /// <summary>精确搜索（等值语义，翻译为 GIN 可命中的 <c>@&gt;</c>；与 Text 平行、独立解析）。</summary>
+        public const string Exact = "exact";
         /// <summary>为空。</summary>
         public const string Empty = "empty";
         /// <summary>不为空。</summary>

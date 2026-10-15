@@ -1,3 +1,5 @@
+using System.Text.Json;
+
 namespace EIMSNext.Core.Query;
 
 /// <summary>
@@ -81,5 +83,81 @@ public static class PgJsonFunctions
             return false;
         }
         return jsonbColumn is IEnumerable<string> list && list.Contains(element);
+    }
+
+    /// <summary>
+    /// 判断 jsonb 列是否包含给定 jsonb 对象（精确查找 <c>FilterOp.Exact</c> 专用），下推为 <c>jsonb @&gt; jsonbObject</c>。
+    /// </summary>
+    /// <remarks>
+    /// 映射到中缀运算符而非函数调用，以命中 jsonb_path_ops GIN 索引
+    /// （jsonb_path_ops 只服务 <c>@&gt;</c>，Eq/Text 使用的 <c>@?</c> 不命中）。
+    /// 右侧是按字段路径预构造的 jsonb 对象字面量（值已在 C# 侧按 JSON 转义）；
+    /// 关系型提供程序由 HasTranslation 翻译成 SQL，不会执行此方法体；
+    /// 仅 InMemory 提供程序（单元测试）执行内存包含判定。
+    /// </remarks>
+    public static bool JsonbContains(object? jsonbColumn, string? jsonbObject)
+    {
+        if (jsonbObject is null || jsonbColumn is null)
+        {
+            return false;
+        }
+
+        try
+        {
+            using var left = JsonDocument.Parse(JsonSerializer.Serialize(jsonbColumn));
+            using var right = JsonDocument.Parse(jsonbObject);
+            return JsonbValueContains(left.RootElement, right.RootElement);
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>内存版 jsonb 包含判定（近似 PG <c>@&gt;</c> 语义，仅服务 InMemory 提供程序）。</summary>
+    private static bool JsonbValueContains(JsonElement container, JsonElement contained)
+    {
+        switch (contained.ValueKind)
+        {
+            case JsonValueKind.Object:
+                if (container.ValueKind != JsonValueKind.Object) return false;
+                foreach (var prop in contained.EnumerateObject())
+                {
+                    if (!container.TryGetProperty(prop.Name, out var value) || !JsonbValueContains(value, prop.Value))
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            case JsonValueKind.Array:
+                if (container.ValueKind != JsonValueKind.Array) return false;
+                foreach (var item in contained.EnumerateArray())
+                {
+                    var matched = false;
+                    foreach (var candidate in container.EnumerateArray())
+                    {
+                        if (JsonbValueContains(candidate, item))
+                        {
+                            matched = true;
+                            break;
+                        }
+                    }
+
+                    if (!matched) return false;
+                }
+
+                return true;
+            case JsonValueKind.Number:
+                if (container.ValueKind != JsonValueKind.Number) return false;
+                return decimal.TryParse(container.GetRawText(), System.Globalization.NumberStyles.Number,
+                           System.Globalization.CultureInfo.InvariantCulture, out var left)
+                    && decimal.TryParse(contained.GetRawText(), System.Globalization.NumberStyles.Number,
+                           System.Globalization.CultureInfo.InvariantCulture, out var right)
+                    && left == right;
+            default:
+                return container.ValueKind == contained.ValueKind
+                    && string.Equals(container.ToString(), contained.ToString(), StringComparison.Ordinal);
+        }
     }
 }

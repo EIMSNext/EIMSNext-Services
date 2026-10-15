@@ -30,6 +30,11 @@ namespace EIMSNext.Core.Query
         /// <summary>参与关键字搜索的动态字段名。</summary>
         public List<string>? SearchFields { get; set; }
 
+        /// <summary>
+        /// 搜索模式：0=模糊（默认），非 0=精确（等值，jsonb 走 <c>@&gt;</c> 命中 GIN）。
+        /// </summary>
+        public int SearchMode { get; set; }
+
         /// <summary>是否包含逻辑删除数据。</summary>
         public bool IncludeDeleted { get; set; }
 

@@ -1,5 +1,6 @@
 using System.Dynamic;
 
+using EIMSNext.Common;
 using EIMSNext.Core.Query;
 using EIMSNext.Entities;
 using EIMSNext.Persistence.PostgreSql;
@@ -89,6 +90,110 @@ public sealed class JsonbGinIndexTests
 
         await transaction.RollbackAsync();
     }
+
+    /// <summary>
+    /// 精确查找（FilterOp.Exact）应生成 @&gt; 运算符（而非 eims_json_object_contains 函数调用），
+    /// 且执行计划命中 IX_FormData_Data_Gin。@&gt; 是 jsonb_path_ops 唯一服务的运算符。
+    /// </summary>
+    [MSTest.TestMethod]
+    public async Task DynamicFilter_JsonbExact_UsesAtContainsAndGinIndex()
+    {
+        await using var db = TestDbFactory.Create();
+        await db.Database.OpenConnectionAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        var filter = new DynamicFilter { Field = "data.f_name", Op = FilterOp.Exact, Value = "x" };
+        var sql = db.Set<EIMSNext.Entities.FormData>()
+            .IgnoreQueryFilters()
+            .Where(filter.ToPredicate<EIMSNext.Entities.FormData>())
+            .Select(f => f.Id)
+            .ToQueryString();
+
+        MSTest.Assert.IsTrue(sql.Contains("@>"), $"应生成 @> 运算符，实际 SQL：\n{sql}");
+        MSTest.Assert.IsFalse(sql.Contains("eims_json_object_contains"), $"不应走函数调用，实际 SQL：\n{sql}");
+
+        var plan = await ExplainAsync(db, sql);
+        MSTest.Assert.IsTrue(plan.Contains("IX_FormData_Data_Gin"),
+            $"执行计划应命中 GIN 索引 IX_FormData_Data_Gin。SQL：\n{sql}\n执行计划：\n{plan}");
+
+        await transaction.RollbackAsync();
+    }
+
+    /// <summary>
+    /// 精确查找语义：只命中整值相等的行（模糊 Text 作对照），覆盖标量、数值、
+    /// 选项 label 对象、多选数组、子表行数组五种存储形态。
+    /// </summary>
+    [MSTest.TestMethod]
+    public async Task DynamicFilter_JsonbExact_MatchesWholeValueOnly()
+    {
+        await using var db = TestDbFactory.Create();
+        await db.Database.OpenConnectionAsync();
+        await using var transaction = await db.Database.BeginTransactionAsync();
+
+        db.Set<EIMSNext.Entities.FormData>().AddRange(
+        [
+            new()
+            {
+                Id = "exact-a",
+                CorpId = "exact-probe",
+                Data = new Dictionary<string, object?>
+                {
+                    ["f_name"] = "x",
+                    ["f_num"] = 100L,
+                    ["f_sel"] = new Dictionary<string, object?> { ["value"] = "a", ["label"] = "苹果" },
+                    ["f_multi"] = new List<object?>
+                        { new Dictionary<string, object?> { ["value"] = "a", ["label"] = "苹果" } },
+                    ["f_t"] = new List<object?> { new Dictionary<string, object?> { ["f_c"] = "v" } },
+                },
+            },
+            new()
+            {
+                Id = "exact-b",
+                CorpId = "exact-probe",
+                Data = new Dictionary<string, object?>
+                {
+                    ["f_name"] = "xy",
+                    ["f_num"] = 1000L,
+                    ["f_sel"] = new Dictionary<string, object?> { ["value"] = "ab", ["label"] = "苹果汁" },
+                    ["f_multi"] = new List<object?>
+                        { new Dictionary<string, object?> { ["value"] = "ab", ["label"] = "苹果汁" } },
+                    ["f_t"] = new List<object?> { new Dictionary<string, object?> { ["f_c"] = "w" } },
+                },
+            },
+        ]);
+        await db.SaveChangesAsync();
+
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a" },
+            FindIds(db, new DynamicFilter { Field = "data.f_name", Op = FilterOp.Exact, Value = "x" }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a", "exact-b" },
+            FindIds(db, new DynamicFilter { Field = "data.f_name", Op = FilterOp.Text, Value = "x" }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a", "exact-b" },
+            FindIds(db, new DynamicFilter { Field = "data.f_sel", Op = FilterOp.Text, Value = "苹果", Type = FieldType.Select1 }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a" },
+            FindIds(db, new DynamicFilter { Field = "data.f_sel", Op = FilterOp.Exact, Value = "苹果", Type = FieldType.Select1 }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a" },
+            FindIds(db, new DynamicFilter { Field = "data.f_multi", Op = FilterOp.Exact, Value = "苹果", Type = FieldType.Select2 }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a" },
+            FindIds(db, new DynamicFilter { Field = "data.f_num", Op = FilterOp.Exact, Value = "100", Type = FieldType.Number }));
+        MSTest.CollectionAssert.AreEquivalent(
+            new[] { "exact-a" },
+            FindIds(db, new DynamicFilter { Field = "data.f_t>f_c", Op = FilterOp.Exact, Value = "v", Type = FieldType.Input }));
+
+        await transaction.RollbackAsync();
+    }
+
+    private static List<string> FindIds(PostgreSqlDbContext db, DynamicFilter filter)
+        => db.Set<EIMSNext.Entities.FormData>()
+            .IgnoreQueryFilters()
+            .Where(filter.ToPredicate<EIMSNext.Entities.FormData>())
+            .Select(f => f.Id)
+            .ToList();
 
     private static async Task<string> ExplainAsync(PostgreSqlDbContext db, string sql)
     {

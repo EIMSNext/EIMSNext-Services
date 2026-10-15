@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Globalization;
 using System.Linq.Expressions;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using EIMSNext.Common;
@@ -189,12 +190,17 @@ namespace EIMSNext.Core.Query
                 return aggregated;
             }
 
-            var fieldPath = DynamicField.FormatFieldForFilter(filter.Field!, filter.Type);
+            var fieldPath = filter.Field!;
             var operation = filter.Op!.ToLowerInvariant();
-            if (string.Equals(operation, FilterOp.Text, StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(operation, FilterOp.Text, StringComparison.OrdinalIgnoreCase)
+                || string.Equals(operation, FilterOp.Exact, StringComparison.OrdinalIgnoreCase))
             {
+                // 搜索语义的字段改写（选项字段 → .label）必须在 .value/.id 补全之前：
+                // 顺序颠倒会把路径拼成 value.label 这种不存在的层。
                 fieldPath = FormatTextSearchField(fieldPath, filter.Type);
             }
+
+            fieldPath = DynamicField.FormatFieldForFilter(fieldPath, filter.Type);
 
             // 会在下面那条恒假分支里被直接吞掉，绕过 EnsureSafeValues 的拒绝逻辑。
             var values = NormalizeValues(filter.Value);
@@ -213,7 +219,8 @@ namespace EIMSNext.Core.Query
                     return BuildAddressPredicate(jsonbPath, operation, values);
                 }
 
-                return BuildJsonbPredicate(jsonbPath, operation, values);
+                // 子表（原始字段带 >）首段是行数组；改写后的 fieldPath 已不可靠，只认原始字段。
+                return BuildJsonbPredicate(jsonbPath, operation, values, filter.Type, filter.Field!.Contains('>'));
             }
 
             // 语义等价于「沿路径进入子表列」，路径拆分已由 PathAccessor 处理。
@@ -318,7 +325,9 @@ namespace EIMSNext.Core.Query
         private static Expression BuildJsonbPredicate(
             DynamicPathAccessor.JsonbPathResolution jsonb,
             string op,
-            List<object> values)
+            List<object> values,
+            string? fieldType,
+            bool arrayWrapped)
         {
             var container = jsonb.Container;
             var path = jsonb.Path;
@@ -344,6 +353,40 @@ namespace EIMSNext.Core.Query
                     // 字符串字面量的规则转义（反斜杠要写成 \\）。
                     var pattern = ToJsonPathStringLiteral(Regex.Escape(keyword));
                     return Match($"{path} ? (@ like_regex {pattern} flag \"i\")");
+                }
+
+                case FilterOp.Exact:
+                {
+                    var keyword = values.Count > 0 ? values[0]?.ToString() : null;
+                    if (string.IsNullOrWhiteSpace(keyword)) return Expression.Constant(true, typeof(bool));
+
+                    var keys = ParseJsonPathObjectKeys(path);
+                    if (keys is null)
+                    {
+                        // 含数组下标等结构 @> 表达不了，退回 @? 等值（语义正确，不走 GIN）。
+                        return Match($"{path} ? (@ == {ToJsonLiteral(keyword)})");
+                    }
+
+                    // 数值字段按数值字面量匹配：jsonb 里数字与字符串类型不同，字符串字面量命中不了数字存储。
+                    object leaf = keyword;
+                    if (string.Equals(fieldType, FieldType.Number, StringComparison.OrdinalIgnoreCase)
+                        && decimal.TryParse(keyword, NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+                    {
+                        leaf = number;
+                    }
+
+                    Expression? combined = null;
+                    foreach (var candidate in BuildExactContainmentCandidates(
+                                 keys, leaf, BuildExactLevelShapes(keys.Count, arrayWrapped, fieldType)))
+                    {
+                        var exactPredicate = Expression.Call(
+                            typeof(PgJsonFunctions).GetMethod(nameof(PgJsonFunctions.JsonbContains))!,
+                            container,
+                            Expression.Constant(JsonSerializer.Serialize(candidate), typeof(string)));
+                        combined = combined is null ? exactPredicate : Expression.OrElse(combined, exactPredicate);
+                    }
+
+                    return combined!;
                 }
 
                 case FilterOp.AllIn:
@@ -443,6 +486,98 @@ namespace EIMSNext.Core.Query
                 default:
                     return null;
             }
+        }
+
+        /// <summary>
+        /// 从 JSONPath 提取对象键段；含数组下标（<c>@&gt;</c> 无法表达）时返回 null。
+        /// </summary>
+        /// <returns>键段列表，形如 <c>["f_x", "label"]</c>；不可表达时为 null。</returns>
+        private static List<string>? ParseJsonPathObjectKeys(string jsonPath)
+        {
+            if (jsonPath.Length < 2 || jsonPath[0] != '$') return null;
+            var keys = new List<string>();
+            var i = 1;
+            while (i < jsonPath.Length)
+            {
+                if (jsonPath[i] != '.' || i + 1 >= jsonPath.Length || jsonPath[i + 1] != '"') return null;
+                i += 2;
+                var builder = new StringBuilder();
+                while (i < jsonPath.Length && jsonPath[i] != '"')
+                {
+                    if (jsonPath[i] == '\\' && i + 1 < jsonPath.Length) i++;
+                    builder.Append(jsonPath[i]);
+                    i++;
+                }
+
+                if (i >= jsonPath.Length) return null;
+                keys.Add(builder.ToString());
+                i++;
+            }
+
+            return keys.Count > 0 ? keys : null;
+        }
+
+        /// <summary>
+        /// 推断精确查找各层键的存储形态：true=数组、false=单对象/标量、null=不确定（生成两种变体 OR 兜底）。
+        /// </summary>
+        private static bool?[] BuildExactLevelShapes(int keyCount, bool arrayWrapped, string? fieldType)
+        {
+            var shapes = new bool?[keyCount];
+            Array.Fill(shapes, false);
+            if (keyCount == 0) return shapes;
+
+            if (arrayWrapped)
+            {
+                // 子表列：首段恒为行数组；列值形态按列类型判断。
+                shapes[0] = true;
+                if (keyCount > 1) shapes[1] = IsStructuredValueFieldType(fieldType) ? null : false;
+                return shapes;
+            }
+
+            // 选项/员工/部门字段的值是 {value,label}/{id,...} 结构，多值字段可能是数组，
+            // 形态不确定时生成两种变体；纯文本/数值/编号字段确定为标量。
+            shapes[0] = IsStructuredValueFieldType(fieldType) ? null : false;
+            return shapes;
+        }
+
+        /// <summary>值存储为对象/数组结构（而非标量）的字段类型。</summary>
+        private static bool IsStructuredValueFieldType(string? fieldType) =>
+            IsOptionFieldType(fieldType)
+            || fieldType == FieldType.Employee1
+            || fieldType == FieldType.Employee2
+            || fieldType == FieldType.Department1
+            || fieldType == FieldType.Department2;
+
+        /// <summary>
+        /// 构建精确查找的候选包含对象：自内向外逐层包裹，形态不确定（null）的层生成
+        /// 「单对象 + 单元素数组」两种变体，由调用方 OR 合并（GIN 可 Bitmap OR）。
+        /// </summary>
+        private static List<object> BuildExactContainmentCandidates(List<string> keys, object leaf, bool?[] levelShapes)
+        {
+            var nodes = new List<object> { leaf };
+            for (var i = keys.Count - 1; i >= 0; i--)
+            {
+                var shape = i < levelShapes.Length ? levelShapes[i] : false;
+                var next = new List<object>();
+                foreach (var node in nodes)
+                {
+                    if (shape is true)
+                    {
+                        next.Add(new Dictionary<string, object?> { [keys[i]] = new List<object?> { node } });
+                        continue;
+                    }
+
+                    next.Add(new Dictionary<string, object?> { [keys[i]] = node });
+                    if (shape is null)
+                    {
+                        next.Add(new Dictionary<string, object?> { [keys[i]] = new List<object?> { node } });
+                    }
+                }
+
+                nodes = next;
+            }
+
+            return nodes;
         }
 
         /// <summary>
@@ -571,6 +706,10 @@ namespace EIMSNext.Core.Query
                         return BuildBinary(body, staticType, op, values, elementType);
                     }
 
+                    return BuildEquality(body, staticType, values);
+
+                case FilterOp.Exact:
+                    // 精确查找走等值比较（可命中 btree），与 Text 的 ILIKE 函数包裹形成对照。
                     return BuildEquality(body, staticType, values);
 
                 case FilterOp.Gt:

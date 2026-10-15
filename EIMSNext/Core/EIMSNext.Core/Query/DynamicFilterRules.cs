@@ -9,7 +9,7 @@ public static class DynamicFilterRules
     private static readonly HashSet<string> ValueOperators = new(StringComparer.OrdinalIgnoreCase)
     {
         FilterOp.Eq, FilterOp.Ne, FilterOp.Gt, FilterOp.Gte, FilterOp.Lt, FilterOp.Lte,
-        FilterOp.In, FilterOp.Nin, FilterOp.AllIn, FilterOp.Between, FilterOp.Text,
+        FilterOp.In, FilterOp.Nin, FilterOp.AllIn, FilterOp.Between, FilterOp.Text, FilterOp.Exact,
     };
 
     /// <summary>移除缺少比较值的条件；allin 空数组保留并由翻译器生成 false。</summary>
@@ -28,7 +28,7 @@ public static class DynamicFilterRules
 
         var values = ToValues(filter.Value);
         if (op == FilterOp.AllIn) return Clone(filter, values, replaceValue: true);
-        if (op == FilterOp.Text && (values.Count == 0 || string.IsNullOrWhiteSpace(values[0]?.ToString()))) return null;
+        if ((op == FilterOp.Text || op == FilterOp.Exact) && (values.Count == 0 || string.IsNullOrWhiteSpace(values[0]?.ToString()))) return null;
         if (values.Count == 0 || op == FilterOp.Between && values.Count < 2) return null;
         return Clone(filter, values, replaceValue: true);
     }

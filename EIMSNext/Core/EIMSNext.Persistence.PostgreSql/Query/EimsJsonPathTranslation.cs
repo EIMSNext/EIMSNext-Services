@@ -29,7 +29,9 @@ public sealed class EimsNpgsqlQuerySqlGenerator(
             ? VisitJsonPathExists(jsonPathExists)
             : extensionExpression is JsonbArrayContainsExpression jsonbArrayContains
                 ? VisitJsonbArrayContains(jsonbArrayContains)
-                : base.VisitExtension(extensionExpression);
+                : extensionExpression is JsonbObjectContainsExpression jsonbObjectContains
+                    ? VisitJsonbObjectContains(jsonbObjectContains)
+                    : base.VisitExtension(extensionExpression);
 
     private Expression VisitJsonPathExists(JsonPathExistsExpression jsonPathExists)
     {
@@ -46,6 +48,14 @@ public sealed class EimsNpgsqlQuerySqlGenerator(
         Visit((Expression)jsonbArrayContains.Element);
         Sql.Append(")");
         return jsonbArrayContains;
+    }
+
+    private Expression VisitJsonbObjectContains(JsonbObjectContainsExpression jsonbObjectContains)
+    {
+        Visit((Expression)jsonbObjectContains.JsonbColumn);
+        Sql.Append(" @> ");
+        Visit((Expression)jsonbObjectContains.JsonbObject);
+        return jsonbObjectContains;
     }
 }
 
@@ -80,7 +90,9 @@ public sealed class EimsNpgsqlSqlNullabilityProcessor(
             ? VisitJsonPathExists(jsonPathExists, allowOptimizedExpansion, out nullable)
             : sqlExpression is JsonbArrayContainsExpression jsonbArrayContains
                 ? VisitJsonbArrayContains(jsonbArrayContains, allowOptimizedExpansion, out nullable)
-                : base.VisitCustomSqlExpression(sqlExpression, allowOptimizedExpansion, out nullable);
+                : sqlExpression is JsonbObjectContainsExpression jsonbObjectContains
+                    ? VisitJsonbObjectContains(jsonbObjectContains, allowOptimizedExpansion, out nullable)
+                    : base.VisitCustomSqlExpression(sqlExpression, allowOptimizedExpansion, out nullable);
 
     private SqlExpression VisitJsonPathExists(
         JsonPathExistsExpression jsonPathExists,
@@ -102,6 +114,17 @@ public sealed class EimsNpgsqlSqlNullabilityProcessor(
         var element = Visit(jsonbArrayContains.Element, allowOptimizedExpansion, out var elementNullable);
         nullable = columnNullable || elementNullable;
         return jsonbArrayContains.Update(column, element);
+    }
+
+    private SqlExpression VisitJsonbObjectContains(
+        JsonbObjectContainsExpression jsonbObjectContains,
+        bool allowOptimizedExpansion,
+        out bool nullable)
+    {
+        var column = Visit(jsonbObjectContains.JsonbColumn, allowOptimizedExpansion, out var columnNullable);
+        var jsonbObject = Visit(jsonbObjectContains.JsonbObject, allowOptimizedExpansion, out var objectNullable);
+        nullable = columnNullable || objectNullable;
+        return jsonbObjectContains.Update(column, jsonbObject);
     }
 }
 

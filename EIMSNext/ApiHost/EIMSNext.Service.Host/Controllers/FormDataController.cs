@@ -326,7 +326,7 @@ namespace EIMSNext.Service.Host.Controllers
         protected virtual DynamicFindOptions<FormData> FilterBySearch(DynamicFindOptions<FormData> query)
         {
             var formId = query.Scope?.FormId ?? FindFormId(query.Filter);
-            query.Filter = query.Filter.And(BuildSearchFilter(formId, query.Keyword, query.SearchFields));
+            query.Filter = query.Filter.And(BuildSearchFilter(formId, query.Keyword, query.SearchFields, query.SearchMode != 0));
             return query;
         }
 
@@ -400,7 +400,7 @@ namespace EIMSNext.Service.Host.Controllers
 
         protected virtual FormDataExportRequest FilterBySearch(FormDataExportRequest request)
         {
-            request.Filter = request.Filter.And(BuildSearchFilter(request.FormId, request.Keyword, request.SearchFields));
+            request.Filter = request.Filter.And(BuildSearchFilter(request.FormId, request.Keyword, request.SearchFields, request.SearchMode != 0));
             return request;
         }
 
@@ -1303,7 +1303,7 @@ namespace EIMSNext.Service.Host.Controllers
             return child?.Type == FieldType.DataSelect;
         }
 
-        private DynamicFilter? BuildSearchFilter(string? formId, string? keyword, IEnumerable<string>? searchFields)
+        private DynamicFilter? BuildSearchFilter(string? formId, string? keyword, IEnumerable<string>? searchFields, bool exactMatch = false)
         {
             var normalizedKeyword = keyword?.Trim();
             if (string.IsNullOrWhiteSpace(normalizedKeyword))
@@ -1340,7 +1340,7 @@ namespace EIMSNext.Service.Host.Controllers
             {
                 Field = Fields.IsSystemField(field) ? field : $"data.{field}",
                 Type = searchableMap[field],
-                Op = FilterOp.Text,
+                Op = exactMatch ? FilterOp.Exact : FilterOp.Text,
                 Value = normalizedKeyword,
             }));
         }

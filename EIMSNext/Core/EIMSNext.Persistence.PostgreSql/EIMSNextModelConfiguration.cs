@@ -100,6 +100,16 @@ public static class EIMSNextModelConfiguration
             .HasTranslation(args => new JsonbArrayContainsExpression(args[0], args[1]))
             .HasParameter("jsonbColumn").HasStoreType("jsonb");
 
+        // JsonbContains 翻译成 `jsonb @> <jsonb 对象>` 运算符：精确查找（FilterOp.Exact）专用，
+        // 与 JsonbArrayContains 同理必须生成运算符才能命中 jsonb_path_ops GIN 索引
+        // （Eq/Text 使用的 @? 不被 jsonb_path_ops 服务）。
+        var jsonbObjectContains = modelBuilder.HasDbFunction(() => PgJsonFunctions.JsonbContains(default!, default!))
+            .HasName("eims_json_object_contains")
+            .HasSchema("public")
+            .HasTranslation(args => new JsonbObjectContainsExpression(args[0], args[1]));
+        jsonbObjectContains.HasParameter("jsonbColumn").HasStoreType("jsonb");
+        jsonbObjectContains.HasParameter("jsonbObject").HasStoreType("jsonb");
+
         // 排序专用：返回 jsonb 而不是 text，避免数字退化成字典序（"10" < "9"）。
         // CLR 侧声明为 string 只是表达式树的载体；该调用只出现在 ORDER BY 里，
         // 不会投影回客户端，因此不涉及 jsonb → string 的反序列化。
