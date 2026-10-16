@@ -479,7 +479,11 @@ namespace EIMSNext.Flow.Core
 
         private async Task EnsureStartTaskLogAsync(WorkflowInstance workflowInstance, WfDataContext dataContext)
         {
-            var hasStartLog = _taskLogRepo.Find(x => x.DataId == dataContext.DataId && x.NodeType == WfNodeType.Start).Any();
+            var hasStartLog = _taskLogRepo.Find(x =>
+                x.CorpId == dataContext.CorpId
+                && x.FormId == dataContext.FormId
+                && x.DataId == dataContext.DataId
+                && x.NodeType == WfNodeType.Start).Any();
             if (hasStartLog)
             {
                 return;
@@ -574,7 +578,11 @@ namespace EIMSNext.Flow.Core
             List<Wf_TaskLog> logs;
             do
             {
-                logs = _taskLogRepo.Find(x => x.DataId == task.DataId && x.Round == round)
+                logs = _taskLogRepo.Find(x =>
+                        x.CorpId == task.CorpId
+                        && x.FormId == task.FormId
+                        && x.DataId == task.DataId
+                        && x.Round == round)
                     .OrderBy(x => x.ApprovalTime)
                     .ToList();
                 if (logs.Any(x => x.NodeId == startNodeId))

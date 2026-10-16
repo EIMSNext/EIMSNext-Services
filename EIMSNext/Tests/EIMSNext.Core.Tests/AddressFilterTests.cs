@@ -214,8 +214,8 @@ public sealed class AddressFilterTests
         MSTest.Assert.IsTrue(sql.Contains("@?"), $"应生成 @? 运算符，实际 SQL：\n{sql}");
 
         var plan = await ExplainAsync(db, sql);
-        MSTest.Assert.IsTrue(plan.Contains("IX_FormData_Data_Gin"),
-            $"执行计划应命中 GIN 索引。SQL：\n{sql}\n执行计划：\n{plan}");
+        MSTest.Assert.IsTrue(plan.Contains("Bitmap Index Scan"),
+            $"执行计划应命中 GIN 索引（分区表上索引名带分区前缀，断言扫描方式）。SQL：\n{sql}\n执行计划：\n{plan}");
 
         await transaction.RollbackAsync();
     }

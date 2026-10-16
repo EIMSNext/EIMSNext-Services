@@ -67,6 +67,76 @@ public static class PostgreSqlBaselineScript
         ["boolean"] = "false",
     };
 
+    /// <summary>分区策略。</summary>
+    private enum PartitionKind
+    {
+        Hash,
+        Range
+    }
+
+    /// <summary>单张分区表的分区定义。</summary>
+    /// <param name="Kind">哈希或范围分区。</param>
+    /// <param name="KeyColumn">一级分区键列。</param>
+    /// <param name="Modulus">哈希分区数。</param>
+    /// <param name="SubKey">二级分区键列（仅 FormData）。</param>
+    /// <param name="SubModulus">二级哈希分区数。</param>
+    /// <param name="RangeMonths">范围分区的月份数。</param>
+    private sealed record PartitionSpec(
+        PartitionKind Kind,
+        string KeyColumn,
+        int Modulus = 0,
+        string? SubKey = null,
+        int SubModulus = 0,
+        int RangeMonths = 0);
+
+    /// <summary>范围分区的时间锚点：从 2026-01 起 24 个月，之后由 default 分区兜底。</summary>
+    private const int RangeStartYear = 2026;
+    private const int RangeStartMonth = 1;
+    private const int RangeMonthCount = 24;
+
+    private static readonly PartitionSpec RangeMonthly =
+        new(PartitionKind.Range, "CreateTime", RangeMonths: RangeMonthCount);
+
+    /// <summary>
+    /// 分区表登记：表名 → 分区定义（与 <see cref="EIMSNextModelConfiguration"/> 里的复合主键一一对应）。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// PG 硬约束要求分区键包含在主键里，主键复合化在模型层完成；这里只负责把 EF 投影出的
+    /// 普通建表语句改写成分区父表（追加 <c>partition by</c> 子句）并生成子分区 DDL。
+    /// </para>
+    /// <para>
+    /// 布局（v3）：FormData 两级哈希 16×8——列表查询恒带 CorpId+FormId 可剪枝到叶；
+    /// FormDataChangeLog / Wf_TaskLog 单级哈希 16——高频的全局列表（已办/发起/抄送）永远没有
+    /// FormId，两级只放大分区对象数；log 组按 CreateTime 月度范围，过期分区可 detach + drop 归档。
+    /// </para>
+    /// </remarks>
+    private static readonly Dictionary<string, PartitionSpec> PartitionedTables = new(StringComparer.Ordinal)
+    {
+        ["FormData"] = new(PartitionKind.Hash, "CorpId", Modulus: 16, SubKey: "FormId", SubModulus: 8),
+        ["FormDataChangeLog"] = new(PartitionKind.Hash, "CorpId", Modulus: 16),
+        ["Wf_TaskLog"] = new(PartitionKind.Hash, "CorpId", Modulus: 16),
+        ["AuditLog"] = RangeMonthly,
+        ["Ef_RunLog"] = RangeMonthly,
+        ["Ef_RunLogNode"] = RangeMonthly,
+        ["WebPushLog"] = RangeMonthly,
+    };
+
+    /// <summary>范围分区表清单（<see cref="PartitionedTables"/> 中 Range 项），供分区预建作业消费。</summary>
+    public static IReadOnlyList<string> GetRangePartitionTables()
+        => PartitionedTables.Where(x => x.Value.Kind == PartitionKind.Range).Select(x => x.Key).ToList();
+
+    /// <summary>
+    /// 渲染某张范围分区表指定年月的预建分区 DDL（幂等）。
+    /// 命名与边界规则和基线脚本同源，预建作业与 001 再生成之间不会漂移。
+    /// </summary>
+    public static string RenderRangePartitionDdl(string table, int year, int month)
+    {
+        var (nextYear, nextMonth) = AddMonths(year, month, 1);
+        return $"create table if not exists \"{table}_{year}_{month:00}\" partition of \"{table}\" "
+            + $"for values from ({EpochMs(year, month)}) to ({EpochMs(nextYear, nextMonth)});";
+    }
+
     /// <summary>
     /// 渲染 <c>001_CreateTables.sql</c> 的完整内容（含文件头注释）。
     /// </summary>
@@ -77,16 +147,92 @@ public static class PostgreSqlBaselineScript
         var lines = new List<string>();
         AppendBlock(lines, CreateTablesHeader);
 
-        foreach (var (_, block) in tables)
+        foreach (var (table, block) in tables)
         {
             // 文件头与各表块之间、表块与表块之间一律空两行，与原有脚本的排版一致。
             lines.Add(string.Empty);
             lines.Add(string.Empty);
-            lines.AddRange(block);
+            lines.AddRange(PartitionedTables.TryGetValue(table, out var spec)
+                ? ApplyPartitioning(table, block, spec)
+                : block);
         }
 
         return ToPlatformNewLines(string.Join('\n', lines) + "\n");
     }
+
+    /// <summary>
+    /// 把单表建表块改写成「分区父表 + 子分区 DDL」。
+    /// </summary>
+    /// <remarks>
+    /// 主键约束行原样保留：分区键已复合进主键（<see cref="EIMSNextModelConfiguration"/>），
+    /// 满足 PG「分区键 ∈ 主键」的硬约束，无需删约束。
+    /// </remarks>
+    private static List<string> ApplyPartitioning(string table, List<string> block, PartitionSpec spec)
+    {
+        var result = new List<string>(block.Count);
+        foreach (var line in block)
+        {
+            if (line.TrimEnd() == ");")
+            {
+                result.Add(spec.Kind == PartitionKind.Hash
+                    ? $") partition by hash (\"{spec.KeyColumn}\");"
+                    : $") partition by range (\"{spec.KeyColumn}\");");
+                continue;
+            }
+
+            result.Add(line);
+        }
+
+        result.Add(string.Empty);
+        result.AddRange(RenderChildPartitions(table, spec));
+        return result;
+    }
+
+    /// <summary>渲染一张分区表的全部子分区 DDL。</summary>
+    private static IEnumerable<string> RenderChildPartitions(string table, PartitionSpec spec)
+    {
+        if (spec.Kind == PartitionKind.Range)
+        {
+            for (var month = 0; month < spec.RangeMonths; month++)
+            {
+                var (year, monthOfYear) = AddMonths(RangeStartYear, RangeStartMonth, month);
+                var (nextYear, nextMonth) = AddMonths(year, monthOfYear, 1);
+                var from = EpochMs(year, monthOfYear);
+                var to = EpochMs(nextYear, nextMonth);
+                yield return $"create table \"{table}_{year}_{monthOfYear:00}\" partition of \"{table}\" "
+                    + $"for values from ({from}) to ({to});";
+            }
+
+            // 锚点窗口之外的行（含时钟漂移与测试写入）落到 default 分区，避免插入直接报错。
+            yield return $"create table \"{table}_default\" partition of \"{table}\" default;";
+            yield break;
+        }
+
+        for (var remainder = 0; remainder < spec.Modulus; remainder++)
+        {
+            var child = $"{table}_p{remainder:00}";
+            yield return $"create table \"{child}\" partition of \"{table}\" "
+                + $"for values with (modulus {spec.Modulus}, remainder {remainder})"
+                + (spec.SubKey is null ? ";" : $" partition by hash (\"{spec.SubKey}\");");
+
+            if (spec.SubKey is null) continue;
+
+            for (var sub = 0; sub < spec.SubModulus; sub++)
+            {
+                yield return $"create table \"{child}_h{sub:00}\" partition of \"{child}\" "
+                    + $"for values with (modulus {spec.SubModulus}, remainder {sub});";
+            }
+        }
+    }
+
+    private static (int Year, int Month) AddMonths(int year, int month, int delta)
+    {
+        var total = (year * 12 + month - 1) + delta;
+        return (total / 12, total % 12 + 1);
+    }
+
+    private static long EpochMs(int year, int month)
+        => new DateTimeOffset(year, month, 1, 0, 0, 0, TimeSpan.Zero).ToUnixTimeMilliseconds();
 
     /// <summary>
     /// 渲染「模型声明索引」段的全部行（含首尾标记），供
@@ -373,6 +519,10 @@ public static class PostgreSqlBaselineScript
         --   3) 给 NOT NULL 的标量列补中立默认值（text '' / integer、bigint、numeric 0 / boolean false），
         --      便于手工和原生 SQL 插入；EF 写入时始终显式赋值，不依赖这些默认值。
         --      刻意不补的类型：jsonb、数组、uuid、时间戳 —— 补默认值会改变语义或直接非法。
+        --   4) 分区表改写（见 PostgreSqlBaselineScript.PartitionedTables）：FormData 两级哈希
+        --      16×8（CorpId→FormId）、FormDataChangeLog / Wf_TaskLog 单级哈希 16（CorpId）、
+        --      log 组按 CreateTime 月度范围 24 个月 + default 兜底。分区键已复合进各表主键，
+        --      与 EIMSNextModelConfiguration 的 HasKey 一一对应；索引见 002，建在父表上自动级联。
         --
         -- 重新生成（会同时刷新 002 的模型声明索引段）：
         --     置环境变量 EIMS_REGENERATE_BASELINE=1 后执行

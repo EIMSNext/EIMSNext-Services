@@ -9,6 +9,10 @@
 --   3) 给 NOT NULL 的标量列补中立默认值（text '' / integer、bigint、numeric 0 / boolean false），
 --      便于手工和原生 SQL 插入；EF 写入时始终显式赋值，不依赖这些默认值。
 --      刻意不补的类型：jsonb、数组、uuid、时间戳 —— 补默认值会改变语义或直接非法。
+--   4) 分区表改写（见 PostgreSqlBaselineScript.PartitionedTables）：FormData 两级哈希
+--      16×8（CorpId→FormId）、FormDataChangeLog / Wf_TaskLog 单级哈希 16（CorpId）、
+--      log 组按 CreateTime 月度范围 24 个月 + default 兜底。分区键已复合进各表主键，
+--      与 EIMSNextModelConfiguration 的 HasKey 一一对应；索引见 002，建在父表上自动级联。
 --
 -- 重新生成（会同时刷新 002 的模型声明索引段）：
 --     置环境变量 EIMS_REGENERATE_BASELINE=1 后执行
@@ -98,6 +102,7 @@ CREATE TABLE "AppTemplate" (
 
 CREATE TABLE "AuditLog" (
     "Id" citext COLLATE "C" not null default '',
+    "CreateTime" bigint not null default 0,
     "Action" integer not null default 0,
     "EntityType" citext,
     "DataId" citext COLLATE "C",
@@ -108,15 +113,40 @@ CREATE TABLE "AuditLog" (
     "UpdateExp" citext,
     "ClientIp" citext,
     "CreateBy" jsonb,
-    "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_AuditLog" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_AuditLog" PRIMARY KEY ("Id", "CreateTime")
+) partition by range ("CreateTime");
+
+create table "AuditLog_2026_01" partition of "AuditLog" for values from (1767225600000) to (1769904000000);
+create table "AuditLog_2026_02" partition of "AuditLog" for values from (1769904000000) to (1772323200000);
+create table "AuditLog_2026_03" partition of "AuditLog" for values from (1772323200000) to (1775001600000);
+create table "AuditLog_2026_04" partition of "AuditLog" for values from (1775001600000) to (1777593600000);
+create table "AuditLog_2026_05" partition of "AuditLog" for values from (1777593600000) to (1780272000000);
+create table "AuditLog_2026_06" partition of "AuditLog" for values from (1780272000000) to (1782864000000);
+create table "AuditLog_2026_07" partition of "AuditLog" for values from (1782864000000) to (1785542400000);
+create table "AuditLog_2026_08" partition of "AuditLog" for values from (1785542400000) to (1788220800000);
+create table "AuditLog_2026_09" partition of "AuditLog" for values from (1788220800000) to (1790812800000);
+create table "AuditLog_2026_10" partition of "AuditLog" for values from (1790812800000) to (1793491200000);
+create table "AuditLog_2026_11" partition of "AuditLog" for values from (1793491200000) to (1796083200000);
+create table "AuditLog_2026_12" partition of "AuditLog" for values from (1796083200000) to (1798761600000);
+create table "AuditLog_2027_01" partition of "AuditLog" for values from (1798761600000) to (1801440000000);
+create table "AuditLog_2027_02" partition of "AuditLog" for values from (1801440000000) to (1803859200000);
+create table "AuditLog_2027_03" partition of "AuditLog" for values from (1803859200000) to (1806537600000);
+create table "AuditLog_2027_04" partition of "AuditLog" for values from (1806537600000) to (1809129600000);
+create table "AuditLog_2027_05" partition of "AuditLog" for values from (1809129600000) to (1811808000000);
+create table "AuditLog_2027_06" partition of "AuditLog" for values from (1811808000000) to (1814400000000);
+create table "AuditLog_2027_07" partition of "AuditLog" for values from (1814400000000) to (1817078400000);
+create table "AuditLog_2027_08" partition of "AuditLog" for values from (1817078400000) to (1819756800000);
+create table "AuditLog_2027_09" partition of "AuditLog" for values from (1819756800000) to (1822348800000);
+create table "AuditLog_2027_10" partition of "AuditLog" for values from (1822348800000) to (1825027200000);
+create table "AuditLog_2027_11" partition of "AuditLog" for values from (1825027200000) to (1827619200000);
+create table "AuditLog_2027_12" partition of "AuditLog" for values from (1827619200000) to (1830297600000);
+create table "AuditLog_default" partition of "AuditLog" default;
 
 
 CREATE TABLE "Client" (
@@ -349,6 +379,7 @@ CREATE TABLE "ECoinPrice" (
 
 CREATE TABLE "Ef_RunLog" (
     "Id" citext COLLATE "C" not null default '',
+    "CreateTime" bigint not null default 0,
     "AppId" citext COLLATE "C" not null default '',
     "EventFlowId" citext COLLATE "C" not null default '',
     "EventFlowName" citext not null default '',
@@ -364,19 +395,45 @@ CREATE TABLE "Ef_RunLog" (
     "Success" boolean not null default false,
     "ErrMsg" citext not null default '',
     "CreateBy" jsonb,
-    "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_Ef_RunLog" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_Ef_RunLog" PRIMARY KEY ("Id", "CreateTime")
+) partition by range ("CreateTime");
+
+create table "Ef_RunLog_2026_01" partition of "Ef_RunLog" for values from (1767225600000) to (1769904000000);
+create table "Ef_RunLog_2026_02" partition of "Ef_RunLog" for values from (1769904000000) to (1772323200000);
+create table "Ef_RunLog_2026_03" partition of "Ef_RunLog" for values from (1772323200000) to (1775001600000);
+create table "Ef_RunLog_2026_04" partition of "Ef_RunLog" for values from (1775001600000) to (1777593600000);
+create table "Ef_RunLog_2026_05" partition of "Ef_RunLog" for values from (1777593600000) to (1780272000000);
+create table "Ef_RunLog_2026_06" partition of "Ef_RunLog" for values from (1780272000000) to (1782864000000);
+create table "Ef_RunLog_2026_07" partition of "Ef_RunLog" for values from (1782864000000) to (1785542400000);
+create table "Ef_RunLog_2026_08" partition of "Ef_RunLog" for values from (1785542400000) to (1788220800000);
+create table "Ef_RunLog_2026_09" partition of "Ef_RunLog" for values from (1788220800000) to (1790812800000);
+create table "Ef_RunLog_2026_10" partition of "Ef_RunLog" for values from (1790812800000) to (1793491200000);
+create table "Ef_RunLog_2026_11" partition of "Ef_RunLog" for values from (1793491200000) to (1796083200000);
+create table "Ef_RunLog_2026_12" partition of "Ef_RunLog" for values from (1796083200000) to (1798761600000);
+create table "Ef_RunLog_2027_01" partition of "Ef_RunLog" for values from (1798761600000) to (1801440000000);
+create table "Ef_RunLog_2027_02" partition of "Ef_RunLog" for values from (1801440000000) to (1803859200000);
+create table "Ef_RunLog_2027_03" partition of "Ef_RunLog" for values from (1803859200000) to (1806537600000);
+create table "Ef_RunLog_2027_04" partition of "Ef_RunLog" for values from (1806537600000) to (1809129600000);
+create table "Ef_RunLog_2027_05" partition of "Ef_RunLog" for values from (1809129600000) to (1811808000000);
+create table "Ef_RunLog_2027_06" partition of "Ef_RunLog" for values from (1811808000000) to (1814400000000);
+create table "Ef_RunLog_2027_07" partition of "Ef_RunLog" for values from (1814400000000) to (1817078400000);
+create table "Ef_RunLog_2027_08" partition of "Ef_RunLog" for values from (1817078400000) to (1819756800000);
+create table "Ef_RunLog_2027_09" partition of "Ef_RunLog" for values from (1819756800000) to (1822348800000);
+create table "Ef_RunLog_2027_10" partition of "Ef_RunLog" for values from (1822348800000) to (1825027200000);
+create table "Ef_RunLog_2027_11" partition of "Ef_RunLog" for values from (1825027200000) to (1827619200000);
+create table "Ef_RunLog_2027_12" partition of "Ef_RunLog" for values from (1827619200000) to (1830297600000);
+create table "Ef_RunLog_default" partition of "Ef_RunLog" default;
 
 
 CREATE TABLE "Ef_RunLogNode" (
     "Id" citext COLLATE "C" not null default '',
+    "CreateTime" bigint not null default 0,
     "RunLogId" citext COLLATE "C" not null default '',
     "EventFlowId" citext COLLATE "C" not null default '',
     "WfInstanceId" citext COLLATE "C" not null default '',
@@ -393,15 +450,40 @@ CREATE TABLE "Ef_RunLogNode" (
     "Summary" citext not null default '',
     "ExecTime" bigint not null default 0,
     "CreateBy" jsonb,
-    "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_Ef_RunLogNode" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_Ef_RunLogNode" PRIMARY KEY ("Id", "CreateTime")
+) partition by range ("CreateTime");
+
+create table "Ef_RunLogNode_2026_01" partition of "Ef_RunLogNode" for values from (1767225600000) to (1769904000000);
+create table "Ef_RunLogNode_2026_02" partition of "Ef_RunLogNode" for values from (1769904000000) to (1772323200000);
+create table "Ef_RunLogNode_2026_03" partition of "Ef_RunLogNode" for values from (1772323200000) to (1775001600000);
+create table "Ef_RunLogNode_2026_04" partition of "Ef_RunLogNode" for values from (1775001600000) to (1777593600000);
+create table "Ef_RunLogNode_2026_05" partition of "Ef_RunLogNode" for values from (1777593600000) to (1780272000000);
+create table "Ef_RunLogNode_2026_06" partition of "Ef_RunLogNode" for values from (1780272000000) to (1782864000000);
+create table "Ef_RunLogNode_2026_07" partition of "Ef_RunLogNode" for values from (1782864000000) to (1785542400000);
+create table "Ef_RunLogNode_2026_08" partition of "Ef_RunLogNode" for values from (1785542400000) to (1788220800000);
+create table "Ef_RunLogNode_2026_09" partition of "Ef_RunLogNode" for values from (1788220800000) to (1790812800000);
+create table "Ef_RunLogNode_2026_10" partition of "Ef_RunLogNode" for values from (1790812800000) to (1793491200000);
+create table "Ef_RunLogNode_2026_11" partition of "Ef_RunLogNode" for values from (1793491200000) to (1796083200000);
+create table "Ef_RunLogNode_2026_12" partition of "Ef_RunLogNode" for values from (1796083200000) to (1798761600000);
+create table "Ef_RunLogNode_2027_01" partition of "Ef_RunLogNode" for values from (1798761600000) to (1801440000000);
+create table "Ef_RunLogNode_2027_02" partition of "Ef_RunLogNode" for values from (1801440000000) to (1803859200000);
+create table "Ef_RunLogNode_2027_03" partition of "Ef_RunLogNode" for values from (1803859200000) to (1806537600000);
+create table "Ef_RunLogNode_2027_04" partition of "Ef_RunLogNode" for values from (1806537600000) to (1809129600000);
+create table "Ef_RunLogNode_2027_05" partition of "Ef_RunLogNode" for values from (1809129600000) to (1811808000000);
+create table "Ef_RunLogNode_2027_06" partition of "Ef_RunLogNode" for values from (1811808000000) to (1814400000000);
+create table "Ef_RunLogNode_2027_07" partition of "Ef_RunLogNode" for values from (1814400000000) to (1817078400000);
+create table "Ef_RunLogNode_2027_08" partition of "Ef_RunLogNode" for values from (1817078400000) to (1819756800000);
+create table "Ef_RunLogNode_2027_09" partition of "Ef_RunLogNode" for values from (1819756800000) to (1822348800000);
+create table "Ef_RunLogNode_2027_10" partition of "Ef_RunLogNode" for values from (1822348800000) to (1825027200000);
+create table "Ef_RunLogNode_2027_11" partition of "Ef_RunLogNode" for values from (1825027200000) to (1827619200000);
+create table "Ef_RunLogNode_2027_12" partition of "Ef_RunLogNode" for values from (1827619200000) to (1830297600000);
+create table "Ef_RunLogNode_default" partition of "Ef_RunLogNode" default;
 
 
 CREATE TABLE "Employee" (
@@ -598,8 +680,9 @@ CREATE TABLE "ExportLog" (
 
 CREATE TABLE "FormData" (
     "Id" citext COLLATE "C" not null default '',
-    "AppId" citext COLLATE "C" not null default '',
+    "CorpId" citext COLLATE "C" not null default '',
     "FormId" citext COLLATE "C" not null default '',
+    "AppId" citext COLLATE "C" not null default '',
     "FlowStatus" integer not null default 0,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
@@ -608,14 +691,159 @@ CREATE TABLE "FormData" (
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
-    "CorpId" citext COLLATE "C",
     "Data" jsonb not null,
-    CONSTRAINT "PK_FormData" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_FormData" PRIMARY KEY ("CorpId", "FormId", "Id")
+) partition by hash ("CorpId");
+
+create table "FormData_p00" partition of "FormData" for values with (modulus 16, remainder 0) partition by hash ("FormId");
+create table "FormData_p00_h00" partition of "FormData_p00" for values with (modulus 8, remainder 0);
+create table "FormData_p00_h01" partition of "FormData_p00" for values with (modulus 8, remainder 1);
+create table "FormData_p00_h02" partition of "FormData_p00" for values with (modulus 8, remainder 2);
+create table "FormData_p00_h03" partition of "FormData_p00" for values with (modulus 8, remainder 3);
+create table "FormData_p00_h04" partition of "FormData_p00" for values with (modulus 8, remainder 4);
+create table "FormData_p00_h05" partition of "FormData_p00" for values with (modulus 8, remainder 5);
+create table "FormData_p00_h06" partition of "FormData_p00" for values with (modulus 8, remainder 6);
+create table "FormData_p00_h07" partition of "FormData_p00" for values with (modulus 8, remainder 7);
+create table "FormData_p01" partition of "FormData" for values with (modulus 16, remainder 1) partition by hash ("FormId");
+create table "FormData_p01_h00" partition of "FormData_p01" for values with (modulus 8, remainder 0);
+create table "FormData_p01_h01" partition of "FormData_p01" for values with (modulus 8, remainder 1);
+create table "FormData_p01_h02" partition of "FormData_p01" for values with (modulus 8, remainder 2);
+create table "FormData_p01_h03" partition of "FormData_p01" for values with (modulus 8, remainder 3);
+create table "FormData_p01_h04" partition of "FormData_p01" for values with (modulus 8, remainder 4);
+create table "FormData_p01_h05" partition of "FormData_p01" for values with (modulus 8, remainder 5);
+create table "FormData_p01_h06" partition of "FormData_p01" for values with (modulus 8, remainder 6);
+create table "FormData_p01_h07" partition of "FormData_p01" for values with (modulus 8, remainder 7);
+create table "FormData_p02" partition of "FormData" for values with (modulus 16, remainder 2) partition by hash ("FormId");
+create table "FormData_p02_h00" partition of "FormData_p02" for values with (modulus 8, remainder 0);
+create table "FormData_p02_h01" partition of "FormData_p02" for values with (modulus 8, remainder 1);
+create table "FormData_p02_h02" partition of "FormData_p02" for values with (modulus 8, remainder 2);
+create table "FormData_p02_h03" partition of "FormData_p02" for values with (modulus 8, remainder 3);
+create table "FormData_p02_h04" partition of "FormData_p02" for values with (modulus 8, remainder 4);
+create table "FormData_p02_h05" partition of "FormData_p02" for values with (modulus 8, remainder 5);
+create table "FormData_p02_h06" partition of "FormData_p02" for values with (modulus 8, remainder 6);
+create table "FormData_p02_h07" partition of "FormData_p02" for values with (modulus 8, remainder 7);
+create table "FormData_p03" partition of "FormData" for values with (modulus 16, remainder 3) partition by hash ("FormId");
+create table "FormData_p03_h00" partition of "FormData_p03" for values with (modulus 8, remainder 0);
+create table "FormData_p03_h01" partition of "FormData_p03" for values with (modulus 8, remainder 1);
+create table "FormData_p03_h02" partition of "FormData_p03" for values with (modulus 8, remainder 2);
+create table "FormData_p03_h03" partition of "FormData_p03" for values with (modulus 8, remainder 3);
+create table "FormData_p03_h04" partition of "FormData_p03" for values with (modulus 8, remainder 4);
+create table "FormData_p03_h05" partition of "FormData_p03" for values with (modulus 8, remainder 5);
+create table "FormData_p03_h06" partition of "FormData_p03" for values with (modulus 8, remainder 6);
+create table "FormData_p03_h07" partition of "FormData_p03" for values with (modulus 8, remainder 7);
+create table "FormData_p04" partition of "FormData" for values with (modulus 16, remainder 4) partition by hash ("FormId");
+create table "FormData_p04_h00" partition of "FormData_p04" for values with (modulus 8, remainder 0);
+create table "FormData_p04_h01" partition of "FormData_p04" for values with (modulus 8, remainder 1);
+create table "FormData_p04_h02" partition of "FormData_p04" for values with (modulus 8, remainder 2);
+create table "FormData_p04_h03" partition of "FormData_p04" for values with (modulus 8, remainder 3);
+create table "FormData_p04_h04" partition of "FormData_p04" for values with (modulus 8, remainder 4);
+create table "FormData_p04_h05" partition of "FormData_p04" for values with (modulus 8, remainder 5);
+create table "FormData_p04_h06" partition of "FormData_p04" for values with (modulus 8, remainder 6);
+create table "FormData_p04_h07" partition of "FormData_p04" for values with (modulus 8, remainder 7);
+create table "FormData_p05" partition of "FormData" for values with (modulus 16, remainder 5) partition by hash ("FormId");
+create table "FormData_p05_h00" partition of "FormData_p05" for values with (modulus 8, remainder 0);
+create table "FormData_p05_h01" partition of "FormData_p05" for values with (modulus 8, remainder 1);
+create table "FormData_p05_h02" partition of "FormData_p05" for values with (modulus 8, remainder 2);
+create table "FormData_p05_h03" partition of "FormData_p05" for values with (modulus 8, remainder 3);
+create table "FormData_p05_h04" partition of "FormData_p05" for values with (modulus 8, remainder 4);
+create table "FormData_p05_h05" partition of "FormData_p05" for values with (modulus 8, remainder 5);
+create table "FormData_p05_h06" partition of "FormData_p05" for values with (modulus 8, remainder 6);
+create table "FormData_p05_h07" partition of "FormData_p05" for values with (modulus 8, remainder 7);
+create table "FormData_p06" partition of "FormData" for values with (modulus 16, remainder 6) partition by hash ("FormId");
+create table "FormData_p06_h00" partition of "FormData_p06" for values with (modulus 8, remainder 0);
+create table "FormData_p06_h01" partition of "FormData_p06" for values with (modulus 8, remainder 1);
+create table "FormData_p06_h02" partition of "FormData_p06" for values with (modulus 8, remainder 2);
+create table "FormData_p06_h03" partition of "FormData_p06" for values with (modulus 8, remainder 3);
+create table "FormData_p06_h04" partition of "FormData_p06" for values with (modulus 8, remainder 4);
+create table "FormData_p06_h05" partition of "FormData_p06" for values with (modulus 8, remainder 5);
+create table "FormData_p06_h06" partition of "FormData_p06" for values with (modulus 8, remainder 6);
+create table "FormData_p06_h07" partition of "FormData_p06" for values with (modulus 8, remainder 7);
+create table "FormData_p07" partition of "FormData" for values with (modulus 16, remainder 7) partition by hash ("FormId");
+create table "FormData_p07_h00" partition of "FormData_p07" for values with (modulus 8, remainder 0);
+create table "FormData_p07_h01" partition of "FormData_p07" for values with (modulus 8, remainder 1);
+create table "FormData_p07_h02" partition of "FormData_p07" for values with (modulus 8, remainder 2);
+create table "FormData_p07_h03" partition of "FormData_p07" for values with (modulus 8, remainder 3);
+create table "FormData_p07_h04" partition of "FormData_p07" for values with (modulus 8, remainder 4);
+create table "FormData_p07_h05" partition of "FormData_p07" for values with (modulus 8, remainder 5);
+create table "FormData_p07_h06" partition of "FormData_p07" for values with (modulus 8, remainder 6);
+create table "FormData_p07_h07" partition of "FormData_p07" for values with (modulus 8, remainder 7);
+create table "FormData_p08" partition of "FormData" for values with (modulus 16, remainder 8) partition by hash ("FormId");
+create table "FormData_p08_h00" partition of "FormData_p08" for values with (modulus 8, remainder 0);
+create table "FormData_p08_h01" partition of "FormData_p08" for values with (modulus 8, remainder 1);
+create table "FormData_p08_h02" partition of "FormData_p08" for values with (modulus 8, remainder 2);
+create table "FormData_p08_h03" partition of "FormData_p08" for values with (modulus 8, remainder 3);
+create table "FormData_p08_h04" partition of "FormData_p08" for values with (modulus 8, remainder 4);
+create table "FormData_p08_h05" partition of "FormData_p08" for values with (modulus 8, remainder 5);
+create table "FormData_p08_h06" partition of "FormData_p08" for values with (modulus 8, remainder 6);
+create table "FormData_p08_h07" partition of "FormData_p08" for values with (modulus 8, remainder 7);
+create table "FormData_p09" partition of "FormData" for values with (modulus 16, remainder 9) partition by hash ("FormId");
+create table "FormData_p09_h00" partition of "FormData_p09" for values with (modulus 8, remainder 0);
+create table "FormData_p09_h01" partition of "FormData_p09" for values with (modulus 8, remainder 1);
+create table "FormData_p09_h02" partition of "FormData_p09" for values with (modulus 8, remainder 2);
+create table "FormData_p09_h03" partition of "FormData_p09" for values with (modulus 8, remainder 3);
+create table "FormData_p09_h04" partition of "FormData_p09" for values with (modulus 8, remainder 4);
+create table "FormData_p09_h05" partition of "FormData_p09" for values with (modulus 8, remainder 5);
+create table "FormData_p09_h06" partition of "FormData_p09" for values with (modulus 8, remainder 6);
+create table "FormData_p09_h07" partition of "FormData_p09" for values with (modulus 8, remainder 7);
+create table "FormData_p10" partition of "FormData" for values with (modulus 16, remainder 10) partition by hash ("FormId");
+create table "FormData_p10_h00" partition of "FormData_p10" for values with (modulus 8, remainder 0);
+create table "FormData_p10_h01" partition of "FormData_p10" for values with (modulus 8, remainder 1);
+create table "FormData_p10_h02" partition of "FormData_p10" for values with (modulus 8, remainder 2);
+create table "FormData_p10_h03" partition of "FormData_p10" for values with (modulus 8, remainder 3);
+create table "FormData_p10_h04" partition of "FormData_p10" for values with (modulus 8, remainder 4);
+create table "FormData_p10_h05" partition of "FormData_p10" for values with (modulus 8, remainder 5);
+create table "FormData_p10_h06" partition of "FormData_p10" for values with (modulus 8, remainder 6);
+create table "FormData_p10_h07" partition of "FormData_p10" for values with (modulus 8, remainder 7);
+create table "FormData_p11" partition of "FormData" for values with (modulus 16, remainder 11) partition by hash ("FormId");
+create table "FormData_p11_h00" partition of "FormData_p11" for values with (modulus 8, remainder 0);
+create table "FormData_p11_h01" partition of "FormData_p11" for values with (modulus 8, remainder 1);
+create table "FormData_p11_h02" partition of "FormData_p11" for values with (modulus 8, remainder 2);
+create table "FormData_p11_h03" partition of "FormData_p11" for values with (modulus 8, remainder 3);
+create table "FormData_p11_h04" partition of "FormData_p11" for values with (modulus 8, remainder 4);
+create table "FormData_p11_h05" partition of "FormData_p11" for values with (modulus 8, remainder 5);
+create table "FormData_p11_h06" partition of "FormData_p11" for values with (modulus 8, remainder 6);
+create table "FormData_p11_h07" partition of "FormData_p11" for values with (modulus 8, remainder 7);
+create table "FormData_p12" partition of "FormData" for values with (modulus 16, remainder 12) partition by hash ("FormId");
+create table "FormData_p12_h00" partition of "FormData_p12" for values with (modulus 8, remainder 0);
+create table "FormData_p12_h01" partition of "FormData_p12" for values with (modulus 8, remainder 1);
+create table "FormData_p12_h02" partition of "FormData_p12" for values with (modulus 8, remainder 2);
+create table "FormData_p12_h03" partition of "FormData_p12" for values with (modulus 8, remainder 3);
+create table "FormData_p12_h04" partition of "FormData_p12" for values with (modulus 8, remainder 4);
+create table "FormData_p12_h05" partition of "FormData_p12" for values with (modulus 8, remainder 5);
+create table "FormData_p12_h06" partition of "FormData_p12" for values with (modulus 8, remainder 6);
+create table "FormData_p12_h07" partition of "FormData_p12" for values with (modulus 8, remainder 7);
+create table "FormData_p13" partition of "FormData" for values with (modulus 16, remainder 13) partition by hash ("FormId");
+create table "FormData_p13_h00" partition of "FormData_p13" for values with (modulus 8, remainder 0);
+create table "FormData_p13_h01" partition of "FormData_p13" for values with (modulus 8, remainder 1);
+create table "FormData_p13_h02" partition of "FormData_p13" for values with (modulus 8, remainder 2);
+create table "FormData_p13_h03" partition of "FormData_p13" for values with (modulus 8, remainder 3);
+create table "FormData_p13_h04" partition of "FormData_p13" for values with (modulus 8, remainder 4);
+create table "FormData_p13_h05" partition of "FormData_p13" for values with (modulus 8, remainder 5);
+create table "FormData_p13_h06" partition of "FormData_p13" for values with (modulus 8, remainder 6);
+create table "FormData_p13_h07" partition of "FormData_p13" for values with (modulus 8, remainder 7);
+create table "FormData_p14" partition of "FormData" for values with (modulus 16, remainder 14) partition by hash ("FormId");
+create table "FormData_p14_h00" partition of "FormData_p14" for values with (modulus 8, remainder 0);
+create table "FormData_p14_h01" partition of "FormData_p14" for values with (modulus 8, remainder 1);
+create table "FormData_p14_h02" partition of "FormData_p14" for values with (modulus 8, remainder 2);
+create table "FormData_p14_h03" partition of "FormData_p14" for values with (modulus 8, remainder 3);
+create table "FormData_p14_h04" partition of "FormData_p14" for values with (modulus 8, remainder 4);
+create table "FormData_p14_h05" partition of "FormData_p14" for values with (modulus 8, remainder 5);
+create table "FormData_p14_h06" partition of "FormData_p14" for values with (modulus 8, remainder 6);
+create table "FormData_p14_h07" partition of "FormData_p14" for values with (modulus 8, remainder 7);
+create table "FormData_p15" partition of "FormData" for values with (modulus 16, remainder 15) partition by hash ("FormId");
+create table "FormData_p15_h00" partition of "FormData_p15" for values with (modulus 8, remainder 0);
+create table "FormData_p15_h01" partition of "FormData_p15" for values with (modulus 8, remainder 1);
+create table "FormData_p15_h02" partition of "FormData_p15" for values with (modulus 8, remainder 2);
+create table "FormData_p15_h03" partition of "FormData_p15" for values with (modulus 8, remainder 3);
+create table "FormData_p15_h04" partition of "FormData_p15" for values with (modulus 8, remainder 4);
+create table "FormData_p15_h05" partition of "FormData_p15" for values with (modulus 8, remainder 5);
+create table "FormData_p15_h06" partition of "FormData_p15" for values with (modulus 8, remainder 6);
+create table "FormData_p15_h07" partition of "FormData_p15" for values with (modulus 8, remainder 7);
 
 
 CREATE TABLE "FormDataChangeLog" (
     "Id" citext COLLATE "C" not null default '',
+    "CorpId" citext COLLATE "C" not null default '',
     "AppId" citext COLLATE "C" not null default '',
     "FormId" citext COLLATE "C" not null default '',
     "DataId" citext COLLATE "C" not null default '',
@@ -629,9 +857,25 @@ CREATE TABLE "FormDataChangeLog" (
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
-    "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_FormDataChangeLog" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_FormDataChangeLog" PRIMARY KEY ("CorpId", "Id")
+) partition by hash ("CorpId");
+
+create table "FormDataChangeLog_p00" partition of "FormDataChangeLog" for values with (modulus 16, remainder 0);
+create table "FormDataChangeLog_p01" partition of "FormDataChangeLog" for values with (modulus 16, remainder 1);
+create table "FormDataChangeLog_p02" partition of "FormDataChangeLog" for values with (modulus 16, remainder 2);
+create table "FormDataChangeLog_p03" partition of "FormDataChangeLog" for values with (modulus 16, remainder 3);
+create table "FormDataChangeLog_p04" partition of "FormDataChangeLog" for values with (modulus 16, remainder 4);
+create table "FormDataChangeLog_p05" partition of "FormDataChangeLog" for values with (modulus 16, remainder 5);
+create table "FormDataChangeLog_p06" partition of "FormDataChangeLog" for values with (modulus 16, remainder 6);
+create table "FormDataChangeLog_p07" partition of "FormDataChangeLog" for values with (modulus 16, remainder 7);
+create table "FormDataChangeLog_p08" partition of "FormDataChangeLog" for values with (modulus 16, remainder 8);
+create table "FormDataChangeLog_p09" partition of "FormDataChangeLog" for values with (modulus 16, remainder 9);
+create table "FormDataChangeLog_p10" partition of "FormDataChangeLog" for values with (modulus 16, remainder 10);
+create table "FormDataChangeLog_p11" partition of "FormDataChangeLog" for values with (modulus 16, remainder 11);
+create table "FormDataChangeLog_p12" partition of "FormDataChangeLog" for values with (modulus 16, remainder 12);
+create table "FormDataChangeLog_p13" partition of "FormDataChangeLog" for values with (modulus 16, remainder 13);
+create table "FormDataChangeLog_p14" partition of "FormDataChangeLog" for values with (modulus 16, remainder 14);
+create table "FormDataChangeLog_p15" partition of "FormDataChangeLog" for values with (modulus 16, remainder 15);
 
 
 CREATE TABLE "FormDataImportLog" (
@@ -1188,6 +1432,7 @@ CREATE TABLE "UserCorp" (
 
 CREATE TABLE "WebPushLog" (
     "Id" citext COLLATE "C" not null default '',
+    "CreateTime" bigint not null default 0,
     "AppId" citext COLLATE "C" not null default '',
     "FormId" citext COLLATE "C" not null default '',
     "WebHookId" citext COLLATE "C" not null default '',
@@ -1200,15 +1445,40 @@ CREATE TABLE "WebPushLog" (
     "PushResult" citext,
     "Success" boolean not null default false,
     "CreateBy" jsonb,
-    "CreateTime" bigint not null default 0,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_WebPushLog" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_WebPushLog" PRIMARY KEY ("Id", "CreateTime")
+) partition by range ("CreateTime");
+
+create table "WebPushLog_2026_01" partition of "WebPushLog" for values from (1767225600000) to (1769904000000);
+create table "WebPushLog_2026_02" partition of "WebPushLog" for values from (1769904000000) to (1772323200000);
+create table "WebPushLog_2026_03" partition of "WebPushLog" for values from (1772323200000) to (1775001600000);
+create table "WebPushLog_2026_04" partition of "WebPushLog" for values from (1775001600000) to (1777593600000);
+create table "WebPushLog_2026_05" partition of "WebPushLog" for values from (1777593600000) to (1780272000000);
+create table "WebPushLog_2026_06" partition of "WebPushLog" for values from (1780272000000) to (1782864000000);
+create table "WebPushLog_2026_07" partition of "WebPushLog" for values from (1782864000000) to (1785542400000);
+create table "WebPushLog_2026_08" partition of "WebPushLog" for values from (1785542400000) to (1788220800000);
+create table "WebPushLog_2026_09" partition of "WebPushLog" for values from (1788220800000) to (1790812800000);
+create table "WebPushLog_2026_10" partition of "WebPushLog" for values from (1790812800000) to (1793491200000);
+create table "WebPushLog_2026_11" partition of "WebPushLog" for values from (1793491200000) to (1796083200000);
+create table "WebPushLog_2026_12" partition of "WebPushLog" for values from (1796083200000) to (1798761600000);
+create table "WebPushLog_2027_01" partition of "WebPushLog" for values from (1798761600000) to (1801440000000);
+create table "WebPushLog_2027_02" partition of "WebPushLog" for values from (1801440000000) to (1803859200000);
+create table "WebPushLog_2027_03" partition of "WebPushLog" for values from (1803859200000) to (1806537600000);
+create table "WebPushLog_2027_04" partition of "WebPushLog" for values from (1806537600000) to (1809129600000);
+create table "WebPushLog_2027_05" partition of "WebPushLog" for values from (1809129600000) to (1811808000000);
+create table "WebPushLog_2027_06" partition of "WebPushLog" for values from (1811808000000) to (1814400000000);
+create table "WebPushLog_2027_07" partition of "WebPushLog" for values from (1814400000000) to (1817078400000);
+create table "WebPushLog_2027_08" partition of "WebPushLog" for values from (1817078400000) to (1819756800000);
+create table "WebPushLog_2027_09" partition of "WebPushLog" for values from (1819756800000) to (1822348800000);
+create table "WebPushLog_2027_10" partition of "WebPushLog" for values from (1822348800000) to (1825027200000);
+create table "WebPushLog_2027_11" partition of "WebPushLog" for values from (1825027200000) to (1827619200000);
+create table "WebPushLog_2027_12" partition of "WebPushLog" for values from (1827619200000) to (1830297600000);
+create table "WebPushLog_default" partition of "WebPushLog" default;
 
 
 CREATE TABLE "Webhook" (
@@ -1347,6 +1617,7 @@ CREATE TABLE "Wf_Task" (
 
 CREATE TABLE "Wf_TaskLog" (
     "Id" citext COLLATE "C" not null default '',
+    "CorpId" citext COLLATE "C" not null default '',
     "AppId" citext COLLATE "C" not null default '',
     "FormId" citext COLLATE "C" not null default '',
     "FormName" citext not null default '',
@@ -1370,9 +1641,25 @@ CREATE TABLE "Wf_TaskLog" (
     "DeleteFlag" boolean not null default false,
     "DeleteBy" jsonb,
     "DeleteTime" bigint,
-    "CorpId" citext COLLATE "C",
-    CONSTRAINT "PK_Wf_TaskLog" PRIMARY KEY ("Id")
-);
+    CONSTRAINT "PK_Wf_TaskLog" PRIMARY KEY ("CorpId", "Id")
+) partition by hash ("CorpId");
+
+create table "Wf_TaskLog_p00" partition of "Wf_TaskLog" for values with (modulus 16, remainder 0);
+create table "Wf_TaskLog_p01" partition of "Wf_TaskLog" for values with (modulus 16, remainder 1);
+create table "Wf_TaskLog_p02" partition of "Wf_TaskLog" for values with (modulus 16, remainder 2);
+create table "Wf_TaskLog_p03" partition of "Wf_TaskLog" for values with (modulus 16, remainder 3);
+create table "Wf_TaskLog_p04" partition of "Wf_TaskLog" for values with (modulus 16, remainder 4);
+create table "Wf_TaskLog_p05" partition of "Wf_TaskLog" for values with (modulus 16, remainder 5);
+create table "Wf_TaskLog_p06" partition of "Wf_TaskLog" for values with (modulus 16, remainder 6);
+create table "Wf_TaskLog_p07" partition of "Wf_TaskLog" for values with (modulus 16, remainder 7);
+create table "Wf_TaskLog_p08" partition of "Wf_TaskLog" for values with (modulus 16, remainder 8);
+create table "Wf_TaskLog_p09" partition of "Wf_TaskLog" for values with (modulus 16, remainder 9);
+create table "Wf_TaskLog_p10" partition of "Wf_TaskLog" for values with (modulus 16, remainder 10);
+create table "Wf_TaskLog_p11" partition of "Wf_TaskLog" for values with (modulus 16, remainder 11);
+create table "Wf_TaskLog_p12" partition of "Wf_TaskLog" for values with (modulus 16, remainder 12);
+create table "Wf_TaskLog_p13" partition of "Wf_TaskLog" for values with (modulus 16, remainder 13);
+create table "Wf_TaskLog_p14" partition of "Wf_TaskLog" for values with (modulus 16, remainder 14);
+create table "Wf_TaskLog_p15" partition of "Wf_TaskLog" for values with (modulus 16, remainder 15);
 
 
 CREATE TABLE "WorkbenchConfig" (

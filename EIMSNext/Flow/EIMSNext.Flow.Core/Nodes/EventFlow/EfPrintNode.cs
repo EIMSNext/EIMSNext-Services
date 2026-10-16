@@ -70,7 +70,9 @@ namespace EIMSNext.Flow.Core.Nodes
                     .ToList();
                 var dataIds = formDatas.Select(x => x.Id).ToList();
                 var taskLogsByDataId = Resolver.GetRepository<Wf_TaskLog>()
-                    .Find(x => dataIds.Contains(x.DataId))
+                    .Find(x => x.CorpId == dataContext.CorpId
+                        && x.FormId == setting.FormId
+                        && dataIds.Contains(x.DataId))
                     .ToList()
                     .GroupBy(x => x.DataId)
                     .ToDictionary(x => x.Key, x => x.AsEnumerable());

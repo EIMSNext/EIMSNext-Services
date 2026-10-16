@@ -420,32 +420,34 @@ namespace EIMSNext.Service.Host.Controllers
         /// 查询表单数据修改日志
         /// </summary>
         /// <param name="key">表单数据ID</param>
+        /// <param name="formId">表单ID（分区剪枝必需）</param>
         /// <param name="skip">跳过数量</param>
         /// <param name="top">返回数量</param>
         /// <param name="permissionGroupId">授权组ID</param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [HttpGet("{key}/changelog")]
-        public ActionResult GetChangeLogs([FromRoute] string key, [FromQuery] int skip = 0, [FromQuery] int top = 20, [FromQuery] string? permissionGroupId = null)
+        public ActionResult GetChangeLogs([FromRoute] string key, [FromQuery] string formId, [FromQuery] int skip = 0, [FromQuery] int top = 20, [FromQuery] string? permissionGroupId = null)
         {
             if (!CanReadFormData(key, permissionGroupId)) return NotFound();
 
-            return Ok(new { value = ApiService.GetChangeLogs(key, skip, top) });
+            return Ok(new { value = ApiService.GetChangeLogs(formId, key, skip, top) });
         }
 
         /// <summary>
         /// 查询表单数据修改日志总数
         /// </summary>
         /// <param name="key">表单数据ID</param>
+        /// <param name="formId">表单ID（分区剪枝必需）</param>
         /// <param name="permissionGroupId">授权组ID</param>
         /// <returns></returns>
         [Permission(Operation = Operation.Read)]
         [HttpGet("{key}/changelog/$count")]
-        public ActionResult GetChangeLogCount([FromRoute] string key, [FromQuery] string? permissionGroupId = null)
+        public ActionResult GetChangeLogCount([FromRoute] string key, [FromQuery] string formId, [FromQuery] string? permissionGroupId = null)
         {
             if (!CanReadFormData(key, permissionGroupId)) return NotFound();
 
-            return Ok(ApiService.CountChangeLogs(key));
+            return Ok(ApiService.CountChangeLogs(formId, key));
         }
 
         private bool CanReadFormData(string key, string? permissionGroupId)

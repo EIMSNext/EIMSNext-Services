@@ -57,8 +57,8 @@ public sealed class JsonbGinIndexTests
         MSTest.Assert.IsFalse(sql.Contains("eims_json_match"), $"不应再走函数调用，实际 SQL：\n{sql}");
 
         var plan = await ExplainAsync(db, sql);
-        MSTest.Assert.IsTrue(plan.Contains("IX_FormData_Data_Gin"),
-            $"执行计划应命中 GIN 索引 IX_FormData_Data_Gin。SQL：\n{sql}\n执行计划：\n{plan}");
+        MSTest.Assert.IsTrue(plan.Contains("Bitmap Index Scan"),
+            $"执行计划应命中 GIN 索引（分区表上索引名带分区前缀，断言扫描方式）。SQL：\n{sql}\n执行计划：\n{plan}");
 
         await transaction.RollbackAsync();
     }
@@ -113,8 +113,8 @@ public sealed class JsonbGinIndexTests
         MSTest.Assert.IsFalse(sql.Contains("eims_json_object_contains"), $"不应走函数调用，实际 SQL：\n{sql}");
 
         var plan = await ExplainAsync(db, sql);
-        MSTest.Assert.IsTrue(plan.Contains("IX_FormData_Data_Gin"),
-            $"执行计划应命中 GIN 索引 IX_FormData_Data_Gin。SQL：\n{sql}\n执行计划：\n{plan}");
+        MSTest.Assert.IsTrue(plan.Contains("Bitmap Index Scan"),
+            $"执行计划应命中 GIN 索引（分区表上索引名带分区前缀，断言扫描方式）。SQL：\n{sql}\n执行计划：\n{plan}");
 
         await transaction.RollbackAsync();
     }

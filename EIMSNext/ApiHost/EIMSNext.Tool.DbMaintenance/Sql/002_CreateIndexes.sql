@@ -13,6 +13,8 @@
 -- >>> generated: model-declared indexes
 -- 本段由 EF 模型投影生成，请勿手工编辑；新增索引优先写在模型里，模型无法表达的（GIN、部分索引、citext_pattern_ops）写在本标记段之下的手写区。
 -- 重新生成：dotnet test Tests/EIMSNext.Core.Tests --filter RegenerateBaselineScripts（需先置环境变量 EIMS_REGENERATE_BASELINE=1）
+create index if not exists "IX_AuditLog_CorpId_CreateTime" on "AuditLog" ("CorpId", "CreateTime");
+
 create index if not exists "IX_Department_CorpId_Code" on "Department" ("CorpId", "Code");
 
 create index if not exists "IX_Employee_CorpId_Code" on "Employee" ("CorpId", "Code");
@@ -27,9 +29,23 @@ create index if not exists "IX_EmployeeGroupMember_EmployeeId" on "EmployeeGroup
 
 create index if not exists "IX_FormData_CorpId_FormId_DeleteFlag" on "FormData" ("CorpId", "FormId", "DeleteFlag");
 
+create index if not exists "IX_FormData_CorpId_Id" on "FormData" ("CorpId", "Id");
+
+create index if not exists "IX_FormDataChangeLog_CorpId_FormId_DataId" on "FormDataChangeLog" ("CorpId", "FormId", "DataId");
+
+create index if not exists "IX_FormDataChangeLog_CorpId_Id" on "FormDataChangeLog" ("CorpId", "Id");
+
+create index if not exists "IX_FormDataImportLog_CorpId_CreateTime" on "FormDataImportLog" ("CorpId", "CreateTime");
+
 create index if not exists "IX_FormDef_CorpId_AppId" on "FormDef" ("CorpId", "AppId");
 
+create index if not exists "IX_IdentityLoginAudit_CorpId_CreateTime" on "IdentityLoginAudit" ("CorpId", "CreateTime");
+
 create unique index if not exists "UX_UserCorp_UserId_CorpId" on "UserCorp" ("UserId", "CorpId");
+
+create index if not exists "IX_WebPushLog_CorpId_CreateTime" on "WebPushLog" ("CorpId", "CreateTime");
+
+create index if not exists "IX_Wf_TaskLog_CorpId_Id" on "Wf_TaskLog" ("CorpId", "Id");
 -- <<< generated: model-declared indexes
 
 -- ---------------------------------------------------------------- 核心与多租户
@@ -81,7 +97,8 @@ create index if not exists "IX_FormNotify_CorpId_FormId" on "FormNotify" ("CorpI
 
 create index if not exists "IX_FormNotifyDispatchLog_CorpId_NotifyId" on "FormNotifyDispatchLog" ("CorpId", "NotifyId");
 
-create index if not exists "IX_FormDataChangeLog_CorpId_DataId" on "FormDataChangeLog" ("CorpId", "DataId");
+-- IX_FormDataChangeLog_CorpId_DataId 已由模型声明索引
+-- IX_FormDataChangeLog_CorpId_FormId_DataId 取代（分区表查询路径统一带 CorpId+FormId）。
 
 create index if not exists "IX_FormDataPermissionGroup_CorpId_FormId" on "FormDataPermissionGroup" ("CorpId", "FormId");
 

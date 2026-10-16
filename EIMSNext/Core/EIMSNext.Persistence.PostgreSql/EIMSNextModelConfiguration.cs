@@ -262,6 +262,56 @@ public static class EIMSNextModelConfiguration
         Mapped<FormDef>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.AppId })
             .HasDatabaseName("IX_FormDef_CorpId_AppId");
 
+        // ------------------------------------------------------------ 分区表（主键与索引）
+        // FormData / FormDataChangeLog / Wf_TaskLog 按 CorpId 哈希分区（FormData 二级再按 FormId），
+        // log 组（见 PartitionedTables）按 CreateTime 月度范围分区。
+        // PG 硬约束：分区键必须包含在主键/唯一约束里，因此这些表的主键在此复合化。
+        // 仓储 Get(id) 走 Queryable（x.Id == id），不走 Set.Find，复合键不影响调用方式；
+        // 复合键还让 EF 生成的 UPDATE ... WHERE 主键 带上分区键，更新也能剪枝到单分区。
+        // CorpId 在基类上是 string?，主键列必须非空，对分区表逐个收紧。
+        Mapped<FormData>(modelBuilder)?.Property(x => x.CorpId).IsRequired();
+        Mapped<FormDataChangeLog>(modelBuilder)?.Property(x => x.CorpId).IsRequired();
+        Mapped<Wf_TaskLog>(modelBuilder)?.Property(x => x.CorpId).IsRequired();
+        Mapped<FormData>(modelBuilder)?.HasKey(x => new { x.CorpId, x.FormId, x.Id });
+        Mapped<FormDataChangeLog>(modelBuilder)?.HasKey(x => new { x.CorpId, x.Id });
+        Mapped<Wf_TaskLog>(modelBuilder)?.HasKey(x => new { x.CorpId, x.Id });
+        // 范围分区组：主键复合化（PG 要求分区键入主键）。PK 索引本身已覆盖 (Id, CreateTime)，
+        // 不再声明独立的 IX_*_Id_CreateTime（与 PK 完全重复）。
+        foreach (var logEntity in new[]
+                 {
+                     typeof(EIMSNext.Core.Entities.AuditLog), typeof(Ef_RunLog), typeof(Ef_RunLogNode), typeof(WebPushLog)
+                 })
+        {
+            // 必须先确认实体已在本上下文的模型里：modelBuilder.Entity(Type) 会把未登记的实体
+            // 隐式加进模型（测试上下文因此凭空多出 log 表，建表脚本直接撞已存在的业务表）。
+            if (modelBuilder.Model.FindEntityType(logEntity) is null) continue;
+
+            modelBuilder.Entity(logEntity).HasKey("Id", "CreateTime");
+        }
+
+        // 按 CorpId 查询的补充索引：FormDataImportLog / IdentityLoginAudit 无任何 CorpId 前缀索引；
+        // AuditLog / WebPushLog 是分区表，索引建在父表自动级联到各月分区。
+        Mapped<FormDataImportLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.CreateTime })
+            .HasDatabaseName("IX_FormDataImportLog_CorpId_CreateTime");
+        Mapped<IdentityLoginAudit>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.CreateTime })
+            .HasDatabaseName("IX_IdentityLoginAudit_CorpId_CreateTime");
+        Mapped<EIMSNext.Core.Entities.AuditLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.CreateTime })
+            .HasDatabaseName("IX_AuditLog_CorpId_CreateTime");
+        Mapped<WebPushLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.CreateTime })
+            .HasDatabaseName("IX_WebPushLog_CorpId_CreateTime");
+
+        // 分区表无独立 PK 索引可复用，按查询路径补索引：
+        // by-key（WHERE CorpId+Id）在复合 PK (CorpId, FormId, Id) 上只能用 CorpId 前缀，专用索引直达。
+        Mapped<FormData>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.Id })
+            .HasDatabaseName("IX_FormData_CorpId_Id");
+        Mapped<FormDataChangeLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.Id })
+            .HasDatabaseName("IX_FormDataChangeLog_CorpId_Id");
+        // 变更日志的读路径（GetChangeLogs/CountChangeLogs）带 CorpId+FormId+DataId。
+        Mapped<FormDataChangeLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.FormId, x.DataId })
+            .HasDatabaseName("IX_FormDataChangeLog_CorpId_FormId_DataId");
+        Mapped<Wf_TaskLog>(modelBuilder)?.HasIndex(x => new { x.CorpId, x.Id })
+            .HasDatabaseName("IX_Wf_TaskLog_CorpId_Id");
+
         // ------------------------------------------------------------ 关系（导航 + 必要外键）
         // 员工与部门 / 员工组是多对多中间表：Employee 通过 EmployeeId 外键导航到
         // EmployeeDepartment / EmployeeGroupMember，使 OData 的

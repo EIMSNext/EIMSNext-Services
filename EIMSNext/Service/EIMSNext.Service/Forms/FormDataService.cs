@@ -449,9 +449,16 @@ namespace EIMSNext.Service
         {
             if (ids.Count == 0) return 0;
 
+            // FormData 按 CorpId 哈希分区，删除条件必须带 CorpId 才能剪枝到单分区。
             return physical
-                ? await Repository.Queryable.IgnoreQueryFilters().Where(x => ids.Contains(x.Id)).ExecuteDeleteAsync().ConfigureAwait(false)
-                : await Repository.SoftDeleteManyAsync(ids, Context.Operator, DateTime.UtcNow.ToTimeStampMs()).ConfigureAwait(false);
+                ? await Repository.Queryable
+                    .IgnoreQueryFilters()
+                    .Where(x => x.CorpId == Context.CorpId && ids.Contains(x.Id))
+                    .ExecuteDeleteAsync()
+                    .ConfigureAwait(false)
+                : await Repository
+                    .SoftDeleteManyAsync(x => x.CorpId == Context.CorpId && ids.Contains(x.Id), Context.Operator, DateTime.UtcNow.ToTimeStampMs())
+                    .ConfigureAwait(false);
         }
 
         protected virtual Task<WfResponse?> DeleteWorkflowInstancesByDataIdsAsync(IReadOnlyCollection<string> dataIds)

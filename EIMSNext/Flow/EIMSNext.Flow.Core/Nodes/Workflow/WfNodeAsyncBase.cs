@@ -94,7 +94,9 @@ namespace EIMSNext.Flow.Core.Nodes
             }
 
             var existedEmpIds = TaskLogRepository.Find(x =>
-                x.DataId == dataContext.DataId
+                x.CorpId == dataContext.CorpId
+                && x.FormId == dataContext.FormId
+                && x.DataId == dataContext.DataId
                 && x.NodeId == wfStep.Id
                 && x.Result == ApproveAction.CopyTo
                 && x.Round == dataContext.Round
@@ -302,7 +304,9 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 // OrderByDescending(...).FirstOrDefault()，两者都翻译为 ORDER BY ... LIMIT 1。
                 var lastApproval = TaskLogRepository
-                    .Find(x => x.DataId == dataContext.DataId
+                    .Find(x => x.CorpId == dataContext.CorpId
+                        && x.FormId == dataContext.FormId
+                        && x.DataId == dataContext.DataId
                         && x.Result != ApproveAction.CopyTo
                         && x.Result != ApproveAction.Transfer
                         && x.Result != ApproveAction.AutoTransfer

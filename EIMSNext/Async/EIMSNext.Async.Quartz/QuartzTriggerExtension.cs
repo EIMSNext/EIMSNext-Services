@@ -14,6 +14,28 @@ namespace EIMSNext.Async.Quartz
             var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Notify");
             var eventFlowJobKey = new JobKey("EventFlowScheduleJob", "EventFlow");
             var outboxDeliveryJobKey = new JobKey("OutboxDeliveryJob", "Outbox");
+            var partitionMaintainJobKey = new JobKey("PartitionMaintainJob", "Partition");
+
+            qz.AddJob<PartitionMaintainJob>(opts => opts
+                .WithIdentity(partitionMaintainJobKey)
+                .StoreDurably()
+                .WithDescription("RANGE 分区预建作业（当月+下月）"));
+
+            qz.AddTrigger(opts => opts
+                .ForJob(partitionMaintainJobKey)
+                .WithIdentity("PartitionMaintainStartupTrigger", "Partition")
+                .WithDescription("启动时确保当月/下月分区存在")
+                .StartNow());
+
+            qz.AddTrigger(opts => opts
+                .ForJob(partitionMaintainJobKey)
+                .WithIdentity("PartitionMaintainMonthlyTrigger", "Partition")
+                .WithCronSchedule(
+                    configuration["Quartz:PartitionMaintainJob:Cron"] ?? "0 0 3 25 * ?",
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
+                .WithDescription("每月 25 日凌晨预建下月范围分区（可配置 Quartz:PartitionMaintainJob:Cron）")
+                .StartNow());
+
             qz.AddJob<FormNotifyScheduleJob>(opts => opts
                 .WithIdentity(formNotifyJobKey)
                 .StoreDurably()

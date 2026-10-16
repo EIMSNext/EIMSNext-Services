@@ -33,7 +33,7 @@ namespace EIMSNext.Entities
         /// </summary>
         public string ErrMsg { get; set; } = string.Empty;
         /// <summary>
-        /// 执行耗时（毫秒）
+        /// 执行时间（Unix 毫秒时间戳，节点执行完成时刻）
         /// </summary>
         public long ExecTime { get; set; }
     }

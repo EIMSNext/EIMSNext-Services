@@ -453,7 +453,11 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 获取ChangeLogs。
         /// </summary>
-        public List<FormDataChangeLog> GetChangeLogs(string dataId, int skip, int top)
+        /// <remarks>
+        /// FormDataChangeLog 按 CorpId 哈希分区，条件必须带 CorpId+FormId 才能剪枝到单分区，
+        /// 因此 formId 是必填过滤条件，与索引 IX_FormDataChangeLog_CorpId_FormId_DataId 对齐。
+        /// </remarks>
+        public List<FormDataChangeLog> GetChangeLogs(string formId, string dataId, int skip, int top)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return [];
 
@@ -461,7 +465,10 @@ namespace EIMSNext.ApiService
             top = Math.Clamp(top <= 0 ? 20 : top, 1, 200);
 
             return _formDataChangeLogService
-                .Query(x => x.CorpId == IdentityContext.CurrentCorpId && x.DataId == dataId && !x.DeleteFlag)
+                .Query(x => x.CorpId == IdentityContext.CurrentCorpId
+                    && x.FormId == formId
+                    && x.DataId == dataId
+                    && !x.DeleteFlag)
                 .OrderByDescending(x => x.OperateTime)
                 .Skip(skip)
                 .Take(top)
@@ -471,11 +478,15 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 统计ChangeLogs。
         /// </summary>
-        public long CountChangeLogs(string dataId)
+        public long CountChangeLogs(string formId, string dataId)
         {
             if (string.IsNullOrWhiteSpace(dataId)) return 0;
 
-            return _formDataChangeLogService.Count(x => x.CorpId == IdentityContext.CurrentCorpId && x.DataId == dataId && !x.DeleteFlag);
+            return _formDataChangeLogService.Count(x =>
+                x.CorpId == IdentityContext.CurrentCorpId
+                && x.FormId == formId
+                && x.DataId == dataId
+                && !x.DeleteFlag);
         }
 
         private DynamicFilter BuildBaseFilter(FormDataFilterOptionsRequest request)

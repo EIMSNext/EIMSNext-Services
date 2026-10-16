@@ -125,14 +125,26 @@ namespace EIMSNext.Core.Tests
                 string.Join(Environment.NewLine, failures));
         }
 
-        /// <summary>给实例补一个合法主键，避免所有实体都落在 <c>Id = ''</c> 上。</summary>
+        /// <summary>
+        /// 给实例补齐主键值，避免所有实体都落在 <c>Id = ''</c> 上。
+        /// </summary>
+        /// <remarks>
+        /// 分区表（FormData / FormDataChangeLog / Wf_TaskLog / log 组）是复合主键，
+        /// CorpId / FormId 参与主键且列 NOT NULL，这里对主键里的全部字符串列逐列补随机值；
+        /// 数值列（log 组的 CreateTime）保留属性初始化器的默认 0，本身就是合法键值。
+        /// </remarks>
         private static void AssignPrimaryKey(IEntityType entityType, object instance)
         {
-            var idProperty = entityType.FindProperty("Id");
-            if (idProperty?.PropertyInfo is null) return;
-            if (idProperty.PropertyInfo.PropertyType != typeof(string)) return;
+            var primaryKey = entityType.FindPrimaryKey();
+            if (primaryKey is null) return;
 
-            idProperty.PropertyInfo.SetValue(instance, Guid.NewGuid().ToString("N"));
+            foreach (var property in primaryKey.Properties)
+            {
+                if (property.ClrType != typeof(string) || property.PropertyInfo is null) continue;
+                if (property.PropertyInfo.GetValue(instance) is not (null or "")) continue;
+
+                property.PropertyInfo.SetValue(instance, Guid.NewGuid().ToString("N"));
+            }
         }
 
         /// <summary>取异常信息的第一行，避免把整个 Npgsql 堆栈塞进断言消息。</summary>
