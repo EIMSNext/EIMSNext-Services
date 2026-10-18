@@ -1,6 +1,7 @@
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Cryptography;
 using System.Text;
+
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http;
 using Microsoft.Extensions.Caching.Distributed;
@@ -43,7 +44,13 @@ namespace EIMSNext.ApiCore
                 return false;
             }
 
-            return await cache.GetStringAsync(LogoutTokenHelper.GetCacheKey(token), cancellationToken) is not null;
+            try
+            {
+                return await cache.GetStringAsync(LogoutTokenHelper.GetCacheKey(token), cancellationToken) is not null;
+            }
+            catch { }
+
+            return true;
         }
     }
 

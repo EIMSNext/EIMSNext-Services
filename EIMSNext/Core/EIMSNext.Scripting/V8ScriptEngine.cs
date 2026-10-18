@@ -213,7 +213,10 @@ namespace EIMSNext.Scripting
                 }
 
                 // 执行脚本
-                result.Value = engine.Engine.Evaluate($"(() => {{ return {script} }})()");
+                var evaluated = engine.Engine.Evaluate($"(() => {{ return {script} }})()");
+                // JS undefined 必须在引擎边界归一为 null：Undefined 是 ClearScript 的哨兵对象，
+                // 宿主代码（jsonpath 过滤、字段映射等）不认识它，序列化会产出非法 JSON/SQL。
+                result.Value = evaluated is Microsoft.ClearScript.Undefined ? null : evaluated;
             }
             catch (Microsoft.ClearScript.ScriptInterruptedException)
             {

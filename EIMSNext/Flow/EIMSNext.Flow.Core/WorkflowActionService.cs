@@ -287,7 +287,7 @@ namespace EIMSNext.Flow.Core
                 return new WorkflowActionStatusResult();
             }
 
-            var isStarter = task.Starter?.Id == currentEmployeeId;
+            var isStarter = string.Equals(task.Starter?.Id, currentEmployeeId, StringComparison.OrdinalIgnoreCase);
             var withdrawRule = definition?.Metadata?.WorkflowSetting?.WithdrawRule ?? WorkflowWithdrawRule.Disabled;
             var firstApproveNodeId = definition?.Metadata?.Steps?.FirstOrDefault(x => x.NodeType == WfNodeType.Approve)?.Id;
 

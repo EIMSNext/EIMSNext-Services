@@ -308,12 +308,14 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可撤回");
             }
 
-            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            // 撤回针对的是当前在途待办（属于任一审批人），发起人自己并没有待办；
+            // 若按当前员工过滤，发起人永远查不到任务，撤回功能形同虚设。
+            var task = ResolvePendingTask(request.DataId);
             if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("当前流程无可操作待办");
             }
-            if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            if (!string.Equals(task.Starter?.Id, IdentityContext.CurrentEmployee.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("仅流程发起人可撤回");
             }
@@ -368,12 +370,13 @@ namespace EIMSNext.Flow.Host.Controllers
                 return BadRequest("当前流程实例不可催办");
             }
 
-            var task = ResolveCurrentTask(request.DataId, string.Empty);
+            // 同撤回：催办针对在途待办（任一审批人），不能按当前员工过滤。
+            var task = ResolvePendingTask(request.DataId);
             if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("当前流程无可操作待办");
             }
-            if (task?.Starter?.Id != IdentityContext.CurrentEmployee.Id)
+            if (!string.Equals(task.Starter?.Id, IdentityContext.CurrentEmployee.Id, StringComparison.OrdinalIgnoreCase))
             {
                 return BadRequest("仅流程发起人可催办");
             }
@@ -678,6 +681,11 @@ namespace EIMSNext.Flow.Host.Controllers
 
             return _taskService.Query(x => x.DataId == dataId && x.EmployeeId == workerId)
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
+        }
+
+        private Wf_Task? ResolvePendingTask(string dataId)
+        {
+            return _taskService.Query(x => x.DataId == dataId).FirstOrDefault();
         }
 
         private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)

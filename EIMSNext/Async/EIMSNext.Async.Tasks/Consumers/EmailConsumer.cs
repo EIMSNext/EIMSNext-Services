@@ -128,7 +128,8 @@ namespace EIMSNext.Async.Tasks.Consumers
         {
             return taskType == EmailTaskType.PlatWork
                 ? EmailChannelIds.WxWork
-                : EmailChannelIds.Default;
+                : EmailChannelIds.WxWork;
+                //: EmailChannelIds.Default;
         }
     }
 }
