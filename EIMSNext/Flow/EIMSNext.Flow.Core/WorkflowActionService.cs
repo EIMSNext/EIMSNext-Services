@@ -746,7 +746,7 @@ namespace EIMSNext.Flow.Core
             {
                 foreach (var field in form.Content.Items.Take(6))
                 {
-                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = data.Data.GetValueOrDefault(field.Field) });
+                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = BriefField.ToBriefValue(data.Data.GetValueOrDefault(field.Field)) });
                 }
             }
             return brief;

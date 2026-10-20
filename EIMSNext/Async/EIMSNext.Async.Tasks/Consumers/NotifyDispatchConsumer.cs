@@ -353,7 +353,7 @@ namespace EIMSNext.Async.Tasks.Consumers
 
             foreach (var item in task.DataBrief.Take(5))
             {
-                if (item.Value == null || string.IsNullOrWhiteSpace(item.Value.ToString()))
+                if (string.IsNullOrWhiteSpace(item.Value))
                 {
                     continue;
                 }

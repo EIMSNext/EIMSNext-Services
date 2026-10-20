@@ -1,4 +1,6 @@
-﻿using EIMSNext.Core.Abstractions;
+﻿using System.Text.Json;
+using System.Text.Json.Serialization;
+using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 
 namespace EIMSNext.Entities
@@ -80,8 +82,47 @@ namespace EIMSNext.Entities
         /// </summary>
         public string Title { get; set; } = string.Empty;
         /// <summary>
-        /// 字段值
+        /// 字段值（规整后的字符串）
         /// </summary>
-        public object? Value { get; set; }
+        [JsonConverter(typeof(BriefValueConverter))]
+        public string? Value { get; set; }
+
+        /// <summary>
+        /// 把 FormData.Data 的动态值规整为摘要字符串。
+        /// </summary>
+        /// <remarks>
+        /// 不能保留 object：OData 对 object 声明成员会写成
+        /// <c>{ "value@odata.type": "#String", "value": "..." }</c> 包装，
+        /// 前端（裸 HTTP+JSON）与通知模板都拿不到裸值。
+        /// </remarks>
+        public static string? ToBriefValue(object? value) =>
+            value switch
+            {
+                null => null,
+                string s => s,
+                _ => JsonSerializer.Serialize(value),
+            };
+    }
+
+    /// <summary>
+    /// <see cref="BriefField.Value"/> 的容错转换：模型收窄为 string 前落库的 jsonb 里
+    /// 可能是 JSON number/bool/对象，直接反序列化会抛
+    /// <c>Cannot get the value of a token type 'Number' as a string</c>（OData 查询 500）。
+    /// 统一按文本还原，与旧 object 模型下 <c>Value.ToString()</c> 的表现一致。
+    /// </summary>
+    public class BriefValueConverter : JsonConverter<string?>
+    {
+        public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            using var document = JsonDocument.ParseValue(ref reader);
+            var element = document.RootElement;
+            return element.ValueKind == JsonValueKind.Null ? null : element.ToString();
+        }
+
+        public override void Write(Utf8JsonWriter writer, string? value, JsonSerializerOptions options)
+        {
+            if (value is null) writer.WriteNullValue();
+            else writer.WriteStringValue(value);
+        }
     }
 }

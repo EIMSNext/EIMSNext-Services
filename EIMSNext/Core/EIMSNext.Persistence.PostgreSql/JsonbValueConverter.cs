@@ -81,7 +81,15 @@ public static class JsonbValueConverter
 
         });
 
-        return new JsonSerializerOptions { TypeInfoResolver = resolver };
+        return new JsonSerializerOptions
+        {
+            TypeInfoResolver = resolver,
+            // object 声明成员（如 Wf_Task.DataBrief 的 BriefField.Value）必须与 HTTP 层
+            // JsonOptions 同样注册 ObjectJsonConverter：STJ 默认会把 object 退化成
+            // JsonElement，而 OData 序列化不认 JsonElement 的内置 converter（不走 MVC
+            // JsonOptions），反射其属性只写出 {"ValueKind":"String"} 空壳。
+            Converters = { new ObjectJsonConverter() },
+        };
     }
 }
 

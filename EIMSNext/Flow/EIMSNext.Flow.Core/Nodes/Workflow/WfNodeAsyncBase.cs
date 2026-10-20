@@ -361,7 +361,7 @@ namespace EIMSNext.Flow.Core.Nodes
                     i++;
                     if (i > max) break;
 
-                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = data.Data.GetValueOrDefault(field.Field) });
+                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = BriefField.ToBriefValue(data.Data.GetValueOrDefault(field.Field)) });
                 }
             }
 
