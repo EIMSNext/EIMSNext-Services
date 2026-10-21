@@ -310,8 +310,8 @@ namespace EIMSNext.Flow.Host.Controllers
 
             // 撤回针对的是当前在途待办（属于任一审批人），发起人自己并没有待办；
             // 若按当前员工过滤，发起人永远查不到任务，撤回功能形同虚设。
-            var task = ResolvePendingTask(request.DataId);
-            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
+            var task = ResolvePendingTask(wfInst.Id, request.DataId);
+            if (task == null)
             {
                 return BadRequest("当前流程无可操作待办");
             }
@@ -371,8 +371,8 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             // 同撤回：催办针对在途待办（任一审批人），不能按当前员工过滤。
-            var task = ResolvePendingTask(request.DataId);
-            if (task == null || !string.Equals(task.WfInstanceId, wfInst.Id, StringComparison.OrdinalIgnoreCase))
+            var task = ResolvePendingTask(wfInst.Id, request.DataId);
+            if (task == null)
             {
                 return BadRequest("当前流程无可操作待办");
             }
@@ -683,9 +683,14 @@ namespace EIMSNext.Flow.Host.Controllers
                 .FirstOrDefault(x => string.IsNullOrEmpty(wfNodeId) || x.ApproveNodeId == wfNodeId);
         }
 
-        private Wf_Task? ResolvePendingTask(string dataId)
+        private Wf_Task? ResolvePendingTask(string wfInstanceId, string dataId)
         {
-            return _taskService.Query(x => x.DataId == dataId).FirstOrDefault();
+            // Task IDs are only unique within the tenant/workflow context.  Restricting
+            // all three keys prevents a historical task (or a same-ID row in another
+            // tenant) from being selected for withdraw/urge.
+            return _taskService.Query(x => x.CorpId == IdentityContext.CurrentCorpId
+                && x.WfInstanceId == wfInstanceId
+                && x.DataId == dataId).FirstOrDefault();
         }
 
         private WorkflowInstance? ResolveReusableWorkflowInstance(string dataId)
