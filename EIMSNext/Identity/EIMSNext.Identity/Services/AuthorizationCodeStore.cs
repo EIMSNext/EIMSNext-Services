@@ -23,10 +23,10 @@ namespace EIMSNext.Identity.Services
             _cache = cache;
         }
 
-        public async Task<string> IssueAsync(string userId, string username, string? clientId, TimeSpan ttl, CancellationToken cancellationToken = default)
+        public async Task<string> IssueAsync(string userId, string username, string? clientId, TimeSpan ttl, bool isSessionRenewal = false, CancellationToken cancellationToken = default)
         {
             var code = RandomNumberGenerator.GetHexString(32, lowercase: true);
-            var payload = JsonSerializer.Serialize(new AuthorizationCodePayload(userId, username, clientId), SerializerOptions);
+            var payload = JsonSerializer.Serialize(new AuthorizationCodePayload(userId, username, clientId, isSessionRenewal), SerializerOptions);
             await _cache.SetStringAsync(
                 Key(code),
                 payload,

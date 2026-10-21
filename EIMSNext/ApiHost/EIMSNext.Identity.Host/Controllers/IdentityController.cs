@@ -101,7 +101,8 @@ namespace EIMSNext.Identity.Host.Controllers
                 return Unauthorized();
             }
 
-            var code = await _authorizationCodeStore.IssueAsync(user.Id, user.Name, InternalClients.WebClientId, TimeSpan.FromSeconds(LoginCodeTtlSeconds));
+            // isSessionRenewal: 会话续签码，消费方换 token 时不记登录审计（避免与真实登录重复）
+            var code = await _authorizationCodeStore.IssueAsync(user.Id, user.Name, InternalClients.WebClientId, TimeSpan.FromSeconds(LoginCodeTtlSeconds), isSessionRenewal: true);
             return Ok(new { code, expires_in = LoginCodeTtlSeconds });
         }
 
