@@ -22,9 +22,9 @@ namespace EIMSNext.Identity.Utilities
         /// </summary>
         public static string? UnscrambleEncrypted(string? encrypted)
         {
-            if (string.IsNullOrWhiteSpace(encrypted))
+            if (string.IsNullOrWhiteSpace(encrypted) || encrypted.StartsWith("eyJ"))
             {
-                return encrypted;
+                return string.Empty;
             }
 
             var value = encrypted.Trim();

@@ -37,7 +37,7 @@ namespace EIMSNext.Identity.Tests
             Assert.AreEqual(original, TokenRequestHelper.UnscrambleEncrypted(original));
         }
 
-        [DataTestMethod]
+        [TestMethod]
         [DataRow(null)]
         [DataRow("")]
         [DataRow("   ")]

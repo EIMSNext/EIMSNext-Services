@@ -361,7 +361,7 @@ namespace EIMSNext.Service.Tests
 
         private sealed class FakeFormDataService : FakeEntityService<FormData>, IFormDataService
         {
-            public Dictionary<string, FormData> Items { get; } = new(StringComparer.Ordinal);
+            public new Dictionary<string, FormData> Items { get; } = new(StringComparer.Ordinal);
             public List<FormData> AddedEntities { get; } = [];
             public List<FormData> ReplacedEntities { get; } = [];
 
