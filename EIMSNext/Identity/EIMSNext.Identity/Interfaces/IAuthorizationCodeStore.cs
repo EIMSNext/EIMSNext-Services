@@ -6,12 +6,12 @@ namespace EIMSNext.Identity.Interfaces
     /// </summary>
     public interface IAuthorizationCodeStore
     {
-        /// <summary>签发授权码，返回随机 code。</summary>
-        Task<string> IssueAsync(string userId, string username, string? clientId, TimeSpan ttl, CancellationToken cancellationToken = default);
+        /// <summary>签发授权码，返回随机 code。会话续签（authorizeCodeSession）场景传 isSessionRenewal: true，消费时不记登录审计。</summary>
+        Task<string> IssueAsync(string userId, string username, string? clientId, TimeSpan ttl, bool isSessionRenewal = false, CancellationToken cancellationToken = default);
 
         /// <summary>消费授权码：有效且 client 匹配时返回签发载荷（无论成败均立即作废，防重放）。</summary>
         Task<AuthorizationCodePayload?> TryConsumeAsync(string code, string? clientId, CancellationToken cancellationToken = default);
-    }
+        }
 
-    public sealed record AuthorizationCodePayload(string UserId, string Username, string? ClientId);
-}
+        public sealed record AuthorizationCodePayload(string UserId, string Username, string? ClientId, bool IsSessionRenewal = false);
+        }

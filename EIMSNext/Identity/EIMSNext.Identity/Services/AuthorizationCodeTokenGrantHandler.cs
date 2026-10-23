@@ -80,7 +80,12 @@ namespace EIMSNext.Identity.Services
 
             var authenticationTime = DateTimeOffset.UtcNow;
             var claims = CreateUserClaims(payload.Username, user, authenticationTime);
-            await AddIdentityLoginAudit(CreateSuccessAudit(payload.Username, user, claims, GrantType));
+            // 会话续签（authorizeCodeSession 签发的 code）不是登录行为：
+            // 同一次登录中 portal 与调用方各消费一个 code，若都记审计会出现重复登录日志。
+            if (!payload.IsSessionRenewal)
+            {
+                await AddIdentityLoginAudit(CreateSuccessAudit(payload.Username, user, claims, GrantType));
+            }
             return TokenRequestResult.Success(payload.Username, GrantType, client.AccessTokenLifetime, scopes, claims);
         }
 
