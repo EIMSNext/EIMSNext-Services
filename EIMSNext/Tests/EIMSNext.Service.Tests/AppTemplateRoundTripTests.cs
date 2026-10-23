@@ -135,7 +135,9 @@ namespace EIMSNext.Service.Tests
             var publishService = new AppPublishService(resolver);
             var installService = new AppInstallService(resolver);
 
-            var appTemplateId = await publishService.PublishAsync(sourceAppId);
+            var publishResult = await publishService.PublishAsync(sourceAppId);
+            var appTemplateId = publishResult.TemplateId;
+            Assert.AreEqual(0, publishResult.Warnings.Count);
 
             var sourceApp = appRepo.Get(sourceAppId)!;
             var sourceForm = formRepo.Get(sourceFormId)!;
@@ -199,7 +201,7 @@ namespace EIMSNext.Service.Tests
             sourceApp.AppMenus.Add(new AppMenu { MenuId = addedFormId, Title = "Added Form", MenuType = FormType.Form });
             await appRepo.ReplaceAsync(sourceApp);
 
-            var republishedTemplateId = await publishService.PublishAsync(sourceAppId);
+            var republishedTemplateId = (await publishService.PublishAsync(sourceAppId)).TemplateId;
             var addedForm = formRepo.Get(addedFormId)!;
             Assert.AreEqual(appTemplateId, republishedTemplateId);
             Assert.AreEqual(originalFormTemplateId, formRepo.Get(sourceFormId)!.TemplateId);
@@ -265,8 +267,10 @@ namespace EIMSNext.Service.Tests
 
             sourceForm.DeleteFlag = true;
             await formRepo.ReplaceAsync(sourceForm);
-            await publishService.PublishAsync(sourceAppId);
+            var republishResult = await publishService.PublishAsync(sourceAppId);
             Assert.IsNull(formTemplateRepo.Get(sourceForm.TemplateId!));
+            Assert.IsTrue(republishResult.Warnings.Any(w => w.Contains("已跳过该工作流")), $"期望包含工作流跳过告警，实际: {string.Join(" | ", republishResult.Warnings)}");
+            Assert.IsNull(workflowTemplateRepo.Get(sourceWorkflow.TemplateId!));
             var republishedMenuIds = JsonNode.Parse(appTemplateRepo.Get(appTemplateId)!.Menus)!
                 .AsArray()
                 .Select(node => node!["menuId"]!.GetValue<string>())

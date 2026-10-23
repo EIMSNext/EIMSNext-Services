@@ -49,7 +49,7 @@ namespace EIMSNext.Service
             return JsonSerializer.Deserialize<EventSetting>(rewritten);
         }
 
-        public static string RewriteJsonReferences(string json, string appId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string>? workflowMap, Dictionary<string, string>? printMap)
+        public static string RewriteJsonReferences(string json, string appId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string>? workflowMap, Dictionary<string, string>? printMap, List<string>? warnings = null, string? ownerLabel = null)
         {
             if (string.IsNullOrWhiteSpace(json))
             {
@@ -57,7 +57,7 @@ namespace EIMSNext.Service
             }
 
             var node = JsonNode.Parse(json);
-            RewriteReferenceNode(node, appId, formMap, dashboardMap, workflowMap, printMap);
+            RewriteReferenceNode(node, appId, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             return node?.ToJsonString() ?? json;
         }
 
@@ -150,14 +150,14 @@ namespace EIMSNext.Service
             }
         }
 
-        private static void RewriteReferenceNode(JsonNode? node, string appId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string>? workflowMap, Dictionary<string, string>? printMap)
+        private static void RewriteReferenceNode(JsonNode? node, string appId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string>? workflowMap, Dictionary<string, string>? printMap, List<string>? warnings, string? ownerLabel)
         {
             switch (node)
             {
                 case JsonArray array:
                     foreach (var item in array)
                     {
-                        RewriteReferenceNode(item, appId, formMap, dashboardMap, workflowMap, printMap);
+                        RewriteReferenceNode(item, appId, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
                     }
                     break;
                 case JsonObject obj:
@@ -180,36 +180,75 @@ namespace EIMSNext.Service
                                 {
                                     obj[property.Key] = newFormId;
                                 }
+                                else
+                                {
+                                    AddUnmappedWarning(warnings, ownerLabel, property.Key, text);
+                                }
                             }
                             else if (property.Key.Equals("sourceId", StringComparison.OrdinalIgnoreCase))
                             {
                                 var mappedSourceId = MapTemplateReference(text, formMap, dashboardMap, workflowMap);
-                                if (!string.IsNullOrWhiteSpace(mappedSourceId))
+                                if (mappedSourceId != text)
                                 {
                                     obj[property.Key] = mappedSourceId;
                                 }
+                                else
+                                {
+                                    AddUnmappedWarning(warnings, ownerLabel, property.Key, text);
+                                }
                             }
-                            else if ((property.Key.Equals("dashboardId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("dashId", StringComparison.OrdinalIgnoreCase)) && dashboardMap.TryGetValue(text, out var newDashboardId))
+                            else if ((property.Key.Equals("dashboardId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("dashId", StringComparison.OrdinalIgnoreCase)))
                             {
-                                obj[property.Key] = newDashboardId;
+                                if (dashboardMap.TryGetValue(text, out var newDashboardId))
+                                {
+                                    obj[property.Key] = newDashboardId;
+                                }
+                                else
+                                {
+                                    AddUnmappedWarning(warnings, ownerLabel, property.Key, text);
+                                }
                             }
-                            else if ((property.Key.Equals("workflowId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("eventFlowId", StringComparison.OrdinalIgnoreCase))
-                                && workflowMap != null
-                                && workflowMap.TryGetValue(text, out var newWorkflowId))
+                            else if ((property.Key.Equals("workflowId", StringComparison.OrdinalIgnoreCase) || property.Key.Equals("eventFlowId", StringComparison.OrdinalIgnoreCase)) && workflowMap != null)
                             {
-                                obj[property.Key] = newWorkflowId;
+                                if (workflowMap.TryGetValue(text, out var newWorkflowId))
+                                {
+                                    obj[property.Key] = newWorkflowId;
+                                }
+                                else
+                                {
+                                    AddUnmappedWarning(warnings, ownerLabel, property.Key, text);
+                                }
                             }
-                            else if (property.Key.Equals("printId", StringComparison.OrdinalIgnoreCase)
-                                && printMap != null
-                                && printMap.TryGetValue(text, out var newPrintId))
+                            else if (property.Key.Equals("printId", StringComparison.OrdinalIgnoreCase) && printMap != null)
                             {
-                                obj[property.Key] = newPrintId;
+                                if (printMap.TryGetValue(text, out var newPrintId))
+                                {
+                                    obj[property.Key] = newPrintId;
+                                }
+                                else
+                                {
+                                    AddUnmappedWarning(warnings, ownerLabel, property.Key, text);
+                                }
                             }
                         }
 
-                        RewriteReferenceNode(property.Value, appId, formMap, dashboardMap, workflowMap, printMap);
+                        RewriteReferenceNode(property.Value, appId, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
                     }
                     break;
+            }
+        }
+
+        private static void AddUnmappedWarning(List<string>? warnings, string? ownerLabel, string key, string value)
+        {
+            if (warnings == null || string.IsNullOrWhiteSpace(value))
+            {
+                return;
+            }
+
+            var message = $"{ownerLabel ?? "资源"} 中存在未能映射的资源引用，已保留原值: {key}={value}";
+            if (!warnings.Contains(message))
+            {
+                warnings.Add(message);
             }
         }
 

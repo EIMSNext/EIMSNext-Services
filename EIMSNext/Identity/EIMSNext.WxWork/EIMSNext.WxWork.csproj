@@ -9,5 +9,6 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="RestSharp" />
+    <PackageReference Include="HKH.Common" />
   </ItemGroup>
 </Project>

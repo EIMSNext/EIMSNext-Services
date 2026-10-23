@@ -1,10 +1,8 @@
 using EIMSNext.ApiCore.RateLimiting;
 using EIMSNext.Identity.Interfaces;
-using EIMSNext.Identity.Models;
 using EIMSNext.Identity.Services;
 using EIMSNext.Common;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Options;
 using RestSharp;
 using System.Reflection;
 
@@ -18,7 +16,7 @@ namespace EIMSNext.Identity.Host.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly ILogger<OpenController> _logger;
-        private readonly PublicAccessOptions _publicAccessOptions;
+        private readonly PublicAccessKeyProvider _accessKeyProvider;
         private readonly PublicSettingLookupService _publicSettingLookup;
         private readonly PublicRateLimiter _rateLimiter;
         private readonly IIntegrationAuthService _integrationAuthService;
@@ -26,14 +24,14 @@ namespace EIMSNext.Identity.Host.Controllers
         public OpenController(
             IConfiguration configuration,
             ILogger<OpenController> logger,
-            IOptions<PublicAccessOptions> publicAccessOptions,
+            PublicAccessKeyProvider accessKeyProvider,
             PublicSettingLookupService publicSettingLookup,
             PublicRateLimiter rateLimiter,
             IIntegrationAuthService integrationAuthService)
         {
             _configuration = configuration;
             _logger = logger;
-            _publicAccessOptions = publicAccessOptions.Value;
+            _accessKeyProvider = accessKeyProvider;
             _publicSettingLookup = publicSettingLookup;
             _rateLimiter = rateLimiter;
             _integrationAuthService = integrationAuthService;
@@ -59,10 +57,11 @@ namespace EIMSNext.Identity.Host.Controllers
                 return BadRequest(new { message = "targetId 不能为空" });
             }
 
-            if (string.IsNullOrWhiteSpace(_publicAccessOptions.SecretKey))
+            var secretKey = _accessKeyProvider.GetSecretKey();
+            if (string.IsNullOrWhiteSpace(secretKey))
             {
-                _logger.LogError("PublicAccess:SecretKey 未配置");
-                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "PublicAccess:SecretKey 未配置" });
+                _logger.LogError("公开访问密钥未初始化（Client.eimsnext.public.ClientSecret 为空）");
+                return StatusCode(StatusCodes.Status500InternalServerError, new { message = "公开访问密钥未初始化" });
             }
 
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -79,7 +78,7 @@ namespace EIMSNext.Identity.Host.Controllers
             }
 
             var timestampMs = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-            var password = PublicPasswordHelper.GenerateChallenge(targetId, _publicAccessOptions.SecretKey, timestampMs);
+            var password = PublicPasswordHelper.GenerateChallenge(targetId, secretKey, timestampMs);
             var expiresAt = timestampMs + 5 * 60 * 1000;
             return Ok(new { password, expiresAt });
         }

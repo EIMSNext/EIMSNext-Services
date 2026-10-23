@@ -35,10 +35,10 @@ public class IdentityHostSettings
     /// </summary>
     public string? TokenEndPoint => BuildEndpoint("connect/token");
 
-    /// <summary>
-    /// 获取系统令牌端点 URL。
-    /// </summary>
-    public string? SystemTokenEndPoint => BuildEndpoint("system/token");
+        /// <summary>
+        /// 获取系统令牌端点 URL。
+        /// </summary>
+        public string? SystemTokenEndPoint => BuildEndpoint("system/token");
 
     private string? BuildEndpoint(string relativePath)
     {

@@ -18,7 +18,8 @@ namespace EIMSNext.Identity.Utilities
         /// authorizeCode 请求 encrypted 的混淆变体还原：前端把 base64 真实前缀
         /// <c>eyJ</c>（即 <c>{"</c> 的编码）替换为 3 位随机数，并去掉末尾 = 补位。
         /// 还原规则：前 3 位是数字则换回 eyJ；按长度重新补齐 =（长度 %4==1 属非法输入，
-        /// 原样返回交由 ParseEncryptedFields 报错）。
+        /// 原样返回交由 ParseEncryptedFields 报错）。encrypted 必须是混淆后的变体：
+        /// 空/空白或仍是原始 eyJ 前缀（未混淆）的输入一律返回空串，拒绝未混淆请求。
         /// </summary>
         public static string? UnscrambleEncrypted(string? encrypted)
         {

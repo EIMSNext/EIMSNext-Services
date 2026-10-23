@@ -100,12 +100,13 @@ namespace EIMSNext.Identity.Tests
         [TestMethod]
         public async Task HandleAsync_SystemGrant_ReturnsSystemClaims()
         {
+            // system client 的 secret 以明文存储、明文恒定时间比对（ValidateClient system 分支）。
             var client = new Client
             {
                 Id = InternalClients.SystemClientId,
                 Enabled = true,
                 RequireClientSecret = true,
-                ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                ClientSecret = "system-plain-secret-001",
                 AllowedGrantTypes = [CustomGrantType.System],
                 AllowedScopes = ["api.readwrite"]
             };
@@ -118,7 +119,7 @@ namespace EIMSNext.Identity.Tests
             var request = new OpenIddictRequest
             {
                 ClientId = InternalClients.SystemClientId,
-                ClientSecret = InternalClients.SystemClientSecret,
+                ClientSecret = "system-plain-secret-001",
                 GrantType = CustomGrantType.System,
                 Scope = "api.readwrite"
             };
@@ -137,14 +138,14 @@ namespace EIMSNext.Identity.Tests
         }
 
         [TestMethod]
-        public async Task HandleAsync_SystemGrant_Fails_WhenObjectInfoMissing()
+        public async Task HandleAsync_SystemGrant_Fails_WhenSecretWrong()
         {
             var client = new Client
             {
                 Id = InternalClients.SystemClientId,
                 Enabled = true,
                 RequireClientSecret = true,
-                ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                ClientSecret = "system-plain-secret-001",
                 AllowedGrantTypes = [CustomGrantType.System],
                 AllowedScopes = ["api.readwrite"]
             };
@@ -156,7 +157,83 @@ namespace EIMSNext.Identity.Tests
             var request = new OpenIddictRequest
             {
                 ClientId = InternalClients.SystemClientId,
-                ClientSecret = InternalClients.SystemClientSecret,
+                ClientSecret = "wrong-secret",
+                GrantType = CustomGrantType.System,
+                Scope = "api.readwrite"
+            };
+            request.SetParameter("corp_id", "corp-001");
+            request.SetParameter("object_type", "wf");
+            request.SetParameter("object_id", "wf-inst-001");
+
+            var result = await handler.HandleAsync(request);
+
+            Assert.IsFalse(result.Succeeded);
+            Assert.AreEqual(Errors.InvalidClient, result.Error);
+        }
+
+        [TestMethod]
+        public async Task HandleAsync_HashSecretClient_Succeeds()
+        {
+            // 非 system client 的 secret 存 SHA256 hash，ValidateClient hash 分支恒定时间比对。
+            const string plainSecret = "hash-client-secret-001";
+            var client = new Client
+            {
+                Id = "hash-client-001",
+                Enabled = true,
+                RequireClientSecret = true,
+                ClientSecret = plainSecret.Sha256(),
+                AllowedGrantTypes = [GrantTypes.Password],
+                AllowedScopes = ["api.readwrite"]
+            };
+            var user = new User
+            {
+                Id = "admin",
+                Name = "Admin",
+                Email = "admin@eimsnext.com",
+                Password = "hashed",
+                UserCorps = [new UserCorp { CorpId = "corp-001", IsDefault = true }]
+            };
+
+            var handler = new TokenRequestHandler(
+                new FakeUserService(user, [client]),
+                CreateGrantHandlers(user));
+
+            var request = new OpenIddictRequest
+            {
+                ClientId = "hash-client-001",
+                ClientSecret = plainSecret,
+                GrantType = GrantTypes.Password,
+                Username = user.Email,
+                Password = Constants.NoPassword,
+                Scope = "api.readwrite"
+            };
+
+            var result = await handler.HandleAsync(request);
+
+            Assert.IsTrue(result.Succeeded);
+        }
+
+        [TestMethod]
+        public async Task HandleAsync_SystemGrant_Fails_WhenObjectInfoMissing()
+        {
+            var client = new Client
+            {
+                Id = InternalClients.SystemClientId,
+                Enabled = true,
+                RequireClientSecret = true,
+                ClientSecret = "system-plain-secret-001",
+                AllowedGrantTypes = [CustomGrantType.System],
+                AllowedScopes = ["api.readwrite"]
+            };
+
+            var handler = new TokenRequestHandler(
+                new FakeUserService(new User { Id = "noop", Name = "noop" }, [client]),
+                CreateGrantHandlers(new User { Id = "noop", Name = "noop" }));
+
+            var request = new OpenIddictRequest
+            {
+                ClientId = InternalClients.SystemClientId,
+                ClientSecret = "system-plain-secret-001",
                 GrantType = CustomGrantType.System,
                 Scope = "api.readwrite"
             };

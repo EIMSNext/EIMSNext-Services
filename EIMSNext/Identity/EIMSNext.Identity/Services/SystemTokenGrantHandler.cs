@@ -10,7 +10,9 @@ namespace EIMSNext.Identity.Services;
 
 public sealed class SystemTokenGrantHandler : TokenGrantHandlerBase, ITokenGrantHandler
 {
-    public SystemTokenGrantHandler(IIdentityLoginAuditService auditLoginService, IHttpContextAccessor contextAccessor)
+    public SystemTokenGrantHandler(
+        IIdentityLoginAuditService auditLoginService,
+        IHttpContextAccessor contextAccessor)
         : base(auditLoginService, contextAccessor)
     {
     }

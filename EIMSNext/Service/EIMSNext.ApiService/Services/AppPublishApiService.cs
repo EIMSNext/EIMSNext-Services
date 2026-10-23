@@ -32,25 +32,25 @@ namespace EIMSNext.ApiService
         /// 同一 <c>AppDef</c> 重复发布会走 upsert 路径，<c>AppProfile</c> 不会重复。
         /// </summary>
         /// <param name="appDefId">要发布的 <see cref="AppDef"/> Id。</param>
-        /// <returns>新创建或已更新的 <see cref="AppProfile"/> Id。</returns>
-        public async Task<string> PublishAsync(string appDefId)
+        /// <returns>应用档案 Id 与发布告警（被跳过/保留原值的引用说明）。</returns>
+        public async Task<AppPublishApiResult> PublishAsync(string appDefId)
         {
             if (string.IsNullOrWhiteSpace(appDefId))
             {
                 throw new BadRequestException("appDefId 不能为空");
             }
 
-            var templateId = await PublishService.PublishAsync(appDefId);
+            var result = await PublishService.PublishAsync(appDefId);
 
             var profile = AppProfileRepository.Queryable
-                .FirstOrDefault(x => x.TemplateId == templateId && !x.DeleteFlag);
+                .FirstOrDefault(x => x.TemplateId == result.TemplateId && !x.DeleteFlag);
 
             if (profile != null)
             {
                 await StampAuthorAsync(profile);
             }
 
-            return profile?.Id ?? templateId;
+            return new AppPublishApiResult(profile?.Id ?? result.TemplateId, result.Warnings);
         }
 
         /// <summary>

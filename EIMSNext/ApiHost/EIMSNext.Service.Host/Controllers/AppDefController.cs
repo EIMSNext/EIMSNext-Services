@@ -5,6 +5,7 @@ using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.ApiService.ViewModels;
 using EIMSNext.Entities;
+using EIMSNext.Service.Contracts;
 using EIMSNext.Service.Host.Authorization;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -49,10 +50,10 @@ namespace EIMSNext.Service.Host.Controllers
         /// 仅 <c>PlatAdmin</c> 可调用。
         /// </summary>
         /// <param name="id">应用定义 Id。</param>
-        /// <returns>新创建或已更新的 <see cref="AppProfile"/> Id。</returns>
+        /// <returns>应用档案 Id 与发布告警。</returns>
         [HttpPost("{id}/publish")]
         [IdentityType(IdentityTypeDefaults.PlatAdmin)]
-        public async Task<ActionResult<string>> Publish([FromRoute] string id)
+        public async Task<ActionResult<AppPublishApiResult>> Publish([FromRoute] string id)
         {
             var apiService = Resolver.Resolve<AppPublishApiService>();
             return Ok(await apiService.PublishAsync(id));

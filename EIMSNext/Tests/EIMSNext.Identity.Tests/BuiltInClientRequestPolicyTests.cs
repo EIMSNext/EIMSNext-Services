@@ -13,6 +13,7 @@ using EIMSNext.ApiService;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
@@ -185,7 +186,7 @@ namespace EIMSNext.Identity.Tests
             {
                 ["grant_type"] = CustomGrantType.System,
                 ["client_id"] = InternalClients.SystemClientId,
-                ["client_secret"] = InternalClients.SystemClientSecret,
+                ["client_secret"] = "system-secret-001",
                 ["scope"] = "api.readwrite",
                 ["corp_id"] = "corp-001",
                 ["object_type"] = "wf",
@@ -199,7 +200,7 @@ namespace EIMSNext.Identity.Tests
             Assert.AreEqual(1, handler.CallCount);
             Assert.AreEqual(CustomGrantType.System, handler.LastRequest?.GrantType);
             Assert.AreEqual(InternalClients.SystemClientId, handler.LastRequest?.ClientId);
-            Assert.AreEqual(InternalClients.SystemClientSecret, handler.LastRequest?.ClientSecret);
+            Assert.AreEqual("system-secret-001", handler.LastRequest?.ClientSecret);
             Assert.AreEqual("corp-001", handler.LastRequest?.GetParameter("corp_id")?.ToString());
             Assert.AreEqual("wf", handler.LastRequest?.GetParameter("object_type")?.ToString());
             Assert.AreEqual("instance-001", handler.LastRequest?.GetParameter("object_id")?.ToString());
@@ -318,7 +319,12 @@ namespace EIMSNext.Identity.Tests
 
         private static AuthorizationController CreateController(RecordingTokenRequestHandler handler)
         {
-            return new AuthorizationController(handler, CreatePolicy(), new FakeHostEnvironment(isDevelopment: true));
+            return new AuthorizationController(
+                handler,
+                CreatePolicy(),
+                new FakeHostEnvironment(isDevelopment: true),
+                new ConfigurationBuilder().Build(),
+                new HttpContextAccessor());
         }
 
         private static HttpRequest CreateRequest(string? origin = null)

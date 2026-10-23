@@ -54,6 +54,11 @@ namespace EIMSNext.ApiCore
                 {
                     return "127.0.0.1";
                 }
+                // IPv4-mapped IPv6（::ffff:a.b.c.d）归一化为 IPv4，保证与白名单规则可比
+                if (remoteIp.IsIPv4MappedToIPv6)
+                {
+                    return remoteIp.MapToIPv4().ToString();
+                }
                 return remoteIp.ToString();
             }
 

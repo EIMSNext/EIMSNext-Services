@@ -20,10 +20,9 @@ namespace EIMSNext.ApiCore
         private readonly IWebHostEnvironment _environment;
 
         /// <summary>
-        /// 
+        ///
         /// </summary>
         /// <param name="next"></param>
-        /// <param name="logger"></param>
         public ExceptionFilterMiddleware(RequestDelegate next, IWebHostEnvironment environment, ILogger<ExceptionFilterMiddleware> logger)
         {
             _next = next;
@@ -81,6 +80,13 @@ namespace EIMSNext.ApiCore
                 return (StatusCodes.Status400BadRequest, "badrequest", "请求格式不合法或超出限制");
             }
 
+            // UnLogException 的消息是开发人员编写的业务提示（不落日志），各环境均原样返回调用方。
+            if (error is UnLogException)
+            {
+                return (StatusCodes.Status500InternalServerError, "internalservererror", error.Message);
+            }
+
+            // 内部异常细节只允许 Development 返回（本地调试）；生产一律通用消息，表/列/SQL 等信息只进日志。
             var errorMsg = _environment.IsDevelopment() ? GetInnerExceptionMessage(error) : "抱歉，出错了";
             return (StatusCodes.Status500InternalServerError, "internalservererror", errorMsg);
         }

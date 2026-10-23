@@ -1,5 +1,6 @@
 using System.Composition;
 using EIMSNext.Entities;
+using HKH.Common;
 using EIMSNext.Identity.Abstractions;
 using EIMSNext.Core;
 using EIMSNext.Core.Abstractions;
@@ -23,7 +24,7 @@ namespace EIMSNext.Identity.Feishu
         {
             var token = await client.GetUserAccessTokenAsync(GetClientId(setting), GetClientSecret(setting), GetRequiredCode(payload.Code, "飞书"), cancellationToken);
             var userInfo = await client.GetUserInfoAsync(token.Data?.AccessToken ?? string.Empty, cancellationToken);
-            var data = userInfo.Data ?? throw new InvalidOperationException("未能获取飞书用户信息");
+            var data = userInfo.Data ?? throw new UnLogException("未能获取飞书用户信息");
 
             return new IntegrationAuthResult
             {

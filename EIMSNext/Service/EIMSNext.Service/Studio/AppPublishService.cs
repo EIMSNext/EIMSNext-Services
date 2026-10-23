@@ -18,8 +18,9 @@ namespace EIMSNext.Service
     {
         private readonly IResolver _resolver = resolver;
 
-        public async Task<string> PublishAsync(string appDefId)
+        public async Task<AppPublishResult> PublishAsync(string appDefId)
         {
+            var warnings = new List<string>();
             var appDefRepo = _resolver.GetRepository<AppDef>();
             var formDefRepo = _resolver.GetRepository<FormDef>();
             var dashboardDefRepo = _resolver.GetRepository<DashboardDef>();
@@ -53,9 +54,47 @@ namespace EIMSNext.Service
             var formMap = formDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(formTemplateRepo, x.TemplateId));
             var dashboardMap = dashboardDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(dashboardTemplateRepo, x.TemplateId));
             var dashboardItemMap = dashboardItemDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(dashboardItemTemplateRepo, x.TemplateId));
-            var wfMap = wfDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(wfTemplateRepo, x.TemplateId));
-            var printMap = printDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(printTemplateRepo, x.TemplateId));
-            var permissionGroupMap = permissionGroups.ToDictionary(x => x.Id, x => EnsureTemplateId(permissionGroupTemplateRepo, x.TemplateId));
+            // 工作流绑定的表单（ExternalId）无法映射时整个工作流跳过发布，原因写入 warnings 供发布人员查看。
+            var wfMap = new Dictionary<string, string>();
+            var publishableWfDefs = new List<(Wf_Definition Def, string ExternalTemplateId)>();
+            foreach (var wfDef in wfDefs)
+            {
+                var externalTemplateId = MapEntityReferenceToTemplate(
+                    wfDef.ExternalId, formMap, dashboardMap, wfMap, warnings,
+                    $"工作流[{wfDef.Name}] 绑定的表单不存在或已被删除，已跳过该工作流: {wfDef.ExternalId}");
+                if (externalTemplateId == null)
+                {
+                    continue;
+                }
+
+                wfMap[wfDef.Id] = EnsureTemplateId(wfTemplateRepo, wfDef.TemplateId);
+                publishableWfDefs.Add((wfDef, externalTemplateId));
+            }
+            // 打印模板/权限组绑定的表单（FormId）无法映射时整个资源跳过发布，原因写入 warnings 供发布人员查看。
+            var publishablePrintDefs = new List<PrintDef>();
+            foreach (var printDef in printDefs)
+            {
+                if (!string.IsNullOrWhiteSpace(printDef.FormId) && !formMap.ContainsKey(printDef.FormId))
+                {
+                    AddPublishWarning(warnings, $"打印模板[{printDef.Name}] 绑定的表单不存在或已被删除，已跳过该打印模板: {printDef.FormId}");
+                    continue;
+                }
+
+                publishablePrintDefs.Add(printDef);
+            }
+            var publishablePermissionGroups = new List<FormDataPermissionGroup>();
+            foreach (var permissionGroup in permissionGroups)
+            {
+                if (!string.IsNullOrWhiteSpace(permissionGroup.FormId) && !formMap.ContainsKey(permissionGroup.FormId))
+                {
+                    AddPublishWarning(warnings, $"权限组[{permissionGroup.Name}] 绑定的表单不存在或已被删除，已跳过该权限组: {permissionGroup.FormId}");
+                    continue;
+                }
+
+                publishablePermissionGroups.Add(permissionGroup);
+            }
+            var printMap = publishablePrintDefs.ToDictionary(x => x.Id, x => EnsureTemplateId(printTemplateRepo, x.TemplateId));
+            var permissionGroupMap = publishablePermissionGroups.ToDictionary(x => x.Id, x => EnsureTemplateId(permissionGroupTemplateRepo, x.TemplateId));
             var dashboardLayoutMap = CreateLayoutTemplateMap(dashboardDefs);
 
             var formTemplateState = GetTemplateState(formTemplateRepo, appTemplateId, formMap.Values, x => x.AppTemplateId);
@@ -75,7 +114,7 @@ namespace EIMSNext.Service
                 Name = appDef.Name,
                 Description = appDef.Description,
                 Icon = appDef.Icon,
-                Menus = SerializeTemplateMenus(appDef.AppMenus, formMap, dashboardMap)
+                Menus = SerializeTemplateMenus(appDef.AppMenus, formMap, dashboardMap, warnings)
             };
             var formTemplates = formDefs.ToDictionary(formDef => formDef.Id, formDef => new FormTemplate
             {
@@ -84,9 +123,9 @@ namespace EIMSNext.Service
                 Name = formDef.Name,
                 Type = FormType.Form,
                 Icon = string.Empty,
-                Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap),
+                Content = RewriteFormDefContent(formDef, formMap, dashboardMap, wfMap, printMap, warnings, $"表单[{formDef.Name}]"),
                 UsingWorkflow = formDef.UsingWorkflow,
-                FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap)
+                FormSettings = RewriteFormDefSettings(formDef, formMap, dashboardMap, wfMap, printMap, warnings, $"表单[{formDef.Name}]")
             });
             var dashboardTemplates = dashboardDefs.ToDictionary(dashboardDef => dashboardDef.Id, dashboardDef => new DashboardTemplate
             {
@@ -103,37 +142,37 @@ namespace EIMSNext.Service
                 ItemType = itemDef.ItemType,
                 LayoutId = dashboardLayoutMap.TryGetValue(itemDef.LayoutId, out var layoutId) ? layoutId : itemDef.LayoutId,
                 Name = itemDef.Name,
-                Details = RewriteJsonToTemplate(itemDef.Details, formMap, dashboardMap, wfMap, printMap)
+                Details = RewriteJsonToTemplate(itemDef.Details, formMap, dashboardMap, wfMap, printMap, warnings, $"看板项[{itemDef.Name}]")
             });
-            var workflowTemplates = wfDefs.ToDictionary(wfDef => wfDef.Id, wfDef => new WfDefinitionTemplate
+            var workflowTemplates = publishableWfDefs.ToDictionary(entry => entry.Def.Id, entry => new WfDefinitionTemplate
             {
-                Id = wfMap[wfDef.Id],
+                Id = wfMap[entry.Def.Id],
                 AppTemplateId = appTemplateId,
-                Name = wfDef.Name,
-                FlowType = wfDef.FlowType,
-                ExternalTemplateId = MapEntityReferenceToTemplate(wfDef.ExternalId, formMap, dashboardMap, wfMap, wfDef.Name),
-                Description = wfDef.Description,
-                Content = RewriteJsonToTemplate(wfDef.Content, formMap, dashboardMap, wfMap, printMap),
-                Metadata = RewriteWorkflowMetadataToTemplate(wfDef.Metadata, formMap, dashboardMap, wfMap, printMap),
-                EventSource = wfDef.EventSource,
-                SourceTemplateId = MapEntityReferenceToTemplate(wfDef.SourceId, formMap, dashboardMap, wfMap, wfDef.Name),
-                EventSetting = RewriteEventSettingToTemplate(wfDef.EventSetting, formMap, dashboardMap, wfMap),
-                Disabled = wfDef.Disabled
+                Name = entry.Def.Name,
+                FlowType = entry.Def.FlowType,
+                ExternalTemplateId = entry.ExternalTemplateId,
+                Description = entry.Def.Description,
+                Content = RewriteJsonToTemplate(entry.Def.Content, formMap, dashboardMap, wfMap, printMap, warnings, $"工作流[{entry.Def.Name}]"),
+                Metadata = RewriteWorkflowMetadataToTemplate(entry.Def.Metadata, formMap, dashboardMap, wfMap, printMap, warnings, $"工作流[{entry.Def.Name}]"),
+                EventSource = entry.Def.EventSource,
+                SourceTemplateId = MapEntityReferenceToTemplate(entry.Def.SourceId, formMap, dashboardMap, wfMap, warnings, $"工作流[{entry.Def.Name}] 的事件来源不存在或已被删除，已忽略事件来源: {entry.Def.SourceId}"),
+                EventSetting = RewriteEventSettingToTemplate(entry.Def.EventSetting, formMap, dashboardMap, wfMap, warnings, $"工作流[{entry.Def.Name}]"),
+                Disabled = entry.Def.Disabled
             });
-            var printTemplates = printDefs.ToDictionary(printDef => printDef.Id, printDef => new PrintDefTemplate
+            var printTemplates = publishablePrintDefs.ToDictionary(printDef => printDef.Id, printDef => new PrintDefTemplate
             {
                 Id = printMap[printDef.Id],
                 AppTemplateId = appTemplateId,
                 FormTemplateId = formMap.TryGetValue(printDef.FormId, out var formTemplateId) ? formTemplateId : string.Empty,
                 Name = printDef.Name,
-                Content = RewriteJsonToTemplate(printDef.Content, formMap, dashboardMap, wfMap, printMap),
+                Content = RewriteJsonToTemplate(printDef.Content, formMap, dashboardMap, wfMap, printMap, warnings, $"打印模板[{printDef.Name}]"),
                 PrintType = printDef.PrintType
             });
-            var permissionGroupTemplates = permissionGroups.ToDictionary(permissionGroup => permissionGroup.Id, permissionGroup => new FormDataPermissionGroupTemplate
+            var permissionGroupTemplates = publishablePermissionGroups.ToDictionary(permissionGroup => permissionGroup.Id, permissionGroup => new FormDataPermissionGroupTemplate
             {
                 Id = permissionGroupMap[permissionGroup.Id],
                 AppTemplateId = appTemplateId,
-                FormTemplateId = formMap.TryGetValue(permissionGroup.FormId, out var formTemplateId) ? formTemplateId : permissionGroup.FormId,
+                FormTemplateId = formMap.TryGetValue(permissionGroup.FormId, out var groupFormTemplateId) ? groupFormTemplateId : permissionGroup.FormId,
                 Name = permissionGroup.Name,
                 Desc = permissionGroup.Desc,
                 Type = permissionGroup.Type,
@@ -182,21 +221,21 @@ namespace EIMSNext.Service
                 await SetTemplateIdAsync(dashboardItemDefRepo, itemDef, dashboardItemMap[itemDef.Id]);
             }
 
-            foreach (var wfDef in wfDefs)
+            foreach (var (wfDef, _) in publishableWfDefs)
             {
                 await UpsertAsync(wfTemplateRepo, workflowTemplates[wfDef.Id], workflowTemplateState.ExistingIds.Contains(wfMap[wfDef.Id]));
 
                 await SetTemplateIdAsync(wfDefRepo, wfDef, wfMap[wfDef.Id]);
             }
 
-            foreach (var printDef in printDefs)
+            foreach (var printDef in publishablePrintDefs)
             {
                 await UpsertAsync(printTemplateRepo, printTemplates[printDef.Id], printTemplateState.ExistingIds.Contains(printMap[printDef.Id]));
 
                 await SetTemplateIdAsync(printDefRepo, printDef, printMap[printDef.Id]);
             }
 
-            foreach (var permissionGroup in permissionGroups)
+            foreach (var permissionGroup in publishablePermissionGroups)
             {
                 await UpsertAsync(permissionGroupTemplateRepo, permissionGroupTemplates[permissionGroup.Id], permissionGroupTemplateState.ExistingIds.Contains(permissionGroupMap[permissionGroup.Id]));
 
@@ -209,7 +248,7 @@ namespace EIMSNext.Service
 
             scope.CommitTransaction();
 
-            return appTemplateId;
+            return new AppPublishResult(appTemplateId, warnings);
         }
 
         private static TemplateState GetTemplateState<T>(
@@ -379,28 +418,28 @@ namespace EIMSNext.Service
             }
         }
 
-        private static FormContent RewriteFormDefContent(FormDef formDef, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap)
+        private static FormContent RewriteFormDefContent(FormDef formDef, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap, List<string> warnings, string ownerLabel)
         {
             var json = JsonSerializer.Serialize(formDef.Content);
-            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap);
+            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             return JsonSerializer.Deserialize<FormContent>(rewritten) ?? new FormContent();
         }
 
-        private static FormSettings RewriteFormDefSettings(FormDef formDef, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap)
+        private static FormSettings RewriteFormDefSettings(FormDef formDef, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap, List<string> warnings, string ownerLabel)
         {
             var json = JsonSerializer.Serialize(formDef.FormSettings);
-            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap);
+            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             return JsonSerializer.Deserialize<FormSettings>(rewritten) ?? new FormSettings();
         }
 
-        private static WfMetadata RewriteWorkflowMetadataToTemplate(WfMetadata metadata, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap)
+        private static WfMetadata RewriteWorkflowMetadataToTemplate(WfMetadata metadata, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap, List<string> warnings, string ownerLabel)
         {
             var json = JsonSerializer.Serialize(metadata);
-            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap);
+            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             return JsonSerializer.Deserialize<WfMetadata>(rewritten) ?? new WfMetadata();
         }
 
-        private static EventSetting? RewriteEventSettingToTemplate(EventSetting? eventSetting, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap)
+        private static EventSetting? RewriteEventSettingToTemplate(EventSetting? eventSetting, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, List<string> warnings, string ownerLabel)
         {
             if (eventSetting == null)
             {
@@ -408,11 +447,11 @@ namespace EIMSNext.Service
             }
 
             var json = JsonSerializer.Serialize(eventSetting);
-            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, null);
+            var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, null, warnings, ownerLabel);
             return JsonSerializer.Deserialize<EventSetting>(rewritten);
         }
 
-        private static string RewriteJsonToTemplate(string json, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string>? printMap)
+        private static string RewriteJsonToTemplate(string json, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string>? printMap, List<string> warnings, string ownerLabel)
         {
             return AppTemplateReferenceRewriter.RewriteJsonReferences(
                 json,
@@ -420,10 +459,15 @@ namespace EIMSNext.Service
                 formMap,
                 dashboardMap,
                 workflowMap,
-                printMap);
+                printMap,
+                warnings,
+                ownerLabel);
         }
 
-        private static string? MapEntityReferenceToTemplate(string? entityId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, string? ownerName)
+        /// <summary>
+        /// 将发布引用映射为模板 Id；映射不到时不中止发布，返回 null 并把原因写入 <paramref name="warnings"/>。
+        /// </summary>
+        private static string? MapEntityReferenceToTemplate(string? entityId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, List<string> warnings, string unmappedMessage)
         {
             if (string.IsNullOrWhiteSpace(entityId))
             {
@@ -445,17 +489,20 @@ namespace EIMSNext.Service
                 return workflowTemplateId;
             }
 
-            // 映射表只覆盖当前应用且未删除的资源，映射失败说明该引用无法解析到应用内的模板。
-            // 原先原样保留会把无效 ID 写进模板字段，污染模板数据并导致导出校验失败，故直接中止发布。
-            throw new BadRequestException($"{(string.IsNullOrWhiteSpace(ownerName) ? "工作流" : ownerName)} 引用了不存在或不属于当前应用的资源: {entityId}");
+            if (!warnings.Contains(unmappedMessage))
+            {
+                warnings.Add(unmappedMessage);
+            }
+
+            return null;
         }
 
-        private static string SerializeTemplateMenus(List<AppMenu> menus, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
+        private static string SerializeTemplateMenus(List<AppMenu> menus, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, List<string> warnings)
         {
             var items = new JsonArray();
             foreach (var menu in menus)
             {
-                var mappedMenu = MapMenuToTemplate(menu, formMap, dashboardMap);
+                var mappedMenu = MapMenuToTemplate(menu, formMap, dashboardMap, warnings);
                 if (mappedMenu != null)
                 {
                     items.Add(mappedMenu);
@@ -465,13 +512,14 @@ namespace EIMSNext.Service
             return items.ToJsonString();
         }
 
-        private static JsonObject? MapMenuToTemplate(AppMenu menu, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
+        private static JsonObject? MapMenuToTemplate(AppMenu menu, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, List<string> warnings)
         {
             var menuId = menu.MenuId;
             if (menu.MenuType == FormType.Form)
             {
                 if (!formMap.TryGetValue(menu.MenuId, out var formTemplateId))
                 {
+                    AddPublishWarning(warnings, $"菜单[{menu.Title}] 引用的表单不存在或已被删除，已跳过该菜单: {menu.MenuId}");
                     return null;
                 }
                 menuId = formTemplateId;
@@ -480,6 +528,7 @@ namespace EIMSNext.Service
             {
                 if (!dashboardMap.TryGetValue(menu.MenuId, out var dashboardTemplateId))
                 {
+                    AddPublishWarning(warnings, $"菜单[{menu.Title}] 引用的看板不存在或已被删除，已跳过该菜单: {menu.MenuId}");
                     return null;
                 }
                 menuId = dashboardTemplateId;
@@ -503,7 +552,7 @@ namespace EIMSNext.Service
                 var subMenus = new JsonArray();
                 foreach (var subMenu in menu.SubMenus)
                 {
-                    var mappedSubMenu = MapMenuToTemplate(subMenu, formMap, dashboardMap);
+                    var mappedSubMenu = MapMenuToTemplate(subMenu, formMap, dashboardMap, warnings);
                     if (mappedSubMenu != null)
                     {
                         subMenus.Add(mappedSubMenu);
@@ -513,6 +562,14 @@ namespace EIMSNext.Service
             }
 
             return obj;
+        }
+
+        private static void AddPublishWarning(List<string> warnings, string message)
+        {
+            if (!warnings.Contains(message))
+            {
+                warnings.Add(message);
+            }
         }
     }
 }

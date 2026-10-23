@@ -3,7 +3,7 @@ using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Models;
 using EIMSNext.Identity.Services;
-using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace EIMSNext.Identity.Tests;
 
@@ -54,21 +54,23 @@ public sealed class PublicTokenServiceTests
 
     private static PublicTokenService CreateService(params PublicAccessSetting[] settings)
     {
-        return new PublicTokenService(
-            new FakeIdentityDbContext(settings),
-            Options.Create(new PublicAccessOptions { SecretKey = SecretKey }));
+        var clients = new[] { new Client { Id = InternalClients.PublicClientId, ClientSecret = SecretKey } };
+        var db = new FakeIdentityDbContext(settings, clients);
+        return new PublicTokenService(db, new PublicAccessKeyProvider(db, new MemoryCache(new MemoryCacheOptions())));
     }
 
     private sealed class FakeIdentityDbContext : IIdentityDbContext
     {
         private readonly IQueryable<PublicAccessSetting> _publicSettings;
+        private readonly IQueryable<Client> _clients;
 
-        public FakeIdentityDbContext(IEnumerable<PublicAccessSetting> settings)
+        public FakeIdentityDbContext(IEnumerable<PublicAccessSetting> settings, IEnumerable<Client>? clients = null)
         {
             _publicSettings = settings.AsQueryable();
+            _clients = (clients ?? Enumerable.Empty<Client>()).AsQueryable();
         }
 
-        public IQueryable<Client> Clients => Enumerable.Empty<Client>().AsQueryable();
+        public IQueryable<Client> Clients => _clients;
         public IQueryable<User> Users => Enumerable.Empty<User>().AsQueryable();
         public IQueryable<UserCorp> UserCorps => Enumerable.Empty<UserCorp>().AsQueryable();
         public IQueryable<EmployeeLookup> Employees => Enumerable.Empty<EmployeeLookup>().AsQueryable();

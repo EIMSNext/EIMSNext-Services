@@ -30,20 +30,20 @@ namespace EIMSNext.Identity.Tests
         }
 
         [TestMethod]
-        public void UnscrambleEncrypted_KeepsPlainBase64Unchanged()
+        public void UnscrambleEncrypted_RejectsUnscrambledInput()
         {
-            // 未混淆的 encrypted（真实前缀 eyJ）应原样通过
+            // encrypted 必须是混淆后的变体：仍是真实前缀 eyJ（未混淆）的输入直接拒绝
             var original = Encode(new Dictionary<string, string> { ["grant_type"] = "authorization_code" });
-            Assert.AreEqual(original, TokenRequestHelper.UnscrambleEncrypted(original));
+            Assert.AreEqual(string.Empty, TokenRequestHelper.UnscrambleEncrypted(original));
         }
 
         [TestMethod]
         [DataRow(null)]
         [DataRow("")]
         [DataRow("   ")]
-        public void UnscrambleEncrypted_PassesEmptyThrough(string? encrypted)
+        public void UnscrambleEncrypted_EmptyInputReturnsEmpty(string? encrypted)
         {
-            Assert.AreEqual(encrypted, TokenRequestHelper.UnscrambleEncrypted(encrypted));
+            Assert.AreEqual(string.Empty, TokenRequestHelper.UnscrambleEncrypted(encrypted));
         }
 
         [TestMethod]

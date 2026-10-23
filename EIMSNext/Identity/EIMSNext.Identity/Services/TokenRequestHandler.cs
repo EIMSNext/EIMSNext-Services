@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 using EIMSNext.Entities;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Models;
@@ -77,8 +80,22 @@ namespace EIMSNext.Identity.Services
                 return null;
             }
 
+            // system client 的 secret 以明文存储（轮换走 DB 手动 SQL），其余 client 存 SHA256 hash；
+            // 统一恒定时间比较，防内网可重试端点上的时序侧信道。
+            if (client.Id == InternalClients.SystemClientId)
+            {
+                return FixedTimeEquals(clientSecret, client.ClientSecret) ? client : null;
+            }
+
             var hashed = clientSecret.Sha256();
-            return string.Equals(client.ClientSecret, hashed, StringComparison.Ordinal) ? client : null;
+            return FixedTimeEquals(hashed, client.ClientSecret) ? client : null;
+        }
+
+        private static bool FixedTimeEquals(string left, string? right)
+        {
+            return CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(left),
+                Encoding.UTF8.GetBytes(right ?? string.Empty));
         }
 
         private static bool IsGrantTypeAllowed(Client client, string? grantType)

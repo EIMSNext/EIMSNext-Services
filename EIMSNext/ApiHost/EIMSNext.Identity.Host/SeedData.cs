@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+
 using EIMSNext.Identity.Abstractions;
 using EIMSNext.Entities;
 
@@ -31,6 +33,10 @@ namespace EIMSNext.Identity.Host
                     Id = InternalClients.PublicClientId,
                     Name = "EIMSNext.Public",
                     RequireClientSecret = false,
+                    // 该列对 public client 不作 OAuth client secret 用（client 本身仍匿名），
+                    // 存公开访问 challenge 的 HMAC 密钥（OpenController/PublicTokenService 进程内读取）；
+                    // 空库首建生成，轮换走 DB 手动 SQL。
+                    ClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant(),
                     AllowedGrantTypes = [CustomGrantType.Public],
                     AllowedScopes =
                     [
@@ -46,8 +52,10 @@ namespace EIMSNext.Identity.Host
                 {
                     Id = InternalClients.SystemClientId,
                     Name = "EIMSNext.System",
+                    // secret 为随机明文，仅空库首建 seed 时落库；轮换由 DB 手动 SQL 完成。
+                    // ValidateClient 对该 client 恒定时间明文比对，其余 client 仍为 SHA256 hash 比对。
                     RequireClientSecret = true,
-                    ClientSecret = InternalClients.SystemClientSecret.Sha256(),
+                    ClientSecret = Convert.ToHexString(RandomNumberGenerator.GetBytes(32)).ToLowerInvariant(),
                     AllowedGrantTypes = [CustomGrantType.System],
                     AllowedScopes = ["api.readwrite"],
                     AccessTokenLifetime = Constants.TokenLifetime_Default,

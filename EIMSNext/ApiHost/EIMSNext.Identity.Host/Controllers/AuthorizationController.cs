@@ -1,11 +1,15 @@
 using EIMSNext.Entities;
+using EIMSNext.Common;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Utilities;
 using EIMSNext.ApiCore.RateLimiting;
+using EIMSNext.ApiCore;
 
 using Microsoft.AspNetCore;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 using OpenIddict.Abstractions;
@@ -25,16 +29,22 @@ namespace EIMSNext.Identity.Host.Controllers
         private readonly IBuiltInClientRequestPolicy _builtInClientRequestPolicy;
         private readonly IHostEnvironment _environment;
         private readonly PublicRateLimiter? _rateLimiter;
+        private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _httpContextAccessor;
 
         public AuthorizationController(
             ITokenRequestHandler tokenRequestHandler,
             IBuiltInClientRequestPolicy builtInClientRequestPolicy,
             IHostEnvironment environment,
+            IConfiguration configuration,
+            IHttpContextAccessor httpContextAccessor,
             PublicRateLimiter? rateLimiter = null)
         {
             _tokenRequestHandler = tokenRequestHandler;
             _builtInClientRequestPolicy = builtInClientRequestPolicy;
             _environment = environment;
+            _configuration = configuration;
+            _httpContextAccessor = httpContextAccessor;
             _rateLimiter = rateLimiter;
         }
 
@@ -216,6 +226,17 @@ namespace EIMSNext.Identity.Host.Controllers
             if (!validation.Succeeded)
             {
                 return CreateErrorResult(validation.Error!, validation.ErrorDescription!);
+            }
+
+            // 可选 IP 白名单：仅当 IdentityHost:SystemTokenAllowedIPs 配置时生效，缺省不限制（内网使用）。
+            var allowedIps = _configuration["IdentityHost:SystemTokenAllowedIPs"];
+            if (!string.IsNullOrWhiteSpace(allowedIps))
+            {
+                var clientIp = IpHelper.GetClientIp(_httpContextAccessor);
+                if (!IpMatcher.IsAllowed(clientIp, allowedIps.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)))
+                {
+                    return CreateErrorResult(OpenIddictConstants.Errors.InvalidClient, "来源 IP 不在允许列表内。");
+                }
             }
 
             var request = TokenRequestHelper.CreateRequest(fields.Select(pair => new KeyValuePair<string, string?>(pair.Key, pair.Value.ToString())));

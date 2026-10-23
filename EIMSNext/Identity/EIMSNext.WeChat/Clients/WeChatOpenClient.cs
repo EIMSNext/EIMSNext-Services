@@ -1,3 +1,4 @@
+using HKH.Common;
 using EIMSNext.WeChat.Models;
 using RestSharp;
 
@@ -16,15 +17,15 @@ namespace EIMSNext.WeChat.Clients
                 .AddQueryParameter("grant_type", "authorization_code");
 
             var response = await Client.ExecuteAsync<WeChatAccessTokenResponse>(request, cancellationToken);
-            var data = response.Data ?? throw new InvalidOperationException("未能获取微信令牌响应");
+            var data = response.Data ?? throw new UnLogException("未能获取微信令牌响应");
             if (!response.IsSuccessful)
             {
-                throw new InvalidOperationException(response.ErrorMessage ?? "微信令牌请求失败");
+                throw new UnLogException(response.ErrorMessage ?? "微信令牌请求失败");
             }
 
             if (data.ErrorCode != 0)
             {
-                throw new InvalidOperationException(data.ErrorMessage);
+                throw new UnLogException(data.ErrorMessage);
             }
 
             return data;
@@ -38,15 +39,15 @@ namespace EIMSNext.WeChat.Clients
                 .AddQueryParameter("lang", "zh_CN");
 
             var response = await Client.ExecuteAsync<WeChatUserInfoResponse>(request, cancellationToken);
-            var data = response.Data ?? throw new InvalidOperationException("未能获取微信用户信息");
+            var data = response.Data ?? throw new UnLogException("未能获取微信用户信息");
             if (!response.IsSuccessful)
             {
-                throw new InvalidOperationException(response.ErrorMessage ?? "微信用户信息请求失败");
+                throw new UnLogException(response.ErrorMessage ?? "微信用户信息请求失败");
             }
 
             if (data.ErrorCode != 0)
             {
-                throw new InvalidOperationException(data.ErrorMessage);
+                throw new UnLogException(data.ErrorMessage);
             }
 
             return data;

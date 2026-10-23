@@ -41,8 +41,8 @@ namespace EIMSNext.Identity.Extensions
                 options.EnableSensitiveDataLogging(settings.EnableSensitiveDataLogging);
             });
             services.AddScoped<IIdentityDbContext>(provider => provider.GetRequiredService<IdentityDbContext>());
+            services.AddScoped<PublicAccessKeyProvider>();
 
-            services.Configure<PublicAccessOptions>(configuration.GetSection(PublicAccessOptions.SectionName));
             services.AddOptions<IdentityLoginAuditQueueOptions>()
                 .Bind(configuration.GetSection(IdentityLoginAuditQueueOptions.SectionName))
                 .Validate(options => options.Capacity > 0, "IdentityLoginAuditQueue:Capacity must be greater than zero.")

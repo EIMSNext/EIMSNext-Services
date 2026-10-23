@@ -1,7 +1,6 @@
 using EIMSNext.ApiService;
 using EIMSNext.Identity.Interfaces;
 using EIMSNext.Identity.Models;
-using Microsoft.Extensions.Options;
 
 namespace EIMSNext.Identity.Services
 {
@@ -10,18 +9,23 @@ namespace EIMSNext.Identity.Services
         private const string UsernamePrefix = "public_";
 
         private readonly IIdentityDbContext _dbContext;
-        private readonly string _secretKey;
+        private readonly PublicAccessKeyProvider _accessKeyProvider;
 
-        public PublicTokenService(
-            IIdentityDbContext dbContext,
-            IOptions<PublicAccessOptions> accessOptions)
+        public PublicTokenService(IIdentityDbContext dbContext, PublicAccessKeyProvider accessKeyProvider)
         {
             _dbContext = dbContext;
-            _secretKey = accessOptions.Value.SecretKey;
+            _accessKeyProvider = accessKeyProvider;
         }
 
         public PublicTokenValidationResult Validate(string? username, string? password, PublicScope scope)
         {
+            var secretKey = _accessKeyProvider.GetSecretKey();
+            if (string.IsNullOrWhiteSpace(secretKey))
+            {
+                // 密钥未初始化时 fail-closed，防止退化成无签名校验。
+                return PublicTokenValidationResult.Invalid("公开访问凭证无效");
+            }
+
             if (string.IsNullOrWhiteSpace(username) ||
                 !username.StartsWith(UsernamePrefix, StringComparison.Ordinal))
             {
@@ -50,7 +54,7 @@ namespace EIMSNext.Identity.Services
                 return PublicTokenValidationResult.Invalid("公开访问链接已过期");
             }
 
-            if (!PublicAccessValidator.ValidateSection(section, password, setting.TargetId, _secretKey))
+            if (!PublicAccessValidator.ValidateSection(section, password, setting.TargetId, secretKey))
             {
                 return PublicTokenValidationResult.Invalid("公开访问凭证无效");
             }
