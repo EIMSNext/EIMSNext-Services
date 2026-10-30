@@ -12,7 +12,10 @@ namespace EIMSNext.ApiHost.Extensions
         {
             builder.RegisterType<OutboxIdempotencyKeyFactory>().As<IOutboxIdempotencyKeyFactory>().SingleInstance();
             // OutboxPublisher 持有 scoped IRepository/DbContext，不能注册为单例。
-            builder.RegisterType<OutboxPublisher>().As<IOutboxPublisher>().InstancePerLifetimeScope();
+            builder.RegisterType<OutboxPublisher>()
+                .As<IOutboxPublisher>()
+                .As<ITransactionalOutboxPublisher>()
+                .InstancePerLifetimeScope();
         }
 
         public static void RegisterOutboxConsumers(this ContainerBuilder builder)

@@ -15,7 +15,7 @@ namespace EIMSNext.Async.Quartz.Jobs
     /// <summary>
     /// 出箱扫描投递 Job（Quartz 定时）。
     /// 周期性扫 OutboxMessage 表中到期 Pending 行 → 经底层投递器推送 → 成功标记 Sent / 失败标记 Failed；
-    /// 同时对超退避阈值的死信按补偿窗口重置回 Pending，提供“已落库未发出”的自愈能力。
+    /// 超过退避次数的消息保留为终态死信，等待排查，不会被自动重置。
     /// </summary>
     [DisallowConcurrentExecution]
     public class OutboxDeliveryJob : JobBase<OutboxDeliveryJob>
@@ -53,24 +53,6 @@ namespace EIMSNext.Async.Quartz.Jobs
             foreach (var msg in ready)
             {
                 await DeliverOnceAsync(msg);
-            }
-
-            // 死信补偿：Failed 且最后尝试时间已超过最长退避窗口的，重置回 Pending 再投一次。
-            var deadLetterOldest = now - RetryBackoffMs[^1];
-            var failed = await _outboxRepo.Queryable
-                .Where(x => x.Status == OutboxStatus.Failed && x.LastAttemptTime <= deadLetterOldest)
-                .OrderBy(x => x.LastAttemptTime)
-                .Take(100)
-                .ToListAsync();
-            foreach (var msg in failed)
-            {
-                await _outboxRepo.UpdateAsync(msg.Id, setters => setters
-                    .SetProperty(x => x.Status, OutboxStatus.Pending)
-                    .SetProperty(x => x.OutAt, now)
-                    .SetProperty(x => x.Attempt, 0)
-                    .SetProperty(x => x.Error, string.Empty));
-                Logger.LogInformation("Outbox dead-letter {Id} (key={Key}) reset to Pending, attempt={Attempt}",
-                    msg.Id, msg.IdempotencyKey, 0);
             }
         }
 

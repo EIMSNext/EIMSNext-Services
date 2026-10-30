@@ -129,10 +129,10 @@ namespace EIMSNext.Component
                 eventSetting.SourceFormId = triggerMeta.FormId;
                 eventSetting.OtherFormIds = otherformIds;
                 eventSetting.CascadeMode = flowData.EfCascade;
-                if (flowData.EventIds?.Count > 0)
-                {
-                    eventSetting.SpecifiedEvents = $",{string.Join(',', flowData.EventIds)},";
-                }
+                // 必须同步清空：UI 删空指定清单后 content 无 eventIds，此处残留旧值会导致幽灵触发
+                eventSetting.SpecifiedEvents = flowData.EventIds?.Count > 0
+                    ? $",{string.Join(',', flowData.EventIds)},"
+                    : null;
             }
 
             return steps;

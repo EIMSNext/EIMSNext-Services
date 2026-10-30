@@ -41,13 +41,21 @@ namespace EIMSNext.Flow.Core.Nodes
             List<ActionFormData>? toUpdates = null;
             if (updateSetting.UpdateMode == UpdateMode.Node)
             {
-                //TODO: 是否需要复制副本?
-                toUpdates = dataContext.NodeDatas.FirstOrDefault(x => x.Key == updateSetting.NodeId).Value?.ActionDatas.ToList();
+                //必须深拷贝副本：上游节点落库后 Persisted=true，直接复用原对象会被
+                //ProcessNodeCoreAsync 的 Persisted/Unchanged 门禁跳过，导致本节点静默不落库
+                toUpdates = dataContext.NodeDatas
+                    .FirstOrDefault(x => x.Key == updateSetting.NodeId).Value?.ActionDatas
+                    .Select(x => new ActionFormData
+                    {
+                        State = DataState.Unchanged,
+                        FormData = x.FormData.SerializeToJson().DeserializeFromJson<FormData>()!,
+                    })
+                    .ToList();
             }
             else if (updateSetting.UpdateMode == UpdateMode.Form)
             {
                 var findOpt = Metadata!.EfNodeSetting!.UpdateSetting!.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-                BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+                BuildDynamicFilter(dataContext, findOpt.Filter!, GetNodeScriptData(dataContext));
                 findOpt.Take = Math.Min(
                     findOpt.GetEffectiveTake() <= 0 ? WfMetadataParser.DefaultEventFlowNodeTake : findOpt.Take,
                     WfMetadataParser.DefaultEventFlowNodeTake);
@@ -89,7 +97,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             updateSetting.FieldSettings.ForEach(x =>
                             {
                                 //M->M
-                                SetMainToMain(toUpdate.FormData, x, scriptData);
+                                SetMainToMain(dataContext, toUpdate.FormData, x, scriptData);
                             });
                         });
                     }
@@ -123,7 +131,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                     {
                                         for (var i = 0; i < valArrData.Count(); i++)
                                         {
-                                            var subMatchExp = BuildFieldMatchExp(updateSetting.UpdateMatch, scriptData, i);
+                                            var subMatchExp = BuildFieldMatchExp(dataContext, updateSetting.UpdateMatch, scriptData, i);
 
                                             foreach (var toUpdate in toUpdates)
                                             {
@@ -143,11 +151,11 @@ namespace EIMSNext.Flow.Core.Nodes
                                                             var field = x.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries)[1];
                                                             if (x.ValueIsSubField())
                                                             {
-                                                                UpdateSubToSub(toUpdateSubItem, field, x, i, scriptData);
+                                                                UpdateSubToSub(dataContext, toUpdateSubItem, field, x, i, scriptData);
                                                             }
                                                             else
                                                             {
-                                                                UpdateMainToSub(toUpdateSubItem, field, x, scriptData);
+                                                                UpdateMainToSub(dataContext, toUpdateSubItem, field, x, scriptData);
                                                             }
                                                         });
 
@@ -161,11 +169,11 @@ namespace EIMSNext.Flow.Core.Nodes
                                                         var field = x.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries)[1];
                                                         if (x.ValueIsSubField())
                                                         {
-                                                            UpdateSubToSub(toUpdateSubItem, field, x, i, scriptData);
+                                                            UpdateSubToSub(dataContext, toUpdateSubItem, field, x, i, scriptData);
                                                         }
                                                         else
                                                         {
-                                                            UpdateMainToSub(toUpdateSubItem, field, x, scriptData);
+                                                            UpdateMainToSub(dataContext, toUpdateSubItem, field, x, scriptData);
                                                         }
                                                     });
                                                 }
@@ -187,7 +195,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                 var nodeDatas = dataContext.NodeDatas[multiDataFieldSetting.ValueField!.Field.NodeId!].ActionDatas;
                                 for (var mi = 0; mi < nodeDatas.Count; mi++)
                                 {
-                                    var subMatchExp = BuildFieldMatchExp(updateSetting.UpdateMatch, scriptData, mi);
+                                    var subMatchExp = BuildFieldMatchExp(dataContext, updateSetting.UpdateMatch, scriptData, mi);
 
                                     foreach (var toUpdate in toUpdates)
                                     {
@@ -209,11 +217,11 @@ namespace EIMSNext.Flow.Core.Nodes
                                                         var field = x.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries)[1];
                                                         if (x.ValueIsSingleResultNode())
                                                         {
-                                                            UpdateMainToSub(toUpdateSubItem, field, x, scriptData);
+                                                            UpdateMainToSub(dataContext, toUpdateSubItem, field, x, scriptData);
                                                         }
                                                         else
                                                         {
-                                                            UpdateMultiMainToSub(toUpdateSubItem, mi, field, x, scriptData);
+                                                            UpdateMultiMainToSub(dataContext, toUpdateSubItem, mi, field, x, scriptData);
                                                         }
                                                     }
                                                 });
@@ -228,11 +236,11 @@ namespace EIMSNext.Flow.Core.Nodes
                                                 var field = x.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries)[1];
                                                 if (x.ValueIsSingleResultNode())
                                                 {
-                                                    UpdateMainToSub(toUpdateSubItem, field, x, scriptData);
+                                                    UpdateMainToSub(dataContext, toUpdateSubItem, field, x, scriptData);
                                                 }
                                                 else
                                                 {
-                                                    UpdateMultiMainToSub(toUpdateSubItem, mi, field, x, scriptData);
+                                                    UpdateMultiMainToSub(dataContext, toUpdateSubItem, mi, field, x, scriptData);
                                                 }
                                             });
                                         }
@@ -254,7 +262,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             var nodeDatas = dataContext.NodeDatas[multiDataFieldSetting.ValueField!.Field.NodeId!].ActionDatas;
                             for (var mi = 0; mi < nodeDatas.Count; mi++)
                             {
-                                var matchExp = BuildFieldMatchExp(updateSetting.UpdateMatch, scriptData, mi);
+                                var matchExp = BuildFieldMatchExp(dataContext, updateSetting.UpdateMatch, scriptData, mi);
                                 var toUpdate = toUpdates.FirstOrDefault(x => ScriptEngine.Evaluate<bool>(matchExp, x.FormData.ToScriptData()).Value);
                                 if (toUpdate == null)
                                 {
@@ -287,12 +295,12 @@ namespace EIMSNext.Flow.Core.Nodes
                                         if (!x.ValueIsSingleResultNode())
                                         {
                                             //MM->M
-                                            SetMultiMainToMain(toUpdate.FormData, mi, x, scriptData);
+                                            SetMultiMainToMain(dataContext, toUpdate.FormData, mi, x, scriptData);
                                         }
                                         else
                                         {
                                             //M->M
-                                            SetMainToMain(toUpdate.FormData, x, scriptData);
+                                            SetMainToMain(dataContext, toUpdate.FormData, x, scriptData);
                                         }
                                     });
                                 }
@@ -331,12 +339,12 @@ namespace EIMSNext.Flow.Core.Nodes
         }
 
 
-        protected string BuildFieldMatchExp(DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex = -1)
+        protected string BuildFieldMatchExp(EfDataContext dataContext, DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex = -1)
         {
             if (matchSetting.Items?.Count > 0)
             {
                 List<string> subExps = new List<string>();
-                matchSetting.Items.ForEach(x => subExps.Add(BuildFieldMatchExp(x, scriptData, mIndex)));
+                matchSetting.Items.ForEach(x => subExps.Add(BuildFieldMatchExp(dataContext, x, scriptData, mIndex)));
 
                 var rel = (matchSetting.Rel == FilterRel.Or) ? "||" : "&&";
                 return string.Join(rel, subExps.Select(x => $"({x})"));
@@ -346,7 +354,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 if (string.IsNullOrEmpty(matchSetting.Field?.Field))
                     return ScriptExpression.TRUE;
 
-                var value = EvalMatchValue(matchSetting, scriptData, mIndex);
+                var value = EvalMatchValue(dataContext, matchSetting, scriptData, mIndex);
                 return FormatMatchExp(matchSetting.Field, matchSetting.Op ?? FilterOp.Eq, value);
             }
         }
@@ -394,7 +402,7 @@ namespace EIMSNext.Flow.Core.Nodes
 
             return oper;
         }
-        private string EvalMatchValue(DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex)
+        private string EvalMatchValue(EfDataContext dataContext, DataMatchSetting matchSetting, Dictionary<string, object>? scriptData, int mIndex)
         {
             object? value = null;
             if (matchSetting.Value != null)
@@ -404,14 +412,14 @@ namespace EIMSNext.Flow.Core.Nodes
                     if (matchSetting.Value.FieldValue!.IsSubField)
                     {
                         var valueExp = $"data.n_{matchSetting.Value!.FieldValue!.NodeId}.{matchSetting.Value!.FieldValue!.Field!.Replace(">", $"[{mIndex}].")}";
-                        value = ScriptEngine.Evaluate(valueExp, scriptData).Value;
+                        value = MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
                     }
                     else
                     {
                         if (mIndex > -1)
                         {
                             var valueExp = $"data.n_{matchSetting.Value!.FieldValue!.NodeId}[{mIndex}].{matchSetting.Value!.FieldValue.Field}";
-                            value = ScriptEngine.Evaluate(valueExp, scriptData).Value;
+                            value = MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
                         }
                     }
                 }

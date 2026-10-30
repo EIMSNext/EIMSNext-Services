@@ -15,6 +15,8 @@ using Microsoft.Extensions.Logging;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 using EIMSNext.Core.Extensions;
+using EIMSNext.Async.Abstractions.System;
+using EIMSNext.ApiClient.File;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -138,6 +140,98 @@ namespace EIMSNext.Flow.Core.Nodes
         }
 
         /// <summary>
+        /// 打印产物惰性上传：值若是待上传标记（<see cref="EfPendingPrintFile.MarkerKey"/>），
+        /// 首次消费时经 FileApiClient 上传并把附件信息缓存到 run 上下文；同一 run 多个消费点共享一次上传。
+        /// run 跨进程恢复（重试/暂停）后内存产物丢失时，按 marker 持久化要素就地重渲染（重复打印无副作用）。
+        /// </summary>
+        protected object? MaterializePrintOutput(EfDataContext dataContext, object? value)
+        {
+            var marker = ExtractPendingPrintMarker(value);
+            if (marker == null
+                || !marker.TryGetValue(EfPendingPrintFile.MarkerKey, out var nodeId)
+                || nodeId is not string printNodeId)
+            {
+                return value;
+            }
+
+            if (!dataContext.PendingPrints.TryGetValue(printNodeId, out var pending))
+            {
+                pending = new EfPrintRenderer(Resolver).RenderFromMarker(dataContext, marker);
+                dataContext.PendingPrints[printNodeId] = pending;
+            }
+
+            if (pending.Attachment == null)
+            {
+                var accessToken = Resolver.Resolve<ISystemTokenProvider>()
+                    .GetAccessTokenAsync(dataContext.CorpId, "ef", dataContext.EventFlowId)
+                    .GetAwaiter().GetResult();
+                var attachment = Resolver.Resolve<IFileClient>()
+                    .Upload(pending.Content, pending.FileName, accessToken)
+                    .GetAwaiter().GetResult()
+                    ?? throw new InvalidOperationException("附件上传失败：File.Host 未返回附件信息");
+
+                pending.Attachment = new Dictionary<string, object?>
+                {
+                    ["id"] = attachment.Id,
+                    ["name"] = attachment.FileName,
+                    ["fileName"] = attachment.FileName,
+                    ["savePath"] = attachment.SavePath,
+                    ["thumbPath"] = attachment.ThumbPath,
+                    ["fileExt"] = attachment.FileExt,
+                    ["fileSize"] = attachment.FileSize,
+                    ["url"] = attachment.SavePath,
+                    ["thumbUrl"] = attachment.ThumbPath,
+                };
+            }
+
+            return new Dictionary<string, object?>(pending.Attachment);
+        }
+
+        /// <summary>
+        /// 从待上传标记中提取完整 marker 字典。脚本求值结果经 V8 往返后可能是
+        /// IDictionary、JsonElement 或 ClearScript 宿主对象，分别识别；非标记返回 null。
+        /// </summary>
+        private static Dictionary<string, object?>? ExtractPendingPrintMarker(object? value)
+        {
+            switch (value)
+            {
+                case null:
+                case string:
+                case char:
+                case bool:
+                case byte:
+                case short:
+                case int:
+                case long:
+                case float:
+                case double:
+                case decimal:
+                    return null;
+                case IDictionary<string, object?> dict:
+                    return dict.TryGetValue(EfPendingPrintFile.MarkerKey, out var entry) && entry is string
+                        ? new Dictionary<string, object?>(dict)
+                        : null;
+                case JsonElement { ValueKind: JsonValueKind.Object } json:
+                    return json.TryGetProperty(EfPendingPrintFile.MarkerKey, out var prop) && prop.ValueKind == JsonValueKind.String
+                        ? json.EnumerateObject().ToDictionary(p => p.Name, p => (object?)p.Value.ToString())
+                        : null;
+                default:
+                    try
+                    {
+                        var json = value.SerializeToJson();
+                        if (json == null || !json.Contains(EfPendingPrintFile.MarkerKey))
+                            return null;
+
+                        return json.DeserializeFromJson<Dictionary<string, object?>>();
+                    }
+                    catch
+                    {
+                        return null;
+                    }
+            }
+        }
+
+        /// <summary>
         /// 写入节点执行日志（异步）。
         /// </summary>
         protected async Task CreateExecLogAsync(
@@ -177,7 +271,27 @@ namespace EIMSNext.Flow.Core.Nodes
                     Summary = string.IsNullOrWhiteSpace(summary) ? (success ? "执行成功" : failureReason) : summary,
                     Success = success
                 };
-                await RunLogNodeRepository.InsertAsync(runLogNode);
+                var existed = RunLogNodeRepository.Find(x =>
+                        x.RunLogId == runLogNode.RunLogId
+                        && x.NodeId == runLogNode.NodeId)
+                    .FirstOrDefault();
+                if (existed == null)
+                {
+                    await RunLogNodeRepository.InsertAsync(runLogNode);
+                }
+                else
+                {
+                    runLogNode.Id = existed.Id;
+                    runLogNode.CreateBy = existed.CreateBy;
+                    runLogNode.CreateTime = existed.CreateTime;
+                    runLogNode.UpdateBy = existed.UpdateBy;
+                    runLogNode.UpdateTime = existed.UpdateTime;
+                    runLogNode.DeleteFlag = existed.DeleteFlag;
+                    runLogNode.DeleteBy = existed.DeleteBy;
+                    runLogNode.DeleteTime = existed.DeleteTime;
+                    runLogNode.CorpId = existed.CorpId;
+                    await RunLogNodeRepository.ReplaceAsync(runLogNode);
+                }
             }
             catch (Exception ex)    //写日志失败不影响整个数据流程
             {
@@ -285,20 +399,20 @@ namespace EIMSNext.Flow.Core.Nodes
         #endregion
 
         #region Filter
-        protected void BuildDynamicFilter(DynamicFilter filter, Dictionary<string, object> data)
+        protected void BuildDynamicFilter(EfDataContext dataContext, DynamicFilter filter, Dictionary<string, object> data)
         {
             filter.Value = DynamicValueNormalizer.Normalize(filter.Value);
             if (filter.ValueIsExp)
             {
-                filter.Value = EvalFilterValue(filter.ValueIsField, filter.Value!.ToString()!, data);
+                filter.Value = EvalFilterValue(dataContext, filter.ValueIsField, filter.Value!.ToString()!, data);
             }
 
             if (filter.IsGroup && filter.Items?.Count > 0)
             {
-                filter.Items.ForEach(x => BuildDynamicFilter(x, data));
+                filter.Items.ForEach(x => BuildDynamicFilter(dataContext, x, data));
             }
         }
-        protected object? EvalFilterValue(bool isFieldExp, string script, Dictionary<string, object> data)
+        protected object? EvalFilterValue(EfDataContext dataContext, bool isFieldExp, string script, Dictionary<string, object> data)
         {
             if (isFieldExp && script.Contains('>')) //子表字段
             {
@@ -313,7 +427,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 return arr.Value!.ToString().DeserializeFromJson<List<object>>();
             }
 
-            return ScriptEngine.Evaluate(script, data).Value;
+            return MaterializePrintOutput(dataContext, ScriptEngine.Evaluate(script, data).Value);
         }
         #endregion
 
@@ -433,12 +547,12 @@ namespace EIMSNext.Flow.Core.Nodes
                         if (fieldSetting.ValueIsSubField())
                         {
                             // S->S
-                            SetSubToSub(insertData, arrData, field[1], fieldSetting, subNodeData, scriptData);
+                            SetSubToSub(dataContext, insertData, arrData, field[1], fieldSetting, subNodeData, scriptData);
                         }
                         else
                         {
                             //M->S
-                            SetMainToSub(insertData, arrData, field[1], fieldSetting, scriptData);
+                            SetMainToSub(dataContext, insertData, arrData, field[1], fieldSetting, scriptData);
                         }
                     }
                     else
@@ -446,12 +560,12 @@ namespace EIMSNext.Flow.Core.Nodes
                         if (fieldSetting.ValueIsSubField())
                         {
                             //S->M
-                            SetSubToMain(insertData, mIndex, fieldSetting, subNodeData, scriptData);
+                            SetSubToMain(dataContext, insertData, mIndex, fieldSetting, subNodeData, scriptData);
                         }
                         else
                         {
                             //M->M
-                            SetMainToMain(insertData, fieldSetting, scriptData);
+                            SetMainToMain(dataContext, insertData, fieldSetting, scriptData);
                         }
                     }
                 }
@@ -475,13 +589,13 @@ namespace EIMSNext.Flow.Core.Nodes
                             if (dataContext.NodeDatas.ContainsKey(fieldSetting.ValueField!.Field.NodeId!))
                             {
                                 var valSubData = dataContext.NodeDatas[fieldSetting.ValueField!.Field.NodeId!].ActionDatas.FirstOrDefault()?.FormData;
-                                SetSubToSub(insertData, arrData, field[1], fieldSetting, valSubData, scriptData);
+                                SetSubToSub(dataContext, insertData, arrData, field[1], fieldSetting, valSubData, scriptData);
                             }
                         }
                         else
                         {
                             //M->S
-                            SetMainToSub(insertData, arrData, field[1], fieldSetting, scriptData);
+                            SetMainToSub(dataContext, insertData, arrData, field[1], fieldSetting, scriptData);
                         }
                     }
                     else
@@ -492,7 +606,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             if (dataContext.NodeDatas.ContainsKey(fieldSetting.ValueField!.Field.NodeId!))
                             {
                                 var valSubData = dataContext.NodeDatas[fieldSetting.ValueField!.Field.NodeId!].ActionDatas.FirstOrDefault()?.FormData;
-                                SetSubToMain(insertData, mIndex, fieldSetting, valSubData, scriptData);
+                                SetSubToMain(dataContext, insertData, mIndex, fieldSetting, valSubData, scriptData);
                             }
                         }
                         else
@@ -500,12 +614,12 @@ namespace EIMSNext.Flow.Core.Nodes
                             if (!fieldSetting.ValueIsSingleResultNode())
                             {
                                 //MM->M
-                                SetMultiMainToMain(insertData, mIndex, fieldSetting, scriptData);
+                                SetMultiMainToMain(dataContext, insertData, mIndex, fieldSetting, scriptData);
                             }
                             else
                             {
                                 //M->M
-                                SetMainToMain(insertData, fieldSetting, scriptData);
+                                SetMainToMain(dataContext, insertData, fieldSetting, scriptData);
                             }
                         }
                     }
@@ -529,19 +643,19 @@ namespace EIMSNext.Flow.Core.Nodes
                             if (dataContext.NodeDatas.ContainsKey(fieldSetting.ValueField!.Field.NodeId!))
                             {
                                 var valSubData = dataContext.NodeDatas[fieldSetting.ValueField!.Field.NodeId!].ActionDatas.FirstOrDefault()?.FormData;
-                                SetSubToSub(insertData, arrData, field[1], fieldSetting, valSubData, scriptData);
+                                SetSubToSub(dataContext, insertData, arrData, field[1], fieldSetting, valSubData, scriptData);
                             }
                         }
                         else
                         {
                             //M->S
-                            SetMainToSub(insertData, arrData, field[1], fieldSetting, scriptData);
+                            SetMainToSub(dataContext, insertData, arrData, field[1], fieldSetting, scriptData);
                         }
                     }
                     else
                     {
                         //M->M
-                        SetMainToMain(insertData, fieldSetting, scriptData);
+                        SetMainToMain(dataContext, insertData, fieldSetting, scriptData);
                     }
                 }
             }
@@ -550,7 +664,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 主表单字段对主表单字段
         /// </summary>
-        protected void SetMainToMain(FormData target, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void SetMainToMain(EfDataContext dataContext, FormData target, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             switch (fieldSetting.ValueType)
             {
@@ -560,8 +674,9 @@ namespace EIMSNext.Flow.Core.Nodes
                     }
                     break;
                 case FieldValueType.Field:
+                case FieldValueType.Formula: //公式与字段引用一样依赖上下文数据，公式里引用了 n_xxx 节点数据
                     {
-                        target.Data.AddOrUpdate(fieldSetting.Field.Field, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value);
+                        target.Data.AddOrUpdate(fieldSetting.Field.Field, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value));
                     }
                     break;
                 default: // FieldValueType.Custom
@@ -574,9 +689,9 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 主表单字段对子表单字段
         /// </summary>
-        protected void SetMainToSub(FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void SetMainToSub(EfDataContext dataContext, FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
-            var value = (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value;
+            var value = MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value);
             if (subForm.Count > 0)
             {
                 subForm.ForEach(x => x.AddOrUpdate(subField, value));
@@ -591,7 +706,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>
-        protected void SetSubToSub(FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
+        protected void SetSubToSub(EfDataContext dataContext, FormData target, List<Dictionary<string, object?>> subForm, string subField, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
         {
             var valArrField = fieldSetting.ValueField!.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
             var valMainField = valArrField[0];//.Replace("data.", "");
@@ -618,7 +733,7 @@ namespace EIMSNext.Flow.Core.Nodes
                             subForm.Add(subData);
                         }
 
-                        subData.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{i}]."), scriptData).Value);
+                        subData.AddOrUpdate(subField, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{i}]."), scriptData).Value));
                     }
                 }
             }
@@ -626,7 +741,7 @@ namespace EIMSNext.Flow.Core.Nodes
         /// <summary>
         /// 子表单字段对主表单字段
         /// </summary>
-        protected void SetSubToMain(FormData target, int mIndex, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
+        protected void SetSubToMain(EfDataContext dataContext, FormData target, int mIndex, FormFieldSetting fieldSetting, FormData? source, Dictionary<string, object>? scriptData)
         {
             var valArrField = fieldSetting.ValueField!.Field.Field.Split('>', StringSplitOptions.RemoveEmptyEntries);
             var valMainField = valArrField[0];//.Replace("data.", "");
@@ -637,44 +752,44 @@ namespace EIMSNext.Flow.Core.Nodes
                 var valArrData = valSubData.Data.GetValueOrDefault<IEnumerable<object>>(valMainField);
                 if (valArrData != null && valArrData.Count() > mIndex)
                 {
-                    target.Data.AddOrUpdate(fieldSetting.Field.Field, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{mIndex}]."), scriptData).Value);
+                    target.Data.AddOrUpdate(fieldSetting.Field.Field, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{mIndex}]."), scriptData).Value));
                 }
             }
         }
         /// <summary>
         /// 多条记录的主表单(SingleResultNode=false)对主表单字段
         /// </summary>
-        protected void SetMultiMainToMain(FormData target, int mIndex, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void SetMultiMainToMain(EfDataContext dataContext, FormData target, int mIndex, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             var valueField = fieldSetting.ValueField!;
             var valueExp = $"data.n_{valueField.Field.NodeId}[{mIndex}].{valueField.Field.Field}";
-            target.Data.AddOrUpdate(fieldSetting.Field.Field, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
+            target.Data.AddOrUpdate(fieldSetting.Field.Field, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value));
         }
 
         /// <summary>
         /// 主表单字段对子表单字段
         /// </summary>
-        protected void UpdateMainToSub(IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void UpdateMainToSub(EfDataContext dataContext, IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
-            subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value);
+            subItem.AddOrUpdate(subField, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp, scriptData).Value));
         }
 
         /// <summary>
         /// 多条记录的主表单(SingleResultNode=false)对主表单字段
         /// </summary>
-        protected void UpdateMultiMainToSub(IDictionary<string, object?> subItem, int mIndex, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
+        protected void UpdateMultiMainToSub(EfDataContext dataContext, IDictionary<string, object?> subItem, int mIndex, string subField, FormFieldSetting fieldSetting, Dictionary<string, object>? scriptData)
         {
             var valueField = fieldSetting.ValueField!;
             var valueExp = $"data.n_{valueField.Field.NodeId}[{mIndex}].{valueField.Field.Field}";
-            subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value);
+            subItem.AddOrUpdate(subField, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(valueExp, scriptData).Value));
         }
 
         /// <summary>
         /// 子表单字段对子表单字段
         /// </summary>
-        protected void UpdateSubToSub(IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, int i, Dictionary<string, object>? scriptData)
+        protected void UpdateSubToSub(EfDataContext dataContext, IDictionary<string, object?> subItem, string subField, FormFieldSetting fieldSetting, int i, Dictionary<string, object>? scriptData)
         {
-            subItem.AddOrUpdate(subField, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{i}]."), scriptData).Value);
+            subItem.AddOrUpdate(subField, MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(fieldSetting.ValueExp.Replace(">", $"[{i}]."), scriptData).Value));
         }
 
         #endregion

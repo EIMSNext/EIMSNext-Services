@@ -80,11 +80,14 @@ namespace EIMSNext.Core.Repositories
         public static bool IsInTransaction => _currentState.Value?.Transaction is not null;
 
         /// <summary>
-        /// 判断指定上下文是否持有当前 ambient 事务。
+        /// 判断指定上下文是否持有当前事务。除环境事务状态外，同时感知连接级事务：
+        /// 环境状态可能被 <see cref="SuppressAmbient"/> 隐藏或属于其他上下文，而连接上的事务仍然开着。
+        /// 工作单元以 EF 事务为准——同一连接不能开第二个事务，故凡连接级事务已开即视为在事务中（加入而非新开）。
         /// </summary>
         public static bool IsInTransactionFor(DbContext dbContext)
-            => _currentState.Value is { Transaction: not null, Context: { } context }
-                && ReferenceEquals(context, dbContext);
+            => (_currentState.Value is { Transaction: not null, Context: { } context }
+                && ReferenceEquals(context, dbContext))
+               || dbContext.Database.CurrentTransaction is not null;
 
         /// <summary>
         /// 临时抑制当前异步上下文中的事务，用于明确允许独立提交的弱一致性操作。

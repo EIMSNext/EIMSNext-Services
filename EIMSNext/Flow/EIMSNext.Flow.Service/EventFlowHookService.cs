@@ -13,6 +13,7 @@ using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 
 using HKH.Mef2.Integration;
+using Microsoft.Extensions.Configuration;
 
 namespace EIMSNext.Flow.Service
 {
@@ -24,9 +25,9 @@ namespace EIMSNext.Flow.Service
         private readonly IRepository<Wf_Definition> _definitionRepository = resolver.GetRepository<Wf_Definition>();
         private readonly IRepository<EventFlowHookSample> _sampleRepository = resolver.GetRepository<EventFlowHookSample>();
         private readonly IEventFlowRunner _eventFlowRunner = resolver.Resolve<IEventFlowRunner>();
-
+        private readonly int _maxChainDepth = EfChainConsts.ResolveMaxChainDepth(resolver.Resolve<IConfiguration>()[EfChainConsts.MaxChainDepthConfigKey]);
         /// <inheritdoc />
-        public async Task<(int StatusCode, string ContentType, string Body)> HandleAsync(string corpId, string eventFlowId, string clientIp, string method, string contentType, Dictionary<string, string> headers, string body)
+        public async Task<(int StatusCode, string ContentType, string Body)> HandleAsync(string corpId, string eventFlowId, string clientIp, string method, string contentType, Dictionary<string, string> headers, string body, string? accessToken = null)
         {
             var definition = _definitionRepository.Queryable.FirstOrDefault(x =>
                 x.CorpId == corpId &&
@@ -47,8 +48,9 @@ namespace EIMSNext.Flow.Service
             ValidateIp(clientIp, triggerSetting.HttpTrigger);
 
             var requestContext = BuildRequestContext(clientIp, headers, body);
+            var chain = ParseChainHeader(headers, _maxChainDepth);
             await SaveSampleAsync(definition, requestContext);
-            await RunHttpEventFlowAsync(definition, requestContext);
+            await RunHttpEventFlowAsync(definition, requestContext, chain, accessToken);
 
             return (
                 triggerSetting.HttpTrigger?.ResponseEnabled == true ? triggerSetting.HttpTrigger.ResponseStatusCode ?? 200 : 200,
@@ -256,7 +258,7 @@ namespace EIMSNext.Flow.Service
             await _definitionRepository.ReplaceAsync(definition);
         }
 
-        private Task RunHttpEventFlowAsync(Wf_Definition definition, EventFlowHttpRequestContext requestContext)
+        private Task RunHttpEventFlowAsync(Wf_Definition definition, EventFlowHttpRequestContext requestContext, EfChainContext? chain, string? accessToken)
         {
             var data = new FormData
             {
@@ -266,8 +268,33 @@ namespace EIMSNext.Flow.Service
                 Data = ToExpando(requestContext),
             };
 
-            return _eventFlowRunner.RunAsync(new EfRunParameter(string.Empty, string.Empty, data, EventSourceType.Http, EventType.None, string.Empty, null, CascadeMode.All, null)
+            return _eventFlowRunner.RunAsync(new EfRunParameter(string.Empty, accessToken ?? string.Empty, data, EventSourceType.Http, EventType.None, string.Empty, null, chain)
                 .WithEventFlowId(definition.Id));
+        }
+
+        /// <summary>
+        /// 从 hook 请求头恢复 EventFlow 链上下文（WebhookConsumer 出站经 X-EF-Chain 透传）。
+        /// 缺失/损坏/伪造均返回 null（视作新链）：规则只减不增，伪造无法制造环。
+        /// </summary>
+        private static EfChainContext? ParseChainHeader(Dictionary<string, string> headers, int maxChainDepth)
+        {
+            var chainJson = headers
+                .FirstOrDefault(x => string.Equals(x.Key, "X-EF-Chain", StringComparison.OrdinalIgnoreCase))
+                .Value;
+            if (string.IsNullOrWhiteSpace(chainJson))
+            {
+                return null;
+            }
+
+            try
+            {
+                var chain = chainJson.DeserializeFromJson<EfChainContext>();
+                return chain is not null && chain.IsValid(maxChainDepth) ? chain : null;
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         private static Dictionary<string, object?> ToExpando(EventFlowHttpRequestContext requestContext)

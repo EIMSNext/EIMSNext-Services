@@ -26,7 +26,7 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 var querySetting = Metadata!.EfNodeSetting!.QueryOneSetting!;
                 var findOpt = querySetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-                BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+                BuildDynamicFilter(dataContext, findOpt.Filter!, GetNodeScriptData(dataContext));
 
                 var queryData = FormDataRepository.Find(findOpt).FirstOrDefault();
 

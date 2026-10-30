@@ -15,9 +15,9 @@ namespace EIMSNext.ApiService
         /// <summary>
         /// 执行HTTP触发。
         /// </summary>
-        public Task<(int StatusCode, string ContentType, string Body)> HandleAsync(string corpId, string eventFlowId, string clientIp, string method, string contentType, Dictionary<string, string> headers, string body)
+        public Task<(int StatusCode, string ContentType, string Body)> HandleAsync(string corpId, string eventFlowId, string clientIp, string method, string contentType, Dictionary<string, string> headers, string body, string? accessToken = null)
         {
-            return _service.HandleAsync(corpId, eventFlowId, clientIp, method, contentType, headers, body);
+            return _service.HandleAsync(corpId, eventFlowId, clientIp, method, contentType, headers, body, accessToken);
         }
 
         /// <summary>

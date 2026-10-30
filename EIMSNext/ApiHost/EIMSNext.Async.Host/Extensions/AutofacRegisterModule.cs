@@ -32,6 +32,7 @@ namespace EIMSNext.Async.Host.Extensions
 
             builder.RegisterOutboxConsumers();
             builder.RegisterType<OutboxDeliveryJob>().AsSelf().InstancePerDependency();
+            builder.RegisterType<OutboxCleanupJob>().AsSelf().InstancePerDependency();
         }
     }
 }

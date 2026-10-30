@@ -1,4 +1,5 @@
 ﻿using EIMSNext.Common.Extensions;
+using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
@@ -14,6 +15,8 @@ using System.Dynamic;
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 using WorkflowCore.Primitives;
+using EIMSNext.Async.Abstractions.Messaging;
+using System.Text.Json;
 
 namespace EIMSNext.Flow.Core.Nodes
 {
@@ -370,23 +373,33 @@ namespace EIMSNext.Flow.Core.Nodes
 
         protected async Task RunEventFlow(EfRunParameter paramter)
         {
-            var isWorkflowTransition = paramter.WorkflowTransition
-                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
-                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
-            EfExecResult efExecResult;
-            if (isWorkflowTransition)
+            var data = paramter.Data;
+            var executionId = string.IsNullOrWhiteSpace(paramter.ExecutionId)
+                ? TsidIdGenerator.NewId()
+                : paramter.ExecutionId;
+
+            // EF 触发消息与审批节点的业务写入使用同一短事务落入 Outbox，
+            // 由出箱 Job 在事务提交后投递 RabbitMQ。这样消息不会因提交后发布失败而丢失，
+            // 同时 EF 执行本身仍然与审批事务解耦。
+            var message = new EventFlowRunTaskArgs
             {
-                efExecResult = await EventFlowRunner.RunAsync(paramter);
-            }
-            else
-            {
-                using var suppression = TransactionScope.SuppressAmbient();
-                efExecResult = await EventFlowRunner.RunAsync(paramter);
-            }
-            if (!efExecResult.Success)
-            {
-                throw new UnLogException(efExecResult.Error);
-            }
+                CorpId = data.CorpId ?? string.Empty,
+                EventFlowId = string.Empty,
+                MatchAllEventFlows = true,
+                ExecutionId = executionId,
+                AppId = data.AppId,
+                FormId = data.FormId,
+                DataId = data.Id,
+                EventSource = EventSourceType.Form,
+                EventType = paramter.EventType,
+                WfNodeId = paramter.WfNodeId,
+                NodeAction = paramter.NodeAction,
+                StarterId = paramter.Starter?.Id,
+                StarterCode = paramter.Starter?.Value,
+                StarterName = paramter.Starter?.Label,
+                ChainJson = paramter.Chain?.SerializeToJson()
+            };
+            await Resolver.Resolve<ITransactionalOutboxPublisher>().EnqueueRequiredAsync(message);
         }
     }
 }

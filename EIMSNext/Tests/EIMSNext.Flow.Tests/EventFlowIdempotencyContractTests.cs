@@ -41,17 +41,6 @@ namespace EIMSNext.Flow.Tests
             Assert.IsTrue(restored.ActionDatas.Single().Persisted);
         }
 
-        [TestMethod]
-        public void WorkflowTransitionRequiresExplicitOptIn()
-        {
-            var parameter = NewParameter();
-
-            Assert.IsFalse(parameter.WorkflowTransition);
-            parameter.WithWorkflowTransition().WithExecutionId("transition-1");
-
-            Assert.IsTrue(parameter.WorkflowTransition);
-            Assert.AreEqual("transition-1", parameter.ExecutionId);
-        }
 
         private static EfRunParameter NewParameter()
         {
@@ -62,8 +51,6 @@ namespace EIMSNext.Flow.Tests
                 EventSourceType.Form,
                 EventType.Approving,
                 "node-1",
-                null,
-                CascadeMode.All,
                 null).WithNodeAction("submit");
         }
     }

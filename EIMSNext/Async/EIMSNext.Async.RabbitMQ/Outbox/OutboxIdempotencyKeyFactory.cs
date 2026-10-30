@@ -12,6 +12,10 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
                 SystemMessageTaskArgs system when system.EventStamp > 0 => $"system-message:{system.NotifyId}:{system.EventStamp}",
                 WebhookTaskArgs webhook when !string.IsNullOrWhiteSpace(webhook.EventId)
                     => $"webhook:{webhook.CorpId}:{webhook.AppId}:{webhook.FormId}:{webhook.DataId}:{webhook.Trigger}:{webhook.EventId}",
+                EventFlowRunTaskArgs eventFlow when !string.IsNullOrWhiteSpace(eventFlow.RetryAttemptId)
+                    => $"eventflow-retry:{eventFlow.CorpId}:{eventFlow.RetryAttemptId}",
+                EventFlowRunTaskArgs eventFlow when !string.IsNullOrWhiteSpace(eventFlow.ExecutionId)
+                    => $"eventflow:{eventFlow.CorpId}:{eventFlow.ExecutionId}",
                 _ => throw new InvalidOperationException($"{typeof(TMessage).Name} requires a stable external event key.")
             };
         }

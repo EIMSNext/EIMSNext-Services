@@ -35,8 +35,8 @@ namespace EIMSNext.ApiClient.Flow
         public string WfDefinitionId { get; set; } = string.Empty;
         public int Version { get; set; }
         public string DataId { get; set; } = string.Empty;
-        public CascadeMode EfCascade { get; set; }
-        public string? EventIds { get; set; }
+        /// <summary>EventFlow 链上下文 JSON（EfChainContext）：EF 写数据触发下游时透传，供链尾解析出站门禁；入口触发为空。</summary>
+        public string? ChainJson { get; set; }
     }
     public class ApproveRequest
     {
@@ -124,14 +124,22 @@ namespace EIMSNext.ApiClient.Flow
     public class EfRunRequest
     {
         public string ExecutionId { get; set; } = string.Empty;
+        public string? RunLogId { get; set; }
+        public string? RetryNodeId { get; set; }
+        public string? RetryAttemptId { get; set; }
         public string EventFlowId { get; set; } = string.Empty;
+        /// <summary>EventFlowId 为空时，是否明确允许匹配全部候选 EF。</summary>
+        public bool MatchAllEventFlows { get; set; }
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
         public string WfNodeId { get; set; } = string.Empty;
         public string? NodeAction { get; set; }
-        public CascadeMode EfCascade { get; set; }
-        public string? EventIds { get; set; }
+        public string? StarterId { get; set; }
+        public string? StarterCode { get; set; }
+        public string? StarterName { get; set; }
+        /// <summary>EventFlow 链上下文 JSON（EfChainContext）：EF 写数据触发下游时透传，供链尾解析出站门禁；入口触发为空。</summary>
+        public string? ChainJson { get; set; }
         public List<string>? ChangeFields { get; set; }
     }
     /// <summary>
@@ -185,10 +193,9 @@ namespace EIMSNext.ApiClient.Flow
     }
     public enum CascadeMode
     {
-        NotSet = 0,
-        All = 1,
-        Specified = 2,
-        Never = 3
+        All = 0,
+        Specified = 1,
+        Never = 2
     }
     public enum WorkflowStatus
     {

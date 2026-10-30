@@ -3,6 +3,8 @@
 using EIMSNext.ApiHost.Controllers;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Common;
+using EIMSNext.Common.Extensions;
+using System.Text.Json;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
@@ -10,6 +12,7 @@ using EIMSNext.Core.Query;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
+using EIMSNext.Flow.Persistence;
 using EIMSNext.Service.Contracts;
 
 using HKH.Mef2.Integration;
@@ -18,6 +21,7 @@ using Microsoft.AspNetCore.Mvc;
 
 
 using WorkflowCore.Interface;
+using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Host.Controllers
 {
@@ -30,6 +34,9 @@ namespace EIMSNext.Flow.Host.Controllers
         private readonly IWfDefinitionService _defservice;
         private readonly IFormDataService _formDataservice;
         private readonly IEventFlowRunner _eventFlowRunner;
+        private readonly IWorkflowRegistry _workflowRegistry;
+        private readonly IWorkflowExecutor _workflowExecutor;
+        private readonly IWorkflowPersistenceProvider _workflowPersistence;
 
         public EventFlowController(IResolver resolver) : base(resolver)
         {
@@ -39,6 +46,9 @@ namespace EIMSNext.Flow.Host.Controllers
             _logger = resolver.GetLogger<EventFlowController>();
             _formDataservice = resolver.Resolve<IFormDataService>();
             _eventFlowRunner = resolver.Resolve<IEventFlowRunner>();
+            _workflowRegistry = resolver.Resolve<IWorkflowRegistry>();
+            _workflowExecutor = resolver.Resolve<IWorkflowExecutor>();
+            _workflowPersistence = (IWorkflowPersistenceProvider)resolver.Resolve<IPersistenceProvider>();
         }
 
         [HttpPost, Route("Load")]
@@ -56,13 +66,21 @@ namespace EIMSNext.Flow.Host.Controllers
         [HttpPost, Route("Run")]
         public async Task<IActionResult> RunAsync(EfRunRequest request)
         {
-            if (request.EfCascade == CascadeMode.Never)
-                return ApiResult.Success(new { Id = "", Error = "" }).ToActionResult();
-
-            if (request.EventType.HasFlag(EventType.Approving)
-                || !string.IsNullOrWhiteSpace(request.NodeAction))
+            if (!IsSystemIdentity && (request.EventType.HasFlag(EventType.Approving)
+                || !string.IsNullOrWhiteSpace(request.NodeAction)))
             {
                 return BadRequest("外部 EventFlow 不允许触发工作流节点流转");
+            }
+
+            if (IsSystemIdentity && string.IsNullOrWhiteSpace(request.EventFlowId)
+                && !request.MatchAllEventFlows)
+            {
+                return BadRequest("系统触发 EventFlow 时必须明确指定 EventFlowId 或 MatchAllEventFlows");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.RunLogId))
+            {
+                return await RetryExistingWorkflowAsync(request);
             }
 
             FormData? formData = null;
@@ -128,14 +146,12 @@ namespace EIMSNext.Flow.Host.Controllers
                     request.EventSource,
                     request.EventType,
                     request.WfNodeId,
-                    ResolveStarter(request),
-                    request.EfCascade,
-                    request.EventIds)
+                    ResolveStarter(request))
                 .WithExecutionId(request.ExecutionId)
                 .WithEventFlowId(request.EventFlowId)
-                .WithNodeAction(null)
-                .WithWorkflowTransition(false)
-                .WithChangeFields(request.ChangeFields);
+                .WithNodeAction(request.NodeAction)
+                .WithChangeFields(request.ChangeFields)
+                .WithChain(request.ChainJson?.DeserializeFromJson<EfChainContext>());
 
             var efExecResult = await _eventFlowRunner.RunAsync(runParamter);
 
@@ -145,6 +161,173 @@ namespace EIMSNext.Flow.Host.Controllers
             }
 
             return ApiResult.Success(new { Id = efExecResult.EfInstance?.Id ?? "", Error = "" }).ToActionResult();
+        }
+
+        private async Task<IActionResult> RetryExistingWorkflowAsync(EfRunRequest request)
+        {
+            if (!IsSystemIdentity)
+            {
+                return Forbid();
+            }
+
+            var runLogRepository = Resolver.GetRepository<Ef_RunLog>();
+            var runLog = runLogRepository.Get(request.RunLogId!);
+            if (runLog == null || runLog.DeleteFlag || !string.Equals(runLog.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase))
+            {
+                return NotFound("运行日志不存在");
+            }
+
+            try
+            {
+                if (string.IsNullOrWhiteSpace(request.RetryAttemptId)
+                    || !string.Equals(runLog.RetryAttemptId, request.RetryAttemptId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Conflict("该重试已被其他尝试接管");
+                }
+
+                if (string.IsNullOrWhiteSpace(runLog.WfInstanceId))
+                {
+                    return BadRequest("该运行没有可恢复的工作流实例");
+                }
+
+                if (!string.Equals(runLog.EventFlowId, request.EventFlowId, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest("重试的 EF 定义与原运行不一致");
+                }
+
+                var instance = await _workflowPersistence.GetWorkflowInstance(runLog.WfInstanceId);
+                var definition = _workflowRegistry.GetDefinition(instance.WorkflowDefinitionId, instance.Version);
+                if (definition == null)
+                {
+                    return BadRequest("原 EF 工作流定义不可用，无法验证重试节点");
+                }
+
+                var step = definition.Steps.FirstOrDefault(x => string.Equals(x.ExternalId, request.RetryNodeId, StringComparison.OrdinalIgnoreCase));
+                if (step == null)
+                {
+                    return BadRequest("重试节点不属于原 EF 工作流");
+                }
+
+                var pointer = instance.ExecutionPointers.FirstOrDefault(x => x.StepId == step.Id && x.Status == PointerStatus.Failed);
+                if (pointer == null)
+                {
+                    const string noFailedPointerReason = "重试时未找到失败节点指针，按原 EF 已完成处理。";
+                    var completedAt = DateTime.UtcNow.ToTimeStampMs();
+                    // 仅更新结果字段，重试占用状态由 finally 统一释放。
+                    await runLogRepository.UpdateManyAsync(
+                        x => x.Id == request.RunLogId && x.RetryAttemptId == request.RetryAttemptId,
+                        setters => setters
+                            .SetProperty(x => x.Success, true)
+                            .SetProperty(x => x.ErrMsg, noFailedPointerReason)
+                            .SetProperty(x => x.EndTime, completedAt)
+                            .SetProperty(x => x.UpdateTime, completedAt));
+
+                    var nodeLogRepository = Resolver.GetRepository<Ef_RunLogNode>();
+                    var failedNodeLog = nodeLogRepository.Find(x =>
+                            x.RunLogId == request.RunLogId
+                            && x.CorpId == runLog.CorpId
+                            && x.NodeId == request.RetryNodeId
+                            && !x.Success)
+                        .FirstOrDefault();
+                    if (failedNodeLog != null)
+                    {
+                        await nodeLogRepository.UpdateAsync(failedNodeLog.Id, setters => setters
+                            .SetProperty(x => x.Success, true)
+                            .SetProperty(x => x.ErrMsg, noFailedPointerReason)
+                            .SetProperty(x => x.FailureReason, noFailedPointerReason)
+                            .SetProperty(x => x.Summary, noFailedPointerReason)
+                            .SetProperty(x => x.EndTime, completedAt)
+                            .SetProperty(x => x.ExecTime, completedAt));
+                    }
+
+                    return ApiResult.Success(new { Id = instance.Id, Error = string.Empty }).ToActionResult();
+                }
+
+                var nodeExecutionRepository = Resolver.GetRepository<EventFlowNodeExecution>();
+                await nodeExecutionRepository.UpdateManyAsync(
+                    x => x.RunLogId == request.RunLogId
+                        && x.NodeId == request.RetryNodeId
+                        && x.Status == EventFlowNodeExecutionStatus.Processing,
+                    setters => setters
+                        .SetProperty(x => x.Status, EventFlowNodeExecutionStatus.Failed)
+                        .SetProperty(x => x.ProcessingOwner, string.Empty)
+                        .SetProperty(x => x.LeaseUntil, 0));
+
+                pointer.Status = PointerStatus.Pending;
+                pointer.Active = true;
+                pointer.StartTime = null;
+                pointer.EndTime = null;
+                pointer.EventData = null;
+                pointer.EventPublished = false;
+                pointer.RetryCount++;
+                instance.Status = WorkflowStatus.Runnable;
+                instance.CompleteTime = null;
+                instance.NextExecution = DateTime.UtcNow.Ticks;
+
+                try
+                {
+                    var executionResult = await _workflowExecutor.Execute(instance, CancellationToken.None);
+                    if (instance.Status == WorkflowStatus.Complete)
+                    {
+                        instance.CompleteTime ??= DateTime.UtcNow;
+                        instance.NextExecution = null;
+                    }
+                    await _workflowPersistence.PersistWorkflow(instance, executionResult.Subscriptions ?? []);
+                    if (executionResult.Errors.Count > 0)
+                    {
+                        await _workflowPersistence.PersistErrors(executionResult.Errors, CancellationToken.None);
+                    }
+
+                    var error = executionResult.Errors.Count == 0
+                        ? string.Empty
+                        : string.Join("; ", executionResult.Errors.Select(x => x.Message));
+                    var completedAt = DateTime.UtcNow.ToTimeStampMs();
+                    // 仅更新结果字段，重试占用状态由 finally 统一释放。
+                    await runLogRepository.UpdateManyAsync(
+                        x => x.Id == request.RunLogId && x.RetryAttemptId == request.RetryAttemptId,
+                        setters => setters
+                            .SetProperty(x => x.Success, instance.Status == WorkflowStatus.Complete && executionResult.Errors.Count == 0)
+                            .SetProperty(x => x.ErrMsg, error)
+                            .SetProperty(x => x.EndTime, completedAt)
+                            .SetProperty(x => x.UpdateTime, completedAt));
+                    return ApiResult.Success(new { Id = instance.Id, Error = error }).ToActionResult();
+                }
+                catch (Exception ex)
+                {
+                    var failedAt = DateTime.UtcNow.ToTimeStampMs();
+                    await runLogRepository.UpdateManyAsync(
+                        x => x.Id == request.RunLogId && x.RetryAttemptId == request.RetryAttemptId,
+                        setters => setters
+                            .SetProperty(x => x.Success, false)
+                            .SetProperty(x => x.ErrMsg, ex.Message)
+                            .SetProperty(x => x.EndTime, failedAt)
+                            .SetProperty(x => x.UpdateTime, failedAt));
+                    throw;
+                }
+            }
+            finally
+            {
+                // 重试占用释放的唯一收口：提前返回/执行异常等路径均经此处，避免租约被占满 30 分钟。
+                if (runLog.RetryInProgress)
+                {
+                    try
+                    {
+                        var now = DateTime.UtcNow.ToTimeStampMs();
+                        await runLogRepository.UpdateManyAsync(
+                            x => x.Id == request.RunLogId
+                                && x.RetryAttemptId == request.RetryAttemptId,
+                            setters => setters
+                                .SetProperty(x => x.RetryInProgress, false)
+                                .SetProperty(x => x.RetryLeaseUntil, (long?)null)
+                                .SetProperty(x => x.RetryAttemptId, string.Empty)
+                                .SetProperty(x => x.UpdateTime, now));
+                    }
+                    catch (Exception cleanupException)
+                    {
+                        _logger.LogError(cleanupException, "清理 EF 重试状态失败。RunLogId={RunLogId}", request.RunLogId);
+                    }
+                }
+            }
         }
 
         private bool IsSystemIdentity => IdentityContext.IdentityType == ApiService.IdentityType.System;
@@ -159,6 +342,14 @@ namespace EIMSNext.Flow.Host.Controllers
         {
             if (IdentityContext.IdentityType == ApiService.IdentityType.System)
             {
+                if (!string.IsNullOrWhiteSpace(request.StarterId))
+                {
+                    return new Operator(
+                        request.StarterId,
+                        request.StarterCode ?? string.Empty,
+                        request.StarterName ?? request.StarterCode ?? "System");
+                }
+
                 var objectName = string.IsNullOrWhiteSpace(request.EventFlowId) ? "ef_unknown" : $"ef_{request.EventFlowId}";
                 return new Operator("system", objectName, "System");
             }
@@ -220,14 +411,22 @@ namespace EIMSNext.Flow.Host.Controllers
     public class EfRunRequest
     {
         public string ExecutionId { get; set; } = string.Empty;
+        public string? RunLogId { get; set; }
+        public string? RetryNodeId { get; set; }
+        public string? RetryAttemptId { get; set; }
         public string EventFlowId { get; set; } = string.Empty;
+        /// <summary>EventFlowId 为空时，是否明确允许匹配全部候选 EF。</summary>
+        public bool MatchAllEventFlows { get; set; }
         public string DataId { get; set; } = string.Empty;
         public EventSourceType EventSource { get; set; }
         public EventType EventType { get; set; }
         public string WfNodeId { get; set; } = string.Empty;
         public string? NodeAction { get; set; }
-        public CascadeMode EfCascade { get; set; }
-        public string? EventIds { get; set; }
+        public string? StarterId { get; set; }
+        public string? StarterCode { get; set; }
+        public string? StarterName { get; set; }
+        /// <summary>EventFlow 链上下文 JSON（EfChainContext）：EF 写数据触发下游时透传，供链尾解析出站门禁；入口触发为空。</summary>
+        public string? ChainJson { get; set; }
         public List<string>? ChangeFields { get; set; }
     }
 }

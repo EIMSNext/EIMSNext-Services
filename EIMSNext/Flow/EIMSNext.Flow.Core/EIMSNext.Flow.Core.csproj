@@ -13,6 +13,7 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\Core\EIMSNext.ApiCore\EIMSNext.ApiCore.csproj" />
+    <ProjectReference Include="..\..\ApiClient\EIMSNext.ApiClient.File\EIMSNext.ApiClient.File.csproj" />
     <ProjectReference Include="..\..\Async\EIMSNext.Async.Abstractions\EIMSNext.Async.Abstractions.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Cache\EIMSNext.Cache.csproj" />
     <ProjectReference Include="..\..\Core\EIMSNext.Print\EIMSNext.Print.csproj" />
@@ -22,7 +23,6 @@
     <ProjectReference Include="..\..\Core\EIMSNext.Entities\EIMSNext.Entities.csproj" />
     <ProjectReference Include="..\..\Service\EIMSNext.Service.Contracts\EIMSNext.Service.Contracts.csproj" />
     <ProjectReference Include="..\..\Plugin\EIMSNext.Plugin.Runtime\EIMSNext.Plugin.Runtime.csproj" />
-    <ProjectReference Include="..\..\File\EIMSNext.File.Contracts\EIMSNext.File.Contracts.csproj" />
   </ItemGroup>
 </Project>
 

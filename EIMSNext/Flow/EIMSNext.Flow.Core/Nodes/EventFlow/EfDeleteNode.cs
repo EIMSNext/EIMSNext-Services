@@ -42,7 +42,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 else if (updateSetting.DeleteMode == UpdateMode.Form)
                 {
                     var findOpt = updateSetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-                    BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+                    BuildDynamicFilter(dataContext, findOpt.Filter!, GetNodeScriptData(dataContext));
                     findOpt.Take = Math.Min(
                         findOpt.GetEffectiveTake() <= 0 ? EIMSNext.Component.WfMetadataParser.DefaultEventFlowNodeTake : findOpt.Take,
                         EIMSNext.Component.WfMetadataParser.DefaultEventFlowNodeTake);

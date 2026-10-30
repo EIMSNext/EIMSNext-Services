@@ -4,6 +4,8 @@ using EIMSNext.Plugin.Runtime;
 using EIMSNext.Mef;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.Async.RabbitMQ;
+using EIMSNext.Async.Abstractions.System;
+using EIMSNext.Async.Tasks.System;
 using EIMSNext.Component;
 using EIMSNext.Flow.Core;
 using EIMSNext.Flow.Core.Interfaces;
@@ -65,6 +67,7 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddGlobalMef(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddPluginRuntime(EIMSNext.Common.Constants.BaseDirectory);
 builder.Services.AddRabbitMqMessaging(builder.Configuration);
+builder.Services.AddSingleton<ISystemTokenProvider, SystemTokenProvider>();
 
 var app = builder.Build();
 

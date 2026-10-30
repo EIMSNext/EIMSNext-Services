@@ -14,7 +14,7 @@ namespace EIMSNext.Flow.Core.Interfaces
 
     public class EfRunParameter
     {
-        public EfRunParameter(string userId, string accessToken, FormData data, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public EfRunParameter(string userId, string accessToken, FormData data, EventSourceType eventSource, EventType eventType, string wfNodeId, Operator? starter, EfChainContext? chain = null)
         {
             UserId = userId;
             AccessToken = accessToken;
@@ -23,8 +23,7 @@ namespace EIMSNext.Flow.Core.Interfaces
             EventType = eventType;
             WfNodeId = wfNodeId;
             Starter = starter;
-            Cascade = cascade;
-            EventIds = eventIds;
+            Chain = chain;
         }
 
         public EfRunParameter WithEventFlowId(string eventFlowId)
@@ -39,21 +38,9 @@ namespace EIMSNext.Flow.Core.Interfaces
             return this;
         }
 
-        public EfRunParameter WithWorkflowTransition(bool value = true)
-        {
-            WorkflowTransition = value;
-            return this;
-        }
-
         public EfRunParameter WithExecutionId(string executionId)
         {
             ExecutionId = executionId;
-            return this;
-        }
-
-        public EfRunParameter WithWorkflowInstanceId(string workflowInstanceId)
-        {
-            WorkflowInstanceId = workflowInstanceId;
             return this;
         }
 
@@ -66,6 +53,12 @@ namespace EIMSNext.Flow.Core.Interfaces
             return this;
         }
 
+        public EfRunParameter WithChain(EfChainContext? chain)
+        {
+            Chain = chain;
+            return this;
+        }
+
         public string UserId { get; private set; }
         public string AccessToken { get; private set; }
         public FormData Data { get; private set; }
@@ -74,13 +67,12 @@ namespace EIMSNext.Flow.Core.Interfaces
         public EventType EventType { get; private set; }
         public string WfNodeId { get; private set; }
         public string? NodeAction { get; private set; }
-        public bool WorkflowTransition { get; private set; }
         public string ExecutionId { get; private set; } = string.Empty;
-        public string WorkflowInstanceId { get; private set; } = string.Empty;
         public Operator? Starter { get; private set; }
-        public CascadeMode Cascade { get; private set; }
-        public string? EventIds { get; private set; }
         public IReadOnlyCollection<string>? ChangeFields { get; private set; }
+
+        /// <summary>EventFlow 链上下文：null = 新链（用户操作/定时/外部回调）。</summary>
+        public EfChainContext? Chain { get; private set; }
     }
 
     public class EfExecResult

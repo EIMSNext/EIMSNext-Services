@@ -1,7 +1,7 @@
 ﻿using EIMSNext.ApiClient.Flow;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Async.Tasks.System;
+using EIMSNext.Async.Abstractions.System;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;

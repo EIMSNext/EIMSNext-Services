@@ -16,9 +16,22 @@ namespace EIMSNext.Async.RabbitMQ.Messaging
             ArgumentNullException.ThrowIfNull(body);
 
             await using var connection = await connectionFactory.CreateConnectionAsync(cancellationToken);
-            await using var channel = await connection.CreateChannelAsync(cancellationToken: cancellationToken);
+            await using var channel = await connection.CreateChannelAsync(
+                new CreateChannelOptions(true, true),
+                cancellationToken);
             await channel.QueueDeclareAsync(queueName, durable: true, exclusive: false, autoDelete: false, arguments: null, cancellationToken: cancellationToken);
-            await channel.BasicPublishAsync(exchange: string.Empty, routingKey: queueName, body: body, cancellationToken: cancellationToken);
+            var properties = new BasicProperties
+            {
+                Persistent = true,
+                ContentType = "application/json"
+            };
+            await channel.BasicPublishAsync(
+                exchange: string.Empty,
+                routingKey: queueName,
+                mandatory: true,
+                basicProperties: properties,
+                body: body,
+                cancellationToken: cancellationToken);
             logger.LogInformation("Outbox raw message published to queue {QueueName}", queueName);
         }
     }

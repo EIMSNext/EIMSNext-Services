@@ -32,7 +32,7 @@ namespace EIMSNext.Flow.Core.Nodes
                 await AddTaskLog(context.Workflow, new Wf_Task(), dataContext, Metadata!, approveData);
 
                 var formData = GetFormData(dataContext.DataId);
-                await RunEventFlow(new EfRunParameter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                await RunEventFlow(new EfRunParameter(dataContext.UserId ?? "", dataContext.AccessToken, formData, EventSourceType.Form, EventType.Submitted, "", dataContext.WfStarter, dataContext.Chain)
                     .WithExecutionId($"{context.Workflow.Id}:start:{dataContext.Round}:submitted"));
 
             }).ConfigureAwait(false);

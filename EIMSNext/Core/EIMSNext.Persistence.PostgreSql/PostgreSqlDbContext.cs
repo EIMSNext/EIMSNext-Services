@@ -51,7 +51,6 @@ public sealed class PostgreSqlDbContext(DbContextOptions<PostgreSqlDbContext> op
     public DbSet<Wf_TaskLog> WfTaskLogs => Set<Wf_TaskLog>();
     public DbSet<Wf_ExecLog> WfExecLogs => Set<Wf_ExecLog>();
     public DbSet<EventFlowNodeExecution> EventFlowNodeExecutions => Set<EventFlowNodeExecution>();
-    public DbSet<WorkflowTransitionExecution> WorkflowTransitionExecutions => Set<WorkflowTransitionExecution>();
     public DbSet<EventFlowScheduleItem> EventFlowScheduleItems => Set<EventFlowScheduleItem>();
     public DbSet<Ef_RunLog> EfRunLogs => Set<Ef_RunLog>();
     public DbSet<Ef_RunLogNode> EfRunLogNodes => Set<Ef_RunLogNode>();

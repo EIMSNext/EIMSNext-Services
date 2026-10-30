@@ -17,7 +17,8 @@ namespace EIMSNext.Service.Contracts
         Task RestoreAsync(IEnumerable<string> ids);
         Task PurgeAsync(IEnumerable<string> ids);
 
-        Task SubmitAsync(IEnumerable<FormData> entities, CascadeMode cascade, string? eventIds);
+        Task SubmitAsync(IEnumerable<FormData> entities);
+
 
         Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query);
     }

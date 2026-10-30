@@ -9,9 +9,11 @@ create index if not exists "IX_Wf_TaskLog_WfInstanceId" on "Wf_TaskLog" ("WfInst
 
 -- 同一条数据只允许一个在途实例（Runnable=0 / Suspended=1）。已完成/已终止的实例不参与，
 -- 流程走完后仍可重新发起。并发 Start 时后到者会撞这条约束而不是静默建出第二个实例。
+-- Reference 为空串的实例（EventFlow 运行实例，不绑定具体数据）不参与唯一性——
+-- 否则同时只允许一条 EF 运行，第二条必撞 23505。
 create unique index if not exists "UX_WorkflowInstance_Active_Reference"
     on "WorkflowInstance" (lower("Reference"))
- where "Status" in (0, 1);
+ where "Status" in (0, 1) and "Reference" <> '';
 
 -- 历史日志按 数据Id + 流程版本 回填实例Id；仅当该数据恰好对应单一实例时才写，避免归属写错。
 update "Wf_TaskLog" l

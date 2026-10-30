@@ -13,7 +13,7 @@ CREATE TABLE "WorkflowInstance" (
     "Reference" text,
     "NextExecution" bigint,
     "Status" integer NOT NULL,
-    "Data" jsonb,
+    "Data" json,
     "CreateTime" timestamptz NOT NULL,
     "CompleteTime" timestamptz
 );
@@ -28,22 +28,22 @@ CREATE TABLE "ExecutionPointer" (
     "StepId" integer NOT NULL,
     "Active" boolean NOT NULL,
     "SleepUntil" timestamptz,
-    "PersistenceData" jsonb,
+    "PersistenceData" json,
     "StartTime" timestamptz,
     "EndTime" timestamptz,
     "EventName" text,
     "EventKey" text,
     "EventPublished" boolean NOT NULL,
-    "EventData" jsonb,
-    "ExtensionAttributes" jsonb,
+    "EventData" json,
+    "ExtensionAttributes" json,
     "StepName" text,
     "RetryCount" integer NOT NULL,
-    "Children" jsonb,
-    "ContextItem" jsonb,
+    "Children" json,
+    "ContextItem" json,
     "PredecessorId" text,
-    "Outcome" jsonb,
+    "Outcome" json,
     "Status" integer NOT NULL,
-    "Scope" jsonb
+    "Scope" json
 );
 
 CREATE TABLE "EventSubscription" (
@@ -54,7 +54,7 @@ CREATE TABLE "EventSubscription" (
     "EventName" text,
     "EventKey" text,
     "SubscribeAsOf" timestamptz NOT NULL,
-    "SubscriptionData" jsonb,
+    "SubscriptionData" json,
     "ExternalToken" text,
     "ExternalWorkerId" text,
     "ExternalTokenExpiry" timestamptz
@@ -64,7 +64,7 @@ CREATE TABLE "Event" (
     "Id" text PRIMARY KEY,
     "EventName" text,
     "EventKey" text,
-    "EventData" jsonb,
+    "EventData" json,
     "EventTime" timestamptz NOT NULL,
     "IsProcessed" boolean NOT NULL
 );

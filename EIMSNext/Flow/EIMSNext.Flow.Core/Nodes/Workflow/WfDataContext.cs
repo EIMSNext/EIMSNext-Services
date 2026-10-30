@@ -1,4 +1,5 @@
 ﻿using System.Dynamic;
+using System.Text.Json;
 
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
@@ -10,7 +11,7 @@ namespace EIMSNext.Flow.Core
     public class WfDataContext
     {
         private WfDataContext() { }
-        public WfDataContext(string corpId, string userId, string accessToken, string appId, string formId, string dataId, Operator? starter, CascadeMode cascade, string? eventIds)
+        public WfDataContext(string corpId, string userId, string accessToken, string appId, string formId, string dataId, Operator? starter, EfChainContext? chain = null)
         {
             CorpId = corpId;
             UserId = userId;
@@ -19,8 +20,7 @@ namespace EIMSNext.Flow.Core
             FormId = formId;
             DataId = dataId;
             WfStarter = starter;
-            EfCascade = cascade;
-            EventIds = eventIds;
+            Chain = chain;
         }
 
         public static WfDataContext FromData(IDictionary<string, object?> data)
@@ -42,8 +42,7 @@ namespace EIMSNext.Flow.Core
                 ctx.WfStarter = new Operator(empId, empCode, empName);
             }
 
-            ctx.EfCascade = (CascadeMode)data.GetValue<int>(WfConsts.EfCascade, 0);
-            ctx.EventIds = data.GetValue<string?>(WfConsts.EventIds, null);
+            ctx.Chain = data.GetValue<string?>(WfConsts.EfChain, null)?.DeserializeFromJson<EfChainContext>();
             ctx.Round = data.GetValue<int>(WfConsts.ApprovalRounnd, 1);
 
             return ctx;
@@ -56,8 +55,9 @@ namespace EIMSNext.Flow.Core
         public string FormId { get; private set; } = string.Empty;
         public string DataId { get; private set; } = string.Empty;
         public Operator? WfStarter { get; private set; }
-        public CascadeMode EfCascade { get; private set; }
-        public string? EventIds { get; private set; }
+
+        /// <summary>EventFlow 链上下文：null = 新链。</summary>
+        public EfChainContext? Chain { get; private set; }
         public bool MatchedResult { get; set; }
         public bool MatchParallel { get; set; }
         public int Round { get; set; } = 1;
@@ -86,8 +86,7 @@ namespace EIMSNext.Flow.Core
             data.AddOrUpdate(WfConsts.WfStarter, empdo);
             data.AddOrUpdate(WfConsts.MatchedResult, MatchedResult);
             data.AddOrUpdate(WfConsts.MatchParallel, MatchParallel);
-            data.AddOrUpdate(WfConsts.EfCascade, (int)EfCascade);
-            data.AddOrUpdate(WfConsts.EventIds, EventIds);
+            data.AddOrUpdate(WfConsts.EfChain, Chain?.SerializeToJson());
             data.AddOrUpdate(WfConsts.ApprovalRounnd, Round);
 
             return data;

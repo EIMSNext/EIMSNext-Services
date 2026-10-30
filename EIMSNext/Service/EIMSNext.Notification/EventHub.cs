@@ -21,7 +21,7 @@ namespace EIMSNext.Notification
     {
         private static string domain = "eimsnext.com";
 
-        public async Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data)
+        public async Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data, string? chainJson = null)
         {
             ArgumentException.ThrowIfNullOrWhiteSpace(eventId);
             var destination = await WebhookUrlSafety.ResolveAsync(webhook.Url, Configuration).ConfigureAwait(false);
@@ -59,6 +59,11 @@ namespace EIMSNext.Notification
                 {
                     var payload = await content.ReadAsByteArrayAsync();
                     request.Headers.TryAddWithoutValidation("X-EIMS-Signature", WebhookSignature.Compute(payload, webhook.Secret));
+                }
+                if (!string.IsNullOrWhiteSpace(chainJson))
+                {
+                    // EventFlow 链上下文透传：hook 回环本系统时由入站端点恢复链，运行期循环/深度校验不断链
+                    request.Headers.TryAddWithoutValidation("X-EF-Chain", chainJson);
                 }
 
                 var resp = await httpClient.SendAsync(request);

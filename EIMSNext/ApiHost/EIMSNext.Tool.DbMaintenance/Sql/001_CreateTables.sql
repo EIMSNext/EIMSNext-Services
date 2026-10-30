@@ -394,6 +394,10 @@ CREATE TABLE "Ef_RunLog" (
     "EndTime" bigint,
     "Success" boolean not null default false,
     "ErrMsg" citext not null default '',
+    "RetryContextJson" citext not null default '',
+    "RetryInProgress" boolean not null default false,
+    "RetryAttemptId" citext not null default '',
+    "RetryLeaseUntil" bigint,
     "CreateBy" jsonb,
     "UpdateBy" jsonb,
     "UpdateTime" bigint,
@@ -1721,19 +1725,4 @@ CREATE TABLE "WorkbenchRecentVisit" (
     "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_WorkbenchRecentVisit" PRIMARY KEY ("Id")
-);
-
-
-CREATE TABLE "WorkflowTransitionExecution" (
-    "Id" citext COLLATE "C" not null default '',
-    "ExecutionId" citext COLLATE "C" not null default '',
-    "WorkflowInstanceId" citext COLLATE "C" not null default '',
-    "CorpId" citext COLLATE "C" not null default '',
-    "WfNodeId" citext COLLATE "C" not null default '',
-    "NodeAction" citext not null default '',
-    "Status" integer not null default 0,
-    "Error" text not null default '',
-    "CreateTime" bigint not null default 0,
-    "UpdateTime" bigint not null default 0,
-    CONSTRAINT "PK_WorkflowTransitionExecution" PRIMARY KEY ("Id")
 );

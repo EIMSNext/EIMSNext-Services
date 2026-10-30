@@ -118,5 +118,8 @@ namespace EIMSNext.Async.Abstractions.Messaging
 
         /// <summary>Stable event identifier supplied by the business event source.</summary>
         public string EventId { get; set; } = string.Empty;
+
+        /// <summary>EventFlow 链上下文 JSON（写入处于链上时非空）：hook 回环本系统时经 X-EF-Chain 透传恢复链。</summary>
+        public string? ChainJson { get; set; }
     }
 }

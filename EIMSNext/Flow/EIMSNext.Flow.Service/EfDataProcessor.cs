@@ -14,7 +14,6 @@ using EIMSNext.Service.Contracts;
 using HKH.Mef2.Integration;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
 namespace EIMSNext.Flow.Service
@@ -22,15 +21,9 @@ namespace EIMSNext.Flow.Service
     /// <summary>
     /// EventFlow 写数据的入口。
     /// <para>
-    /// 重要约束：eventFlow 通过本处理器写入的 <see cref="FormData"/> 使用
-    /// <see cref="DataAction.EventFlow"/> 而非 <see cref="DataAction.Submit"/>，
-    /// 因此 <see cref="FormDataService.BeforeAdd"/> 中 <c>ResolveSerialNumbers</c>
-    /// 不会触发——这意味着 eventFlow 插入的 <c>serialno</c> 类型字段会留空。
-    /// </para>
-    /// <para>
-    /// 这是有意为之：eventFlow 通常用于子表/批量/历史回写，让流水号在子表内自增会与
-    /// 主表单号冲突。若业务需要让 eventFlow 写入的记录也带流水号，请在该节点之前的
-    /// 公式/赋值中显式计算序列值，或将上游 Action 改为 <c>Submit</c>。
+    /// EF 写数复用 UI 提交管线（FormDataService）：插入按提交处理（验必填/生成流水号/当前节点启动流程，发
+    /// Submitted），修改与删除按草稿保存处理（只发 Modified/Removed）；防循环靠链
+    /// （R1/R2 + 链尾级联门禁），不需要额外的写入抑制标记。
     /// </para>
     /// </summary>
     public class EfDataProcessor : IEfDataProcessor
@@ -39,7 +32,6 @@ namespace EIMSNext.Flow.Service
         protected IServiceContext ServiceContext { get; private set; }
         protected IRepository<Wf_Definition> WfDefinitionRepository { get; private set; }
         protected IFormDataService FormDataService { get; private set; }
-        protected IWorkflowHost WorkflowHost { get; private set; }
         protected ILogger<EfDataProcessor> Logger { get; private set; }
         protected IRepository<EventFlowNodeExecution> NodeExecutionRepository { get; private set; }
         private static string ProcessingOwner => $"{Environment.MachineName}:{Environment.ProcessId}";
@@ -50,7 +42,6 @@ namespace EIMSNext.Flow.Service
             this.ServiceContext = resolver.GetServiceContext();
             this.WfDefinitionRepository = resolver.GetRepository<Wf_Definition>();
             this.FormDataService = resolver.Resolve<IFormDataService>();
-            this.WorkflowHost = resolver.Resolve<IWorkflowHost>();
             this.Logger = resolver.GetLogger<EfDataProcessor>();
             this.NodeExecutionRepository = resolver.GetRepository<EventFlowNodeExecution>();
         }
@@ -95,7 +86,7 @@ namespace EIMSNext.Flow.Service
             InitServiceContext(dataContext);
             var executionId = string.IsNullOrWhiteSpace(dataContext.ExecutionId) ? inst.Id : dataContext.ExecutionId;
             var actions = nodeData.ActionDatas
-                .Select(x => new ActionFormData { State = x.State, FormData = x.FormData, Persisted = x.Persisted, WorkflowStarted = x.WorkflowStarted })
+                .Select(x => new ActionFormData { State = x.State, FormData = x.FormData, Persisted = x.Persisted })
                 .ToList();
             try
             {
@@ -176,15 +167,20 @@ namespace EIMSNext.Flow.Service
                         execution = (await NodeExecutionRepository.GetAsync(execution.Id))!;
                     }
 
+                    // EF 写数复用 UI 提交管线：插入按提交处理（验必填/流水号/当前节点直接起流程），
+                    // 修改与删除按草稿保存处理（只发 Modified/Removed）；防循环靠链。
                     switch (action.State)
                     {
                         case DataState.Inserted:
+                            ServiceContext.Action = DataAction.Submit;
                             await FormDataService.AddAsync([action.FormData]);
                             break;
                         case DataState.Modified:
+                            ServiceContext.Action = DataAction.Save;
                             await FormDataService.ReplaceAsync(action.FormData);
                             break;
                         case DataState.Removed:
+                            ServiceContext.Action = DataAction.Save;
                             await FormDataService.DeleteAsync([action.FormData.Id]);
                             break;
                     }
@@ -272,10 +268,11 @@ namespace EIMSNext.Flow.Service
                 return action.FormData.Id;
             }
 
+            // 只作 ExecutionKey 的稳定成分（重跑幂等靠它定位既有执行记账），不写回 FormData.Id：
+            // 目标行主键交给仓储 EnsureId 补 TSID，与 UI 提交行的 Id 风格保持一致。
             var seed = $"{executionId}:{eventFlowId}:{nodeId}:{ordinal}";
             var hash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(seed))).ToLowerInvariant();
-            action.FormData.Id = hash[..24];
-            return action.FormData.Id;
+            return hash[..24];
         }
 
         /// <summary>
@@ -294,46 +291,14 @@ namespace EIMSNext.Flow.Service
                 || postgres.MessageText.Contains("eventflownodeexecution", StringComparison.OrdinalIgnoreCase);
         }
 
-        public void Process(WorkflowInstance inst)
-        {
-            var dataContext = (EfDataContext)inst.Data;
-
-            InitServiceContext(dataContext);
-
-            //TODO: 流程表单，在创建后应自动提交
-            foreach (var action in dataContext.NodeDatas.Values.SelectMany(x => x.ActionDatas)
-                .Where(x => x.State == DataState.Inserted && !x.WorkflowStarted))
-            {
-                var x = action.FormData;
-                try
-                {
-                    var formDef = dataContext.FormDefs[x.FormId];
-                    if (formDef.UsingWorkflow)
-                    {
-                        var data = new WfDataContext(x.CorpId ?? "", dataContext.UserId, dataContext.AccessToken, x.AppId, x.FormId, x.Id, x.CreateBy, dataContext.EfCascade, dataContext.EventIds);
-                        WorkflowHost.StartWorkflow(x.FormId, data.ToExpando());
-                        action.WorkflowStarted = true;
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Logger.LogError(ex, "EventFlow自动提交表单失败。FormDataId={FormDataId}", x.Id);
-                }
-            }
-
-            foreach (var node in dataContext.NodeDatas.Values)
-            {
-                node.ActionDatas = node.ActionDatas;
-            }
-        }
-
         private void InitServiceContext(EfDataContext dataContext)
         {
             ServiceContext.CorpId = dataContext.CorpId;
             ServiceContext.UserId = dataContext.UserId;
             ServiceContext.AccessToken = dataContext.AccessToken;
             ServiceContext.Operator = dataContext.WfStarter ?? Operator.Empty;
-            ServiceContext.Action = DataAction.EventFlow;
+            ServiceContext.Action = DataAction.None;
+            ServiceContext.Chain = dataContext.Chain;
         }
     }
 }

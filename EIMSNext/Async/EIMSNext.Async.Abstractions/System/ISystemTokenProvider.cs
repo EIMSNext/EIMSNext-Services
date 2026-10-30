@@ -1,4 +1,4 @@
-namespace EIMSNext.Async.Tasks.System;
+namespace EIMSNext.Async.Abstractions.System;
 
 public interface ISystemTokenProvider
 {

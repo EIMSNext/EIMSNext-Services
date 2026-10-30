@@ -33,8 +33,11 @@ namespace EIMSNext.Flow.Core
         /// 分支节点兜底（Else）分支的判定表达式：此前没有任何条件分支命中。
         /// </summary>
         public const string NoMatchExpression = " (data.matched_result==false) ";
-        public const string EfCascade = "ef_cascade";
-        public const string EventIds = "event_ids";
+        /// <summary>
+        /// EventFlow 链上下文（EfChainContext 的 JSON）：跨触发边界传播，运行期循环/深度校验。
+        /// 旧实例缺此 key 时视作新链。
+        /// </summary>
+        public const string EfChain = "ef_chain";
         public const string ApprovalRounnd = "approval_round";
     }
 }

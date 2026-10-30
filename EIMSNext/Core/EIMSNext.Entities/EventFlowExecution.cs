@@ -35,28 +35,4 @@ namespace EIMSNext.Entities
         Failed = 2
     }
 
-    /// <summary>
-    /// 工作流节点流转触发的一批 EventFlow 的执行状态。
-    /// </summary>
-    public sealed class WorkflowTransitionExecution : KeyedEntityBase
-    {
-        public string ExecutionId { get; set; } = string.Empty;
-        public string WorkflowInstanceId { get; set; } = string.Empty;
-        public string CorpId { get; set; } = string.Empty;
-        public string WfNodeId { get; set; } = string.Empty;
-        public string NodeAction { get; set; } = string.Empty;
-        public WorkflowTransitionStatus Status { get; set; }
-        public string Error { get; set; } = string.Empty;
-        public long CreateTime { get; set; }
-        public long UpdateTime { get; set; }
-    }
-
-    public enum WorkflowTransitionStatus
-    {
-        Pending = 0,
-        Running = 1,
-        EventFlowsCompleted = 2,
-        Failed = 3,
-        Completed = 4
-    }
 }

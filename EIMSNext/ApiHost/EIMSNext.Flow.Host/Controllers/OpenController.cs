@@ -5,6 +5,7 @@ using Asp.Versioning;
 using EIMSNext.ApiHost.Extensions;
 using EIMSNext.ApiCore;
 using EIMSNext.ApiService;
+using EIMSNext.Async.Abstractions.System;
 using EIMSNext.Common;
 using EIMSNext.Service.Contracts;
 
@@ -21,10 +22,12 @@ namespace EIMSNext.Flow.Host.Controllers
     public class OpenController : ControllerBase
     {
         private readonly IResolver _resolver;
+        private readonly ISystemTokenProvider _systemTokenProvider;
 
         public OpenController(IResolver resolver)
         {
             _resolver = resolver;
+            _systemTokenProvider = resolver.Resolve<ISystemTokenProvider>();
         }
 
         /// <summary>
@@ -57,6 +60,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
             using var reader = new StreamReader(Request.Body);
             var body = await reader.ReadToEndAsync();
+            var accessToken = await _systemTokenProvider.GetAccessTokenAsync(corpId, "ef", eventFlowId);
 
             var result = await _resolver.Resolve<IEventFlowHookService>().HandleAsync(
                 corpId,
@@ -65,9 +69,15 @@ namespace EIMSNext.Flow.Host.Controllers
                 Request.Method,
                 Request.ContentType ?? string.Empty,
                 headers,
-                body);
+                body,
+                accessToken);
 
-            return Content(result.Body, result.ContentType, System.Text.Encoding.UTF8);
+            return new ContentResult
+            {
+                StatusCode = result.StatusCode,
+                Content = result.Body,
+                ContentType = result.ContentType,
+            };
         }
     }
 }

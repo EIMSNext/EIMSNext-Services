@@ -8,13 +8,14 @@ namespace EIMSNext.Flow.Core.Nodes.EventFlow
     {
         public static bool ValueIsSingleResultNode(this FormFieldSetting fieldSetting)
         {
+            //ValueField 可能为空（Formula 未配 drivingField / Field 缺 FieldValue），按单结果处理
             return (fieldSetting.ValueType != FieldValueType.Field && fieldSetting.ValueType != FieldValueType.Formula)
-                || (fieldSetting.ValueField!.SingleResultNode ?? true);
+                || (fieldSetting.ValueField?.SingleResultNode ?? true);
         }
         public static bool ValueIsSubField(this FormFieldSetting fieldSetting)
         {
             return (fieldSetting.ValueType == FieldValueType.Field || fieldSetting.ValueType == FieldValueType.Formula)
-                && fieldSetting.ValueField!.Field.IsSubField;
+                && (fieldSetting.ValueField?.Field.IsSubField ?? false);
         }
 
         public static bool IsEmpty(this DataMatchSetting matchSetting)

@@ -4,7 +4,7 @@ using System.Text.Json;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Abstractions.Messaging;
 using EIMSNext.Async.RabbitMQ.Messaging;
-using EIMSNext.Async.Tasks.System;
+using EIMSNext.Async.Abstractions.System;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
 using EIMSNext.Core.Abstractions;

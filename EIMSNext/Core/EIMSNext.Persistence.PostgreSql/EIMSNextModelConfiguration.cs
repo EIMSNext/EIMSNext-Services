@@ -201,8 +201,6 @@ public static class EIMSNextModelConfiguration
         Mapped<PrintDef>(modelBuilder)?.Property(x => x.Content).HasColumnType("text");
         Mapped<Wf_Definition>(modelBuilder)?.Property(x => x.Content).HasColumnType("text");
         Mapped<EventFlowNodeExecution>(modelBuilder)?.Property(x => x.ResultSnapshot).HasColumnType("text");
-        // WorkflowTransitionExecution.Error 存放异常描述，同样是普通文本。
-        Mapped<WorkflowTransitionExecution>(modelBuilder)?.Property(x => x.Error).HasColumnType("text");
 
         // ------------------------------------------------------------ 字符列
         // 全部字符列（主键与外键、业务文本）统一用 citext：EF 会把对应参数一并按 citext 发送，
@@ -387,8 +385,7 @@ public static class EIMSNextModelConfiguration
             || entityType == typeof(DashboardItemDef) && propertyName == nameof(DashboardItemDef.Details)
             || entityType == typeof(PrintDef) && propertyName == nameof(PrintDef.Content)
             || entityType == typeof(Wf_Definition) && propertyName == nameof(Wf_Definition.Content)
-            || entityType == typeof(EventFlowNodeExecution) && propertyName == nameof(EventFlowNodeExecution.ResultSnapshot)
-            || entityType == typeof(WorkflowTransitionExecution) && propertyName == nameof(WorkflowTransitionExecution.Error);
+            || entityType == typeof(EventFlowNodeExecution) && propertyName == nameof(EventFlowNodeExecution.ResultSnapshot);
     }
 
     private static bool IsCaseInsensitiveStringArray(Type entityType, string propertyName)

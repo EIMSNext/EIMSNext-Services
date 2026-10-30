@@ -18,7 +18,7 @@ using Quartz;
 namespace EIMSNext.Async.Quartz.Jobs
 {
     /// <summary>
-    /// 数据流定时调度扫描作业。扫描到到期项后通过 IMessagePublisher 发布 EventFlowRunTaskArgs，
+    /// 数据流定时调度扫描作业。扫描到到期项后通过 Outbox 发布 EventFlowRunTaskArgs，
     /// 由 Async.Tasks 中的 EventFlowRunConsumer 调 FlowApiClient.RunEventFlow 触发一次执行。
     /// </summary>
     [DisallowConcurrentExecution]
@@ -38,7 +38,7 @@ namespace EIMSNext.Async.Quartz.Jobs
             var scheduleRepo = Resolver.GetRepository<EventFlowScheduleItem>();
             var definitionRepo = Resolver.GetRepository<Wf_Definition>();
             var formDataRepo = Resolver.GetRepository<FormData>();
-            var publisher = Resolver.Resolve<IMessagePublisher>();
+            var publisher = Resolver.Resolve<ITransactionalOutboxPublisher>();
             var now = DateTime.UtcNow.ToTimeStampMs();
 
             var dueItems = scheduleRepo.Find(x => x.TriggerTime <= now).ToList();
@@ -76,7 +76,7 @@ namespace EIMSNext.Async.Quartz.Jobs
                     var triggerSetting = definition.Metadata.Steps.FirstOrDefault()?.EfNodeSetting?.TriggerSetting;
                     var wfNodeId = triggerSetting?.WfNodeId ?? string.Empty;
 
-                    await publisher.PublishAsync(new EventFlowRunTaskArgs
+                    var eventFlowMessage = new EventFlowRunTaskArgs
                     {
                         CorpId = definition.CorpId??string.Empty,
                         EventFlowId = definition.Id,
@@ -86,11 +86,12 @@ namespace EIMSNext.Async.Quartz.Jobs
                         DataId = item.DataId,
                         EventSource = EventSourceType.Schedule,
                         EventType = EventType.None,
-                        Cascade = CascadeMode.All,
                         WfNodeId = string.IsNullOrEmpty(wfNodeId) ? null : wfNodeId,
-                    });
-
+                    };
+                    await using var scope = new TransactionScope(scheduleRepo.DbContext);
+                    await publisher.EnqueueRequiredAsync(eventFlowMessage);
                     await AdvanceAsync(scheduleRepo, definition, item);
+                    await scope.CommitTransactionAsync();
                 }
                 catch (Exception ex)
                 {

@@ -1,12 +1,5 @@
 ﻿using HKH.Mef2.Integration;
 
-using EIMSNext.Core.Abstractions;
-using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
-using EIMSNext.Core.Query;
-using EIMSNext.Core.Services.Extensions;
-using EIMSNext.Flow.Core.Interfaces;
-
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
 
@@ -16,18 +9,11 @@ namespace EIMSNext.Flow.Core.Nodes
     {
         public EfEndNode(IResolver resolver) : base(resolver)
         {
-            _dataProcessor = resolver.Resolve<IEfDataProcessor>();
         }
-
-        private IEfDataProcessor _dataProcessor;
 
         public override ExecutionResult Run(IStepExecutionContext context)
         {
-            return ExecuteWithLogAsync(context, dataContext =>
-            {
-                _dataProcessor.Process(context.Workflow);
-                return Task.FromResult(ExecutionResult.Next());
-            }).GetAwaiter().GetResult();
+            return ExecuteWithLogAsync(context, _ => Task.FromResult(ExecutionResult.Next())).GetAwaiter().GetResult();
         }
     }
 }

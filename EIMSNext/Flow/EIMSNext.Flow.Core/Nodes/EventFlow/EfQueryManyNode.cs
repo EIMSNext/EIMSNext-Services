@@ -28,7 +28,7 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 var querySetting = Metadata!.EfNodeSetting!.QueryManySetting!;
                 var findOpt = querySetting.DynamicFindOptions!.DeserializeFromJson<DynamicFindOptions<FormData>>()!;
-                BuildDynamicFilter(findOpt.Filter!, GetNodeScriptData(dataContext));
+                BuildDynamicFilter(dataContext, findOpt.Filter!, GetNodeScriptData(dataContext));
                 findOpt.Take = Math.Min(
                     findOpt.GetEffectiveTake() <= 0 ? EIMSNext.Component.WfMetadataParser.DefaultEventFlowNodeTake : findOpt.Take,
                     EIMSNext.Component.WfMetadataParser.DefaultEventFlowNodeTake);

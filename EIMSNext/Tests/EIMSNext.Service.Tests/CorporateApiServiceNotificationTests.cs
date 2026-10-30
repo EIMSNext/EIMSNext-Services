@@ -139,6 +139,7 @@ public class CorporateApiServiceNotificationTests
         public IEmployee? Employee { get; set; }
         public string? ClientIp { get; set; }
         public DataAction Action { get; set; }
+        public EfChainContext? Chain { get; set; }
         public IScopeCache ScopeCache => throw new NotSupportedException();
         public T? UserAs<T>() where T : class, IUser => User as T;
     }

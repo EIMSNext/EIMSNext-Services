@@ -62,6 +62,7 @@ namespace EIMSNext.Service.Contracts
         public DataAction Action { get; set; }
         public string CorpId { get; set; }
         public string UserId { get; set; }
+        public EfChainContext? Chain { get; set; }
 
         private void RetrieveUser()
         {

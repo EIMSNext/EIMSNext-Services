@@ -80,6 +80,13 @@ namespace EIMSNext.Async.RabbitMQ.Outbox
             return acquired is null or DBNull ? null : token;
         }
 
+        public Task<bool> IsCompletedAsync(string eventKey, string target, CancellationToken cancellationToken = default)
+            => repository.AnyAsync(
+                x => x.EventKey == eventKey
+                    && x.Target == target
+                    && x.Status == ProcessedMessageStatus.Completed,
+                cancellationToken);
+
         /// <summary>
         /// 标记处理完成，并释放租约。
         /// </summary>

@@ -9,10 +9,10 @@ using EIMSNext.Common.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Flow.Core.Interfaces;
 using EIMSNext.Scripting;
-
+using System.Text.Json;
 using HKH.Mef2.Integration;
 
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 
 using WorkflowCore.Interface;
@@ -30,12 +30,14 @@ namespace EIMSNext.Flow.Core.Nodes
             _resolver = resolver;
             ScriptEngine = resolver.Resolve<IScriptEngine>();
             Logger = resolver.GetLogger<EventFlowRunner>();
+            var maxDepthRaw = resolver.Resolve<IConfiguration>()[EfChainConsts.MaxChainDepthConfigKey];
+            MaxChainDepth = EfChainConsts.ResolveMaxChainDepth(maxDepthRaw);
         }
 
         protected ISyncWorkflowRunner SyncWfRunner => _resolver.Resolve<ISyncWorkflowRunner>();
         protected IScriptEngine ScriptEngine { get; private set; }
         protected ILogger<EventFlowRunner> Logger { get; private set; }
-        private IRepository<WorkflowTransitionExecution> TransitionRepository => _resolver.Resolve<IRepository<WorkflowTransitionExecution>>();
+        protected int MaxChainDepth { get; private set; }
 
 
         public bool IsMeet(Wf_Definition eventFlow, FormData data)
@@ -60,71 +62,66 @@ namespace EIMSNext.Flow.Core.Nodes
             {
                 paramter.WithExecutionId(TsidIdGenerator.NewId());
             }
-            if (paramter.Cascade == CascadeMode.Never || (paramter.Cascade == CascadeMode.Specified && string.IsNullOrEmpty(paramter.EventIds)))
+
+            if (paramter.Chain is { } incomingChain && !incomingChain.IsValid(MaxChainDepth))
             {
+                Logger.LogWarning(
+                    "EventFlow 链上下文无效，按新链处理。ExecutionId={ExecutionId}, ChainId={ChainId}, Depth={Depth}",
+                    paramter.ExecutionId,
+                    incomingChain.ChainId,
+                    incomingChain.Depth);
+                paramter.WithChain(null);
+            }
+
+            // 出站级联门禁（链尾解析）：以「当前执行的 EF」——链尾定义——上的配置为准，各是各的，与链起始点无关。
+            // 链为空 = 入口触发（表单/定时/HTTP/手动 API），不设门禁；入站只看 trigger 配置。
+            var cascadeGate = await ResolveChainCascadeAsync(paramter);
+            if (cascadeGate.BlockReason != null)
+            {
+                // 级联开关切断：逐候选写运行日志留痕（治「为啥没跑」），不静默返回
+                await WriteCascadeBlockedLogsAsync(paramter, cascadeGate.BlockReason);
                 return execResult;
             }
-
-            var transitionMode = paramter.WorkflowTransition
-                && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
-                && !string.IsNullOrWhiteSpace(paramter.NodeAction);
-            var inTransaction = TransactionScope.IsInTransactionFor(TransitionRepository.DbContext);
-            if (transitionMode)
-            {
-                var executionId = paramter.ExecutionId;
-                var transition = TransitionRepository.Find(x => x.ExecutionId == executionId).FirstOrDefault();
-                if (transition?.Status == WorkflowTransitionStatus.Completed)
-                {
-                    return execResult;
-                }
-
-                var now = DateTime.UtcNow.ToTimeStampMs();
-                if (transition is null)
-                {
-                    // PostgreSQL 下没有等价的 upsert 语义（部分列 SetOnInsert、部分列 Set），
-                    // 因此改用「先查后插/改」——外层已在事务内（由 SubmitAsync 打开），
-                    // 并发竞态由 ExecutionId 上的唯一约束在提交时兜底。
-                    var created = new WorkflowTransitionExecution
-                    {
-                        Id = TransitionRepository.NewId(),
-                        ExecutionId = executionId,
-                        WorkflowInstanceId = paramter.WorkflowInstanceId,
-                        CorpId = paramter.Data.CorpId ?? string.Empty,
-                        WfNodeId = paramter.WfNodeId,
-                        NodeAction = paramter.NodeAction ?? string.Empty,
-                        CreateTime = now,
-                        UpdateTime = now,
-                        Status = WorkflowTransitionStatus.Running,
-                    };
-                    await TransitionRepository.InsertAsync(created);
-                }
-                else
-                {
-                    await TransitionRepository.UpdateManyAsync(
-                        x => x.ExecutionId == executionId,
-                        setters => setters
-                            .SetProperty(x => x.Status, WorkflowTransitionStatus.Running)
-                            .SetProperty(x => x.UpdateTime, now));
-                }
-            }
+            var cascadeAllowedIds = cascadeGate.AllowedIds;
 
             var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
-            var corpId = paramter.Data.CorpId;
-            var eventSource = paramter.EventSource;
-            var candidates = repository.Find(x => x.CorpId == corpId
-                && x.FlowType == FlowType.EventFlow
-                && !x.DeleteFlag
-                && !x.Disabled
-                && x.EventSetting != null
-                && x.EventSource == eventSource).ToList();
+            var candidates = LoadCandidates(repository, paramter);
 
-            if (!string.IsNullOrEmpty(paramter.EventFlowId))
-            {
-                candidates = candidates.Where(x => x.Id == paramter.EventFlowId).ToList();
-            }
+            // 父链 = 本次触发携带的链（null = 新链）。每个候选都从父链独立派生：
+            // 同批候选是兄弟关系，不得互相把对方并入 Path/抬升 Depth（否则深度虚高误触 R2、兄弟互斥误触 R1）
+            var parentChain = paramter.Chain;
 
-            foreach (var eventFlow in candidates.Where(x => IsRunnableEventFlow(x, paramter)))
+            foreach (var eventFlow in candidates)
             {
+                if (!IsRunnableEventFlow(eventFlow, paramter))
+                {
+                    continue;
+                }
+
+                // 链尾 EF 配 Specified：仅放行清单内的候选，未命中的静默跳过（与历史行为一致）
+                if (cascadeAllowedIds != null && !cascadeAllowedIds.Contains(eventFlow.Id))
+                {
+                    continue;
+                }
+
+                var chain = parentChain;
+                // R1 循环中断：同一链上已执行过该 EventFlow（自环/链环），静默跳过并留痕
+                // R2 深度上限：超限中断整链。只写日志告警，不置 Error、不抛异常——不连坐父审批/表单写入
+                var (chainBlockReason, depthExceeded) = EvaluateChainBlock(chain, eventFlow.Id, MaxChainDepth);
+                if (chainBlockReason != null)
+                {
+                    await WriteChainInterruptedLogAsync(eventFlow, paramter, chainBlockReason);
+                    if (depthExceeded)
+                    {
+                        Logger.LogError("EventFlow 链深度超限，已中断整链。EventFlowId={EventFlowId}, ExecutionId={ExecutionId}, {Reason}",
+                            eventFlow.Id, paramter.ExecutionId, chainBlockReason);
+                    }
+                    continue;
+                }
+
+                // R3 链上标记：深度+1、路径追加，随 EfDataContext 向下游传播
+                paramter.WithChain(BuildChainForCandidate(chain, eventFlow.Id));
+
                 var result = await RunSingleAsync(eventFlow, paramter);
                 execResult.EfInstance = result.EfInstance ?? execResult.EfInstance;
 
@@ -136,51 +133,153 @@ namespace EIMSNext.Flow.Core.Nodes
                 }
             }
 
-            if (transitionMode)
-            {
-                var executionId = paramter.ExecutionId;
-                if (string.IsNullOrEmpty(execResult.Error))
-                {
-                    // 状态推进语义保持不变：
-                    //   Running → EventFlowsCompleted（事务内可见，供同事务内的后续节点读取）
-                    //            → Completed（提交后异步落库，避免事务外的读看到「已完成」而跳过真正未完成的工作）
-                    await TransitionRepository.UpdateManyAsync(
-                        x => x.ExecutionId == executionId,
-                        setters => setters
-                            .SetProperty(x => x.Status, WorkflowTransitionStatus.EventFlowsCompleted)
-                            .SetProperty(x => x.Error, string.Empty)
-                            .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
+            return execResult;
+        }
 
-                    await TransactionScope.RegisterAfterCommitAsync(TransitionRepository.DbContext, async () =>
-                    {
-                        await TransitionRepository.UpdateManyAsync(
-                            x => x.ExecutionId == executionId,
-                            setters => setters
-                                .SetProperty(x => x.Status, WorkflowTransitionStatus.Completed)
-                                .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
-                    });
-                }
-                else
-                {
-                    await TransitionRepository.UpdateManyAsync(
-                        x => x.ExecutionId == executionId,
-                        setters => setters
-                            .SetProperty(x => x.Status, WorkflowTransitionStatus.Failed)
-                            .SetProperty(x => x.Error, execResult.Error ?? string.Empty)
-                            .SetProperty(x => x.UpdateTime, DateTime.UtcNow.ToTimeStampMs()));
-                }
+        /// <summary>
+        /// 解析出站级联门禁（链尾解析）：链尾 = 当前正在执行的 EF，其定义上的
+        /// CascadeMode/SpecifiedEvents 决定本次数据变更还能触发哪些下游——每跳从各自定义现读。
+        /// 链为空 = 入口触发，不设门禁。
+        /// </summary>
+        private async Task<(string? BlockReason, HashSet<string>? AllowedIds)> ResolveChainCascadeAsync(EfRunParameter paramter)
+        {
+            var chain = paramter.Chain;
+            if (chain == null || chain.Path.Count == 0)
+            {
+                return (null, null);
             }
 
-            return execResult;
+            var tailEventFlowId = chain.Path[^1];
+            var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
+            var tailDefinition = repository.Find(x => x.Id == tailEventFlowId).FirstOrDefault();
+            if (tailDefinition == null || tailDefinition.DeleteFlag || tailDefinition.Disabled)
+            {
+                // 链尾定义已删除/禁用：出站策略不可知，按最严格（Never）切断并留痕——兜底不依赖业务配置
+                Logger.LogError("EventFlow 链尾定义已删除或禁用，级联下游已切断。EventFlowId={EventFlowId}, ExecutionId={ExecutionId}",
+                    tailEventFlowId, paramter.ExecutionId);
+                return ("ChainCascadeDefinitionMissing", null);
+            }
+
+            return EvaluateCascadeGate(tailDefinition.EventSetting);
+        }
+
+        /// <summary>
+        /// 出站门禁纯函数：Never / Specified 空清单 → 整链阻断；Specified 非空 → 仅放行清单；
+        /// All 或缺省（无 EventSetting）→ 不设门禁，与全链「缺省即 All」一致。
+        /// </summary>
+        private static (string? BlockReason, HashSet<string>? AllowedIds) EvaluateCascadeGate(EventSetting? setting)
+        {
+            var mode = setting?.CascadeMode ?? CascadeMode.All;
+            if (mode == CascadeMode.Never)
+            {
+                return ("ChainCascadeNever", null);
+            }
+
+            if (mode == CascadeMode.Specified)
+            {
+                var specified = setting?.SpecifiedEvents;
+                if (string.IsNullOrWhiteSpace(specified))
+                {
+                    return ("ChainCascadeSpecifiedEmpty", null);
+                }
+
+                var allowedIds = specified
+                    .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                    .ToHashSet(StringComparer.OrdinalIgnoreCase);
+                return (null, allowedIds);
+            }
+
+            return (null, null);
+        }
+
+        /// <summary>
+        /// 链规则判定（纯函数）：返回非空原因即中断该候选。
+        /// R1 环检测（flowId 已在 Path，大小写不敏感）优先于 R2 深度上限。
+        /// </summary>
+        private static (string? Reason, bool DepthExceeded) EvaluateChainBlock(EfChainContext? chain, string eventFlowId, int maxChainDepth)
+        {
+            if (chain == null)
+            {
+                return (null, false);
+            }
+
+            if (chain.Path.Contains(eventFlowId, StringComparer.OrdinalIgnoreCase))
+            {
+                return ($"ChainLoopSuppressed, depth={chain.Depth}, path={FormatChainPath(chain.Path)}", false);
+            }
+
+            if (chain.Depth >= maxChainDepth)
+            {
+                return ($"ChainDepthExceeded, depth={chain.Depth + 1}/{maxChainDepth}, path={FormatChainPath(chain.Path)}", true);
+            }
+
+            return (null, false);
+        }
+
+        /// <summary>
+        /// 由父链派生候选的执行链（纯函数）：深度父+1、路径追加自身；父链为 null 时开新链。
+        /// 同批候选各自从同一父链派生，互不引用——保证 R1/R2 只对真实祖先链生效。
+        /// </summary>
+        private static EfChainContext BuildChainForCandidate(EfChainContext? parentChain, string eventFlowId)
+        {
+            return new EfChainContext
+            {
+                ChainId = parentChain?.ChainId ?? TsidIdGenerator.NewId(),
+                Depth = (parentChain?.Depth ?? 0) + 1,
+                Path = parentChain == null ? [eventFlowId] : [.. parentChain.Path, eventFlowId]
+            };
+        }
+
+        private static List<Wf_Definition> LoadCandidates(IRepository<Wf_Definition> repository, EfRunParameter paramter)
+        {
+            var candidates = repository.Find(x => x.CorpId == paramter.Data.CorpId
+                && x.FlowType == FlowType.EventFlow
+                && !x.DeleteFlag
+                && !x.Disabled
+                && x.EventSetting != null
+                && x.EventSource == paramter.EventSource).ToList();
+
+            if (!string.IsNullOrEmpty(paramter.EventFlowId))
+            {
+                candidates = candidates.Where(x => x.Id == paramter.EventFlowId).ToList();
+            }
+
+            return candidates;
+        }
+
+        private static string FormatChainPath(List<string> path)
+        {
+            return string.Join(" -> ", path);
+        }
+
+        private async Task WriteCascadeBlockedLogsAsync(EfRunParameter paramter, string reason)
+        {
+            var repository = _resolver.Resolve<IRepository<Wf_Definition>>();
+            //只给「除级联门禁外本就满足触发条件」的候选留痕：SourceId/EventType/WfNodeId/ChangeFields
+            //全不匹配的 EF 与本次触发无关，不写日志污染 RunLog
+            foreach (var eventFlow in LoadCandidates(repository, paramter).Where(x => IsRunnableEventFlow(x, paramter)))
+            {
+                await WriteChainInterruptedLogAsync(eventFlow, paramter, reason);
+            }
+        }
+
+        private async Task WriteChainInterruptedLogAsync(Wf_Definition eventFlow, EfRunParameter paramter, string reason)
+        {
+            try
+            {
+                var runLogRepository = _resolver.Resolve<IRepository<Ef_RunLog>>();
+                var runLog = CreateRunLog(eventFlow, paramter, DateTime.UtcNow.ToTimeStampMs());
+                runLogRepository.Insert(runLog);
+                UpdateRunLog(runLogRepository, runLog, string.Empty, false, reason);
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "写入链中断运行日志失败。EventFlowId={EventFlowId}", eventFlow.Id);
+            }
         }
 
         private bool IsRunnableEventFlow(Wf_Definition eventFlow, EfRunParameter paramter)
         {
-            if (!IsCascadeAllowed(eventFlow, paramter))
-            {
-                return false;
-            }
-
             if (!IsSourceMatched(eventFlow, paramter))
             {
                 return false;
@@ -210,13 +309,6 @@ namespace EIMSNext.Flow.Core.Nodes
             }
 
             return IsMeet(eventFlow, paramter.Data);
-        }
-
-        private static bool IsCascadeAllowed(Wf_Definition eventFlow, EfRunParameter paramter)
-        {
-            return paramter.Cascade == CascadeMode.NotSet
-                || paramter.Cascade == CascadeMode.All
-                || IsSpecified(paramter.EventIds, eventFlow.Id);
         }
 
         private static bool IsSourceMatched(Wf_Definition eventFlow, EfRunParameter paramter)
@@ -262,25 +354,27 @@ namespace EIMSNext.Flow.Core.Nodes
                 .Any();
         }
 
-        private static bool IsSpecified(string? eventIds, string eventFlowId)
-        {
-            if (string.IsNullOrWhiteSpace(eventIds))
-            {
-                return false;
-            }
-
-            return eventIds.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .Contains(eventFlowId, StringComparer.OrdinalIgnoreCase);
-        }
-
         private async Task<EfExecResult> RunSingleAsync(Wf_Definition eventFlow, EfRunParameter paramter)
         {
             var execResult = new EfExecResult();
             var runLogRepository = _resolver.Resolve<IRepository<Ef_RunLog>>();
             var startTime = DateTime.UtcNow.ToTimeStampMs();
             var runLog = CreateRunLog(eventFlow, paramter, startTime);
+            runLog.StartTime = startTime;
+            runLog.EndTime = null;
+            runLog.Success = false;
+            runLog.ErrMsg = string.Empty;
             try
             {
+                runLog.RetryContextJson = new EfRunRetryContext
+                {
+                    ExecutionId = paramter.ExecutionId,
+                    DataId = paramter.Data.Id,
+                    WfNodeId = paramter.WfNodeId,
+                    NodeAction = paramter.NodeAction,
+                    ChangeFields = paramter.ChangeFields?.ToList(),
+                    ChainJson = paramter.Chain?.SerializeToJson()
+                }.SerializeToJson();
                 runLogRepository.Insert(runLog);
             }
             catch (Exception ex)
@@ -300,23 +394,19 @@ namespace EIMSNext.Flow.Core.Nodes
                 ExecutionId = string.IsNullOrWhiteSpace(paramter.ExecutionId)
                     ? runLog?.Id ?? TsidIdGenerator.NewId()
                     : paramter.ExecutionId,
-                WorkflowInstanceId = paramter.WorkflowInstanceId,
-                WorkflowTransition = paramter.WorkflowTransition
-                    && !string.IsNullOrWhiteSpace(paramter.WfNodeId)
-                    && !string.IsNullOrWhiteSpace(paramter.NodeAction),
                 WfNodeId = paramter.WfNodeId,
                 NodeAction = paramter.NodeAction ?? string.Empty,
                 FormId = paramter.Data.FormId,
                 DataId = paramter.Data.Id,
                 TriggerData = paramter.Data,
                 WfStarter = paramter.Starter,
-                EfCascade = eventFlow.EventSetting!.CascadeMode,
-                EventIds = eventFlow.EventSetting.SpecifiedEvents
+                Chain = paramter.Chain
             };
 
             try
             {
-                var efInst = await SyncWfRunner.RunWorkflowSync(eventFlow.ExternalId, 1, ctx, "", CancellationToken.None, false);
+                // 重试需要从原 WorkflowInstance 恢复失败指针，因此 EF 运行必须持久化 WorkflowCore 状态。
+                var efInst = await SyncWfRunner.RunWorkflowSync(eventFlow.ExternalId, 1, ctx, "", CancellationToken.None, true);
                 var efDataContext = efInst.Data as EfDataContext;
                 execResult.EfInstance = efInst;
                 execResult.Error = efDataContext?.ErrMsg;

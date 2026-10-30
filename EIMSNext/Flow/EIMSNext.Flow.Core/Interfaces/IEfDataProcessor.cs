@@ -12,7 +12,5 @@ namespace EIMSNext.Flow.Core.Interfaces
         /// </para>
         /// </summary>
         Task<EfNodeData> ProcessNodeAsync(WorkflowInstance inst, EfNodeData nodeData, string actionType);
-
-        void Process(WorkflowInstance inst);
     }
 }

@@ -131,32 +131,32 @@ namespace EIMSNext.Flow.Core.Nodes
             var payload = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
             foreach (var field in setting.FieldSettings)
             {
-                payload[field.FieldKey] = ResolveFieldValue(field, scriptData);
+                payload[field.FieldKey] = ResolveFieldValue(dataContext, field, scriptData);
             }
 
             return payload;
         }
 
-        private object? ResolveFieldValue(PluginFieldSetting field, Dictionary<string, object> scriptData)
+        private object? ResolveFieldValue(EfDataContext dataContext, PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
             if (string.Equals(field.FieldType, PluginFieldKind.TableForm, StringComparison.OrdinalIgnoreCase)
                 && field.SubFieldSettings.Count > 0)
             {
-                return BuildSubListPayload(field, scriptData);
+                return BuildSubListPayload(dataContext, field, scriptData);
             }
 
             return field.ValueType switch
             {
                 PluginValueType.Empty => null,
-                PluginValueType.Field when field.ValueField != null => ResolveMappedFieldValue(field.ValueField, scriptData),
+                PluginValueType.Field when field.ValueField != null => ResolveMappedFieldValue(dataContext, field.ValueField, scriptData),
                 _ => field.Value,
             };
         }
 
-        private List<Dictionary<string, object?>> BuildSubListPayload(PluginFieldSetting field, Dictionary<string, object> scriptData)
+        private List<Dictionary<string, object?>> BuildSubListPayload(EfDataContext dataContext, PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
             var columns = field.SubFieldSettings
-                .Select(subField => BuildSubListColumn(subField, scriptData))
+                .Select(subField => BuildSubListColumn(dataContext, subField, scriptData))
                 .ToList();
             var rowCount = columns
                 .Where(x => x.RowValues != null)
@@ -181,12 +181,12 @@ namespace EIMSNext.Flow.Core.Nodes
             return rows;
         }
 
-        private SubListColumn BuildSubListColumn(PluginFieldSetting field, Dictionary<string, object> scriptData)
+        private SubListColumn BuildSubListColumn(EfDataContext dataContext, PluginFieldSetting field, Dictionary<string, object> scriptData)
         {
             if (field.ValueType == PluginValueType.Field && field.ValueField != null)
             {
                 var usesRowValues = UsesRowValues(field.ValueField);
-                var value = ResolveMappedFieldValue(field.ValueField, scriptData, usesRowValues);
+                var value = ResolveMappedFieldValue(dataContext, field.ValueField, scriptData, usesRowValues);
                 return usesRowValues
                     ? new SubListColumn(field, ToValueList(value), null, false)
                     : new SubListColumn(field, null, value, true);
@@ -279,9 +279,9 @@ namespace EIMSNext.Flow.Core.Nodes
             object? ScalarValue,
             bool CreatesRowWhenNoRowValues);
 
-        private object? ResolveMappedFieldValue(PluginFieldReference field, Dictionary<string, object> scriptData, bool asRowValues = false)
+        private object? ResolveMappedFieldValue(EfDataContext dataContext, PluginFieldReference field, Dictionary<string, object> scriptData, bool asRowValues = false)
         {
-            var value = ScriptEngine.Evaluate(BuildFieldExpression(field, asRowValues), scriptData).Value;
+            var value = MaterializePrintOutput(dataContext, (object?)ScriptEngine.Evaluate(BuildFieldExpression(field, asRowValues), scriptData).Value);
             if (!field.IsSubField)
             {
                 return value;

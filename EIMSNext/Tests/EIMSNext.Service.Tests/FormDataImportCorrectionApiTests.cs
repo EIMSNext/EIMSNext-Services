@@ -293,6 +293,7 @@ namespace EIMSNext.Service.Tests
             public IEmployee? Employee { get; set; }
             public string? ClientIp { get; set; }
             public DataAction Action { get; set; }
+            public EfChainContext? Chain { get; set; }
             public IScopeCache ScopeCache => throw new NotSupportedException();
             public T? UserAs<T>() where T : class, IUser => User as T;
         }
@@ -420,7 +421,7 @@ namespace EIMSNext.Service.Tests
 
             public Task RestoreAsync(IEnumerable<string> ids) => throw new NotSupportedException();
             public Task PurgeAsync(IEnumerable<string> ids) => throw new NotSupportedException();
-            public Task SubmitAsync(IEnumerable<FormData> entities, CascadeMode cascade, string? eventIds) => throw new NotSupportedException();
+            public Task SubmitAsync(IEnumerable<FormData> entities) => throw new NotSupportedException();
             public Task<FilterOptionResult> GetFieldOptionsAsync(FilterOptionQuery query) => throw new NotSupportedException();
 
             private static bool Matches(FormData item, DynamicFilter filter)

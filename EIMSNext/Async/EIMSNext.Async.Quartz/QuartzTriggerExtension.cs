@@ -14,6 +14,7 @@ namespace EIMSNext.Async.Quartz
             var wfExpireJobKey = new JobKey("WfExpireNotifyJob", "Notify");
             var eventFlowJobKey = new JobKey("EventFlowScheduleJob", "EventFlow");
             var outboxDeliveryJobKey = new JobKey("OutboxDeliveryJob", "Outbox");
+            var outboxCleanupJobKey = new JobKey("OutboxCleanupJob", "Outbox");
             var partitionMaintainJobKey = new JobKey("PartitionMaintainJob", "Partition");
 
             qz.AddJob<PartitionMaintainJob>(opts => opts
@@ -56,6 +57,11 @@ namespace EIMSNext.Async.Quartz
                 .StoreDurably()
                 .WithDescription("出箱扫描投递作业"));
 
+            qz.AddJob<OutboxCleanupJob>(opts => opts
+                .WithIdentity(outboxCleanupJobKey)
+                .StoreDurably()
+                .WithDescription("出箱表保留期清理作业"));
+
             qz.AddTrigger(opts => opts
                 .ForJob(formNotifyJobKey)
                 .WithIdentity("FormNotifyScheduleTrigger", "Notify")
@@ -91,6 +97,14 @@ namespace EIMSNext.Async.Quartz
                     cs => cs.InTimeZone(TimeZoneInfo.Local))
                 .WithDescription("按 Cron 扫描出箱投递（默认每10秒，可配置 Quartz:OutboxDeliveryJob:Cron）")
                 .StartNow());
+
+            qz.AddTrigger(opts => opts
+                .ForJob(outboxCleanupJobKey)
+                .WithIdentity("OutboxCleanupTrigger", "Outbox")
+                .WithCronSchedule(
+                    configuration["Quartz:OutboxCleanupJob:Cron"] ?? "0 10 3 * * ?",
+                    cs => cs.InTimeZone(TimeZoneInfo.Local))
+                .WithDescription("每日 03:10 清理超保留期的出箱与去重记录（可配置 Quartz:OutboxCleanupJob:Cron）"));
 
             return qz;
         }

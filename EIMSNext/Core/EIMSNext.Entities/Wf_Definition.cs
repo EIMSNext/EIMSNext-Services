@@ -1220,26 +1220,24 @@ namespace EIMSNext.Entities
     }
 
     /// <summary>
-    /// 级联触发模式枚举
+    /// 级联触发模式枚举（三值：全部/指定/不触发）。
+    /// 数值即持久化契约：content JSON 原样往返无映射，与前端 FlowData.ts、ApiClient.Flow.CascadeMode 必须一致。
+    /// All=0 兼容存量数据——存量 content efCascade 缺省/为 0 的定义保持「全部触发」行为不变。
     /// </summary>
     public enum CascadeMode
     {
         /// <summary>
-        /// 未设置
-        /// </summary>
-        NotSet,
-        /// <summary>
         /// 全部级联
         /// </summary>
-        All,
+        All = 0,
         /// <summary>
         /// 指定级联
         /// </summary>
-        Specified,
+        Specified = 1,
         /// <summary>
         /// 不级联
         /// </summary>
-        Never
+        Never = 2
     }
 
     /// <summary>

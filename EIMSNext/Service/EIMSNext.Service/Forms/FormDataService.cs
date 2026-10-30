@@ -18,6 +18,7 @@ using EIMSNext.Core.Services;
 using EIMSNext.Service.Contracts;
 using EIMSNext.Entities;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using HKH.Common;
 using HKH.Mef2.Integration;
 using EIMSNext.Core;
@@ -183,12 +184,15 @@ namespace EIMSNext.Service
 
         public override async Task AddAsync(IEnumerable<FormData> entities)
         {
+            var list = entities.ToList();
             var action = Context.Action;
-            await base.AddAsync(entities);
+            await using var scope = NewTransactionScope();
+            await AddCoreAsync(list);
             // Nested persistence/hooks can share the request context. Restore the original
             // action before deciding whether the submitted data must start a workflow.
             Context.Action = action;
-            await SubmitAsync(entities, EIMSNext.Entities.CascadeMode.NotSet, null);
+            await SubmitAsync(list);
+            await scope.CommitTransactionAsync().ConfigureAwait(false);
         }
 
         protected override async Task AfterAdd(IEnumerable<FormData> entities)
@@ -198,7 +202,8 @@ namespace EIMSNext.Service
             var entity = entities.First();
             var webhookEventId = TsidIdGenerator.NewId();
             var webhookPayload = (entity).SerializeToJson();
-            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId));
+            var webhookChainJson = Context.Chain?.SerializeToJson();
+            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Created, webhookPayload, webhookEventId, webhookChainJson));
 
             await EnqueueFormNotify(messagePublisher, entity, null, FormNotifyTriggerMode.DataAdded);
             await RebuildTimeFieldNotifySchedulesAsync(entity);
@@ -226,15 +231,17 @@ namespace EIMSNext.Service
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
 
-            var result = await base.ReplaceAsync(entity);
+            await using var scope = NewTransactionScope();
+            var result = await ReplaceCoreAsync(entity).ConfigureAwait(false);
             Context.Action = action;
-            await SubmitAsync([entity], EIMSNext.Entities.CascadeMode.NotSet, null);
+            await SubmitAsync([entity]);
 
             if (ShouldTriggerFormDataChangeEventFlow() && changeFields.Count > 0)
             {
-                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Modified, EIMSNext.Entities.CascadeMode.NotSet, null, changeFields);
+                await EnqueueFormEventFlowAsync(entity, ApiClient.Flow.EventType.Modified, changeFields);
             }
 
+            await scope.CommitTransactionAsync().ConfigureAwait(false);
             return result;
         }
 
@@ -302,13 +309,15 @@ namespace EIMSNext.Service
                 ? await Repository.FindAsync(x => idList.Contains(x.Id)).ConfigureAwait(false)
                 : new List<FormData>();
 
-            var result = await base.DeleteAsync(idList);
+            await using var scope = NewTransactionScope();
+            var result = await DeleteCoreAsync(x => idList.Contains(x.Id)).ConfigureAwait(false);
 
             foreach (var entity in deleting)
             {
-                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Entities.CascadeMode.NotSet, null, null);
+                await EnqueueFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, null);
             }
 
+            await scope.CommitTransactionAsync().ConfigureAwait(false);
             return result;
         }
 
@@ -369,13 +378,15 @@ namespace EIMSNext.Service
                 ? Repository.FindList(filter)
                 : [];
 
-            var result = await base.DeleteAsync(filter);
+            await using var scope = NewTransactionScope();
+            var result = await DeleteCoreAsync(filter).ConfigureAwait(false);
 
             foreach (var entity in deleting)
             {
-                await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, EIMSNext.Entities.CascadeMode.NotSet, null, null);
+                await EnqueueFormEventFlowAsync(entity, ApiClient.Flow.EventType.Removed, null);
             }
 
+            await scope.CommitTransactionAsync().ConfigureAwait(false);
             return result;
         }
 
@@ -501,7 +512,8 @@ namespace EIMSNext.Service
                 ?? new Dictionary<string, object?>();
             formExp.TryAdd("oridata", oriValue);
             var webhookEventId = TsidIdGenerator.NewId();
-            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId));
+            var webhookChainJson = Context.Chain?.SerializeToJson();
+            TransactionScope.RegisterAfterCommit(DbContext, () => EnqueueWebhookAsync(outboxPublisher, entity, WebHookTrigger.Data_Updated, formExp.SerializeToJson(), webhookEventId, webhookChainJson));
 
             await EnqueueFormNotify(messagePublisher, entity, old, FormNotifyTriggerMode.DataChanged);
             await RebuildTimeFieldNotifySchedulesAsync(entity);
@@ -563,7 +575,7 @@ namespace EIMSNext.Service
             }
         }
 
-        public async Task SubmitAsync(IEnumerable<FormData> entities, EIMSNext.Entities.CascadeMode cascade, string? eventIds)
+        public async Task SubmitAsync(IEnumerable<FormData> entities)
         {
             var entity = entities.First();
 
@@ -584,35 +596,44 @@ namespace EIMSNext.Service
                         return;
                     }
 
-                    WfResponse? wfResp;
-                    try
-                    {
-                        wfResp = await _flowClient.Start(new StartRequest
-                        {
-                            WfDefinitionId = wfDef.ExternalId,
-                            Version = wfDef.Version,
-                            DataId = entity.Id,
-                        }, Context.AccessToken);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new UnLogException($"流程服务调用失败: {ex.Message}", ex);
-                    }
-
-                    if (wfResp == null)
-                    {
-                        throw new UnLogException("流程服务未返回启动结果");
-                    }
-                    if (!string.IsNullOrEmpty(wfResp.Error))
-                    {
-                        throw new UnLogException($"流程启动失败: {wfResp.Error}");
-                    }
+                    await StartWorkflowAsync(entity, wfDef);
                 }
                 else
                 {
-                    await RunFormEventFlowAsync(entity, ApiClient.Flow.EventType.Submitted, cascade, eventIds, null);
+                    await EnqueueFormEventFlowAsync(entity, ApiClient.Flow.EventType.Submitted, null);
                 }
             }
+        }
+
+        private Task StartWorkflowAsync(FormData entity, Wf_Definition wfDef)
+        {
+            return TriggerAfterCommitAsync(async () =>
+            {
+                WfResponse? wfResp;
+                try
+                {
+                    wfResp = await _flowClient.Start(new StartRequest
+                    {
+                        WfDefinitionId = wfDef.ExternalId,
+                        Version = wfDef.Version,
+                        DataId = entity.Id,
+                        ChainJson = Context.Chain?.SerializeToJson(),
+                    }, Context.AccessToken);
+                }
+                catch (Exception ex)
+                {
+                    throw new UnLogException($"流程服务调用失败: {ex.Message}", ex);
+                }
+
+                if (wfResp == null)
+                {
+                    throw new UnLogException("流程服务未返回启动结果");
+                }
+                if (!string.IsNullOrEmpty(wfResp.Error))
+                {
+                    throw new UnLogException($"流程启动失败: {wfResp.Error}");
+                }
+            });
         }
 
         private Wf_Definition? FindCurrentWorkflowDefinition(string formId)
@@ -628,38 +649,65 @@ namespace EIMSNext.Service
 
         private bool ShouldTriggerFormDataChangeEventFlow()
         {
+            // EventFlow 写数据也是链的一环：入站只看 trigger 配置，与普通/流程表单无关；
+            // 出站门禁由链尾解析（EventFlowRunner.ResolveChainCascadeAsync），此处不固定 false。
             return Context.Action == DataAction.None || Context.Action == DataAction.Save;
         }
 
-        private async Task RunFormEventFlowAsync(
+        private async Task EnqueueFormEventFlowAsync(
             FormData entity,
             ApiClient.Flow.EventType eventType,
-            EIMSNext.Entities.CascadeMode cascade,
-            string? eventIds,
             IEnumerable<string>? changeFields)
         {
-            if (cascade == EIMSNext.Entities.CascadeMode.Never)
+            var message = new EventFlowRunTaskArgs
             {
-                return;
-            }
-
-            var efResp = await _flowClient.RunEventFlow(new EfRunRequest
-            {
-                ExecutionId = $"form:{entity.Id}:{eventType}:{entity.UpdateTime ?? entity.CreateTime}:{eventIds ?? string.Empty}",
+                CorpId = entity.CorpId ?? Context.CorpId,
+                AppId = entity.AppId,
+                FormId = entity.FormId,
                 DataId = entity.Id,
-                EventSource = ApiClient.Flow.EventSourceType.Form,
-                EventType = eventType,
-                EfCascade = (ApiClient.Flow.CascadeMode)cascade,
-                EventIds = eventIds,
+                EventSource = EIMSNext.Entities.EventSourceType.Form,
+                EventType = eventType switch
+                {
+                    ApiClient.Flow.EventType.Submitted => EIMSNext.Entities.EventType.Submitted,
+                    ApiClient.Flow.EventType.Modified => EIMSNext.Entities.EventType.Modified,
+                    ApiClient.Flow.EventType.Removed => EIMSNext.Entities.EventType.Removed,
+                    _ => EIMSNext.Entities.EventType.None
+                },
+                MatchAllEventFlows = true,
+                ExecutionId = $"form:{entity.Id}:{eventType}:{entity.UpdateTime ?? entity.CreateTime}:{TsidIdGenerator.NewId()}",
+                StarterId = Context.Operator?.Id,
+                StarterCode = Context.Operator?.Value,
+                StarterName = Context.Operator?.Label,
+                ChainJson = Context.Chain?.SerializeToJson(),
                 ChangeFields = changeFields?
                     .Where(x => !string.IsNullOrWhiteSpace(x))
                     .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList()
-            }, Context.AccessToken);
-            if (efResp != null && !string.IsNullOrEmpty(efResp.Error))
+            };
+
+            await Resolver.Resolve<ITransactionalOutboxPublisher>().EnqueueRequiredAsync(message);
+        }
+
+        /// <summary>
+        /// 触发类动作（起工作流 / 发数据事件）统一登记到事务提交后执行：
+        /// 无环境事务时（UI 写路径，base 写操作已各自提交）立即执行，异常照旧上抛；
+        /// 处于环境事务时（EventFlow 节点写）延迟到提交后——loopback HTTP 才能读到已提交行，
+        /// 失败只记日志：数据已落库，不能把业务事务翻成失败。
+        /// </summary>
+        private Task TriggerAfterCommitAsync(Func<Task> action)
+        {
+            var deferred = TransactionScope.IsInTransactionFor(DbContext);
+            return TransactionScope.RegisterAfterCommitAsync(DbContext, async () =>
             {
-                throw new UnLogException(efResp.Error);
-            }
+                try
+                {
+                    await action();
+                }
+                catch (Exception ex) when (deferred)
+                {
+                    Logger.LogError(ex, "提交后触发失败（数据已落库）。");
+                }
+            });
         }
 
         /// <summary>
@@ -1044,7 +1092,7 @@ namespace EIMSNext.Service
             });
         }
 
-        private static Task EnqueueWebhookAsync(IOutboxPublisher publisher, FormData entity, WebHookTrigger trigger, string payloadJson, string eventId)
+        private static Task EnqueueWebhookAsync(IOutboxPublisher publisher, FormData entity, WebHookTrigger trigger, string payloadJson, string eventId, string? chainJson)
         {
             return publisher.EnqueueAsync(new WebhookTaskArgs
             {
@@ -1054,7 +1102,8 @@ namespace EIMSNext.Service
                 Trigger = trigger,
                 PayloadJson = payloadJson,
                 DataId = entity.Id,
-                EventId = eventId
+                EventId = eventId,
+                ChainJson = chainJson
             });
         }
 

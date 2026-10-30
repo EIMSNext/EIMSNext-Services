@@ -21,6 +21,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 using System.Dynamic;
+using System.Text.Json;
 
 using WorkflowCore.Interface;
 using WorkflowCore.Models;
@@ -72,19 +73,27 @@ namespace EIMSNext.Flow.Host.Controllers
         [HttpPost, Route("Start")]
         public async Task<IActionResult> StartAsync(StartRequest request)
         {
-            if (IdentityContext.CurrentEmployee == null || (string.IsNullOrEmpty(request.WfDefinitionId) && string.IsNullOrEmpty(request.DataId)))
+            if (string.IsNullOrEmpty(request.WfDefinitionId) && string.IsNullOrEmpty(request.DataId))
             {
-                return BadRequest("发起人和流程定义Id和数据Id不能为空");
+                return BadRequest("流程定义Id和数据Id不能为空");
+            }
+
+            // system 身份（定时/内部触发经 EF 写数提交）没有员工身份，合成系统操作者，与 EventFlowController.ResolveStarter 一致
+            var starter = IdentityContext.IdentityType == ApiService.IdentityType.System
+                ? new Operator("system", $"wf_{request.WfDefinitionId}", "System")
+                : IdentityContext.CurrentEmployee?.ToOperator();
+            if (starter == null)
+            {
+                return BadRequest("发起人不能为空");
             }
 
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
-                var cascade = request.EfCascade == CascadeMode.NotSet ? CascadeMode.All : request.EfCascade;
                 // FormData.Id 来自 citext 主键，是该数据 ID 的规范大小写；工作流 Reference
                 // 是 text，后续锁、唯一索引和查询都以此值统一，避免大小写变体产生多个实例。
                 var dataId = formData.Id;
-                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, dataId, IdentityContext.CurrentEmployee.ToOperator(), cascade, request.EventIds);
+                var data = new WfDataContext(formData.CorpId ?? "", IdentityContext.CurrentUserID, IdentityContext.AccessToken, formData.AppId, formData.FormId, dataId, starter, request.ChainJson?.DeserializeFromJson<EfChainContext>());
                 var version = request.Version;
                 if (!request.Version.HasValue || request.Version.Value == 0)
                     version = _defservice.Find(request.WfDefinitionId)?.Version;
@@ -716,8 +725,7 @@ namespace EIMSNext.Flow.Host.Controllers
                 data.FormId,
                 data.DataId,
                 data.WfStarter,
-                data.EfCascade,
-                data.EventIds)
+                data.Chain)
             {
                 Round = existingData.Round + 1
             };
@@ -864,8 +872,8 @@ namespace EIMSNext.Flow.Host.Controllers
         public string WfDefinitionId { get; set; } = string.Empty;
         public int? Version { get; set; }
         public string DataId { get; set; } = string.Empty;
-        public CascadeMode EfCascade { get; set; }
-        public string? EventIds { get; set; }
+        /// <summary>EventFlow 链上下文 JSON（EfChainContext）：EF 写数据触发下游时透传，供链尾解析出站门禁；入口触发为空。</summary>
+        public string? ChainJson { get; set; }
     }
     public class ApproveRequest
     {

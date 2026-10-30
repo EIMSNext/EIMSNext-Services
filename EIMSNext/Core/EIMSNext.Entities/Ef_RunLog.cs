@@ -50,5 +50,27 @@ namespace EIMSNext.Entities
 
         /// <summary>失败时的错误信息（成功时为空）。</summary>
         public string ErrMsg { get; set; } = string.Empty;
+
+        /// <summary>人工重试所需的原始 EF 触发上下文。</summary>
+        public string RetryContextJson { get; set; } = string.Empty;
+
+        /// <summary>是否有一条人工重试消息正在执行或排队。</summary>
+        public bool RetryInProgress { get; set; }
+
+        /// <summary>当前人工重试消息的唯一尝试 ID。</summary>
+        public string RetryAttemptId { get; set; } = string.Empty;
+
+        /// <summary>人工重试占用租约到期时间（Unix 毫秒）。</summary>
+        public long? RetryLeaseUntil { get; set; }
+    }
+
+    public sealed class EfRunRetryContext
+    {
+        public string ExecutionId { get; set; } = string.Empty;
+        public string DataId { get; set; } = string.Empty;
+        public string WfNodeId { get; set; } = string.Empty;
+        public string? NodeAction { get; set; }
+        public List<string>? ChangeFields { get; set; }
+        public string? ChainJson { get; set; }
     }
 }

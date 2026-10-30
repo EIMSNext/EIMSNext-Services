@@ -93,6 +93,87 @@ namespace EIMSNext.Async.Tests
         }
 
         [TestMethod]
+        public async Task ExecuteInScopeAsync_ShouldPassChainJsonToEventHub_ForLoopBackChain()
+        {
+            // 回归锁：链上表单写入 → WebhookTaskArgs.ChainJson → EventHub（X-EF-Chain header 透传给入站端点恢复链）
+            var eventHub = new RecordingEventHub();
+            var repository = new FakeWebhookRepository([
+                new Webhook { Id = "wh-1", CorpId = "corp-1", AppId = "app-1", FormId = "form-1", Url = "https://example.com/1", SourceType = WebHookSource.Form, Triggers = (long)WebHookTrigger.Data_Created, Disabled = false }
+            ]);
+
+            var processingRepository = new FakeMessageProcessingRepository();
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<IConnectionFactory, ConnectionFactory>();
+            services.AddSingleton<IMessageRouteResolver, FakeMessageRouteResolver>();
+            services.AddSingleton<IEventHub>(eventHub);
+            services.AddSingleton<IMessageProcessingRepository>(processingRepository);
+            services.AddSingleton<IOutboxIdempotencyKeyFactory, EIMSNext.Async.RabbitMQ.Outbox.OutboxIdempotencyKeyFactory>();
+            services.AddSingleton<IRepository<Webhook>>(repository);
+            services.AddSingleton<IRepository<WebhookAlias>>(new FakeWebhookAliasRepository([]));
+            services.AddSingleton(new EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions());
+            services.AddSingleton<Microsoft.Extensions.Options.IOptions<EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions>>(sp => Microsoft.Extensions.Options.Options.Create(sp.GetRequiredService<EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions>()));
+            services.AddScoped<IResolver, TestResolver>();
+
+            await using var provider = services.BuildServiceProvider();
+            var consumer = new WebhookConsumer(provider.GetRequiredService<IServiceScopeFactory>());
+
+            await consumer.ExecuteInScopeAsync(new WebhookTaskArgs
+            {
+                CorpId = "corp-1",
+                AppId = "app-1",
+                FormId = "form-1",
+                Trigger = WebHookTrigger.Data_Created,
+                EventId = "event-chain",
+                PayloadJson = "{\"id\":\"data-1\"}",
+                ChainJson = "{\"ChainId\":\"chain-1\",\"Depth\":2,\"Path\":[\"ef-a\",\"ef-b\"]}"
+            }, CancellationToken.None);
+
+            Assert.AreEqual(1, eventHub.Calls.Count);
+            Assert.AreEqual("{\"ChainId\":\"chain-1\",\"Depth\":2,\"Path\":[\"ef-a\",\"ef-b\"]}", eventHub.Calls[0].ChainJson);
+        }
+
+        [TestMethod]
+        public async Task ExecuteInScopeAsync_ShouldPassNullChainJson_WhenMessageHasNoChain()
+        {
+            // 链外消息（用户直接操作/老消息无该字段）：ChainJson 为 null，入站端点视作新链
+            var eventHub = new RecordingEventHub();
+            var repository = new FakeWebhookRepository([
+                new Webhook { Id = "wh-1", CorpId = "corp-1", AppId = "app-1", FormId = "form-1", Url = "https://example.com/1", SourceType = WebHookSource.Form, Triggers = (long)WebHookTrigger.Data_Created, Disabled = false }
+            ]);
+
+            var processingRepository = new FakeMessageProcessingRepository();
+            var services = new ServiceCollection();
+            services.AddLogging();
+            services.AddSingleton<IConnectionFactory, ConnectionFactory>();
+            services.AddSingleton<IMessageRouteResolver, FakeMessageRouteResolver>();
+            services.AddSingleton<IEventHub>(eventHub);
+            services.AddSingleton<IMessageProcessingRepository>(processingRepository);
+            services.AddSingleton<IOutboxIdempotencyKeyFactory, EIMSNext.Async.RabbitMQ.Outbox.OutboxIdempotencyKeyFactory>();
+            services.AddSingleton<IRepository<Webhook>>(repository);
+            services.AddSingleton<IRepository<WebhookAlias>>(new FakeWebhookAliasRepository([]));
+            services.AddSingleton(new EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions());
+            services.AddSingleton<Microsoft.Extensions.Options.IOptions<EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions>>(sp => Microsoft.Extensions.Options.Options.Create(sp.GetRequiredService<EIMSNext.Async.RabbitMQ.Messaging.ConsumerConcurrencyOptions>()));
+            services.AddScoped<IResolver, TestResolver>();
+
+            await using var provider = services.BuildServiceProvider();
+            var consumer = new WebhookConsumer(provider.GetRequiredService<IServiceScopeFactory>());
+
+            await consumer.ExecuteInScopeAsync(new WebhookTaskArgs
+            {
+                CorpId = "corp-1",
+                AppId = "app-1",
+                FormId = "form-1",
+                Trigger = WebHookTrigger.Data_Created,
+                EventId = "event-nochain",
+                PayloadJson = "{\"id\":\"data-1\"}"
+            }, CancellationToken.None);
+
+            Assert.AreEqual(1, eventHub.Calls.Count);
+            Assert.IsNull(eventHub.Calls[0].ChainJson);
+        }
+
+        [TestMethod]
         public async Task ExecuteInScopeAsync_WhenWebhookFails_DoesNotRecordCompletionAndRequestsRequeue()
         {
             var processingRepository = new FakeMessageProcessingRepository();
@@ -131,11 +212,11 @@ namespace EIMSNext.Async.Tests
 
         private sealed class RecordingEventHub : IEventHub
         {
-            public List<(Webhook Webhook, WebHookTrigger Trigger, object Data)> Calls { get; } = [];
+            public List<(Webhook Webhook, WebHookTrigger Trigger, object Data, string? ChainJson)> Calls { get; } = [];
 
-            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data)
+            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data, string? chainJson = null)
             {
-                Calls.Add((webhook, trigger, data));
+                Calls.Add((webhook, trigger, data, chainJson));
                 return Task.CompletedTask;
             }
         }
@@ -165,6 +246,9 @@ namespace EIMSNext.Async.Tests
                 return Task.FromResult<string?>("lease-token");
             }
 
+            public Task<bool> IsCompletedAsync(string eventKey, string target, CancellationToken cancellationToken = default)
+                => Task.FromResult(false);
+
             public Task<bool> MarkCompletedAsync(string eventKey, string target, string leaseToken, long processedTime, CancellationToken cancellationToken = default)
             {
                 CompletedTargets.Add(target);
@@ -180,7 +264,7 @@ namespace EIMSNext.Async.Tests
 
         private sealed class ThrowingEventHub : IEventHub
         {
-            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data)
+            public Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data, string? chainJson = null)
                 => throw new HttpRequestException("Webhook unavailable.");
         }
 

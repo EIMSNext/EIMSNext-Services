@@ -68,7 +68,7 @@ namespace EIMSNext.Async.Tasks.Consumers
                 {
                     var webhookPayload = payload.DeepClone();
                     ApplyAliases(webhookPayload, aliasConfig?.FieldAlias ?? []);
-                    await eventHub.SendAsync(webhook, args.Trigger, args.EventId, webhookPayload);
+                    await eventHub.SendAsync(webhook, args.Trigger, args.EventId, webhookPayload, args.ChainJson);
                     await processingRepository.MarkCompletedAsync(baseKey, target, leaseToken, DateTime.UtcNow.ToTimeStampMs(), ct);
                 }
                 catch (TaskRequeueException)

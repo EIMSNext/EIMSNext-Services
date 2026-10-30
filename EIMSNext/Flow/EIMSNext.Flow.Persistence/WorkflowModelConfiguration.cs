@@ -94,8 +94,13 @@ public static class WorkflowModelConfiguration
 
     private static void Json<T>(PropertyBuilder<T> property)
     {
+        // 列类型必须是 json 而不是 jsonb：jsonb 不保留对象键序（按键长度、字节序重排），
+        // "$type"（5 字符）会被排到更短的兄弟键（如 "ins"、"Path"、"Id"）之后，而
+        // Newtonsoft 只把对象首键位的 $type 当类型元数据，错位后整条读路径报废。
+        // json 原样保留写入文本，序列化时 $type 恒为首键，读回键序不变。
+        // 这些列零索引零查询（引擎与业务查询全部走标量列），不需要 jsonb 的操作符与 GIN。
         property.HasConversion(value => RuntimeJson.Write(value), json => RuntimeJson.Read<T>(json))
-            .HasColumnType("jsonb");
+            .HasColumnType("json");
         property.Metadata.SetValueComparer(new ValueComparer<T>(
             (left, right) => RuntimeJson.Write(left) == RuntimeJson.Write(right),
             value => RuntimeJson.Write(value).GetHashCode(),
@@ -115,7 +120,7 @@ public static class WorkflowModelConfiguration
             // ControlPersistenceData 会被静默降级成 ExpandoObject。
             //
             // 关于 TypeNameHandling 的安全取舍：这里的输入只来自本应用自己的持久化写入
-            // （jsonb 列，不是外部请求体），没有把不可信 JSON 直接喂进来的路径；
+            // （json 列，不是外部请求体），没有把不可信 JSON 直接喂进来的路径；
             // 反过来，若加一份类型白名单，漏列某个集合/状态类型会让工作流恢复直接失败，
             // 运维风险高于理论攻击面。因此这里用 Objects 而不是白名单 Binder。
             TypeNameHandling = TypeNameHandling.Objects,
@@ -127,6 +132,7 @@ public static class WorkflowModelConfiguration
         };
 
         public static string Write<T>(T value) => JsonConvert.SerializeObject(value, Settings);
+
         public static T Read<T>(string json) => JsonConvert.DeserializeObject<T>(json, Settings)!;
 
         // Workflow payloads use ExpandoObject, not JObject/JsonElement. Keep that

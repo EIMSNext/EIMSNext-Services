@@ -63,11 +63,9 @@ namespace EIMSNext.Flow.Core.Nodes
                                         else
                                         {
                                             var formData = GetFormData(dataContext.DataId);
-                                            await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                            await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.Chain)
                                                 .WithNodeAction("submit")
-                                                .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit")
-                                                .WithWorkflowInstanceId(context.Workflow.Id)
-                                                .WithWorkflowTransition());
+                                                .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit"));
 
                                             result = ApproveResult.Next;
                                         }
@@ -78,11 +76,9 @@ namespace EIMSNext.Flow.Core.Nodes
                                         await DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id);
 
                                         var formData = GetFormData(dataContext.DataId);
-                                        await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                        await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Approving, meta.Id, dataContext.WfStarter, dataContext.Chain)
                                             .WithNodeAction("submit")
-                                            .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit")
-                                            .WithWorkflowInstanceId(context.Workflow.Id)
-                                            .WithWorkflowTransition());
+                                            .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:submit"));
 
                                         result = ApproveResult.Next;
                                     }
@@ -109,7 +105,7 @@ namespace EIMSNext.Flow.Core.Nodes
                                     await DeleteTasks(dataContext.CorpId, dataContext.DataId, meta.Id);
 
                                     var formData = GetFormData(dataContext.DataId);
-                                    await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.EfCascade, dataContext.EventIds)
+                                    await RunEventFlow(new EfRunParameter(dataContext.UserId, dataContext.AccessToken, formData, EventSourceType.Form, EventType.Rejected, meta.Id, dataContext.WfStarter, dataContext.Chain)
                                         .WithExecutionId($"{context.Workflow.Id}:{meta.Id}:{dataContext.Round}:rejected"));
 
                                     result = ApproveResult.Persist;

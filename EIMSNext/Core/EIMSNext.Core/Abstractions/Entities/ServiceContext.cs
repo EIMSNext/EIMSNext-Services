@@ -48,6 +48,11 @@ namespace EIMSNext.Core.Abstractions
         public DataAction Action { get; set; }
 
         /// <summary>
+        /// 获取或设置 EventFlow 链上下文（运行期循环/深度校验传播载体；null = 新链）。
+        /// </summary>
+        public EfChainContext? Chain { get; set; }
+
+        /// <summary>
         /// 获取作用域缓存。
         /// </summary>
         IScopeCache ScopeCache { get; }
@@ -126,9 +131,5 @@ namespace EIMSNext.Core.Abstractions
         /// 流程退回
         /// </summary>
         Return = 4,
-        /// <summary>
-        /// 数据流内部写入
-        /// </summary>
-        EventFlow = 5,
     }
 }

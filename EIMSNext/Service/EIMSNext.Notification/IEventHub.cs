@@ -4,6 +4,6 @@ namespace EIMSNext.Notification
 {
     public interface IEventHub
     {
-        Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data);
+        Task SendAsync(Webhook webhook, WebHookTrigger trigger, string eventId, object data, string? chainJson = null);
     }
 }
