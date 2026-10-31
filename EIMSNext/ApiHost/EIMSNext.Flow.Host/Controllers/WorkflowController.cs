@@ -58,12 +58,23 @@ namespace EIMSNext.Flow.Host.Controllers
             _workflowDb = resolver.Resolve<IWfDbContext>();
         }
 
+        private bool IsSystemIdentity => IdentityContext.IdentityType == ApiService.IdentityType.System;
+
+        private bool BelongsToCurrentCorp(string? corpId)
+        {
+            return !string.IsNullOrWhiteSpace(IdentityContext.CurrentCorpId) &&
+                   string.Equals(corpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase);
+        }
+
         [HttpPost, Route("Load")]
         public IActionResult Load(LoadRequest request)
         {
             var def = _defservice.Query(x => x.ExternalId == request.WfDefinitionId && x.Version == request.Version).FirstOrDefault();
             if (def == null)
                 return BadRequest($"审批流程定义({request.WfDefinitionId}:{request.Version})不存在");
+
+            if (!IsSystemIdentity && !BelongsToCurrentCorp(def.CorpId))
+                return NotFound($"审批流程定义({request.WfDefinitionId})不存在");
 
             _workflowLoader.LoadDefinition(def);
 
@@ -90,6 +101,11 @@ namespace EIMSNext.Flow.Host.Controllers
             var formData = _formDataservice.Get(request.DataId);
             if (formData != null)
             {
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(formData.CorpId))
+                {
+                    return NotFound("数据不存在");
+                }
+
                 // FormData.Id 来自 citext 主键，是该数据 ID 的规范大小写；工作流 Reference
                 // 是 text，后续锁、唯一索引和查询都以此值统一，避免大小写变体产生多个实例。
                 var dataId = formData.Id;
@@ -104,6 +120,11 @@ namespace EIMSNext.Flow.Host.Controllers
                 if (definition == null || definition.Disabled || definition.FlowType != FlowType.Workflow)
                 {
                     return BadRequest($"审批流程定义({request.WfDefinitionId})不存在或未启用");
+                }
+
+                if (!IsSystemIdentity && !BelongsToCurrentCorp(definition.CorpId))
+                {
+                    return NotFound($"审批流程定义({request.WfDefinitionId})不存在");
                 }
 
                 string wfinstId;

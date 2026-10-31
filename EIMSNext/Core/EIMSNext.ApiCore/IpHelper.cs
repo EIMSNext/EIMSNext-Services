@@ -23,6 +23,10 @@ namespace EIMSNext.ApiCore
             }
 
             // 1. 优先从X-Forwarded-For请求头获取（反向代理场景）
+            // ⚠️ 安全须知：该请求头客户端可任意伪造，未经可信代理覆盖时不得作为信任依据
+            // （IP 白名单、限流键均消费此值）。当前为直连部署，无反向代理；
+            // 将来接入 Nginx 等代理时，必须改用 ForwardedHeaders 中间件 + KnownProxies
+            // （由框架把 RemoteIpAddress 替换为可信代理转发的值），届时删除这两个 header 分支。
             var forwardedForHeader = httpContext.Request.Headers["X-Forwarded-For"].FirstOrDefault();
             if (!string.IsNullOrEmpty(forwardedForHeader))
             {

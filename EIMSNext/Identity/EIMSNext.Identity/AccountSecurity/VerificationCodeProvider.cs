@@ -18,6 +18,10 @@ public sealed record VerificationCodeSendResult(DateTimeOffset ExpiresAt, string
 
 public sealed class MockVerificationCodeProvider : IVerificationCodeProvider
 {
+    // 验证码校验侧没有端点限流，不限制错误尝试次数的话，5 分钟有效窗口内的 6 位码
+    // 可被穷举（10^6 空间）。每个码最多允许 5 次错误尝试，超限即作废，须重新发送。
+    public const int MaxAttempts = 5;
+
     private readonly object _gate = new();
     private readonly Dictionary<string, StoredCode> _codes = new(StringComparer.Ordinal);
     private readonly TimeSpan _lifetime;
@@ -78,6 +82,17 @@ public sealed class MockVerificationCodeProvider : IVerificationCodeProvider
             var actual = Encoding.UTF8.GetBytes(code.Trim());
             if (!CryptographicOperations.FixedTimeEquals(expected, actual))
             {
+                // 错误尝试计满即作废当前码；重新 Send 会覆盖 StoredCode 并重置计数。
+                var failed = storedCode with { FailCount = storedCode.FailCount + 1 };
+                if (failed.FailCount >= MaxAttempts)
+                {
+                    _codes.Remove(key);
+                }
+                else
+                {
+                    _codes[key] = failed;
+                }
+
                 return false;
             }
 
@@ -106,5 +121,5 @@ public sealed class MockVerificationCodeProvider : IVerificationCodeProvider
         }
     }
 
-    private sealed record StoredCode(string Code, DateTimeOffset ExpiresAt);
+    private sealed record StoredCode(string Code, DateTimeOffset ExpiresAt, int FailCount = 0);
 }

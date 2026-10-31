@@ -26,9 +26,14 @@ public static class DynamicFilterValidator
         FilterOp.NotEmpty,
     };
 
-    /// <summary>验证过滤树；非法运算符或空子条件会抛出请求错误。</summary>
+    /// <summary>验证过滤树；非法运算符、空子条件或树规模超限会抛出请求错误。</summary>
     public static void Validate(DynamicFilter? filter)
         => Validate(filter, allowEmpty: true);
+
+    // 过滤树来自客户端 JSON（OData $query / 公开 QueryLink 均可直接提交），不信任前端构建器的层级
+    // 限制；超深的嵌套会让递归翻译器与各处遍历放大开销，节点数超限则拖垮谓词翻译。
+    private const int MaxDepth = 5;
+    private const int MaxNodeCount = 50;
 
     private static void Validate(DynamicFilter? filter, bool allowEmpty)
     {
@@ -38,6 +43,8 @@ public static class DynamicFilterValidator
             if (allowEmpty) return;
             throw new BadRequestException("过滤条件不能为空");
         }
+
+        EnsureTreeSize(filter);
 
         if (filter.IsGroup)
         {
@@ -60,5 +67,33 @@ public static class DynamicFilterValidator
             return;
         if (!SupportedOperators.Contains(filter.Op))
             throw new BadRequestException($"不支持的过滤运算符: {filter.Op}");
+    }
+
+    private static void EnsureTreeSize(DynamicFilter? filter)
+    {
+        var nodeCount = 0;
+        Walk(filter, 1);
+        return;
+
+        void Walk(DynamicFilter? node, int depth)
+        {
+            if (node is null) return;
+            if (++nodeCount > MaxNodeCount)
+            {
+                throw new BadRequestException($"过滤条件节点数超过上限 {MaxNodeCount}");
+            }
+
+            if (!node.IsGroup) return;
+
+            if (depth > MaxDepth)
+            {
+                throw new BadRequestException($"过滤条件嵌套层级超过上限 {MaxDepth}");
+            }
+
+            foreach (var child in node.Items ?? [])
+            {
+                Walk(child, depth + 1);
+            }
+        }
     }
 }

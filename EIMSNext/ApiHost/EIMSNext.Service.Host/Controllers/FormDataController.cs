@@ -217,7 +217,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest();
             }
 
-            await _formDataService.RestoreAsync(FilterManageableIds(keys));
+            await _formDataService.RestoreAsync(FilterManageableIds(keys, request.FormId));
             return NoContent();
         }
 
@@ -234,7 +234,7 @@ namespace EIMSNext.Service.Host.Controllers
                 return BadRequest();
             }
 
-            await _formDataService.PurgeAsync(FilterManageableIds(keys));
+            await _formDataService.PurgeAsync(FilterManageableIds(keys, request.FormId));
             return NoContent();
         }
 
@@ -460,6 +460,27 @@ namespace EIMSNext.Service.Host.Controllers
             };
 
             return ApiService.Find(FilterResult(options)).FirstOrDefault() != null;
+        }
+
+        /// <summary>
+        /// 写路径的记录级归属校验，与读路径 Get 的 InheritMemberPermissions 探针同构：
+        /// ManageSelfData 模式解析为 createBy == 当前员工，非本人记录查不到，
+        /// 避免「只能管理自己数据」的员工经 Put/Patch/Delete 越权操作他人数据。
+        /// </summary>
+        private bool CanManageFormData(FormData entity)
+        {
+            if (_permissionEvaluator.HasUnrestrictedManagementIdentity)
+            {
+                return true;
+            }
+
+            return ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
+            {
+                IncludeDeleted = true,
+                Filter = new DynamicFilter { Field = Fields.Id, Op = FilterOp.Eq, Value = entity.Id },
+                Take = 1,
+                Scope = new DataScope { FormId = entity.FormId, InheritMemberPermissions = true },
+            })).FirstOrDefault() != null;
         }
 
         [Permission(Operation = Operation.Read)]
@@ -720,6 +741,7 @@ namespace EIMSNext.Service.Host.Controllers
             //根据key获取数据库中的实体
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
+            if (!CanManageFormData(entity)) return NotFound();
 
             ServiceContext.ScopeCache.Set(entity.Id, entity.DeepClone(), DataVersion.Old);
 
@@ -786,6 +808,7 @@ namespace EIMSNext.Service.Host.Controllers
 
             FormData? entity = ApiService.Get(key);
             if (entity == null) return NotFound();
+            if (!CanManageFormData(entity)) return NotFound();
 
             FormDataRequest model = entity.CastTo<FormData, FormDataRequest>();
 
@@ -852,7 +875,7 @@ namespace EIMSNext.Service.Host.Controllers
                 {
                     // 越权主键必须在进入服务层之前被过滤掉：服务层删除不做企业校验，
                     // 直接透传会让调用方删掉其他企业的数据。
-                    var ownedKeys = FilterManageableIds(batch.Keys);
+                    var ownedKeys = FilterManageableIds(batch.Keys, batch.FormId);
                     if (ownedKeys.Count == 0)
                     {
                         return NotFound();
@@ -867,7 +890,7 @@ namespace EIMSNext.Service.Host.Controllers
             }
             else
             {
-                var owned = FilterManageableIds([key]);
+                var owned = FilterManageableIds([key], batch?.FormId);
                 if (owned.Count == 0)
                 {
                     return NotFound();
@@ -1176,7 +1199,14 @@ namespace EIMSNext.Service.Host.Controllers
             };
         }
 
-        private List<string> FilterManageableIds(IEnumerable<string> ids)
+        /// <summary>
+        /// 把删除范围收敛为"当前调用方可管理的数据"：
+        /// 1. formId 非空时，Id IN 与 FormId = formId 一并拼进查询条件——请求里混入
+        ///    其他表单的数据 ID 会被条件直接排除，且 Scope.FormId 保证分区剪枝；
+        /// 2. InheritMemberPermissions 把当前员工权限组的记录级条件附加在查询后——
+        ///    ManageSelfData 用户只取回自己创建的行，其余行不出现在删除集合里。
+        /// </summary>
+        private List<string> FilterManageableIds(IEnumerable<string> ids, string? formId = null)
         {
             var requested = ids
                 .Where(x => !string.IsNullOrWhiteSpace(x))
@@ -1187,19 +1217,34 @@ namespace EIMSNext.Service.Host.Controllers
                 return [];
             }
 
-            var query = FilterResult(new DynamicFindOptions<FormData>
+            var hasFormId = !string.IsNullOrWhiteSpace(formId);
+            var filter = new DynamicFilter
+            {
+                Field = Fields.Id,
+                Op = FilterOp.In,
+                Value = requested.Cast<object>().ToList(),
+            };
+            if (hasFormId)
+            {
+                filter = filter.And(new DynamicFilter { Field = Fields.FormId, Op = FilterOp.Eq, Value = formId });
+            }
+
+            var found = ApiService.Find(FilterResult(new DynamicFindOptions<FormData>
             {
                 IncludeDeleted = true,
-                Filter = new DynamicFilter
-                {
-                    Field = Fields.Id,
-                    Op = FilterOp.In,
-                    Value = requested.Cast<object>().ToList(),
-                },
+                Filter = filter,
                 Take = requested.Count,
-            });
+                Scope = hasFormId ? new DataScope { FormId = formId, InheritMemberPermissions = true } : null,
+            })).ToList();
 
-            return ApiService.Find(query).ToList().Select(x => x.Id).ToList();
+            // formId 缺省（旧调用方）时表级检查已对普通员工 fail-closed，能走到这里的
+            // 只有直通身份；此处按行探针兜底，防止绕过表级检查的路径漏进记录级越权。
+            if (!hasFormId && !_permissionEvaluator.HasUnrestrictedManagementIdentity)
+            {
+                found = found.Where(CanManageFormData).ToList();
+            }
+
+            return found.Select(x => x.Id).ToList();
         }
 
         private Dictionary<string, string> BuildSearchableFieldMap(FormDef formDef)
