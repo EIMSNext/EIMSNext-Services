@@ -410,7 +410,8 @@ namespace EIMSNext.ApiService
                 importLog.EditableErrorRowCount <= 0 ||
                 importLog.EditableErrorRowCount > EIMSNext.Common.Constants.FormDataImportMaxEditableErrors)
             {
-                throw new InvalidOperationException("当前导入任务没有可在线修改的失败数据");
+                // 业务态拒绝（非服务器错误）：400 + 具体消息直达调用方，不落错误日志
+                throw new BadRequestException("当前导入任务没有可在线修改的失败数据");
             }
         }
 

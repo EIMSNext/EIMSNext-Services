@@ -225,7 +225,11 @@ namespace EIMSNext.Service.Host.Authorization
             var formId = await ReadFormIdAsync(context.HttpContext.Request);
             if (string.IsNullOrWhiteSpace(formId))
             {
-                return false;
+                formId = await ResolveFormIdFallbackAsync(context);
+                if (string.IsNullOrWhiteSpace(formId))
+                {
+                    return false;
+                }
             }
 
             var required = operation.HasFlag(Operation.Add) ? FormDataPermissions.AddNew :
@@ -275,6 +279,65 @@ namespace EIMSNext.Service.Host.Authorization
             catch (JsonException)
             {
                 return null;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// JSON body 中取不到 formId 时的补充解析（权限组 fallback 需要 formId 做权限位校验）：
+        /// 1) multipart 表单：Import/Preview 的 formId 字段，或 Import 的 options JSON 内的 formId；
+        /// 2) 路由 {id}：按 FormDataImportLog 主键反查 FormId（Import/{id}、/Errors、/Retry）。
+        /// 都取不到时返回 null，维持 403。
+        /// </summary>
+        private static async Task<string?> ResolveFormIdFallbackAsync(AuthorizationFilterContext context)
+        {
+            var request = context.HttpContext.Request;
+
+            if (request.HasFormContentType)
+            {
+                try
+                {
+                    var form = await request.ReadFormAsync();
+                    var formId = form["formId"].ToString();
+                    if (string.IsNullOrWhiteSpace(formId))
+                    {
+                        var options = form["options"].ToString();
+                        if (!string.IsNullOrWhiteSpace(options))
+                        {
+                            using var document = JsonDocument.Parse(options);
+                            if (document.RootElement.TryGetProperty("formId", out var value) &&
+                                value.ValueKind == JsonValueKind.String)
+                            {
+                                formId = value.GetString();
+                            }
+                        }
+                    }
+
+                    if (!string.IsNullOrWhiteSpace(formId))
+                    {
+                        return formId;
+                    }
+                }
+                catch (JsonException)
+                {
+                    // options 内容非法，继续走路由反查
+                }
+            }
+
+            if (context.RouteData.Values.TryGetValue("id", out var routeId) &&
+                !string.IsNullOrWhiteSpace(routeId?.ToString()))
+            {
+                var importLogService = (EIMSNext.Service.Contracts.IFormDataImportLogService?)
+                    context.HttpContext.RequestServices.GetService(typeof(EIMSNext.Service.Contracts.IFormDataImportLogService));
+                if (importLogService != null)
+                {
+                    var logFormId = importLogService.Get(routeId.ToString()!)?.FormId;
+                    if (!string.IsNullOrWhiteSpace(logFormId))
+                    {
+                        return logFormId;
+                    }
+                }
             }
 
             return null;
