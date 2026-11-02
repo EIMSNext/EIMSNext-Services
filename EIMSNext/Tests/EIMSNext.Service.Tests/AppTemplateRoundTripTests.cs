@@ -84,6 +84,11 @@ namespace EIMSNext.Service.Tests
                 AppId = sourceAppId,
                 Name = "Source Form",
                 UsingWorkflow = true,
+                Content = new FormContent
+                {
+                    // dataselect 的 dataSource 也是跨表单引用，发布/安装必须重映射
+                    Layout = $"[{{\"type\":\"dataselect\",\"field\":\"ref_pick\",\"title\":\"选择引用\",\"props\":{{\"dataSource\":\"{sourceFormId}\"}}}}]"
+                },
                 FormSettings = new FormSettings
                 {
                     DataTitle = new DataTitleSettings { Mode = "custom", Content = "Test Title" }
@@ -166,6 +171,10 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(sourceForm.TemplateId, workflowTemplate.SourceTemplateId);
             Assert.AreEqual(sourceForm.TemplateId, printTemplate.FormTemplateId);
 
+            // 发布后布局内 dataselect.dataSource 应指向表单模板 ID，而不是源应用 FormDef ID
+            var templateLayout = JsonNode.Parse(formTemplateRepo.Get(sourceForm.TemplateId!)!.Content.Layout)!.AsArray();
+            Assert.AreEqual(sourceForm.TemplateId, templateLayout[0]!["props"]!["dataSource"]!.GetValue<string>());
+
             var templateMenuIds = JsonNode.Parse(appTemplate.Menus)!
                 .AsArray()
                 .Select(node => node!["menuId"]!.GetValue<string>())
@@ -209,7 +218,7 @@ namespace EIMSNext.Service.Tests
             Assert.IsNotNull(formTemplateRepo.Get(addedForm.TemplateId!));
             Assert.AreEqual(originalProfileId, profileRepo.Queryable.Single().Id);
             Assert.AreEqual(originalPublishedAt, profileRepo.Queryable.Single().PublishedAt);
-            Assert.AreEqual(0L, profileRepo.Queryable.Single().InstallCount);
+            Assert.AreEqual(AppProfile.MinInstallCount, profileRepo.Queryable.Single().InstallCount);
 
             var installedAppId = await installService.InstallAsync(profile.Id);
 
@@ -229,11 +238,15 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(sourceDashboardItem.TemplateId, installedDashboardItem.TemplateId);
             Assert.AreEqual(sourceWorkflow.TemplateId, installedWorkflow.TemplateId);
             Assert.AreEqual(sourcePrint.TemplateId, installedPrint.TemplateId);
-            Assert.AreEqual(1L, profileRepo.Get(profile.Id)!.InstallCount);
+            Assert.AreEqual(AppProfile.MinInstallCount + 1L, profileRepo.Get(profile.Id)!.InstallCount);
 
             Assert.AreEqual(installedForm.Id, installedWorkflow.ExternalId);
             Assert.AreEqual(installedForm.Id, installedWorkflow.SourceId);
             Assert.AreEqual(installedForm.Id, installedPrint.FormId);
+
+            // 安装后布局内 dataselect.dataSource 应重映射为新安装的 FormDef ID
+            var installedFormLayout = JsonNode.Parse(installedForm.Content.Layout)!.AsArray();
+            Assert.AreEqual(installedForm.Id, installedFormLayout[0]!["props"]!["dataSource"]!.GetValue<string>());
 
             var installedLayoutId = JsonNode.Parse(installedDashboard.Layout)![0]!["i"]!.GetValue<string>();
             var installedChildParentLayoutId = JsonNode.Parse(installedDashboard.Layout)![1]!["parentLayoutId"]!.GetValue<string>();
@@ -438,7 +451,7 @@ namespace EIMSNext.Service.Tests
             var importedProfile = freshProfileRepo.Get(profileId)!;
             Assert.AreEqual("Source Profile", importedProfile.Name);
             Assert.AreEqual("source summary", importedProfile.Summary);
-            Assert.AreEqual(4L, importedProfile.InstallCount);
+            Assert.AreEqual(AppProfile.MinInstallCount, importedProfile.InstallCount);
             Assert.AreEqual(AppProfileStatus.Published, importedProfile.Status);
         }
 

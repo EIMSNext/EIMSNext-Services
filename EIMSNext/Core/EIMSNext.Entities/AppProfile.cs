@@ -64,9 +64,14 @@ namespace EIMSNext.Entities
         public string Author { get; set; } = string.Empty;
 
         /// <summary>
-        /// 安装次数。
+        /// 安装次数。新建档案的展示基线为 <see cref="MinInstallCount"/>，导入时同样不得低于该值。
         /// </summary>
-        public long InstallCount { get; set; }
+        public long InstallCount { get; set; } = MinInstallCount;
+
+        /// <summary>
+        /// 应用市场展示的安装次数下限。
+        /// </summary>
+        public const long MinInstallCount = 1000;
 
         /// <summary>
         /// 排序索引。

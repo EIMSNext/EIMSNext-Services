@@ -18,6 +18,9 @@ namespace EIMSNext.Service
 
         public static FormContent RewriteFormContent(FormTemplate formTemplate, string appId, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap)
         {
+            // Layout 是内嵌 JSON 字符串，泛化遍历进不去，需先解析重写
+            formTemplate.Content.Layout = RewriteJsonReferences(
+                formTemplate.Content.Layout, string.Empty, formMap, dashboardMap, null, null);
             var json = JsonSerializer.Serialize(formTemplate);
             var rewritten = RewriteJsonReferences(json, appId, formMap, dashboardMap, null, null);
             return JsonSerializer.Deserialize<FormTemplateProjection>(rewritten)?.Content ?? new FormContent();
@@ -174,7 +177,9 @@ namespace EIMSNext.Service
                             }
                             else if (property.Key.Equals("formId", StringComparison.OrdinalIgnoreCase)
                                 || property.Key.Equals("sourceFormId", StringComparison.OrdinalIgnoreCase)
-                                || property.Key.Equals("externalId", StringComparison.OrdinalIgnoreCase))
+                                || property.Key.Equals("externalId", StringComparison.OrdinalIgnoreCase)
+                                // dataselect/query 组件的 props.dataSource 存的是表单引用，发布/安装同样需要重映射
+                                || property.Key.Equals("dataSource", StringComparison.OrdinalIgnoreCase))
                             {
                                 if (formMap.TryGetValue(text, out var newFormId))
                                 {

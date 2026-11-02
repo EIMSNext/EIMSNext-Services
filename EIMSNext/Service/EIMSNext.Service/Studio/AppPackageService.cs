@@ -96,6 +96,7 @@ namespace EIMSNext.Service
 
             if (!plan.ProfileExists)
             {
+                manifest.Profile.InstallCount = Math.Max(manifest.Profile.InstallCount, AppProfile.MinInstallCount);
                 StampForWrite(manifest.Profile, null, context, now);
                 await profileRepo.InsertAsync(manifest.Profile);
             }
@@ -572,7 +573,7 @@ namespace EIMSNext.Service
                         {
                             var isValid = property.Key.ToLowerInvariant() switch
                             {
-                                "formid" or "sourceformid" or "externalid" => formIds.Contains(id),
+                                "formid" or "sourceformid" or "externalid" or "datasource" => formIds.Contains(id),
                                 "dashboardid" or "dashid" => dashboardIds.Contains(id),
                                 "workflowid" or "eventflowid" => workflowIds.Contains(id),
                                 "printid" => printIds.Contains(id),

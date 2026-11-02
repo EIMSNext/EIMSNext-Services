@@ -420,6 +420,9 @@ namespace EIMSNext.Service
 
         private static FormContent RewriteFormDefContent(FormDef formDef, Dictionary<string, string> formMap, Dictionary<string, string> dashboardMap, Dictionary<string, string> workflowMap, Dictionary<string, string> printMap, List<string> warnings, string ownerLabel)
         {
+            // Layout 是内嵌 JSON 字符串，泛化遍历进不去，需先解析重写
+            formDef.Content.Layout = AppTemplateReferenceRewriter.RewriteJsonReferences(
+                formDef.Content.Layout, string.Empty, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             var json = JsonSerializer.Serialize(formDef.Content);
             var rewritten = RewriteJsonToTemplate(json, formMap, dashboardMap, workflowMap, printMap, warnings, ownerLabel);
             return JsonSerializer.Deserialize<FormContent>(rewritten) ?? new FormContent();
