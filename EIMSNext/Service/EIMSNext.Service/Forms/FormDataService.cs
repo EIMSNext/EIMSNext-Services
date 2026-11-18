@@ -37,7 +37,15 @@ namespace EIMSNext.Service
             _attachmentReferenceService = new AttachmentReferenceService(resolver);
         }
 
-        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, string? dataFilter = null, string? update = null)
+        protected override List<AuditLog> CreateInsertLog(IEnumerable<FormData> newData)
+            => BuildFormDataLogs(newData, DbAction.Insert);
+
+        protected override List<AuditLog> CreateDeleteLog(IEnumerable<FormData>? oldData, string? dataFilter = null)
+            => oldData == null
+                ? base.CreateDeleteLog(oldData, dataFilter)
+                : BuildFormDataLogs(oldData, DbAction.Delete);
+
+        protected override List<AuditLog> CreateUpdateLog(IEnumerable<FormData>? oldData, IEnumerable<FormData>? newData, string? dataFilter = null, string? batchChanges = null)
         {
             var logList = new List<AuditLog>();
             var now = DateTime.UtcNow.ToTimeStampMs();
@@ -51,12 +59,10 @@ namespace EIMSNext.Service
                 {
                     Action = DbAction.Update,
                     EntityType = nameof(FormData),
-                    Detail = $"批量更新数据(无旧对象):{dataFilter}",
-                    DataFilter = dataFilter,
+                    Detail = batchChanges ?? AuditLogChangeBuilder.EmptyChanges,
+                    DataFilter = AuditLogChangeBuilder.LimitFilter(dataFilter),
                     CreateBy = op,
-                    UpdateBy = op,
                     CreateTime = now,
-                    UpdateTime = now,
                     ClientIp = ip,
                     CorpId = corpId,
                 });
@@ -72,14 +78,9 @@ namespace EIMSNext.Service
                         Action = DbAction.Update,
                         EntityType = nameof(FormData),
                         DataId = x.Id,
-                        // FormData 不展开字段差异；详情由 FormDataChangeLog 体现
-                        Detail = "已修改（详情见 FormDataChangeLog）",
-                        OldData = x.SerializeToJson(),
-                        NewData = y.SerializeToJson(),
+                        Detail = BuildFormDataChanges(x, y),
                         CreateBy = op,
-                        UpdateBy = op,
                         CreateTime = now,
-                        UpdateTime = now,
                         ClientIp = ip,
                         CorpId = corpId,
                     });
@@ -87,6 +88,102 @@ namespace EIMSNext.Service
             }
 
             return logList;
+        }
+
+        private List<AuditLog> BuildFormDataLogs(IEnumerable<FormData> entities, DbAction action)
+        {
+            var now = DateTime.UtcNow.ToTimeStampMs();
+            var op = Context.Operator;
+            var ip = Context.ClientIp;
+            var corpId = Context.CorpId;
+
+            return entities.Select(x => new AuditLog
+            {
+                Action = action,
+                EntityType = nameof(FormData),
+                DataId = x.Id,
+                Detail = BuildFormDataSummary(x, action == DbAction.Insert),
+                CreateBy = op,
+                CreateTime = now,
+                ClientIp = ip,
+                CorpId = string.IsNullOrWhiteSpace(x.CorpId) ? corpId : x.CorpId,
+            }).ToList();
+        }
+
+        private string BuildFormDataChanges(FormData oldData, FormData newData)
+        {
+            var lookup = BuildFieldLookup(GetFromStore<FormDef>(newData.FormId));
+            return AuditLogChangeBuilder.Serialize(
+                ExpandoComparer.Compare(oldData.Data, newData.Data)
+                    .Take(AuditLogChangeBuilder.MaxItems)
+                    .Select(x => ToAuditLogChange(x, lookup))
+                    .ToList());
+        }
+
+        private static AuditLogChange ToAuditLogChange(ExpandoChangeLog change, IReadOnlyDictionary<string, FieldDef> lookup)
+        {
+            lookup.TryGetValue(change.FieldId, out var field);
+            var sample = change.NewValue ?? change.OriValue;
+            var fieldType = string.IsNullOrWhiteSpace(field?.Type) ? null : field?.Type;
+            var fieldLabel = string.IsNullOrWhiteSpace(field?.Title) ? null : field?.Title;
+
+            return new AuditLogChange
+            {
+                Field = change.FieldId,
+                Type = fieldType ?? AuditLogChangeBuilder.TypeOf(change.FieldId, sample),
+                Label = fieldLabel ?? AuditLogChangeBuilder.LabelOf(change.FieldId),
+                Old = AuditLogChangeBuilder.Normalize(change.OriValue, change.FieldId),
+                New = AuditLogChangeBuilder.Normalize(change.NewValue, change.FieldId),
+            };
+        }
+
+        private string BuildFormDataSummary(FormData entity, bool insert)
+        {
+            var lookup = BuildFieldLookup(GetFromStore<FormDef>(entity.FormId));
+            var changes = entity.Data
+                .Where(x => !string.IsNullOrWhiteSpace(x.Key) && IsScalar(x.Value))
+                .Take(3)
+                .Select(x =>
+                {
+                    lookup.TryGetValue(x.Key, out var field);
+                    var fieldType = string.IsNullOrWhiteSpace(field?.Type) ? null : field?.Type;
+                    var fieldLabel = string.IsNullOrWhiteSpace(field?.Title) ? null : field?.Title;
+                    return new AuditLogChange
+                    {
+                        Field = x.Key,
+                        Type = fieldType ?? AuditLogChangeBuilder.TypeOf(x.Key, x.Value),
+                        Label = fieldLabel ?? AuditLogChangeBuilder.LabelOf(x.Key),
+                        Old = insert ? null : AuditLogChangeBuilder.Normalize(x.Value, x.Key),
+                        New = insert ? AuditLogChangeBuilder.Normalize(x.Value, x.Key) : null,
+                    };
+                })
+                .ToList();
+
+            if (changes.Count == 0)
+            {
+                changes.Add(new AuditLogChange
+                {
+                    Field = "dataId",
+                    Type = "input",
+                    Label = AuditLogChangeBuilder.LabelOf("dataId"),
+                    Old = insert ? null : entity.Id,
+                    New = insert ? entity.Id : null,
+                });
+            }
+
+            return AuditLogChangeBuilder.Serialize(changes);
+        }
+
+        private static bool IsScalar(object? value)
+        {
+            return value switch
+            {
+                null => false,
+                string or bool or byte or sbyte or short or ushort or int or uint or long or ulong
+                    or float or double or decimal => true,
+                JsonElement e => e.ValueKind is not (JsonValueKind.Object or JsonValueKind.Array or JsonValueKind.Undefined),
+                _ => false,
+            };
         }
 
         private static Dictionary<string, FieldDef> BuildFieldLookup(FormDef? formDef)
@@ -245,10 +342,10 @@ namespace EIMSNext.Service
             return result;
         }
 
-        protected override int DeleteCore(Expression<Func<FormData, bool>> filter)
+        protected override int DeleteCore(Expression<Func<FormData, bool>> filter, FormData? knownEntity = null)
             => DeleteCoreAsync(filter).GetAwaiter().GetResult();
 
-        protected override async Task<int> DeleteCoreAsync(Expression<Func<FormData, bool>> filter)
+        protected override async Task<int> DeleteCoreAsync(Expression<Func<FormData, bool>> filter, FormData? knownEntity = null)
         {
             await BeforeDelete(filter);
 
@@ -271,7 +368,9 @@ namespace EIMSNext.Service
             var logicDeleted = await DeleteFormDataByIdsAsync(logicIds, physical: false);
             if (logicIds.Count > 0)
             {
-                await CreateAuditLogAsync(DbAction.Delete, null, null, $"Id in [{string.Join(',', logicIds)}]").ConfigureAwait(false);
+                // targets 已在权限校验时加载，直接复用生成主字段摘要（零额外查询）
+                var logicTargets = targets.Where(x => logicIds.Contains(x.Id)).ToList();
+                await CreateAuditLogAsync(DbAction.Delete, logicTargets, null, $"Id in [{string.Join(',', logicIds)}]").ConfigureAwait(false);
             }
 
             await DeleteStronglyRelatedDataAsync(physicalIds);
@@ -440,12 +539,9 @@ namespace EIMSNext.Service
                 Action = DbAction.PhysicalDelete,
                 EntityType = nameof(FormData),
                 DataId = x.Id,
-                Detail = "物理删除草稿数据",
-                OldData = x.SerializeToJson(),
+                Detail = BuildFormDataSummary(x, false),
                 CreateBy = op,
-                UpdateBy = op,
                 CreateTime = now,
-                UpdateTime = now,
                 ClientIp = ip,
                 CorpId = string.IsNullOrWhiteSpace(x.CorpId) ? corpId : x.CorpId,
             }).ToList();

@@ -51,7 +51,8 @@ namespace EIMSNext.Identity.Services
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
                 GrantType = grantType,
-                FailReason = reason
+                FailReason = reason,
+                Success = false
             };
         }
 
@@ -66,7 +67,8 @@ namespace EIMSNext.Identity.Services
                 ClientId = InternalClients.WebClientId,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                GrantType = grantType
+                GrantType = grantType,
+                Success = true
             };
         }
 
@@ -80,7 +82,8 @@ namespace EIMSNext.Identity.Services
                 UserName = userName,
                 ClientIp = IpHelper.GetClientIp(_contextAccessor),
                 CreateTime = DateTime.UtcNow.ToTimeStampMs(),
-                GrantType = grantType
+                GrantType = grantType,
+                Success = true
             };
         }
     }

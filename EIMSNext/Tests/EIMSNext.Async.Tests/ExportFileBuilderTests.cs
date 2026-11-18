@@ -1,9 +1,12 @@
-﻿using System.Text;
+﻿using System.Reflection;
+using System.Text;
+using EIMSNext.ApiService;
 using EIMSNext.ApiService.RequestModels;
 using EIMSNext.Async.Tasks.Export;
 using EIMSNext.Entities;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
+using EIMSNext.Core.Services;
 using HKH.CSV;
 using NPOI.XSSF.UserModel;
 
@@ -60,6 +63,62 @@ namespace EIMSNext.Async.Tests
             var value = IdentityLoginAuditExportProcessor.GetCellValue(column, row);
 
             Assert.AreEqual("'=cmd|' /C calc'!A0", value.Text);
+        }
+
+        [TestMethod]
+        public void GetAuditLogCellValue_ShouldFormatChangesAndLocalize()
+        {
+            var detail = AuditLogChangeBuilder.Serialize(
+            [
+                new AuditLogChange { Field = "name", Type = "input", Label = "名称", Old = "旧值", New = "新值" }
+            ]);
+            var row = new AuditLog { Action = DbAction.Update, EntityType = "FormData", Detail = detail };
+
+            var action = AuditLogExportProcessor.GetCellValue(new ExportColumn { Key = "action" }, row);
+            var entity = AuditLogExportProcessor.GetCellValue(new ExportColumn { Key = "entityType" }, row);
+            var detailCell = AuditLogExportProcessor.GetCellValue(new ExportColumn { Key = "detail" }, row);
+
+            Assert.AreEqual("修改", action.Text);
+            Assert.AreEqual("表单数据", entity.Text);
+            Assert.AreEqual("名称: 旧值 → 新值", detailCell.Text);
+        }
+
+        [TestMethod]
+        public void GetAuditLogCellValue_ShouldExportDataFilter()
+        {
+            var row = new AuditLog
+            {
+                Action = DbAction.Delete,
+                EntityType = "FormData",
+                Detail = "[]",
+                DataFilter = "Id in [abc]",
+            };
+
+            var detail = AuditLogExportProcessor.GetCellValue(new ExportColumn { Key = "detail" }, row);
+            var filter = AuditLogExportProcessor.GetCellValue(new ExportColumn { Key = "dataFilter" }, row);
+
+            Assert.AreEqual("批量操作（无逐字段变更）", detail.Text);
+            Assert.AreEqual("Id in [abc]", filter.Text);
+        }
+
+        [TestMethod]
+        public void ValidateAuditLogExportRequest_ShouldAcceptDataFilterColumn()
+        {
+            var request = new AuditLogExportRequest
+            {
+                Columns = new List<ExportColumn>
+                {
+                    new() { Key = "dataFilter", Header = "操作条件" },
+                    new() { Key = "detail", Header = "操作详情" },
+                },
+            };
+
+            var method = typeof(AuditLogApiService).GetMethod(
+                "ValidateAuditLogExportRequest", BindingFlags.NonPublic | BindingFlags.Static);
+            Assert.IsNotNull(method);
+            method.Invoke(null, [request]);
+
+            Assert.AreEqual(ExportColumnType.String, request.Columns[0].Type);
         }
 
         [TestMethod]

@@ -18,7 +18,7 @@ namespace EIMSNext.Core.Entities
         public string Id { get; set; } = string.Empty;
     }
     /// <summary>包含审计字段的实体基类。</summary>
-    public abstract class EntityBase : KeyedEntityBase, IEntity
+    public abstract class EntityBase : KeyedEntityBase, IEntity, IHasCreateTime
     {
         /// <summary>创建人。</summary>
         public Operator? CreateBy { get; set; }

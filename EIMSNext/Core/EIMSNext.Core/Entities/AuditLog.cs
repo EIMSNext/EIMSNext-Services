@@ -5,7 +5,7 @@ namespace EIMSNext.Core.Entities
     /// <summary>
     /// 审计日志
     /// </summary>
-    public class AuditLog : CorpEntityBase
+    public class AuditLog : LogEntityBase
     {
         /// <summary>
         /// 操作类型
@@ -20,28 +20,17 @@ namespace EIMSNext.Core.Entities
         /// </summary>
         public string? DataId { get; set; }
         /// <summary>
-        /// 日志详情，以 OldValue->NewValue生成可读性字符串
+        /// 字段变更列表，JSON 数组 [{field,type,label,old,new}]；可读串由前端/导出侧格式化。
+        /// 批量 ExecuteUpdate 只记录被设置的字段（old 恒 null），条件另存 DataFilter。
         /// </summary>
         public string? Detail { get; set; }
         /// <summary>
-        /// 旧对象
-        /// </summary>
-        public string? OldData { get; set; }
-        /// <summary>
-        /// 新对象
-        /// </summary>
-        public string? NewData { get; set; }
-        /// <summary>
-        /// 批量更新/删除时的数据过滤条件
+        /// 批量更新/删除时的条件字符串，与 Detail 分列存放。
         /// </summary>
         public string? DataFilter { get; set; }
         /// <summary>
-        /// 批量更新时的字段
-        /// </summary>
-        public string? UpdateExp { get; set; }
-        /// <summary>
         /// 客户端IP
         /// </summary>
-        public string? ClientIp {  get; set; }
+        public string? ClientIp { get; set; }
     }
 }

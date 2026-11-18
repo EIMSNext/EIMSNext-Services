@@ -34,6 +34,10 @@ namespace EIMSNext.ApiService
             ["loginId"] = ExportColumnType.String,
             ["failReason"] = ExportColumnType.String,
             ["clientIp"] = ExportColumnType.String,
+            ["success"] = ExportColumnType.String,
+            ["grantType"] = ExportColumnType.String,
+            ["userId"] = ExportColumnType.String,
+            ["clientId"] = ExportColumnType.String,
         };
 
         /// <summary>
@@ -109,7 +113,7 @@ namespace EIMSNext.ApiService
         private Expression<Func<IdentityLoginAudit, bool>> BuildIdentityLoginAuditFilter(IdentityLoginAuditExportRequest request)
         {
             var corpId = IdentityContext.CurrentCorpId;
-            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
+            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId;
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {

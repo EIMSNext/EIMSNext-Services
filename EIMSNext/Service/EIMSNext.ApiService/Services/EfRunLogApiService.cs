@@ -48,8 +48,7 @@ namespace EIMSNext.ApiService
 
             var query = RunLogService.All().Where(x =>
                 x.CorpId == corpId &&
-                x.EventFlowId == eventFlowId &&
-                !x.DeleteFlag);
+                x.EventFlowId == eventFlowId);
 
             if (startTime.HasValue)
             {
@@ -82,7 +81,7 @@ namespace EIMSNext.ApiService
         public async Task<EfRunLogDetail?> GetRunDetailAsync(string runLogId)
         {
             var run = await RunLogService.GetAsync(runLogId);
-            if (run == null || run.CorpId != IdentityContext.CurrentCorpId || run.DeleteFlag)
+            if (run == null || run.CorpId != IdentityContext.CurrentCorpId)
             {
                 return null;
             }
@@ -117,7 +116,7 @@ namespace EIMSNext.ApiService
             var runLogRepository = Resolver.GetRepository<Ef_RunLog>();
             await using var scope = new TransactionScope(runLogRepository.DbContext);
             var run = runLogRepository.Get(runLogId);
-            if (run == null || run.CorpId != IdentityContext.CurrentCorpId || run.DeleteFlag)
+            if (run == null || run.CorpId != IdentityContext.CurrentCorpId)
                 throw new NotFoundException("运行日志不存在");
 
             Resolver.Resolve<TenantAccessEvaluator>().EnsureCanManageApp(run.AppId);

@@ -26,7 +26,7 @@ namespace EIMSNext.Async.Tasks.Export
             CancellationToken ct,
             int batchSize,
             Action<CSVWriter, List<ExportColumn>, IEnumerable<TEntity>> writeRows)
-            where TEntity : EntityBase
+            where TEntity : class, IHasCreateTime
         {
             var tempFile = CreateTempFilePath(fileName);
             long totalCount = 0;
@@ -82,7 +82,7 @@ namespace EIMSNext.Async.Tasks.Export
             CancellationToken ct,
             int batchSize,
             Func<ISheet, ExportFileBuilder.ExcelStyles, List<ExportColumn>, IEnumerable<TEntity>, int, int> writeRows)
-            where TEntity : EntityBase
+            where TEntity : class, IHasCreateTime
         {
             var tempFile = CreateTempFilePath(fileName);
             long totalCount = 0;
@@ -161,7 +161,7 @@ namespace EIMSNext.Async.Tasks.Export
             Expression<Func<T, bool>> baseFilter,
             long? lastCreateTime,
             string? lastId)
-            where T : EntityBase
+            where T : class, IHasCreateTime
         {
             if (!lastCreateTime.HasValue || string.IsNullOrWhiteSpace(lastId))
             {

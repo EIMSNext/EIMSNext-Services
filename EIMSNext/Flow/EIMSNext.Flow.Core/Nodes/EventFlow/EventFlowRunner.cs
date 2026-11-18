@@ -462,7 +462,6 @@ namespace EIMSNext.Flow.Core.Nodes
                 runLog.EndTime = endTime;
                 runLog.Success = success;
                 runLog.ErrMsg = errMsg ?? string.Empty;
-                runLog.UpdateTime = endTime;
                 repository.Replace(runLog);
             }
             catch (Exception ex)

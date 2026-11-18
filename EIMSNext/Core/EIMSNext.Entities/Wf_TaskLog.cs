@@ -6,7 +6,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 审批日志
     /// </summary>
-    public class Wf_TaskLog : CorpEntityBase
+    public class Wf_TaskLog : LogEntityBase
     {
         /// <summary>
         /// 应用ID

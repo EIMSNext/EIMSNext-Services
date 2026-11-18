@@ -32,7 +32,7 @@ namespace EIMSNext.Service.Host.Controllers
     [IdentityType(IdentityTypeDefaults.BusinessUser)]
     public abstract class MefControllerBase<S, T> : MefControllerBase
         where S : class, IApiService<T>
-        where T : class, IEntity
+        where T : class, IEntityKey
     {
         /// <summary>
         /// 

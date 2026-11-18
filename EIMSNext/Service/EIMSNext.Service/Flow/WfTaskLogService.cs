@@ -5,7 +5,7 @@ using EIMSNext.Service.Contracts;
 
 namespace EIMSNext.Service
 {
-	public class WfTaskLogService(IResolver resolver) : EntityServiceBase<Wf_TaskLog>(resolver), IWfTaskLogService
+	public class WfTaskLogService(IResolver resolver) : EntityServiceBaseCore<Wf_TaskLog>(resolver), IWfTaskLogService
 	{
 	}
 }

@@ -76,29 +76,23 @@ namespace EIMSNext.Service
 
             await ExecuteWithTransactionRetryAsync(async () =>
             {
-                if (clearAll)
-                {
-                    // 清空全部字段变更日志。
-                    await PatchManyCoreAsync(
-                        x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag,
-                        setters => setters.SetProperty(x => x.Content.FieldChangeLogs, new List<FieldChangeLog>()))
-                        .ConfigureAwait(false);
-                }
-                else
-                {
-                    // 仅移除指定的字段变更日志条目。EF Core 无法对 jsonb 内嵌集合做服务端 PullFilter，
-                    // 加载实体后在内存中过滤再整体替换。
-                    var target = Repository.Queryable
-                        .FirstOrDefault(x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag);
-                    if (target?.Content?.FieldChangeLogs is { Count: > 0 } logs)
-                    {
-                        var remaining = logs.Where(x => !normalizedIds.Contains(x.FieldId)).ToList();
-                        await PatchManyCoreAsync(
-                            x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag,
-                            setters => setters.SetProperty(x => x.Content.FieldChangeLogs, remaining))
-                            .ConfigureAwait(false);
-                    }
-                }
+                // EF Core 无法把 jsonb 内嵌属性作为 SetProperty 目标（既有 500 根因），
+                // 加载实体后整体替换 Content 列，规避对内嵌集合的服务端更新。
+                var target = Repository.Queryable
+                    .FirstOrDefault(x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag);
+                if (target?.Content is null) return;
+
+                var logs = target.Content.FieldChangeLogs;
+                var remaining = clearAll
+                    ? new List<FieldChangeLog>()
+                    : logs.Where(x => !normalizedIds.Contains(x.FieldId)).ToList();
+                if (remaining.Count == logs.Count) return;
+
+                target.Content.FieldChangeLogs = remaining;
+                await PatchManyCoreAsync(
+                    x => x.Id == formId && x.CorpId == Context.CorpId && !x.DeleteFlag,
+                    setters => setters.SetProperty(x => x.Content, target.Content))
+                    .ConfigureAwait(false);
             }).ConfigureAwait(false);
         }
 

@@ -5,7 +5,7 @@ using Microsoft.OData.ModelBuilder;
 
 namespace EIMSNext.Service.Host.Edm
 {
-    public class WfExecLogModelConfiguration : ModelConfigurationBase<Wf_ExecLog>
+    public class WfExecLogModelConfiguration : LogModelConfigurationBase<Wf_ExecLog>
     {
         protected override void ConfigureEntitySet(ODataModelBuilder builder)
         {

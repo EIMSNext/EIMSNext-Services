@@ -12,7 +12,7 @@ namespace EIMSNext.Service.Host.Controllers
     [ApiVersion(1.0)]
     public class ApiControllerBase<S, T> : MefControllerBase<S, T>
        where S : class, IApiService<T>
-        where T : class, IEntity
+        where T : class, IEntityKey
     {
         public ApiControllerBase(IResolver resolver) : base(resolver)
         {

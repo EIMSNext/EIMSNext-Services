@@ -106,12 +106,16 @@ namespace EIMSNext.Core.Services
         public virtual int Replace(T entity) => ReplaceCore(entity);
 
         /// <summary>
-        /// 根据主键 ID 删除实体。
+        /// 根据主键 ID 删除实体。删除前加载实体，用于审计日志生成主字段摘要。
         /// </summary>
-        public virtual int Delete(string id) => DeleteCore(x => x.Id == id);
+        public virtual int Delete(string id)
+        {
+            var knownEntity = GetCoreAsync(id).GetAwaiter().GetResult();
+            return DeleteCore(x => x.Id == id, knownEntity);
+        }
 
         /// <summary>
-        /// 根据多个主键 ID 批量删除实体。
+        /// 根据多个主键 ID 批量删除实体。仅删除单个 ID 时加载实体，用于审计日志生成主字段摘要。
         /// </summary>
         public virtual int Delete(IEnumerable<string> ids)
         {
@@ -119,7 +123,8 @@ namespace EIMSNext.Core.Services
             if (idList.Count == 0) return 0;
 
             using var scope = NewTransactionScope();
-            var result = DeleteCore(x => idList.Contains(x.Id));
+            var knownEntity = idList.Count == 1 ? GetCoreAsync(idList[0]).GetAwaiter().GetResult() : null;
+            var result = DeleteCore(x => idList.Contains(x.Id), knownEntity);
             scope.CommitTransaction();
             return result;
         }
@@ -206,12 +211,16 @@ namespace EIMSNext.Core.Services
         public virtual Task<int> ReplaceAsync(T entity) => ReplaceCoreAsync(entity);
 
         /// <summary>
-        /// 异步根据主键 ID 删除实体。
+        /// 异步根据主键 ID 删除实体。删除前加载实体，用于审计日志生成主字段摘要。
         /// </summary>
-        public virtual Task<int> DeleteAsync(string id) => DeleteCoreAsync(x => x.Id == id);
+        public virtual async Task<int> DeleteAsync(string id)
+        {
+            var knownEntity = await GetCoreAsync(id).ConfigureAwait(false);
+            return await DeleteCoreAsync(x => x.Id == id, knownEntity).ConfigureAwait(false);
+        }
 
         /// <summary>
-        /// 异步根据多个主键 ID 批量删除实体。
+        /// 异步根据多个主键 ID 批量删除实体。仅删除单个 ID 时加载实体，用于审计日志生成主字段摘要。
         /// </summary>
         public virtual async Task<int> DeleteAsync(IEnumerable<string> ids)
         {
@@ -219,7 +228,8 @@ namespace EIMSNext.Core.Services
             if (idList.Count == 0) return 0;
 
             await using var scope = NewTransactionScope();
-            var result = await DeleteCoreAsync(x => idList.Contains(x.Id)).ConfigureAwait(false);
+            var knownEntity = idList.Count == 1 ? await GetCoreAsync(idList[0]).ConfigureAwait(false) : null;
+            var result = await DeleteCoreAsync(x => idList.Contains(x.Id), knownEntity).ConfigureAwait(false);
             await scope.CommitTransactionAsync().ConfigureAwait(false);
             return result;
         }

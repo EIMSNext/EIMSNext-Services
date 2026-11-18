@@ -8,7 +8,7 @@ namespace EIMSNext.Service.Host.Edm
     /// <summary>
     ///
     /// </summary>
-    public class EfRunLogNodeModelConfiguration : CorpModelConfigurationBase<Ef_RunLogNode>
+    public class EfRunLogNodeModelConfiguration : LogModelConfigurationBase<Ef_RunLogNode>
     {
         protected override void ConfigureEntitySet(ODataModelBuilder builder)
         {

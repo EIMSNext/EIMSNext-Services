@@ -7,7 +7,7 @@ namespace EIMSNext.Entities
     /// 数据流单次运行日志。
     /// 每条记录对应一次 EventFlow 的实际执行（无论成功或失败）。
     /// </summary>
-    public class Ef_RunLog : CorpEntityBase
+    public class Ef_RunLog : LogEntityBase
     {
         /// <summary>所属应用 ID。</summary>
         public string AppId { get; set; } = string.Empty;

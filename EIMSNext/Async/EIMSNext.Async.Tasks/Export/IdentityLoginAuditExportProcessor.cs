@@ -60,6 +60,10 @@ namespace EIMSNext.Async.Tasks.Export
                 "loginId" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.LoginId ?? "-") },
                 "failReason" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.FailReason ?? "-") },
                 "clientIp" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.ClientIp ?? "-") },
+                "success" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = row.Success ? "成功" : "失败" },
+                "grantType" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.GrantType ?? "-") },
+                "userId" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.UserId ?? "-") },
+                "clientId" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.ClientId ?? "-") },
                 _ => new ExportFileBuilder.ExportCellValue(),
             };
         }
@@ -89,7 +93,7 @@ namespace EIMSNext.Async.Tasks.Export
 
         private static Expression<Func<IdentityLoginAudit, bool>> BuildFilter(string corpId, IdentityLoginAuditExportRequest request)
         {
-            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
+            Expression<Func<IdentityLoginAudit, bool>> filter = x => x.CorpId == corpId;
 
             if (!string.IsNullOrWhiteSpace(request.UserName))
             {

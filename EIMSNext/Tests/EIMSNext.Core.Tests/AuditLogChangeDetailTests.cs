@@ -1,201 +1,402 @@
-﻿using System.Composition.Hosting;
-using System.Linq.Expressions;
-using System.Reflection;
-using EIMSNext.Cache;
-using EIMSNext.Common;
-using EIMSNext.Common.Extensions;
+﻿using System.Linq.Expressions;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
-using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
-using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Core.Services;
-using EIMSNext.TestSupport;
-using HKH.Mef2.Integration;
-using Microsoft.Extensions.Caching.Distributed;
-using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
+
+using Microsoft.EntityFrameworkCore.Query;
+
+#pragma warning disable EF1001
 
 namespace EIMSNext.Core.Tests
 {
     [TestClass]
     public class AuditLogChangeDetailTests
     {
-        [TestMethod]
-        public void T1_KeyRemovedInNew_DoesNotThrow_AndContainsDeletedLine()
-        {
-            var service = NewService();
-
-            var oldE = new TestAuditEntity { A = "1", B = "2", C = "3" };
-            var newE = new TestAuditEntity { A = "1", B = "2" };
-
-            var result = InvokeGetChangeDetail(service, oldE, newE);
-
-            Assert.IsFalse(result.Contains("KeyNotFound", StringComparison.OrdinalIgnoreCase));
-            Assert.IsTrue(result.Contains("C:", StringComparison.OrdinalIgnoreCase), $"expected C: line in '{result}'");
-            Assert.IsTrue(result.Contains("->null"), $"expected '->null' suffix in '{result}'");
-        }
+        private static List<AuditLogChange> Parse(string json)
+            => JsonSerializer.Deserialize<List<AuditLogChange>>(json)
+               ?? throw new InvalidOperationException("Detail 不是合法的变更数组");
 
         [TestMethod]
-        public void T2_KeyAddedInNew_ContainsAddedLine()
+        public void T1_ChangedFields_SkipUnchangedAndSystemFields()
         {
-            var service = NewService();
+            var oldObj = new JsonObject { ["a"] = "1", ["b"] = "2", ["createTime"] = 100L };
+            var newObj = new JsonObject { ["a"] = "10", ["b"] = "2", ["createTime"] = 200L };
 
-            var oldE = new TestAuditEntity { A = "1" };
-            var newE = new TestAuditEntity { A = "1", D = "new-field" };
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
 
-            var result = InvokeGetChangeDetail(service, oldE, newE);
-
-            Assert.IsTrue(result.Contains("D:", StringComparison.OrdinalIgnoreCase), $"expected D: line in '{result}'");
-            Assert.IsTrue(result.StartsWith("D:null->", StringComparison.OrdinalIgnoreCase)
-                || result.Contains(",D:null->", StringComparison.OrdinalIgnoreCase),
-                $"expected 'D:null->...' in '{result}'");
-            Assert.IsFalse(result.Contains("A:", StringComparison.OrdinalIgnoreCase), $"A should be skipped (unchanged) in '{result}'");
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("a", items[0].Field);
+            Assert.AreEqual("1", items[0].Old?.ToString());
+            Assert.AreEqual("10", items[0].New?.ToString());
         }
 
         [TestMethod]
-        public void T3_AllFieldsEqual_ReturnsEmptyString()
+        public void T2_KeyAddedInNew_ContainsNullOldValue()
         {
-            var service = NewService();
+            var oldObj = new JsonObject { ["a"] = "1" };
+            var newObj = new JsonObject { ["a"] = "1", ["d"] = "new-field" };
 
-            var oldE = new TestAuditEntity { A = "1", B = "2" };
-            var newE = new TestAuditEntity { A = "1", B = "2" };
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
 
-            var result = InvokeGetChangeDetail(service, oldE, newE);
-
-            Assert.AreEqual(string.Empty, result);
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("d", items[0].Field);
+            Assert.IsNull(items[0].Old);
+            Assert.AreEqual("new-field", items[0].New?.ToString());
         }
 
         [TestMethod]
-        public void T3b_ChangedField_LineUsesJsonStrings()
+        public void T3_KeyRemovedInNew_ContainsNullNewValue()
         {
-            var service = NewService();
+            var oldObj = new JsonObject { ["a"] = "1", ["c"] = "3" };
+            var newObj = new JsonObject { ["a"] = "1" };
 
-            var oldE = new TestAuditEntity { A = "before" };
-            var newE = new TestAuditEntity { A = "after" };
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
 
-            var result = InvokeGetChangeDetail(service, oldE, newE);
-
-            Assert.IsTrue(result.Contains("A:\"before\"->\"after\"", StringComparison.OrdinalIgnoreCase),
-                $"expected A:\"before\"->\"after\" in '{result}'");
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("c", items[0].Field);
+            Assert.AreEqual("3", items[0].Old?.ToString());
+            Assert.IsNull(items[0].New);
         }
 
         [TestMethod]
-        public void T3c_MultipleChanges_OnlyChangedFieldsAppear()
+        public void T4_AllFieldsEqual_ReturnsEmptyArray()
         {
-            var service = NewService();
+            var oldObj = new JsonObject { ["a"] = "1", ["b"] = "2" };
+            var newObj = new JsonObject { ["a"] = "1", ["b"] = "2" };
 
-            var oldE = new TestAuditEntity { A = "1", B = "2", C = "3" };
-            var newE = new TestAuditEntity { A = "1", B = "20", C = "30" };
-
-            var result = InvokeGetChangeDetail(service, oldE, newE);
-
-            Assert.IsTrue(result.Contains("B:\"2\"->\"20\"", StringComparison.OrdinalIgnoreCase), $"expected B line in '{result}'");
-            Assert.IsTrue(result.Contains("C:\"3\"->\"30\"", StringComparison.OrdinalIgnoreCase), $"expected C line in '{result}'");
-            Assert.IsFalse(result.Contains("A:", StringComparison.OrdinalIgnoreCase), $"A unchanged should be skipped in '{result}'");
+            Assert.AreEqual(AuditLogChangeBuilder.EmptyChanges,
+                AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
         }
 
-        private static TestEntityService<TestAuditEntity> NewService()
-            => new TestEntityService<TestAuditEntity>(BuildResolver());
-
-        private static string InvokeGetChangeDetail(TestEntityService<TestAuditEntity> service, TestAuditEntity oldT, TestAuditEntity newT)
+        [TestMethod]
+        public void T5_MultipleChanges_KeepNewObjectPropertyOrder()
         {
-            // GetChangeDetail 是 ServiceCore<T> 上的私有方法，使用 closed generic 类型的 MethodInfo。
-            // 注意：该方法为 static（内部已不依赖任何实例状态），
-            // 因此这里同时带上 Instance 与 Static 标志，两种形态都能取到。
-            var method = typeof(ServiceCore<TestAuditEntity>).GetMethod(
-                    "GetChangeDetail", BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.Static)
-                ?? throw new InvalidOperationException("GetChangeDetail not found on ServiceCore<TestAuditEntity>");
-            return (string)method.Invoke(service, [oldT, newT])!;
+            var oldObj = new JsonObject { ["a"] = "1", ["b"] = "2", ["c"] = "3" };
+            var newObj = new JsonObject { ["a"] = "1", ["b"] = "20", ["c"] = "30" };
+
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
+
+            Assert.AreEqual(2, items.Count);
+            Assert.AreEqual("b", items[0].Field);
+            Assert.AreEqual("c", items[1].Field);
         }
 
-        private static IResolver BuildResolver()
+        [TestMethod]
+        public void T6_LongValue_IsClamped()
         {
-            var context = new FakeServiceContext
+            var longText = new string('x', 400);
+            var oldObj = new JsonObject { ["content"] = "before" };
+            var newObj = new JsonObject { ["content"] = longText };
+
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
+
+            Assert.AreEqual(AuditLogChangeBuilder.MaxValueLength + 1,
+                items[0].New?.ToString()?.Length);
+            Assert.IsTrue(items[0].New?.ToString()?.EndsWith('…'));
+        }
+
+        [TestMethod]
+        public void T7_ChangeCount_IsCapped()
+        {
+            var oldObj = new JsonObject();
+            var newObj = new JsonObject();
+            for (var i = 0; i < AuditLogChangeBuilder.MaxItems + 10; i++)
             {
-                CorpId = "test-corp",
-                Operator = new Operator("op-1", "OP1", "Operator One"),
-                ClientIp = "1.2.3.4"
-            };
-            var services = new Dictionary<Type, object>
+                newObj[$"f{i}"] = i;
+            }
+
+            var items = Parse(AuditLogChangeBuilder.BuildChanges(oldObj, newObj));
+
+            Assert.AreEqual(AuditLogChangeBuilder.MaxItems, items.Count);
+        }
+
+        [TestMethod]
+        public void T8_InsertSummary_UsesChineseLabelAndNullOld()
+        {
+            var entity = new TestAuditEntity { Id = "data-1", Name = "采购订单-A" };
+
+            var items = Parse(AuditLogChangeBuilder.BuildSummary(entity, true));
+
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("名称", items[0].Label);
+            Assert.IsNull(items[0].Old);
+            Assert.AreEqual("采购订单-A", items[0].New?.ToString());
+        }
+
+        [TestMethod]
+        public void T9_SummaryWithoutMainField_FallsBackToDataId()
+        {
+            var entity = new TestAuditEntity { Id = "data-1" };
+
+            var items = Parse(AuditLogChangeBuilder.BuildSummary(entity, false));
+
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("dataId", items[0].Field);
+            Assert.AreEqual("data-1", items[0].Old?.ToString());
+            Assert.IsNull(items[0].New);
+        }
+
+        [TestMethod]
+        public void T10_LimitFilter_IsClamped()
+        {
+            var filter = new string('f', AuditLogChangeBuilder.MaxFilterLength + 100);
+
+            Assert.AreEqual(AuditLogChangeBuilder.MaxFilterLength + 1,
+                AuditLogChangeBuilder.LimitFilter(filter).Length);
+            Assert.AreEqual(string.Empty, AuditLogChangeBuilder.LimitFilter(null));
+        }
+
+        [TestMethod]
+        public void T11_FormatForExport_UsesLabelAndArrow()
+        {
+            var detail = AuditLogChangeBuilder.Serialize(
+            [
+                new AuditLogChange { Field = "name", Type = "input", Label = "名称", Old = null, New = "采购订单-A" }
+            ]);
+
+            Assert.AreEqual("名称: (空) → 采购订单-A", AuditLogChangeBuilder.FormatForExport(detail));
+        }
+
+        [TestMethod]
+        public void T12_FormatForExport_LegacyTextIsReturnedAsIs()
+        {
+            const string legacy = "批量更新数据(无旧对象):x => x.Id == \"a\"";
+
+            Assert.AreEqual(legacy, AuditLogChangeBuilder.FormatForExport(legacy));
+            Assert.AreEqual("-", AuditLogChangeBuilder.FormatForExport(null));
+        }
+
+        [TestMethod]
+        public void T13_Setters_ConstantValuesBecomeChanges()
+        {
+            var json = AuditLogSettersReader.Build<TestAuditEntity>(
+                s => s.SetProperty(x => x.Name, "订单-B")
+                      .SetProperty(x => x.Enabled, true));
+
+            var items = Parse(json);
+            Assert.AreEqual(2, items.Count);
+            Assert.AreEqual("name", items[0].Field);
+            Assert.AreEqual("名称", items[0].Label);
+            Assert.AreEqual("input", items[0].Type);
+            Assert.IsNull(items[0].Old);
+            Assert.AreEqual("订单-B", items[0].New?.ToString());
+            Assert.AreEqual("enabled", items[1].Field);
+            Assert.AreEqual("启用", items[1].Label);
+            Assert.AreEqual("switch", items[1].Type);
+        }
+
+        [TestMethod]
+        public void T14_Setters_SkipSystemFields()
+        {
+            var json = AuditLogSettersReader.Build<TestAuditEntity>(
+                s => s.SetProperty(x => x.Name, "订单-B")
+                      .SetProperty(x => x.UpdateTime, 1794447388000L)
+                      .SetProperty(x => x.DeleteFlag, true)
+                      .SetProperty(x => x.CorpId, "corp-1"));
+
+            var items = Parse(json);
+            Assert.AreEqual(1, items.Count);
+            Assert.AreEqual("name", items[0].Field);
+        }
+
+        [TestMethod]
+        public void T15_Setters_ClosureVariableIsEvaluated()
+        {
+            var title = "来自闭包变量";
+            var json = AuditLogSettersReader.Build<TestAuditEntity>(
+                s => s.SetProperty(x => x.Name, title));
+
+            Assert.AreEqual("来自闭包变量", Parse(json)[0].New?.ToString());
+        }
+
+        [TestMethod]
+        public void T16_Setters_DependentExpressionKeepsText()
+        {
+            var json = AuditLogSettersReader.Build<TestAuditEntity>(
+                s => s.SetProperty(x => x.Count, x => x.Count + 1));
+
+            var item = Parse(json)[0];
+            Assert.AreEqual("count", item.Field);
+            Assert.IsTrue((item.New?.ToString() ?? "").Contains("Count"), item.New?.ToString());
+            Assert.IsTrue((item.New?.ToString() ?? "").Contains("+"), item.New?.ToString());
+        }
+
+        [TestMethod]
+        public void T17_Setters_DegradeToEmptyArray()
+        {
+            Assert.AreEqual("[]", AuditLogSettersReader.Build<TestAuditEntity>(null));
+            Assert.AreEqual("[]", AuditLogSettersReader.Build<TestAuditEntity>(
+                _ => throw new InvalidOperationException("setters 异常")));
+        }
+
+        [TestMethod]
+        public void T18_Setters_LimitToMaxItems()
+        {
+            var json = AuditLogSettersReader.Build<TestAuditEntity>(s =>
             {
-                [typeof(IServiceContext)] = context,
-                [typeof(IScopeCache)] = new FakeScopeCache(),
-                [typeof(IRepository<TestAuditEntity>)] = new StubRepository<TestAuditEntity>(),
-                [typeof(IRepository<AuditLog>)] = new StubRepository<AuditLog>(),
-                [typeof(ICacheClient)] = new FakeCacheClient(),
-                [typeof(ILogger<TestAuditEntity>)] = NullLogger<TestAuditEntity>.Instance
-            };
-            return new TestResolver(services);
+                for (var i = 0; i < 60; i++) s.SetProperty(x => x.Name, "v" + i);
+            });
+
+            Assert.AreEqual(AuditLogChangeBuilder.MaxItems, Parse(json).Count);
+        }
+
+        [TestMethod]
+        public void T19_FormatForExport_BatchUsesUnknownOldMarker()
+        {
+            var detail = AuditLogChangeBuilder.Serialize(
+            [
+                new AuditLogChange { Field = "name", Type = "input", Label = "名称", Old = null, New = "订单-B" }
+            ]);
+
+            Assert.AreEqual("名称: (空) → 订单-B", AuditLogChangeBuilder.FormatForExport(detail));
+            Assert.AreEqual("名称: — → 订单-B", AuditLogChangeBuilder.FormatForExport(detail, DbAction.Update));
+            Assert.AreEqual("名称: (空) → 订单-B", AuditLogChangeBuilder.FormatForExport(detail, DbAction.Insert));
+        }
+
+        [TestMethod]
+        public void T20_FormatForExport_UpdateWithOldValueIsNotBatch()
+        {
+            var detail = AuditLogChangeBuilder.Serialize(
+            [
+                new AuditLogChange { Field = "name", Type = "input", Label = "名称", Old = "旧值", New = "新值" }
+            ]);
+
+            Assert.AreEqual("名称: 旧值 → 新值", AuditLogChangeBuilder.FormatForExport(detail, DbAction.Update));
+            Assert.AreEqual("批量操作（无逐字段变更）", AuditLogChangeBuilder.FormatForExport("[]", DbAction.Update));
+        }
+
+        [TestMethod]
+        public void T21_FormatForExport_TruncationIncludesItemCount()
+        {
+            var changes = new List<AuditLogChange>();
+            for (var i = 0; i < 40; i++)
+            {
+                changes.Add(new AuditLogChange
+                {
+                    Field = $"f{i}", Type = "input", Label = $"字段{i}",
+                    Old = null, New = new string('x', 120),
+                });
+            }
+
+            var text = AuditLogChangeBuilder.FormatForExport(
+                AuditLogChangeBuilder.Serialize(changes), DbAction.Update);
+
+            const string suffix = "…（共 40 项）";
+            Assert.IsTrue(text.EndsWith(suffix), text);
+            Assert.AreEqual(AuditLogChangeBuilder.MaxFilterLength + suffix.Length, text.Length);
+        }
+
+        [TestMethod]
+        public void T22_Normalize_ConvertsMillisecondTimestampWhenFieldIsTime()
+        {
+            const long ms = 1794447388000L;
+
+            var converted = AuditLogChangeBuilder.Normalize(ms, "lastVisitTime");
+            var expectedDate = DateTimeOffset.FromUnixTimeMilliseconds(ms).ToLocalTime().ToString("yyyy-MM-dd");
+            Assert.IsNotNull(converted);
+            Assert.IsInstanceOfType(converted, typeof(string));
+            Assert.IsTrue(((string)converted).StartsWith(expectedDate), (string)converted);
+
+            // 无字段名时不猜语义，保持原始数值
+            var raw = AuditLogChangeBuilder.Normalize(ms) as JsonNode;
+            Assert.IsNotNull(raw);
+            Assert.AreEqual("1794447388000", raw.ToJsonString());
+        }
+
+        [TestMethod]
+        public void T23_FormatFilter_EvaluatesScalarClosure()
+        {
+            var formId = "FORM-1";
+            Expression<Func<TestAuditEntity, bool>> filter = x => x.Id == formId;
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsTrue(text.Contains("FORM-1"), text);
+            Assert.IsFalse(text.Contains("value("), text);
+        }
+
+        [TestMethod]
+        public void T24_FormatFilter_EvaluatesCollectionClosure()
+        {
+            var idList = new List<string> { "ID-1", "ID-2" };
+            Expression<Func<TestAuditEntity, bool>> filter = x => idList.Contains(x.Id);
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsTrue(text.Contains("\"ID-1\", \"ID-2\""), text);
+            Assert.IsFalse(text.Contains("value("), text);
+        }
+
+        [TestMethod]
+        public void T25_FormatFilter_EvaluatesNestedMemberChain()
+        {
+            var holder = new Holder();
+            Expression<Func<TestAuditEntity, bool>> filter = x => x.Id == holder.Context.CorpId;
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsTrue(text.Contains("corp-1"), text);
+            Assert.IsFalse(text.Contains("value("), text);
+        }
+
+        [TestMethod]
+        public void T26_FormatFilter_DynamicFilterIsSerialized()
+        {
+            var filter = new DynamicFilter { Field = "Id", Op = FilterOp.In, Value = new[] { "A", "B" } };
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsTrue(text.Contains("\"field\":\"Id\""), text);
+            Assert.IsTrue(text.Contains("\"op\":\"in\""), text);
+            Assert.IsTrue(text.Contains("\"A\""), text);
+            Assert.IsFalse(text.Contains("EIMSNext.Core.Query.DynamicFilter"), text);
+        }
+
+        [TestMethod]
+        public void T27_FormatFilter_DegradesWhenEvaluationThrows()
+        {
+            var holder = new ThrowingHolder();
+            Expression<Func<TestAuditEntity, bool>> filter = x => x.Id == holder.CorpId;
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsFalse(string.IsNullOrEmpty(text));
+            Assert.IsTrue(text.Contains("ThrowingHolder.CorpId"), text);
+        }
+
+        [TestMethod]
+        public void T28_FormatFilter_CollectionIsCapped()
+        {
+            var idList = Enumerable.Range(1, 30).Select(x => $"ID-{x}").ToList();
+            Expression<Func<TestAuditEntity, bool>> filter = x => idList.Contains(x.Id);
+
+            var text = AuditLogFilterFormatter.Format(filter);
+
+            Assert.IsTrue(text.Contains("…（共 30 项）"), text);
+            Assert.IsFalse(text.Contains("ID-30"), text);
+        }
+
+        private sealed class Holder
+        {
+            public Holder Context => this;
+            public string CorpId => "corp-1";
+        }
+
+        private sealed class ThrowingHolder
+        {
+            public string CorpId => throw new InvalidOperationException();
         }
 
         private sealed class TestAuditEntity : CorpEntityBase
         {
-            public string? A { get; set; }
-            public string? B { get; set; }
-            public string? C { get; set; }
-            public string? D { get; set; }
+            public string? Name { get; set; }
+            public int Count { get; set; }
+            public bool Enabled { get; set; }
         }
-
-        private sealed class TestEntityService<T> : EntityServiceBaseCore<T> where T : class, IEntityKey
-        {
-            public TestEntityService(IResolver resolver) : base(resolver) { }
-        }
-
-        private sealed class TestResolver(IReadOnlyDictionary<Type, object> services) : IResolver
-        {
-            public CompositionContainer MefContainer => throw new NotSupportedException();
-            public object Resolve(Type type, string? name = null) => services[type];
-            public T Resolve<T>(string? name = null) where T : class => (T)services[typeof(T)];
-            public T GetExport<T>(string? name = null) where T : class => Resolve<T>(name);
-            public object GetExport(Type type, string? name = null) => Resolve(type, name);
-            public IEnumerable<T> GetExports<T>(string? name = null) where T : class => [Resolve<T>(name)];
-            public IEnumerable<object> GetExports(Type type, string? name = null) => [Resolve(type, name)];
-        }
-
-        private sealed class FakeServiceContext : IServiceContext
-        {
-            public string AccessToken { get; set; } = string.Empty;
-            public string CorpId { get; set; } = string.Empty;
-            public Operator? Operator { get; set; }
-            public string UserId { get; set; } = string.Empty;
-            public IUser? User { get; set; }
-            public IEmployee? Employee { get; set; }
-            public string? ClientIp { get; set; }
-            public DataAction Action { get; set; }
-            public EfChainContext? Chain { get; set; }
-            public IScopeCache ScopeCache { get; set; } = new FakeScopeCache();
-        }
-
-        private sealed class FakeScopeCache : IScopeCache
-        {
-            public IEnumerable<T> GetAll<T>(DataVersion version = DataVersion.Temp) where T : class => [];
-            public T? Get<T>(string key, DataVersion version = DataVersion.Temp, Func<string, T?>? getter = null) where T : class => null;
-            public void Set<T>(string key, T value, DataVersion version = DataVersion.Temp) where T : class { }
-            public void Remove<T>(string key, DataVersion version = DataVersion.Temp) where T : class { }
-            public bool Contains<T>(string key, DataVersion version = DataVersion.Temp) where T : class => false;
-        }
-
-        private sealed class FakeCacheClient : ICacheClient
-        {
-            public string? GetString(string key, CacheScope scope, string scopeId = "") => null;
-            public Task<string?> GetStringAsync(string key, CacheScope scope, string scopeId = "") => Task.FromResult<string?>(null);
-            public T? Get<T>(string key, CacheScope scope, string scopeId = "") => default;
-            public Task<T?> GetAsync<T>(string key, CacheScope scope, string scopeId = "") => Task.FromResult<T?>(default);
-            public void SetString(string key, string value, CacheScope scope, string scopeId = "", DistributedCacheEntryOptions? options = null) { }
-            public Task SetStringAsync(string key, string value, CacheScope scope, string scopeId = "", DistributedCacheEntryOptions? options = null) => Task.CompletedTask;
-            public void Set<T>(string key, T value, CacheScope scope, string scopeId = "", DistributedCacheEntryOptions? options = null) { }
-            public Task SetAsync<T>(string key, T value, CacheScope scope, string scopeId = "", DistributedCacheEntryOptions? options = null) => Task.CompletedTask;
-            public void Refresh(string key, CacheScope scope, string scopeId = "") { }
-            public Task RefreshAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
-            public void Remove(string key, CacheScope scope, string scopeId = "") { }
-            public Task RemoveAsync(string key, CacheScope scope, string scopeId = "") => Task.CompletedTask;
-            public long Increment(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => 0;
-            public Task<long> IncrementAsync(string key, long delta, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(0L);
-            public Task<bool> TrySetStringAsync(string key, string value, TimeSpan ttl, CacheScope scope, string scopeId = "") => Task.FromResult(true);
-        }
-
-        // 最小桩：仅让 ServiceCore 构造成功；任何实际方法被调用都抛异常（GetChangeDetail 不触发）。
-        // 复用共享的 StubRepository<T>（见 StubRepository.cs）。
     }
 }
+
+#pragma warning restore EF1001

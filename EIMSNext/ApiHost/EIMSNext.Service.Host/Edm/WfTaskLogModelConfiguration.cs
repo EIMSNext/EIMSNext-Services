@@ -9,7 +9,7 @@ namespace EIMSNext.API.EdmModelConfiguration
     /// <summary>
     /// 
     /// </summary>
-    public class WfTaskLogModelConfiguration : CorpModelConfigurationBase<Wf_TaskLog>
+    public class WfTaskLogModelConfiguration : LogModelConfigurationBase<Wf_TaskLog>
     {
         protected override void ConfigureEntitySet(ODataModelBuilder builder)
         {

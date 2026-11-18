@@ -6,7 +6,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 工作流执行日志实体
     /// </summary>
-    public class Wf_ExecLog : KeyedEntityBase
+    public class Wf_ExecLog : LogEntityBase
     {
         /// <summary>
         /// 工作流实例ID
@@ -36,5 +36,17 @@ namespace EIMSNext.Entities
         /// 执行时间（Unix 毫秒时间戳，节点执行完成时刻）
         /// </summary>
         public long ExecTime { get; set; }
+        /// <summary>
+        /// 节点名称
+        /// </summary>
+        public string NodeName { get; set; } = string.Empty;
+        /// <summary>
+        /// 节点类型
+        /// </summary>
+        public WfNodeType NodeType { get; set; }
+        /// <summary>
+        /// 审批轮次
+        /// </summary>
+        public int Round { get; set; }
     }
 }

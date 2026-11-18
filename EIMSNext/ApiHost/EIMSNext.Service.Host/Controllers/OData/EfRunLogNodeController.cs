@@ -27,8 +27,8 @@ namespace EIMSNext.Service.Host.Controllers.OData
 	{
         // 业务侧通常通过 OData $filter=RunLogId eq 'xxx' 限定到单次运行；AppId 隔离由
         // EfRunLogApiService.GetRunDetailAsync 中 EnsureCanManageEventFlow / EnsureCanManageApp 守住。
-        // 此处仅依赖 base.FilterResult（FilterByCorpId + FilterByDeleted）做企业隔离，
-        // 不再预过滤 AppId/RunLogId，避免 ToList 内存物化。
+        // 此处仅依赖 base.FilterResult（FilterByCorpId）做企业隔离；日志实体不实现 IDeleteFlag，
+        // FilterByDeleted 会自动跳过。不再预过滤 AppId/RunLogId，避免 ToList 内存物化。
 	}
 }
 

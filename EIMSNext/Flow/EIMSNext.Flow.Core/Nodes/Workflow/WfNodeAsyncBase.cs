@@ -327,7 +327,24 @@ namespace EIMSNext.Flow.Core.Nodes
             Wf_ExecLog? execLog = null;
             try
             {
-                execLog = new Wf_ExecLog() { Id = approveData.ExecLogId, DataId = dataContext.DataId, WfInstanceId = wfInst.Id, EmpId = approveData.WorkerId, NodeId = wfStep.Id, ExecTime = DateTime.UtcNow.ToTimeStampMs(), ErrMsg = errMsg, Success = string.IsNullOrEmpty(errMsg) };
+                var now = DateTime.UtcNow.ToTimeStampMs();
+                execLog = new Wf_ExecLog()
+                {
+                    Id = approveData.ExecLogId,
+                    CorpId = dataContext.CorpId,
+                    CreateBy = new Operator(approveData.WorkerId, approveData.WorkerCode, approveData.WorkerName),
+                    CreateTime = now,
+                    DataId = dataContext.DataId,
+                    WfInstanceId = wfInst.Id,
+                    EmpId = approveData.WorkerId,
+                    NodeId = wfStep.Id,
+                    NodeName = wfStep.Name,
+                    NodeType = wfStep.NodeType,
+                    Round = dataContext.Round,
+                    ExecTime = now,
+                    ErrMsg = errMsg,
+                    Success = string.IsNullOrEmpty(errMsg)
+                };
                 ExecLogRepository.Insert(execLog);
             }
             catch (Exception ex)    //写日志失败不影响整个审批流程

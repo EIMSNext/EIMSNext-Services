@@ -262,9 +262,9 @@ namespace EIMSNext.Flow.Core.Nodes
                     NodeId = wfStep.Id,
                     NodeName = wfStep.Name,
                     NodeType = wfStep.NodeType,
+                    CreateTime = startedAt,
                     StartTime = startedAt,
                     EndTime = finishedAt,
-                    ExecTime = finishedAt,
                     ErrMsg = errMsg,
                     FailureReason = failureReason,
                     TroubleshootingSuggestion = troubleshootingSuggestion,
@@ -284,11 +284,6 @@ namespace EIMSNext.Flow.Core.Nodes
                     runLogNode.Id = existed.Id;
                     runLogNode.CreateBy = existed.CreateBy;
                     runLogNode.CreateTime = existed.CreateTime;
-                    runLogNode.UpdateBy = existed.UpdateBy;
-                    runLogNode.UpdateTime = existed.UpdateTime;
-                    runLogNode.DeleteFlag = existed.DeleteFlag;
-                    runLogNode.DeleteBy = existed.DeleteBy;
-                    runLogNode.DeleteTime = existed.DeleteTime;
                     runLogNode.CorpId = existed.CorpId;
                     await RunLogNodeRepository.ReplaceAsync(runLogNode);
                 }

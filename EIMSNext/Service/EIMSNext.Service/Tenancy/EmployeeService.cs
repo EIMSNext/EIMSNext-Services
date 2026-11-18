@@ -140,7 +140,11 @@ namespace EIMSNext.Service
                             action: DbAction.Delete,
                             entityType: nameof(CorpOnboardingRequest),
                             dataId: request.Id,
-                            detail: $"拒绝【{request.ApplicantName}】的加入企业申请",
+                            detail: AuditLogChangeBuilder.Serialize(
+                            [
+                                new AuditLogChange { Field = "applicantName", Type = "input", Label = "申请人", Old = request.ApplicantName, New = null },
+                                new AuditLogChange { Field = "status", Type = "input", Label = "审批状态", Old = "待审核", New = "已拒绝" },
+                            ]),
                             now: reviewedTime, op: op, ip: ip, currentCorpId: currentCorpId));
                         continue;
                     }
@@ -162,7 +166,11 @@ namespace EIMSNext.Service
                         action: DbAction.Update,
                         entityType: nameof(CorpOnboardingRequest),
                         dataId: request.Id,
-                        detail: $"审批通过【{request.ApplicantName}】的加入企业申请",
+                        detail: AuditLogChangeBuilder.Serialize(
+                        [
+                            new AuditLogChange { Field = "applicantName", Type = "input", Label = "申请人", Old = null, New = request.ApplicantName },
+                            new AuditLogChange { Field = "status", Type = "input", Label = "审批状态", Old = "待审核", New = "已通过" },
+                        ]),
                         now: reviewedTime, op: op, ip: ip, currentCorpId: currentCorpId));
                 }
                 committedAuditLogs = auditLogs;
@@ -191,9 +199,7 @@ namespace EIMSNext.Service
                     DataId = dataId,
                     Detail = detail,
                     CreateBy = op,
-                    UpdateBy = op,
                     CreateTime = now,
-                    UpdateTime = now,
                     ClientIp = ip,
                     CorpId = currentCorpId,
             };

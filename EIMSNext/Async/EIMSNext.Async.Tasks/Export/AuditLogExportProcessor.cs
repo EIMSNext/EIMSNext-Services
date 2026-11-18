@@ -7,6 +7,7 @@ using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 using EIMSNext.Core.Repositories;
 using EIMSNext.Core.Query;
+using EIMSNext.Core.Services;
 using EIMSNext.Core.Services.Extensions;
 using EIMSNext.Entities;
 using EIMSNext.Mef;
@@ -51,15 +52,47 @@ namespace EIMSNext.Async.Tasks.Export
             return result;
         }
 
+        private static readonly Dictionary<string, string> EntityLabels = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ["FormData"] = "表单数据",
+            ["FormDef"] = "表单定义",
+            ["AppDef"] = "应用",
+            ["Wf_Definition"] = "流程定义",
+            ["Wf_Task"] = "流程任务",
+            ["PrintDef"] = "打印模板",
+            ["WorkbenchRecentVisit"] = "最近访问",
+            ["WorkbenchConfig"] = "工作台配置",
+            ["DashboardDef"] = "仪表盘",
+            ["DashboardItemDef"] = "仪表盘组件",
+            ["ExportLog"] = "导出任务",
+            ["Corporate"] = "企业",
+            ["CorporateSetting"] = "企业设置",
+            ["CorpOnboardingRequest"] = "加入企业申请",
+        };
+
+        private static string DisplayAction(DbAction action) => action switch
+        {
+            DbAction.Insert => "新增",
+            DbAction.Update => "修改",
+            DbAction.Delete => "删除",
+            DbAction.PhysicalDelete => "物理删除",
+            _ => action.ToString(),
+        };
+
+        private static string DisplayEntity(string? entityType)
+            => string.IsNullOrWhiteSpace(entityType) ? "-"
+                : EntityLabels.TryGetValue(entityType, out var label) ? label : entityType;
+
         internal static ExportFileBuilder.ExportCellValue GetCellValue(ExportColumn column, AuditLog row)
         {
             return column.Key switch
             {
                 "operatorName" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.CreateBy?.Label ?? "-") },
                 "createTime" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.Date, DateTime = ExportFileBuilder.ToLocalDateTime(row.CreateTime) },
-                "action" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.Action.ToString()) },
-                "entityType" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.EntityType ?? "-") },
-                "detail" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.Detail ?? "-") },
+                "action" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(DisplayAction(row.Action)) },
+                "entityType" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(DisplayEntity(row.EntityType)) },
+                "detail" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(AuditLogChangeBuilder.FormatForExport(row.Detail, row.Action)) },
+                "dataFilter" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.DataFilter ?? "-") },
                 "clientIp" => new ExportFileBuilder.ExportCellValue { Type = ExportColumnType.String, Text = ExportFileBuilder.SanitizeForExcel(row.ClientIp ?? "-") },
                 _ => new ExportFileBuilder.ExportCellValue(),
             };
@@ -90,7 +123,7 @@ namespace EIMSNext.Async.Tasks.Export
 
         private static Expression<Func<AuditLog, bool>> BuildFilter(string corpId, AuditLogExportRequest request)
         {
-            Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
+            Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId;
 
             if (!string.IsNullOrWhiteSpace(request.EntityType))
             {

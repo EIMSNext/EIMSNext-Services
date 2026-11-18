@@ -107,17 +107,9 @@ CREATE TABLE "AuditLog" (
     "EntityType" citext,
     "DataId" citext COLLATE "C",
     "Detail" citext,
-    "OldData" citext,
-    "NewData" citext,
     "DataFilter" citext,
-    "UpdateExp" citext,
     "ClientIp" citext,
     "CreateBy" jsonb,
-    "UpdateBy" jsonb,
-    "UpdateTime" bigint,
-    "DeleteFlag" boolean not null default false,
-    "DeleteBy" jsonb,
-    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_AuditLog" PRIMARY KEY ("Id", "CreateTime")
 ) partition by range ("CreateTime");
@@ -396,14 +388,9 @@ CREATE TABLE "Ef_RunLog" (
     "ErrMsg" citext not null default '',
     "RetryContextJson" citext not null default '',
     "RetryInProgress" boolean not null default false,
-    "RetryAttemptId" citext not null default '',
+    "RetryAttemptId" citext COLLATE "C" not null default '',
     "RetryLeaseUntil" bigint,
     "CreateBy" jsonb,
-    "UpdateBy" jsonb,
-    "UpdateTime" bigint,
-    "DeleteFlag" boolean not null default false,
-    "DeleteBy" jsonb,
-    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Ef_RunLog" PRIMARY KEY ("Id", "CreateTime")
 ) partition by range ("CreateTime");
@@ -452,13 +439,7 @@ CREATE TABLE "Ef_RunLogNode" (
     "FailureReason" citext not null default '',
     "TroubleshootingSuggestion" citext not null default '',
     "Summary" citext not null default '',
-    "ExecTime" bigint not null default 0,
     "CreateBy" jsonb,
-    "UpdateBy" jsonb,
-    "UpdateTime" bigint,
-    "DeleteFlag" boolean not null default false,
-    "DeleteBy" jsonb,
-    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Ef_RunLogNode" PRIMARY KEY ("Id", "CreateTime")
 ) partition by range ("CreateTime");
@@ -1133,13 +1114,9 @@ CREATE TABLE "IdentityLoginAudit" (
     "UserName" citext,
     "ClientIp" citext,
     "FailReason" citext,
+    "Success" boolean not null,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
-    "UpdateBy" jsonb,
-    "UpdateTime" bigint,
-    "DeleteFlag" boolean not null default false,
-    "DeleteBy" jsonb,
-    "DeleteTime" bigint,
     "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_IdentityLoginAudit" PRIMARY KEY ("Id")
 );
@@ -1587,6 +1564,12 @@ CREATE TABLE "Wf_ExecLog" (
     "Success" boolean not null default false,
     "ErrMsg" citext not null default '',
     "ExecTime" bigint not null default 0,
+    "NodeName" citext not null default '',
+    "NodeType" integer not null default 0,
+    "Round" integer not null default 0,
+    "CreateBy" jsonb,
+    "CreateTime" bigint not null default 0,
+    "CorpId" citext COLLATE "C",
     CONSTRAINT "PK_Wf_ExecLog" PRIMARY KEY ("Id")
 );
 
@@ -1640,11 +1623,6 @@ CREATE TABLE "Wf_TaskLog" (
     "DataBrief" jsonb not null,
     "CreateBy" jsonb,
     "CreateTime" bigint not null default 0,
-    "UpdateBy" jsonb,
-    "UpdateTime" bigint,
-    "DeleteFlag" boolean not null default false,
-    "DeleteBy" jsonb,
-    "DeleteTime" bigint,
     CONSTRAINT "PK_Wf_TaskLog" PRIMARY KEY ("CorpId", "Id")
 ) partition by hash ("CorpId");
 

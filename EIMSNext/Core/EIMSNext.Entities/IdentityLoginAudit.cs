@@ -6,7 +6,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 登录日志
     /// </summary>
-    public class IdentityLoginAudit : CorpEntityBase
+    public class IdentityLoginAudit : LogEntityBase
     {
         /// <summary>
         /// 登录账号名，可能是电话号码，邮箱或第三方OpenId
@@ -33,8 +33,12 @@ namespace EIMSNext.Entities
         /// </summary>
         public string? ClientIp { get; set; }
         /// <summary>
-        /// 失败原因， 为空时表示成功
+        /// 失败原因
         /// </summary>
         public string? FailReason { get; set; }
+        /// <summary>
+        /// 是否登录成功
+        /// </summary>
+        public bool Success { get; set; }
     }
 }

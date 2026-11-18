@@ -6,7 +6,7 @@ namespace EIMSNext.Entities
     /// <summary>
     /// 数据流单次运行中单个节点的执行记录（隶属于某次 Ef_RunLog）。
     /// </summary>
-    public class Ef_RunLogNode : CorpEntityBase
+    public class Ef_RunLogNode : LogEntityBase
     {
         /// <summary>
         /// 隶属的运行日志ID。
@@ -64,9 +64,5 @@ namespace EIMSNext.Entities
         /// 执行摘要
         /// </summary>
         public string Summary { get; set; } = string.Empty;
-        /// <summary>
-        /// 执行时间（Unix 毫秒时间戳，节点执行完成时刻）
-        /// </summary>
-        public long ExecTime { get; set; }
     }
 }

@@ -172,7 +172,7 @@ namespace EIMSNext.Flow.Host.Controllers
 
             var runLogRepository = Resolver.GetRepository<Ef_RunLog>();
             var runLog = runLogRepository.Get(request.RunLogId!);
-            if (runLog == null || runLog.DeleteFlag || !string.Equals(runLog.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase))
+            if (runLog == null || !string.Equals(runLog.CorpId, IdentityContext.CurrentCorpId, StringComparison.OrdinalIgnoreCase))
             {
                 return NotFound("运行日志不存在");
             }
@@ -219,8 +219,7 @@ namespace EIMSNext.Flow.Host.Controllers
                         setters => setters
                             .SetProperty(x => x.Success, true)
                             .SetProperty(x => x.ErrMsg, noFailedPointerReason)
-                            .SetProperty(x => x.EndTime, completedAt)
-                            .SetProperty(x => x.UpdateTime, completedAt));
+                            .SetProperty(x => x.EndTime, completedAt));
 
                     var nodeLogRepository = Resolver.GetRepository<Ef_RunLogNode>();
                     var failedNodeLog = nodeLogRepository.Find(x =>
@@ -236,8 +235,7 @@ namespace EIMSNext.Flow.Host.Controllers
                             .SetProperty(x => x.ErrMsg, noFailedPointerReason)
                             .SetProperty(x => x.FailureReason, noFailedPointerReason)
                             .SetProperty(x => x.Summary, noFailedPointerReason)
-                            .SetProperty(x => x.EndTime, completedAt)
-                            .SetProperty(x => x.ExecTime, completedAt));
+                            .SetProperty(x => x.EndTime, completedAt));
                     }
 
                     return ApiResult.Success(new { Id = instance.Id, Error = string.Empty }).ToActionResult();
@@ -288,8 +286,7 @@ namespace EIMSNext.Flow.Host.Controllers
                         setters => setters
                             .SetProperty(x => x.Success, instance.Status == WorkflowStatus.Complete && executionResult.Errors.Count == 0)
                             .SetProperty(x => x.ErrMsg, error)
-                            .SetProperty(x => x.EndTime, completedAt)
-                            .SetProperty(x => x.UpdateTime, completedAt));
+                            .SetProperty(x => x.EndTime, completedAt));
                     return ApiResult.Success(new { Id = instance.Id, Error = error }).ToActionResult();
                 }
                 catch (Exception ex)
@@ -300,8 +297,7 @@ namespace EIMSNext.Flow.Host.Controllers
                         setters => setters
                             .SetProperty(x => x.Success, false)
                             .SetProperty(x => x.ErrMsg, ex.Message)
-                            .SetProperty(x => x.EndTime, failedAt)
-                            .SetProperty(x => x.UpdateTime, failedAt));
+                            .SetProperty(x => x.EndTime, failedAt));
                     throw;
                 }
             }
@@ -319,8 +315,7 @@ namespace EIMSNext.Flow.Host.Controllers
                             setters => setters
                                 .SetProperty(x => x.RetryInProgress, false)
                                 .SetProperty(x => x.RetryLeaseUntil, (long?)null)
-                                .SetProperty(x => x.RetryAttemptId, string.Empty)
-                                .SetProperty(x => x.UpdateTime, now));
+                                .SetProperty(x => x.RetryAttemptId, string.Empty));
                     }
                     catch (Exception cleanupException)
                     {

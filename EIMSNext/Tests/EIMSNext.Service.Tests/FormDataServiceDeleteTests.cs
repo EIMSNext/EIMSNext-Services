@@ -44,12 +44,14 @@ namespace EIMSNext.Service.Tests
             Assert.AreEqual(0, service.LogicDeletedIds.Count);
 
             var physicalDeleteLog = AssertHasSinglePhysicalDeleteLog(service, data.Id);
-            Assert.IsNotNull(physicalDeleteLog.OldData);
-            using var oldData = JsonDocument.Parse(physicalDeleteLog.OldData);
-            Assert.AreEqual(data.Id, GetString(oldData.RootElement, "id"));
-            Assert.AreEqual("app-1", GetString(oldData.RootElement, "appId"));
-            Assert.AreEqual("form-1", GetString(oldData.RootElement, "formId"));
-            Assert.AreEqual("Draft Title", GetString(GetProperty(oldData.RootElement, "data"), "title"));
+            // V2 契约：物理删除改写结构化 Detail 摘要（全量对象列已移除）
+            Assert.IsNotNull(physicalDeleteLog.Detail);
+            using var detail = JsonDocument.Parse(physicalDeleteLog.Detail!);
+            Assert.AreEqual(1, detail.RootElement.GetArrayLength());
+            var titleChange = detail.RootElement[0];
+            Assert.AreEqual("title", GetString(titleChange, "field"));
+            Assert.AreEqual("Draft Title", GetString(titleChange, "old"));
+            Assert.AreEqual(JsonValueKind.Null, titleChange.GetProperty("new").ValueKind);
         }
 
         [TestMethod]

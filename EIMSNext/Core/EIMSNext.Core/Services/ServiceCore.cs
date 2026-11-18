@@ -1,7 +1,4 @@
 ﻿using System.Linq.Expressions;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using EIMSNext.Cache;
 using EIMSNext.Common;
 using EIMSNext.Common.Extensions;
@@ -156,13 +153,13 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 记录审计日志（同步版，仅用于同步写路径，内部阻塞真实 DB 写入）。
         /// </summary>
-        protected virtual void CreateAuditLog(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
-            => CreateAuditLogAsync(action, oldData, newData, dataFilter, update).GetAwaiter().GetResult();
+        protected virtual void CreateAuditLog(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? batchChanges = null)
+            => CreateAuditLogAsync(action, oldData, newData, dataFilter, batchChanges).GetAwaiter().GetResult();
 
         /// <summary>
         /// 记录审计日志（异步版，写路径应优先使用以释放请求线程）。
         /// </summary>
-        protected virtual async Task CreateAuditLogAsync(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
+        protected virtual async Task CreateAuditLogAsync(DbAction action, IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? batchChanges = null)
         {
             if (!LogAudit) return;
 
@@ -173,7 +170,7 @@ namespace EIMSNext.Core.Services
             }
             else if (action == DbAction.Update)
             {
-                logList = CreateUpdateLog(oldData, newData, dataFilter, update);
+                logList = CreateUpdateLog(oldData, newData, dataFilter, batchChanges);
             }
             else if (action == DbAction.Delete)
             {
@@ -221,12 +218,9 @@ namespace EIMSNext.Core.Services
                 Action = DbAction.Insert,
                 EntityType = typeof(T).Name,
                 DataId = x.Id,
-                Detail = "新增数据:", //TODO:考虑显示一两个主字段？
-                NewData = x.SerializeToJson(),
+                Detail = AuditLogChangeBuilder.BuildSummary(x, true),
                 CreateBy = op,
-                UpdateBy = op,
                 CreateTime = now,
-                UpdateTime = now,
                 ClientIp = ip,
                 CorpId = corpId,
             }));
@@ -237,7 +231,7 @@ namespace EIMSNext.Core.Services
         /// 根据更新前后的数据构建更新审计日志。
         /// </summary>
         /// <returns>更新审计日志列表。</returns>
-        protected virtual List<AuditLog> CreateUpdateLog(IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? update = null)
+        protected virtual List<AuditLog> CreateUpdateLog(IEnumerable<T>? oldData, IEnumerable<T>? newData, string? dataFilter = null, string? batchChanges = null)
         {
             var logList = new List<AuditLog>();
             var now = DateTime.UtcNow.ToTimeStampMs();
@@ -251,12 +245,10 @@ namespace EIMSNext.Core.Services
                 {
                     Action = DbAction.Update,
                     EntityType = typeof(T).Name,
-                    Detail = $"批量更新数据(无旧对象):{dataFilter}",
-                    DataFilter = dataFilter,
+                    Detail = batchChanges ?? AuditLogChangeBuilder.EmptyChanges,
+                    DataFilter = AuditLogChangeBuilder.LimitFilter(dataFilter),
                     CreateBy = op,
-                    UpdateBy = op,
                     CreateTime = now,
-                    UpdateTime = now,
                     ClientIp = ip,
                     CorpId = corpId,
                 });
@@ -273,13 +265,9 @@ namespace EIMSNext.Core.Services
                             Action = DbAction.Update,
                             EntityType = typeof(T).Name,
                             DataId = x.Id,
-                            Detail = GetChangeDetail(x, y),
-                            OldData = x.SerializeToJson(),
-                            NewData = y.SerializeToJson(),
+                            Detail = AuditLogChangeBuilder.BuildChanges(x, y),
                             CreateBy = op,
-                            UpdateBy = op,
                             CreateTime = now,
-                            UpdateTime = now,
                             ClientIp = ip,
                             CorpId = corpId,
                         });
@@ -308,12 +296,10 @@ namespace EIMSNext.Core.Services
                 {
                     Action = DbAction.Delete,
                     EntityType = typeof(T).Name,
-                    Detail = "批量删除数据:",
-                    DataFilter = dataFilter,
+                    Detail = AuditLogChangeBuilder.EmptyChanges,
+                    DataFilter = AuditLogChangeBuilder.LimitFilter(dataFilter),
                     CreateBy = op,
-                    UpdateBy = op,
                     CreateTime = now,
-                    UpdateTime = now,
                     ClientIp = ip,
                     CorpId = corpId,
                 });
@@ -326,12 +312,9 @@ namespace EIMSNext.Core.Services
                     Action = DbAction.Delete,
                     EntityType = typeof(T).Name,
                     DataId = x.Id,
-                    Detail = "删除数据:", //TODO:考虑显示一两个主字段？
-                    OldData = x.SerializeToJson(),
+                    Detail = AuditLogChangeBuilder.BuildSummary(x, false),
                     CreateBy = op,
-                    UpdateBy = op,
                     CreateTime = now,
-                    UpdateTime = now,
                     ClientIp = ip,
                     CorpId = corpId,
                 }));
@@ -457,7 +440,7 @@ namespace EIMSNext.Core.Services
         {
             BeforeUpdate(filter, setters).GetAwaiter().GetResult();
             var result = Repository.UpdateManyAsync(filter, setters).GetAwaiter().GetResult();
-            CreateAuditLog(DbAction.Update, null, null, filter.ToString());
+            CreateAuditLog(DbAction.Update, null, null, AuditLogFilterFormatter.Format(filter), AuditLogSettersReader.Build(setters));
             AfterUpdate(filter, setters).GetAwaiter().GetResult();
             return result;
         }
@@ -465,7 +448,7 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 根据过滤谓词删除实体（支持逻辑删除）。
         /// </summary>
-        protected virtual int DeleteCore(Expression<Func<T, bool>> filter)
+        protected virtual int DeleteCore(Expression<Func<T, bool>> filter, T? knownEntity = null)
         {
             BeforeDelete(filter).GetAwaiter().GetResult();
             int result;
@@ -479,7 +462,7 @@ namespace EIMSNext.Core.Services
                 result = Repository.DeleteManyAsync(filter).GetAwaiter().GetResult();
             }
 
-            CreateAuditLog(DbAction.Delete, null, null, filter.ToString());
+            CreateAuditLog(DbAction.Delete, knownEntity is null ? null : [knownEntity], null, AuditLogFilterFormatter.Format(filter));
             AfterDelete(filter).GetAwaiter().GetResult();
             return result;
         }
@@ -502,46 +485,9 @@ namespace EIMSNext.Core.Services
                 result = Repository.DeleteManyAsync(predicate).GetAwaiter().GetResult();
             }
 
-            CreateAuditLog(DbAction.Delete, null, null, filter.ToString());
+            CreateAuditLog(DbAction.Delete, null, null, AuditLogFilterFormatter.Format(filter));
             AfterDelete(predicate).GetAwaiter().GetResult();
             return result;
-        }
-
-        private static string GetChangeDetail(T oldT, T newT)
-        {
-            JsonObject? oldJson = null;
-            JsonObject? newJson = null;
-            try { oldJson = JsonNode.Parse(oldT.SerializeToJson())?.AsObject(); } catch { }
-            try { newJson = JsonNode.Parse(newT.SerializeToJson())?.AsObject(); } catch { }
-
-            if (oldJson == null || newJson == null)
-            {
-                return string.Empty;
-            }
-
-            var builder = new StringBuilder();
-            var keys = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var kv in oldJson) keys.Add(kv.Key);
-            foreach (var kv in newJson) keys.Add(kv.Key);
-
-            foreach (var key in keys)
-            {
-                bool hasOld = oldJson.TryGetPropertyValue(key, out var oldNode);
-                bool hasNew = newJson.TryGetPropertyValue(key, out var newNode);
-
-                // 双侧存在且 deep-equal → 跳过未变更字段
-                if (hasOld && hasNew && JsonNode.DeepEquals(oldNode, newNode))
-                {
-                    continue;
-                }
-
-                var oldStr = hasOld ? (oldNode?.ToJsonString() ?? "null") : "null";
-                var newStr = hasNew ? (newNode?.ToJsonString() ?? "null") : "null";
-                builder.Append($"{key}:{oldStr}->{newStr},");
-            }
-
-            if (builder.Length > 0) builder.Remove(builder.Length - 1, 1);
-            return builder.ToString();
         }
 
         /// <summary>
@@ -645,7 +591,7 @@ namespace EIMSNext.Core.Services
         {
             await BeforeUpdate(filter, setters).ConfigureAwait(false);
             var result = await Repository.UpdateManyAsync(filter, setters).ConfigureAwait(false);
-            await CreateAuditLogAsync(DbAction.Update, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Update, null, null, AuditLogFilterFormatter.Format(filter), AuditLogSettersReader.Build(setters));
             await AfterUpdate(filter, setters).ConfigureAwait(false);
             return result;
         }
@@ -653,7 +599,7 @@ namespace EIMSNext.Core.Services
         /// <summary>
         /// 异步根据过滤谓词删除实体（支持逻辑删除）。
         /// </summary>
-        protected virtual async Task<int> DeleteCoreAsync(Expression<Func<T, bool>> filter)
+        protected virtual async Task<int> DeleteCoreAsync(Expression<Func<T, bool>> filter, T? knownEntity = null)
         {
             await BeforeDelete(filter).ConfigureAwait(false);
             int result;
@@ -667,7 +613,7 @@ namespace EIMSNext.Core.Services
                 result = await Repository.DeleteManyAsync(filter).ConfigureAwait(false);
             }
 
-            await CreateAuditLogAsync(DbAction.Delete, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Delete, knownEntity is null ? null : [knownEntity], null, AuditLogFilterFormatter.Format(filter));
             await AfterDelete(filter).ConfigureAwait(false);
             return result;
         }
@@ -690,7 +636,7 @@ namespace EIMSNext.Core.Services
                 result = await Repository.DeleteManyAsync(predicate).ConfigureAwait(false);
             }
 
-            await CreateAuditLogAsync(DbAction.Delete, null, null, filter.ToString());
+            await CreateAuditLogAsync(DbAction.Delete, null, null, AuditLogFilterFormatter.Format(filter));
             await AfterDelete(predicate).ConfigureAwait(false);
             return result;
         }

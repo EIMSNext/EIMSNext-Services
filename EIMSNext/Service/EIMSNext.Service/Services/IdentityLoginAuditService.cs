@@ -5,7 +5,7 @@ using HKH.Mef2.Integration;
 
 namespace EIMSNext.Service
 {
-	public class IdentityLoginAuditService(IResolver resolver) : EntityServiceBase<IdentityLoginAudit>(resolver), IIdentityLoginAuditService
+	public class IdentityLoginAuditService(IResolver resolver) : EntityServiceBaseCore<IdentityLoginAudit>(resolver), IIdentityLoginAuditService
 	{
 	}
 }

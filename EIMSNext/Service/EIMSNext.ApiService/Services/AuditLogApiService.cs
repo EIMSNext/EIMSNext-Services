@@ -31,6 +31,7 @@ namespace EIMSNext.ApiService
 			["action"] = ExportColumnType.String,
 			["entityType"] = ExportColumnType.String,
 			["detail"] = ExportColumnType.String,
+			["dataFilter"] = ExportColumnType.String,
 			["clientIp"] = ExportColumnType.String,
 		};
 
@@ -109,7 +110,7 @@ namespace EIMSNext.ApiService
 		private Expression<Func<AuditLog, bool>> BuildAuditLogFilter(AuditLogExportRequest request)
 		{
 			var corpId = IdentityContext.CurrentCorpId;
-			Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId && !x.DeleteFlag;
+			Expression<Func<AuditLog, bool>> filter = x => x.CorpId == corpId;
 
 			if (!string.IsNullOrWhiteSpace(request.EntityType))
 			{
