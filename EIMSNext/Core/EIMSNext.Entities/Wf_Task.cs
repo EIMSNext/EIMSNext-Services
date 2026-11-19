@@ -1,5 +1,6 @@
 ﻿using System.Text.Json;
 using System.Text.Json.Serialization;
+using EIMSNext.Common;
 using EIMSNext.Core.Abstractions;
 using EIMSNext.Core.Entities;
 
@@ -88,20 +89,52 @@ namespace EIMSNext.Entities
         public string? Value { get; set; }
 
         /// <summary>
+        /// 从表单字段定义与动态数据生成数据摘要。
+        /// </summary>
+        /// <remarks>
+        /// dataselect 不进摘要：值为 {appId,formId,dataId,data} 对象快照，卡片展示冗长。
+        /// </remarks>
+        public static List<BriefField> FromData(IEnumerable<FieldDef>? items, Dictionary<string, object?>? data)
+        {
+            var brief = new List<BriefField>();
+            if (data is null) return brief;
+
+            foreach (var field in (items ?? []).Where(x => x.Type != FieldType.DataSelect).Take(6))
+            {
+                brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = ToBriefValue(field, data.GetValueOrDefault(field.Field)) });
+            }
+            return brief;
+        }
+
+        /// <summary>
         /// 把 FormData.Data 的动态值规整为摘要字符串。
         /// </summary>
         /// <remarks>
         /// 不能保留 object：OData 对 object 声明成员会写成
         /// <c>{ "value@odata.type": "#String", "value": "..." }</c> 包装，
         /// 前端（裸 HTTP+JSON）与通知模板都拿不到裸值。
+        /// employee1/employee2/department1/department2 取 label；其余复合形状退回 JSON 序列化（保持旧行为）。
         /// </remarks>
-        public static string? ToBriefValue(object? value) =>
-            value switch
+        public static string? ToBriefValue(FieldDef? field, object? value)
+        {
+            if (value is null) return null;
+            if (value is string s) return s;
+            if (value is Dictionary<string, object?> dict)
             {
-                null => null,
-                string s => s,
-                _ => JsonSerializer.Serialize(value),
-            };
+                if (dict.TryGetValue("label", out var label) && label is string text && !string.IsNullOrWhiteSpace(text))
+                    return text;
+                return JsonSerializer.Serialize(value);
+            }
+            if (value is List<object?> list)
+            {
+                var parts = list
+                    .Select(item => ToBriefValue(field, item))
+                    .Where(item => !string.IsNullOrEmpty(item))
+                    .ToList();
+                return parts.Count > 0 ? string.Join("、", parts) : JsonSerializer.Serialize(value);
+            }
+            return JsonSerializer.Serialize(value);
+        }
     }
 
     /// <summary>

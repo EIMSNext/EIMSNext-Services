@@ -367,25 +367,9 @@ namespace EIMSNext.Flow.Core.Nodes
         }
         protected List<BriefField> GetDataBrief(string formId, string dataId)
         {
-            var brief = new List<BriefField>();
-
             var form = GetFormDef(formId);
             var data = GetFormData(dataId);
-
-            if (form.Content.Items?.Count > 0)
-            {
-                var max = 6;
-                var i = 0;
-                foreach (var field in form.Content.Items)
-                {
-                    i++;
-                    if (i > max) break;
-
-                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = BriefField.ToBriefValue(data.Data.GetValueOrDefault(field.Field)) });
-                }
-            }
-
-            return brief;
+            return BriefField.FromData(form?.Content.Items, data?.Data);
         }
 
         protected async Task RunEventFlow(EfRunParameter paramter)

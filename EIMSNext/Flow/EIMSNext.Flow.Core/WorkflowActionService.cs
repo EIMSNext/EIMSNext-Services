@@ -739,17 +739,9 @@ namespace EIMSNext.Flow.Core
 
         private List<BriefField> GetDataBrief(string formId, string dataId)
         {
-            var brief = new List<BriefField>();
             var form = _formDefRepo.Get(formId);
             var data = _formDataRepo.Get(dataId);
-            if (form?.Content.Items?.Count > 0 && data != null)
-            {
-                foreach (var field in form.Content.Items.Take(6))
-                {
-                    brief.Add(new BriefField { Field = field.Field, Title = field.Title, Value = BriefField.ToBriefValue(data.Data.GetValueOrDefault(field.Field)) });
-                }
-            }
-            return brief;
+            return BriefField.FromData(form?.Content.Items, data?.Data);
         }
 
         private async Task UpdateFormStatus(string dataId, FlowStatus flowStatus)
